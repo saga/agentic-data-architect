@@ -3,6 +3,8 @@
  * 默认先 metadata，再 profile / targeted query；所有查询都做只读校验并限制结果量。
  */
 
+import type { SemanticAsset } from '../semantic/types.js';
+
 export interface DatabaseInfo { name: string; }
 /** 数据库 Schema 的最小描述，用于发现和过滤范围。 */
 export interface SchemaInfo { database?: string; name: string; }
@@ -12,6 +14,7 @@ export interface TableInfo {
   schema?: string;
   name: string;
   qualifiedName: string;
+  rowCountEstimate?: number;
 }
 /** 数据库列的基本结构信息。 */
 export interface ColumnInfo { name: string; dataType: string; nullable: boolean; }
@@ -39,6 +42,8 @@ export interface DatabaseAdapter {
   sample(table: string, limit: number): Promise<Record<string, unknown>[]>;
   profile(table: string, columns?: string[]): Promise<DataProfile>;
   query(sql: string): Promise<QueryResult>;
+  /** 可选的业务语义发现能力；不支持的适配器可以不实现。 */
+  listSemanticAssets?: (scope?: string) => Promise<SemanticAsset[]>;
 }
 /** 单列 profiling 结果，记录空值、distinct、范围和少量样本。 */
 export interface ColumnProfile {
