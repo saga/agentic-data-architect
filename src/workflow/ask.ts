@@ -4,6 +4,12 @@ import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
 import { saveConversationMessage, searchConversation } from '../investigation/conversation.js';
+import {
+  appendAuditEvent,
+  buildResearchConfigPrompt,
+  loadInvestigationControl,
+  toCopilotMcpServers,
+} from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -26,6 +32,14 @@ export async function answerQuestion(
     content: question,
   });
   const inv = await loadInvestigation(investigationName);
+  const control = await loadInvestigationControl(investigationName);
+  await appendAuditEvent(investigationName, {
+    actor: 'user',
+    action: 'investigation.question',
+    summary: 'Asked investigation question.',
+    configurationVersion: control.version,
+    details: { questionLength: question.length },
+  });
 
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
@@ -64,8 +78,10 @@ export async function answerQuestion(
   });
   const raw = await askCopilot({
     prompt,
-    systemPrompt: LEAD_SYSTEM_PROMPT,
+    systemPrompt: [LEAD_SYSTEM_PROMPT, control.agent.systemPrompt.content.trim()].filter(Boolean).join('\n\n'),
     workingDirectory: workspaceRoot(inv.name),
+    skills: control.agent.skills.map((item) => item.name),
+    mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
   });
   const parsed = parseAgentAnswer(raw, existingIds);
