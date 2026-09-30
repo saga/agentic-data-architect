@@ -32,6 +32,15 @@ test('stores conversation turns in sqlite and searches them with fts5', () => {
   assert.equal(hits.length, 1);
   assert.match(hits[0]?.content ?? '', /Security Master/);
 
+  saveConversationMessage({
+    sessionName,
+    role: 'assistant',
+    content: 'Position 的权威来源是 IBOR，Security Master 负责证券标识映射。',
+  });
+  const chineseHits = searchConversation(sessionName, '权威来源');
+  assert.equal(chineseHits.length, 1);
+  assert.match(chineseHits[0]?.content ?? '', /权威来源/);
+
   const summary = getConversationSummary(sessionName);
   assert.equal(summary.count, 2);
   assert.ok(summary.lastMessageAt);
