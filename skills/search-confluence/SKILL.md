@@ -1,3 +1,8 @@
+---
+name: search-confluence
+description: Research internal Confluence architecture, ADRs, business documentation, runbooks, processes, and constraints.
+---
+
 # Search Confluence
 
 用途：研究公司内部设计文档、业务说明、运行手册、ADR、流程说明和其它 Confluence 知识。
