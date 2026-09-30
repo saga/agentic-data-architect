@@ -1,3 +1,32 @@
+## 2026-09-30 — Web UI / Express 5 / Ant Design X
+
+### 为什么改
+
+readline 形式不适合作为长期 Data Investigation 工作台。真实使用需要会话列表、历史对话、富 Markdown、Mermaid、状态信息和后续文件/知识引用，因此主入口改为 Web UI。
+
+### 相关文件
+
+- `src/server.ts`：新增 Express 5 server，提供 session / message / report / shared API，并在开发环境挂 Vite middleware、生产环境直接服务 `web/dist`。
+- `src/config.ts`：增加 `PORT` / `HOST` / `NODE_ENV`。
+- `src/agent/copilot.ts`：增加可选 delta callback，为后续 X Chat streaming 保留接口。
+- `src/workflow/ask.ts`：Web 对话和 CLI 统一复用；记录 user/assistant transcript。
+- `web/index.html`：Vite HTML 入口。
+- `web/src/main.tsx`：React 入口。
+- `web/src/App.tsx`：Ant Design X Conversations / Bubble / Sender / Welcome，以及 Ant Design context panel。
+- `web/src/styles.css`：Workbench 布局。
+- `web/tsconfig.json`：前端独立 typecheck。
+- `vite.config.ts`：Vite + React 配置。
+- `.gitignore`：忽略 `.workspace/` 和 `web/dist/`。
+- `.github/workflows/ci.yml`：依赖增加后使用 `npm install`，再执行 audit / typecheck / test。
+- `README.md`：Web UI 成为主入口。
+
+### UI 取舍
+
+没有再引入一个独立 chat framework。直接使用 Ant Design X 原子组件；Markdown 使用官方 `@ant-design/x-markdown`，Mermaid 使用 Ant Design X 的 `Mermaid` 组件。
+
+当前消息 API 仍是一次请求返回最终答案，先保持后端 Agent result / evidence 逻辑不变；Copilot delta callback 已预留，后续可以直接接 Ant Design X streaming。
+
+---
 ## 2026-09-30 — Interactive Investigation Session 与 Workspace 收敛
 
 ### 为什么改
