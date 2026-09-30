@@ -2,12 +2,15 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { createServer as createHttpServer } from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { answerQuestion } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
 import { config } from './config.js';
 import {
+  appendContextInput,
   ensureWorkspace,
   loadWorkspaceContext,
   workspaceRoot,
@@ -20,6 +23,13 @@ import {
   searchConversation,
 } from './investigation/conversation.js';
 import { stopClient } from './agent/copilot.js';
+import {
+  appendAuditEvent,
+  loadInvestigationControl,
+  readAuditEvents,
+  updateInvestigationControl,
+  type InvestigationControl,
+} from './investigation/control.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
@@ -30,6 +40,41 @@ interface SessionSummary {
   label: string;
   userPrompt: string;
   updatedAt: string;
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+    files: 1,
+  },
+});
+
+function safeUploadName(name: string): string {
+  const base = path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 160);
+  return base || 'uploaded-file';
+}
+
+async function listSkills(): Promise<Array<{ name: string; description: string }>> {
+  let entries;
+  try {
+    entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const result: Array<{ name: string; description: string }> = [];
+  for (const entry of entries.filter((item) => item.isDirectory())) {
+    try {
+      const text = await fs.readFile(path.join(config.skillsDir, entry.name, 'SKILL.md'), 'utf8');
+      const name = /^name:\s*(.+)$/m.exec(text)?.[1]?.trim() || entry.name;
+      const description = /^description:\s*(.+)$/m.exec(text)?.[1]?.trim() || '';
+      result.push({ name, description });
+    } catch {
+      // Ignore directories without SKILL.md.
+    }
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function sessionKey(name: string): string {
@@ -73,6 +118,13 @@ async function createSession(name?: string, userPrompt?: string) {
   }
   const investigation = newInvestigation(key, userPrompt?.trim() ?? '');
   await saveInvestigation(investigation);
+  await loadInvestigationControl(key);
+  await appendAuditEvent(key, {
+    actor: 'user',
+    action: 'investigation.created',
+    summary: 'Created investigation session.',
+    details: { hasInitialPrompt: Boolean(userPrompt?.trim()) },
+  });
   return loadWorkspaceContext(key);
 }
 
@@ -100,9 +152,90 @@ export function createApp(vite?: ViteDevServer) {
     const conversation = getConversationSummary(name);
     res.json({
       context,
+      control: await loadInvestigationControl(name),
+      recentAudit: await readAuditEvents(name, 8),
       messages: listConversationMessages(name, 200),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
+    });
+  });
+
+  app.get('/api/skills', async (_req, res) => {
+    res.json({ skills: await listSkills() });
+  });
+
+  app.get('/api/sessions/:name/audit', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 100;
+    res.json({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) });
+  });
+
+  app.put('/api/sessions/:name/config', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const body = req.body as Partial<InvestigationControl>;
+    if (!body.research || !body.agent) {
+      res.status(400).json({ error: 'research and agent configuration are required' });
+      return;
+    }
+    const control = await updateInvestigationControl(name, {
+      research: body.research as InvestigationControl['research'],
+      agent: body.agent as InvestigationControl['agent'],
+    });
+    res.json({ control });
+  });
+
+  app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
+    const name = sessionKey(req.params.name);
+    if (!req.file) {
+      res.status(400).json({ error: 'file is required' });
+      return;
+    }
+
+    const root = workspaceRoot(name);
+    const uploadsDir = path.join(root, 'uploads');
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const originalName = safeUploadName(req.file.originalname);
+    const storedName = randomUUID() + '-' + originalName;
+    const relativePath = path.posix.join('uploads', storedName);
+    const target = path.join(root, 'uploads', storedName);
+    await fs.writeFile(target, req.file.buffer);
+
+    const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+    const input = await appendContextInput(name, {
+      kind: 'document',
+      title: req.file.originalname,
+      source: 'user-upload',
+      artifactPath: relativePath,
+      important: false,
+      mimeType: req.file.mimetype || 'application/octet-stream',
+      sizeBytes: req.file.size,
+      sha256,
+    });
+
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'file.uploaded',
+      summary: 'Uploaded document to investigation workspace.',
+      details: {
+        inputId: input.id,
+        title: req.file.originalname,
+        artifactPath: relativePath,
+        sizeBytes: req.file.size,
+        mimeType: req.file.mimetype || 'application/octet-stream',
+        sha256,
+      },
+    });
+
+    res.status(201).json({
+      input,
+      file: {
+        id: input.id,
+        name: req.file.originalname,
+        path: relativePath,
+        size: req.file.size,
+        mimeType: req.file.mimetype || 'application/octet-stream',
+      },
     });
   });
 
@@ -178,6 +311,10 @@ export function createApp(vite?: ViteDevServer) {
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     console.error(error);
     if (res.headersSent) return;
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ error: 'File is too large. Maximum size is 50 MB.' });
+      return;
+    }
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
     });
