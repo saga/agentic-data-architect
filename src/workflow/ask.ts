@@ -42,7 +42,7 @@ export async function answerQuestion(
 
   const reservedTurn = activeInvestigationTurns.get(investigationName);
   if (reservedTurn && reservedTurn.turnId !== turnId) {
-    throw new Error('This investigation already has an active turn.');
+    throw new Error('这个 Investigation 正在处理上一轮问题，请等它完成，或者先点 Stop。');
   }
 
   let turn;
@@ -67,7 +67,7 @@ export async function answerQuestion(
   }
 
   if (turn.status === 'failed' || turn.status === 'aborted') {
-    throw new Error('This turn ID has already finished and cannot be retried.');
+    throw new Error('这次请求已经结束，不能重复执行，请重新发送问题。');
   }
 
   // Reserve before the first await so another request cannot mistake this turn
