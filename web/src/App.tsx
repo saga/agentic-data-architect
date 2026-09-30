@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   App as AntApp,
@@ -246,6 +246,12 @@ function AppInner() {
   const [showRightTip, setShowRightTip] = useState(() => {
     try { return localStorage.getItem('ada.tip.right') !== 'dismissed'; } catch { return true; }
   });
+  const activeRef = useRef<string>();
+  const loadRequestRef = useRef(0);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const reloadSessions = async (selectLatest = true) => {
     const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
@@ -264,6 +270,7 @@ function AppInner() {
   };
 
   const loadSession = async (key: string, clearFirst = false) => {
+    const requestId = ++loadRequestRef.current;
     setError(undefined);
     if (clearFirst) {
       setCurrent(undefined);
@@ -271,7 +278,7 @@ function AppInner() {
       setAttachmentsOpen(false);
     }
     const result = await getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`);
-    if (key !== active) return;
+    if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
 
     const existing = result.context.inputs
@@ -310,6 +317,7 @@ function AppInner() {
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
+      ++loadRequestRef.current;
       setCurrent(undefined);
     }
   }, [active]);
@@ -376,6 +384,7 @@ function AppInner() {
           body: JSON.stringify({ userPrompt: message }),
         });
         key = created.context.name;
+        activeRef.current = key;
         navigateToSession(key);
       }
 
@@ -406,8 +415,10 @@ function AppInner() {
         body: JSON.stringify({ message }),
       });
 
-      await loadSession(key);
-      await reloadSessions(false);
+      if (activeRef.current === key) {
+        await loadSession(key);
+        await reloadSessions(false);
+      }
 
       if (result.warnings.length) {
         setError(result.warnings.join('; '));
