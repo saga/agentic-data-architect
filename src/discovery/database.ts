@@ -1,5 +1,6 @@
 import { createAdapter } from '../adapters/postgres.js';
 import { SnowflakeAdapter } from '../adapters/snowflake.js';
+import { profileDataset } from '../analysis/profiling.js';
 import type { DatabaseAdapter, DataProfile } from '../adapters/database.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 import { emptyEstate, nodeId, type DataEstate } from '../model/estate.js';
@@ -119,18 +120,9 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
       const limit = input.maxProfileTables ?? 20;
       for (const t of picked.slice(0, limit)) {
         try {
-          const p = await adapter.profile(t.qualifiedName);
-          profiles.push(p);
-          evidence.push({
-            id: nextId('ev'),
-            type: 'profiling',
-            investigationId: input.investigationId,
-            discoveryRunId: input.discoveryRunId,
-            source: `${adapter.type}:${t.qualifiedName} rows=${p.rowCount}`,
-            dataset: t.qualifiedName,
-            value: { rowCount: p.rowCount },
-            collectedAt: now(),
-          });
+          const p = await profileDataset(adapter, t.qualifiedName, input.investigationId, input.discoveryRunId);
+          profiles.push(p.profile);
+          evidence.push(...p.evidence);
         } catch (e) {
           unknowns.push(`profile 失败 ${t.qualifiedName}：${e instanceof Error ? e.message : e}`);
         }
