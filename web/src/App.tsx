@@ -292,9 +292,6 @@ function AppInner() {
   const [showLeftTip, setShowLeftTip] = useState(() => {
     try { return localStorage.getItem('ada.tip.left') !== 'dismissed'; } catch { return true; }
   });
-  const [showRightTip, setShowRightTip] = useState(() => {
-    try { return localStorage.getItem('ada.tip.right') !== 'dismissed'; } catch { return true; }
-  });
   const activeRef = useRef<string | undefined>(undefined);
   const loadRequestRef = useRef(0);
   const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController } | undefined>(undefined);
