@@ -63,6 +63,8 @@ describe('sqlglot parser', () => {
     const targets = stmts.map((s) => s.sources.join(','));
     assert.ok(targets.includes('t1'));
     assert.ok(targets.includes('t2'));
+    const fp = await parser.parseFile('test.sql', `SELECT a FROM t1; THIS IS NOT SQL ((((; SELECT b FROM t2`);
+    assert.equal(fp.length, 2);
   });
 });
 
