@@ -625,3 +625,31 @@ completed
 这个顺序是当前实现最重要的骨架。
 
 后续如果继续增加功能，尽量不要让新的状态绕开 turn、context、conversation DB、control version 这四个边界。
+
+
+## 17. 当前 Agent / Skill 运行边界
+
+当前 session 不再注册 `lead-data-agent` custom agent。每个 Investigation 直接使用 Copilot SDK default agent：
+
+```text
+default agent
+  +
+platform system rules
+  +
+selected Skills
+  +
+investigation guidance
+  +
+configured MCP
+  +
+explicit built-in tool allowlist
+```
+
+Skill 选择保存在 `control.json`，并固定到该 turn 的 configuration version。没有被选择的 Skill 会在 Copilot session 中通过 `disabledSkills` 显式关闭。
+
+Skill version 的 source hash 覆盖整个 Skill 目录，而不只是 `SKILL.md`；因此脚本或 reference 变化也会产生新的 Skill version。
+
+Copilot 使用 `mode: "empty"`，只显式开启本 Workbench 需要的 built-in tools 和配置的 MCP，避免继承 Copilot CLI 的其它宿主能力。
+
+HTTP MCP 的 headers 与 URL 一样从配置中解析环境变量后传入 runtime；secret 本身不写入 `control.json`。
+
