@@ -116,19 +116,21 @@ async function withSharedIndexWriteLock<T>(operation: () => Promise<T>): Promise
   }
 }
 
+async function ensureSharedIndexFile(): Promise<void> {
+  try {
+    await fs.access(sharedIndexFile());
+    return;
+  } catch {
+    await writeJsonAtomic(sharedIndexFile(), {
+      schemaVersion: 1,
+      artifacts: [],
+      updatedAt: new Date().toISOString(),
+    } satisfies SharedIndex);
+  }
+}
+
 async function ensureSharedIndex(): Promise<void> {
-  await withSharedIndexWriteLock(async () => {
-    try {
-      await fs.access(sharedIndexFile());
-      return;
-    } catch {
-      await writeJsonAtomic(sharedIndexFile(), {
-        schemaVersion: 1,
-        artifacts: [],
-        updatedAt: new Date().toISOString(),
-      } satisfies SharedIndex);
-    }
-  });
+  await withSharedIndexWriteLock(() => ensureSharedIndexFile());
 }
 
 export async function withWorkspaceContextLock<T>(
@@ -348,7 +350,7 @@ export async function appendTranscript(name: string, role: 'user' | 'assistant' 
 export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntry, 'updatedAt'>): Promise<void> {
   await withSharedIndexWriteLock(async () => {
     await fs.mkdir(config.sharedDir, { recursive: true });
-    await ensureSharedIndex();
+    await ensureSharedIndexFile();
     const raw = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')) as SharedIndex;
     const artifacts = raw.artifacts.filter((item) => item.id !== entry.id);
     artifacts.push({ ...entry, updatedAt: new Date().toISOString() });
