@@ -1,4 +1,4 @@
-import { CopilotClient } from '@github/copilot-sdk';
+import { BuiltInTools, CopilotClient, ToolSet } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -8,6 +8,14 @@ let starting: Promise<CopilotClient> | null = null;
 
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
 const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
+
+// Explicitly opt into the host tools this workbench needs. Mode "empty" avoids
+// inheriting unrelated Copilot CLI capabilities while still allowing Skills,
+// read/search tools, deterministic Skill scripts, and configured MCP servers.
+const WORKBENCH_TOOLS = new ToolSet()
+  .addBuiltIn(BuiltInTools.Isolated)
+  .addBuiltIn(['grep', 'glob', 'view', 'bash'])
+  .addMcp('*');
 
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
@@ -125,6 +133,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
     disabledSkills,
+    availableTools: WORKBENCH_TOOLS,
     ...(input.mcpServers && Object.keys(input.mcpServers).length ? { mcpServers: input.mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
