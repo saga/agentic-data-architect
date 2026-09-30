@@ -22,6 +22,9 @@
 # TypeScript cache
 *.tsbuildinfo
 
+# Local investigation state (JSON snapshots, never commit)
+/.data/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
