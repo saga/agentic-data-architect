@@ -39,6 +39,7 @@ test('stores conversation turns in sqlite and searches them with fts5', () => {
 
 test('migrates legacy chat inputs out of workspace state', () => {
   const sessionName = 'conversation-migration-test-' + randomUUID();
+  const otherSessionName = 'conversation-migration-test-' + randomUUID();
   const inputs = [
     {
       id: 'legacy-user-message-' + randomUUID(),
@@ -79,4 +80,16 @@ test('migrates legacy chat inputs out of workspace state', () => {
   assert.equal(messages[0]?.role, 'user');
   assert.equal(messages[1]?.role, 'user');
   assert.equal(messages[2]?.role, 'assistant');
+
+  migrateLegacyConversationInputs(otherSessionName, [
+    {
+      id: inputs[0]?.id ?? 'input-001',
+      kind: 'user_message',
+      capturedAt: '2026-09-30T10:01:00.000Z',
+      title: 'Same legacy id in another session',
+      content: 'This is a different session.',
+    },
+  ]);
+  assert.equal(listConversationMessages(otherSessionName).length, 1);
+  assert.equal(listConversationMessages(otherSessionName)[0]?.sessionName, otherSessionName);
 });
