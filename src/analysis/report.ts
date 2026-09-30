@@ -81,17 +81,17 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
       ? (snapshot?.profiles ?? []).map((p) => `- ${p.dataset}: rows=${p.rowCount}`)
       : ['(no DB profiling yet — discover with --database ... --profile)']),
     ``,
-    `## 6. Open Questions`,
+    `## 7. Open Questions`,
     ``,
     ...(inv.unknowns.length ? inv.unknowns.map((u) => `- ${u}`) : ['(none)']),
     ``,
-    `## 7. Evidence-backed Claims`,
+    `## 8. Evidence-backed Claims`,
     ``,
     ...(inv.claims.length
       ? inv.claims.map((c) => `### [${c.status}] ${c.claim.split('\n')[0]?.slice(0, 160)}` + `\n evidence: ${c.evidenceIds.join(', ') || '(none → treat as unknown)'}`)
       : ['(none yet — run ask)']),
     ``,
-    `## 8. Coverage / Gaps`,
+    `## 9. Coverage / Gaps`,
     ``,
     `- SQL parse coverage: ${sqlCoverage}`,
     `- Lineage coverage: ${lineageCoverage}`,
