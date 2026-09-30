@@ -3,67 +3,15 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { workspaceRoot, writeJsonAtomic } from './workspace.js';
-
-export type GitHubSearchMode = 'only_selected' | 'selected_and_broad';
-
-export interface ImportantDocumentRef {
-  id: string;
-  title: string;
-  reference: string;
-}
-
-export interface McpServerSetting {
-  name: string;
-  version: number;
-  enabled: boolean;
-  type: 'local' | 'http';
-  command?: string;
-  args?: string[];
-  url?: string;
-  tools?: string[];
-  /** HTTP headers may reference environment variables as ${NAME}; secret values are never needed in control.json. */
-  headers?: Record<string, string>;
-}
-
-export interface InvestigationControl {
-  schemaVersion: 1;
-  version: number;
-  updatedAt: string;
-  research: {
-    githubRepositories: string[];
-    githubSearchMode: GitHubSearchMode;
-    keywords: string[];
-    importantDocuments: ImportantDocumentRef[];
-  };
-  agent: {
-    systemPrompt: {
-      version: number;
-      content: string;
-    };
-    skills: Array<{
-      name: string;
-      version: number;
-      sourceHash?: string;
-    }>;
-    mcpServers: McpServerSetting[];
-  };
-  history: Array<{
-    version: number;
-    updatedAt: string;
-    reason: string;
-    snapshot: Omit<InvestigationControl, 'history'>;
-  }>;
-}
-
-export interface AuditEvent {
-  id: string;
-  timestamp: string;
-  actor: 'user' | 'system';
-  action: string;
-  summary: string;
-  configurationVersion?: number;
-  details?: Record<string, unknown>;
-}
+import {
+  AuditEventSchema,
+  InvestigationControlSchema,
+  McpServerSettingSchema,
+  type AuditEvent,
+  type ImportantDocumentRef,
+  type InvestigationControl,
+  type McpServerSetting,
+} from './schemas.js';
 
 function controlFile(name: string): string {
   return path.join(workspaceRoot(name), 'control.json');
@@ -244,7 +192,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     },
   } as Omit<InvestigationControl, 'history'>;
 
-  return {
+  return InvestigationControlSchema.parse({
     ...base,
     history: Array.isArray(raw.history)
       ? raw.history.filter((item): item is InvestigationControl['history'][number] => Boolean(item) && typeof item === 'object')
@@ -412,11 +360,11 @@ export async function appendAuditEvent(
   name: string,
   event: Omit<AuditEvent, 'id' | 'timestamp'>,
 ): Promise<AuditEvent> {
-  const full: AuditEvent = {
+  const full = AuditEventSchema.parse({
     id: randomUUID(),
     timestamp: new Date().toISOString(),
     ...event,
-  };
+  });
   await fs.appendFile(auditFile(name), JSON.stringify(full) + '\n', 'utf8');
   return full;
 }
@@ -425,7 +373,10 @@ export async function readAuditEvents(name: string, limit = 50): Promise<AuditEv
   try {
     const text = await fs.readFile(auditFile(name), 'utf8');
     const rows = text.split('\n').filter(Boolean).slice(-Math.max(1, Math.min(limit, 500)));
-    return rows.reverse().map((row) => JSON.parse(row) as AuditEvent);
+    return rows.reverse()
+      .map((row) => AuditEventSchema.safeParse(JSON.parse(row)))
+      .filter((result): result is { success: true; data: AuditEvent } => result.success)
+      .map((result) => result.data);
   } catch {
     return [];
   }
