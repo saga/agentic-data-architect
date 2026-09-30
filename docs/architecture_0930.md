@@ -17,21 +17,21 @@ V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 ---
 ## 当前交互与 Workspace
 
-V1.1 现在不是一次性 CLI pipeline，而是持续 Investigation session：
+V1.1 现在的主入口是 Web Investigation Workbench：
 
 ```text
-npm run start
+Browser
    ↓
-持续 session
+Express 5 API
    ↓
-用户补充目标 / 上下文 / 文档 / GitHub URL
+Investigation / Evidence / Copilot
    ↓
-Agent 分析
-   ↓
-用户继续提问 / 补充 / 纠正方向
-   ↓
-继续分析
+.workspace/<session>/context.json
 ```
+
+浏览器中的 session 可以持续切换和恢复；用户可以在同一个 session 中连续补充上下文、提问、提供资料和纠正方向。
+
+UI 使用 Ant Design + Ant Design X；XMarkdown 负责 Markdown、代码、公式和 Mermaid 展示。
 
 默认 workspace：
 
