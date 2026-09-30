@@ -85,6 +85,10 @@ function getDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS idx_conversation_turns_session
       ON conversation_turns(session_name, updated_at);
 
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_turns_one_running
+      ON conversation_turns(session_name)
+      WHERE status = 'running';
+
     CREATE TABLE IF NOT EXISTS conversation_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       message_id TEXT NOT NULL UNIQUE,
