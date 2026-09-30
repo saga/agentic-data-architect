@@ -6,6 +6,8 @@
 import type { DataProfile } from '../adapters/database.js';
 import type { EvidenceRef, Finding } from '../evidence/types.js';
 import type { LineageGraph } from './lineage.js';
+import type { CurrentStateIntelligence } from '../model/current-state.js';
+import type { SemanticAsset } from '../semantic/types.js';
 
 /**
  * Evidence Retrieval（§十八）：按问题取相关节点/边/profile/finding，
@@ -42,9 +44,11 @@ export function buildQuestionContext(args: {
   profiles: DataProfile[];
   findings: Finding[];
   evidence: EvidenceRef[];
+  currentState?: CurrentStateIntelligence | null;
+  semanticAssets?: SemanticAsset[];
   maxDatasets?: number;
 }): QuestionContext {
-  const { question, lineage, profiles, findings, evidence } = args;
+  const { question, lineage, profiles, findings, evidence, currentState, semanticAssets = [] } = args;
   const qt = tokens(question);
   const byId = new Map(evidence.map((e) => [e.id, e]));
   const out: string[] = [];
@@ -98,6 +102,68 @@ export function buildQuestionContext(args: {
     colCount++;
   }
   if (colCount === 0) out.push('(no column lineage)');
+
+  const semanticMatches = semanticAssets
+    .map((asset) => ({
+      asset,
+      score: scoreDataset(qt, (asset.name + ' ' + (asset.description ?? '')).toLowerCase()),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  if (semanticMatches.length > 0) {
+    out.push('');
+    out.push('业务语义上下文：');
+    for (const match of semanticMatches) {
+      const asset = match.asset;
+      const refs = (asset.evidenceIds ?? []).map(use).filter(Boolean).join(' ');
+      out.push(
+        '- [' + asset.kind + '] ' + asset.provider + ':' + (asset.qualifiedName ?? asset.name) +
+        (asset.description ? ' — ' + asset.description.slice(0, 400) : '') +
+        (refs ? ' ' + refs : ''),
+      );
+    }
+  }
+
+  if (currentState) {
+    const semanticCandidates = currentState.semanticCandidates
+      .filter((candidate) => qt.some((token) => candidate.key.includes(token) || candidate.names.some((name) => name.toLowerCase().includes(token))))
+      .slice(0, 10);
+    if (semanticCandidates.length > 0) {
+      out.push('');
+      out.push('语义候选：');
+      for (const candidate of semanticCandidates) {
+        out.push('- ' + candidate.key + ' [' + candidate.kind + '] ' + candidate.names.slice(0, 5).join('、'));
+        const refs = candidate.evidenceIds.map(use).filter(Boolean);
+        if (refs.length > 0) out.push('  Evidence: ' + refs.join(' '));
+      }
+    }
+
+    const sourceCandidates = currentState.sourceOfTruthCandidates
+      .filter((candidate) => qt.some((token) => candidate.key.includes(token) || candidate.candidateDatasets.some((name) => name.toLowerCase().includes(token))))
+      .slice(0, 8);
+    if (sourceCandidates.length > 0) {
+      out.push('');
+      out.push('来源候选：');
+      for (const candidate of sourceCandidates) {
+        out.push('- ' + candidate.key + ': ' + candidate.candidateDatasets.join('、') + '；这里只是候选，还没有确认业务权威。');
+        const refs = candidate.evidenceIds.map(use).filter(Boolean);
+        if (refs.length > 0) out.push('  Evidence: ' + refs.join(' '));
+      }
+    }
+
+    out.push('');
+    out.push(
+      '当前发现覆盖率：SQL files=' + currentState.coverage.sqlFiles +
+      '，parsed=' + currentState.coverage.sqlParsedStatements +
+      '，parse failures=' + currentState.coverage.sqlParseFailures +
+      '，dataset lineage=' +
+      (currentState.coverage.datasetLineageCoverage === null ? 'n/a' : (currentState.coverage.datasetLineageCoverage * 100).toFixed(0) + '%') +
+      '，semantic assets=' + currentState.coverage.semanticAssets +
+      '，profiled=' + currentState.coverage.profiledDatasets + '。',
+    );
+  }
 
   const relProfiles = profiles.filter((p) => topNames.has(p.dataset.toLowerCase()));
   if (relProfiles.length > 0) {
