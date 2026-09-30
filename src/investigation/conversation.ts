@@ -19,6 +19,16 @@ export interface ConversationSearchHit extends ConversationMessage {
   score: number;
 }
 
+export interface ConversationTurn {
+  turnId: string;
+  sessionName: string;
+  status: 'running' | 'completed' | 'failed' | 'aborted';
+  result?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ConversationSummary {
   count: number;
   lastMessageAt?: string;
@@ -61,6 +71,19 @@ function getDatabase(): DatabaseSync {
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
     PRAGMA busy_timeout = 5000;
+
+    CREATE TABLE IF NOT EXISTS conversation_turns (
+      turn_id TEXT PRIMARY KEY,
+      session_name TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'aborted')),
+      result TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+
+    CREATE INDEX IF NOT EXISTS idx_conversation_turns_session
+      ON conversation_turns(session_name, updated_at);
 
     CREATE TABLE IF NOT EXISTS conversation_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,6 +141,63 @@ function toMessage(row: MessageRow): ConversationMessage {
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
+  };
+}
+
+export function beginConversationTurn(sessionName: string, turnId: string): ConversationTurn {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO conversation_turns (turn_id, session_name, status, created_at, updated_at)
+    VALUES (?, ?, 'running', ?, ?)
+    ON CONFLICT(turn_id) DO NOTHING
+  `).run(turnId, sessionName, now, now);
+  const row = db.prepare(`
+    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    FROM conversation_turns WHERE turn_id = ?
+  `).get(turnId) as Record<string, unknown> | undefined;
+  if (!row) throw new Error('Conversation turn could not be stored: ' + turnId);
+  if (Number(result.changes) === 0 && row.session_name !== sessionName) {
+    throw new Error('Turn ID is already used by another investigation');
+  }
+  return {
+    turnId: String(row.turn_id),
+    sessionName: String(row.session_name),
+    status: row.status as ConversationTurn['status'],
+    ...(typeof row.result === 'string' ? { result: row.result } : {}),
+    ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+export function finishConversationTurn(
+  turnId: string,
+  status: Exclude<ConversationTurn['status'], 'running'>,
+  result?: string,
+  error?: string,
+): void {
+  getDatabase().prepare(`
+    UPDATE conversation_turns
+    SET status = ?, result = ?, error = ?, updated_at = ?
+    WHERE turn_id = ?
+  `).run(status, result ?? null, error ?? null, new Date().toISOString(), turnId);
+}
+
+export function getConversationTurn(turnId: string): ConversationTurn | undefined {
+  const row = getDatabase().prepare(`
+    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    FROM conversation_turns WHERE turn_id = ?
+  `).get(turnId) as Record<string, unknown> | undefined;
+  if (!row) return undefined;
+  return {
+    turnId: String(row.turn_id),
+    sessionName: String(row.session_name),
+    status: row.status as ConversationTurn['status'],
+    ...(typeof row.result === 'string' ? { result: row.result } : {}),
+    ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
   };
 }
 
