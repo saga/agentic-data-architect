@@ -1,6 +1,6 @@
 import { createAdapter } from '../adapters/postgres.js';
 import { SnowflakeAdapter } from '../adapters/snowflake.js';
-import type { DatabaseAdapter } from '../adapters/database.js';
+import type { DatabaseAdapter, DataProfile } from '../adapters/database.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 import { emptyEstate, nodeId, type DataEstate } from '../model/estate.js';
 
@@ -22,7 +22,7 @@ export interface DatabaseDiscoveryInput {
 export interface DatabaseDiscoveryResult {
   adapterType: string;
   estate: DataEstate;
-  profiles: { dataset: string; rowCount: number }[];
+  profiles: DataProfile[];
   evidence: EvidenceRef[];
   unknowns: string[];
 }
@@ -37,7 +37,7 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
   const estate = emptyEstate();
   const evidence: EvidenceRef[] = [];
   const unknowns: string[] = [];
-  const profiles: { dataset: string; rowCount: number }[] = [];
+  const profiles: DataProfile[] = [];
   const now = () => new Date().toISOString();
   const maxTables = input.maxTables ?? 200;
 
@@ -94,7 +94,7 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
       for (const t of picked.slice(0, limit)) {
         try {
           const p = await adapter.profile(t.qualifiedName);
-          profiles.push({ dataset: t.qualifiedName, rowCount: p.rowCount });
+          profiles.push(p);
           evidence.push({
             id: nextId('ev'),
             type: 'profiling',
