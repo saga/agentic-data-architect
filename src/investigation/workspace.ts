@@ -1,9 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import type { Claim, DiscoveryRun, EvidenceRef, Finding } from '../evidence/types.js';
 
 export type WorkspaceInputKind =
   | 'user_prompt'
+  | 'user_message'
+  | 'assistant_message'
   | 'question'
   | 'discovery'
   | 'research'
@@ -23,10 +26,21 @@ export interface WorkspaceInput {
 }
 
 export interface WorkspaceContext {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  name: string;
   userPrompt: string;
+  goal: string;
+  scope: string[];
+  systems: string[];
+  questions: string[];
+  discoveryRuns: DiscoveryRun[];
+  evidence: EvidenceRef[];
+  claims: Claim[];
+  findings: Finding[];
+  unknowns: string[];
   importantInformation: string[];
   inputs: WorkspaceInput[];
+  copilotSessionId?: string;
   updatedAt: string;
 }
 
@@ -37,28 +51,64 @@ export interface WorkspaceSeed {
   systems?: string[];
 }
 
+export interface SharedArtifactIndexEntry {
+  id: string;
+  kind: 'confluence' | 'github' | 'leanix' | 'web' | 'document' | 'other';
+  path: string;
+  title: string;
+  source?: string;
+  uri?: string;
+  updatedAt: string;
+  sessionNames?: string[];
+}
+
+export interface SharedIndex {
+  schemaVersion: 1;
+  artifacts: SharedArtifactIndexEntry[];
+  updatedAt: string;
+}
+
+function safeName(name: string): string {
+  if (!name || name !== path.basename(name) || name === '.' || name === '..') {
+    throw new Error('Invalid Session name: ' + name);
+  }
+  return name;
+}
+
 export function workspaceRoot(name: string): string {
-  return path.join(config.investigationDir, name, 'workspace');
+  return path.join(config.workspaceDir, safeName(name));
 }
 
 export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
-export function researchDir(name: string): string {
-  return path.join(workspaceRoot(name), 'research');
+export function transcriptFile(name: string): string {
+  return path.join(workspaceRoot(name), 'transcript.md');
 }
 
-export function findingsDir(name: string): string {
-  return path.join(workspaceRoot(name), 'findings');
+export function discoveryDir(name: string): string {
+  return path.join(workspaceRoot(name), 'discovery');
+}
+
+export function reportsDir(name: string): string {
+  return path.join(workspaceRoot(name), 'reports');
 }
 
 export function artifactsDir(name: string): string {
   return path.join(workspaceRoot(name), 'artifacts');
 }
 
-export function notesDir(name: string): string {
-  return path.join(workspaceRoot(name), 'notes');
+export function sharedDir(): string {
+  return config.sharedDir;
+}
+
+export function sharedArtifactDir(kind: SharedArtifactIndexEntry['kind']): string {
+  return path.join(config.sharedDir, kind);
+}
+
+export function sharedIndexFile(): string {
+  return path.join(config.sharedDir, 'index.json');
 }
 
 export function redactSensitiveUri(value: string): string {
@@ -79,17 +129,21 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
   const root = workspaceRoot(name);
   await Promise.all([
     fs.mkdir(root, { recursive: true }),
-    fs.mkdir(path.join(root, 'inputs'), { recursive: true }),
-    fs.mkdir(researchDir(name), { recursive: true }),
-    fs.mkdir(path.join(researchDir(name), 'github'), { recursive: true }),
-    fs.mkdir(path.join(researchDir(name), 'leanix'), { recursive: true }),
-    fs.mkdir(path.join(researchDir(name), 'confluence'), { recursive: true }),
-    fs.mkdir(path.join(researchDir(name), 'web'), { recursive: true }),
-    fs.mkdir(findingsDir(name), { recursive: true }),
+    fs.mkdir(discoveryDir(name), { recursive: true }),
+    fs.mkdir(reportsDir(name), { recursive: true }),
     fs.mkdir(artifactsDir(name), { recursive: true }),
-    fs.mkdir(notesDir(name), { recursive: true }),
-    fs.mkdir(path.join(root, 'sources', 'github'), { recursive: true }),
+    fs.mkdir(config.sharedDir, { recursive: true }),
+    ...(['confluence', 'github', 'leanix', 'web', 'document', 'other'] as const).map((kind) =>
+      fs.mkdir(sharedArtifactDir(kind), { recursive: true }),
+    ),
   ]);
+
+  try {
+    await fs.access(sharedIndexFile());
+  } catch {
+    const index: SharedIndex = { schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() };
+    await fs.writeFile(sharedIndexFile(), JSON.stringify(index, null, 2));
+  }
 
   const fp = contextFile(name);
   try {
@@ -98,40 +152,64 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
   } catch {
     const now = new Date().toISOString();
     const context: WorkspaceContext = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      name,
       userPrompt: seed.userPrompt ?? seed.goal ?? '',
+      goal: seed.goal ?? '',
+      scope: seed.scope ?? [],
+      systems: seed.systems ?? [],
+      questions: [],
+      discoveryRuns: [],
+      evidence: [],
+      claims: [],
+      findings: [],
+      unknowns: [],
       importantInformation: [],
       inputs: [],
       updatedAt: now,
     };
-    const initialContent = JSON.stringify(
-      {
-        userPrompt: context.userPrompt,
-        goal: seed.goal ?? '',
-        scope: seed.scope ?? [],
-        systems: seed.systems ?? [],
-      },
-      null,
-      2,
-    );
-    if (context.userPrompt || seed.goal || seed.scope?.length || seed.systems?.length) {
+    if (context.userPrompt || context.goal || context.scope.length || context.systems.length) {
       context.inputs.push({
         id: 'input-001',
         kind: 'user_prompt',
         capturedAt: now,
-        title: 'Investigation initialization',
-        content: initialContent,
+        title: 'Session initialization',
+        content: JSON.stringify({
+          userPrompt: context.userPrompt,
+          goal: context.goal,
+          scope: context.scope,
+          systems: context.systems,
+        }, null, 2),
         important: true,
       });
     }
     await fs.writeFile(fp, JSON.stringify(context, null, 2));
+    await fs.writeFile(transcriptFile(name), '# Investigation Session ' + name + '\n\n');
     return root;
   }
 }
 
 export async function loadWorkspaceContext(name: string): Promise<WorkspaceContext> {
   await ensureWorkspace(name);
-  return JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as WorkspaceContext;
+  const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<WorkspaceContext>;
+  return {
+    schemaVersion: 2,
+    name,
+    userPrompt: raw.userPrompt ?? '',
+    goal: raw.goal ?? '',
+    scope: raw.scope ?? [],
+    systems: raw.systems ?? [],
+    questions: raw.questions ?? [],
+    discoveryRuns: raw.discoveryRuns ?? [],
+    evidence: raw.evidence ?? [],
+    claims: raw.claims ?? [],
+    findings: raw.findings ?? [],
+    unknowns: raw.unknowns ?? [],
+    importantInformation: raw.importantInformation ?? [],
+    inputs: raw.inputs ?? [],
+    ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
 }
 
 export async function appendContextInput(
@@ -160,10 +238,53 @@ export async function addImportantInformation(name: string, information: string[
   const context = await loadWorkspaceContext(name);
   for (const item of information) {
     const value = item.trim();
-    if (value && !context.importantInformation.includes(value)) {
-      context.importantInformation.push(value);
-    }
+    if (value && !context.importantInformation.includes(value)) context.importantInformation.push(value);
   }
   context.updatedAt = new Date().toISOString();
   await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+}
+
+export async function setCopilotSessionId(name: string, sessionId: string): Promise<void> {
+  const context = await loadWorkspaceContext(name);
+  context.copilotSessionId = sessionId;
+  context.updatedAt = new Date().toISOString();
+  await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+}
+
+export async function appendTranscript(name: string, role: 'user' | 'assistant' | 'system', content: string): Promise<void> {
+  await ensureWorkspace(name);
+  const label = role === 'assistant' ? 'Agent' : role === 'user' ? 'User' : 'System';
+  const text = '## ' + label + ' — ' + new Date().toISOString() + '\n\n' + content.trim() + '\n\n';
+  await fs.appendFile(transcriptFile(name), text, 'utf-8');
+}
+
+export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntry, 'updatedAt'>): Promise<void> {
+  await fs.mkdir(config.sharedDir, { recursive: true });
+  try {
+    await fs.access(sharedIndexFile());
+  } catch {
+    const index: SharedIndex = { schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() };
+    await fs.writeFile(sharedIndexFile(), JSON.stringify(index, null, 2));
+  }
+  const raw = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')) as SharedIndex;
+  const artifacts = raw.artifacts.filter((item) => item.id !== entry.id);
+  artifacts.push({ ...entry, updatedAt: new Date().toISOString() });
+  await fs.writeFile(sharedIndexFile(), JSON.stringify({ schemaVersion: 1, artifacts, updatedAt: new Date().toISOString() }, null, 2));
+}
+
+export async function addSharedDocument(
+  kind: SharedArtifactIndexEntry['kind'],
+  id: string,
+  title: string,
+  content: string,
+  metadata: Omit<SharedArtifactIndexEntry, 'id' | 'kind' | 'path' | 'title' | 'updatedAt'> = {},
+): Promise<string> {
+  const dir = sharedArtifactDir(kind);
+  await fs.mkdir(dir, { recursive: true });
+  const safeId = id.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(0, 100);
+  const relativePath = path.posix.join('shared', kind, safeId + '.md');
+  const file = path.join(config.workspaceDir, relativePath);
+  await fs.writeFile(file, content, 'utf-8');
+  await registerSharedArtifact({ id, kind, path: relativePath, title, ...metadata });
+  return relativePath;
 }
