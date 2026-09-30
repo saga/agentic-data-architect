@@ -415,12 +415,13 @@ function AppInner() {
           : undefined,
     }));
 
-    if (streamingAnswer?.key === active) {
+    const currentStreamingAnswer = streamingAnswer;
+    if (currentStreamingAnswer?.key === active) {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
-        content: streamingAnswer.content
-          ? <ChatMarkdown content={streamingAnswer.content} />
+        content: currentStreamingAnswer.content
+          ? <ChatMarkdown content={currentStreamingAnswer.content} />
           : <Text type="secondary">Thinking…</Text>,
         footer: <Text type="secondary">Live</Text>,
       });
