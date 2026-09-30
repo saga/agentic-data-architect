@@ -43,3 +43,7 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 - evidence traceability：覆盖 column lineage、profile table、profile column 都能进入 Agent context 并携带 evidence id。
 - workspace safety：覆盖 database URI 脱敏，避免密码/token 写入 context。
 - profiling performance：PostgreSQL / Snowflake 的 profile 已收敛为每表一次聚合 + 一次小样本，而不是每列多次全表查询。
+
+## 依赖安全回归
+
+CI 对生产依赖执行 critical blocking audit；high severity audit 当前为 informational，因为 Snowflake driver 的已知 `toml` 传递依赖问题尚无兼容的上游修复。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
