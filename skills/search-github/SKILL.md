@@ -1,3 +1,8 @@
+---
+name: search-github
+description: Research GitHub repositories, source code, issues, pull requests, implementation details, and historical behavior.
+---
+
 # Search GitHub
 
 用途：研究代码、仓库、Issue/PR、实现方式和历史行为。
