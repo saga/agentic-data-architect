@@ -1,3 +1,8 @@
+/**
+ * Conversation durable state、幂等和 SQLite FTS。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -5,8 +10,10 @@ import path from 'node:path';
 import { config } from '../config.js';
 import type { WorkspaceInput } from './workspace.js';
 
+/** 对话消息角色；与 Copilot/LLM 的常见角色保持简单一致。 */
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
+/** 持久化后的单条对话消息。 */
 export interface ConversationMessage {
   id: string;
   sessionName: string;
@@ -15,10 +22,12 @@ export interface ConversationMessage {
   createdAt: string;
 }
 
+/** 带全文检索相关性分数的对话命中。 */
 export interface ConversationSearchHit extends ConversationMessage {
   score: number;
 }
 
+/** 一次用户问题的 durable turn 生命周期记录。 */
 export interface ConversationTurn {
   turnId: string;
   sessionName: string;
@@ -29,6 +38,7 @@ export interface ConversationTurn {
   updatedAt: string;
 }
 
+/** 当前 Investigation 对话数量和最近消息时间的轻量摘要。 */
 export interface ConversationSummary {
   count: number;
   lastMessageAt?: string;
@@ -54,10 +64,12 @@ interface MessageWrite {
 let database: DatabaseSync | undefined;
 let databasePath: string | undefined;
 
+/** 返回整个应用共享的 SQLite conversation 数据库路径。 */
 export function conversationDbFile(): string {
   return path.join(config.workspaceDir, 'conversations.db');
 }
 
+/** 初始化或复用 SQLite 数据库，创建 turn、message 和 FTS 表及约束。 */
 function getDatabase(): DatabaseSync {
   const file = conversationDbFile();
   if (database && databasePath === file) return database;
@@ -139,6 +151,7 @@ function getDatabase(): DatabaseSync {
   return database;
 }
 
+/** 把 SQLite message row 转成应用层 ConversationMessage。 */
 function toMessage(row: MessageRow): ConversationMessage {
   return {
     id: row.message_id,
@@ -151,6 +164,7 @@ function toMessage(row: MessageRow): ConversationMessage {
 
 // The partial unique index below makes "one running turn per investigation" a
 // database invariant, not just a convention in the workflow code.
+/** 创建一次 durable turn；借助唯一索引保证同一 Investigation 只能有一个 running turn。 */
 export function beginConversationTurn(sessionName: string, turnId: string): ConversationTurn {
   const db = getDatabase();
   const now = new Date().toISOString();
@@ -178,6 +192,7 @@ export function beginConversationTurn(sessionName: string, turnId: string): Conv
   };
 }
 
+/** 把 running turn 结束为 completed/failed/aborted，并保存结果或错误。 */
 export function finishConversationTurn(
   turnId: string,
   status: Exclude<ConversationTurn['status'], 'running'>,
@@ -191,6 +206,7 @@ export function finishConversationTurn(
   `).run(status, result ?? null, error ?? null, new Date().toISOString(), turnId);
 }
 
+/** 服务启动后把上一次进程遗留的 running turn 标记为 aborted。 */
 export function recoverRunningConversationTurns(): number {
   const result = getDatabase().prepare(`
     UPDATE conversation_turns
@@ -202,6 +218,7 @@ export function recoverRunningConversationTurns(): number {
   return Number(result.changes);
 }
 
+/** 在确认旧 turn 已无人执行后，把它安全终止，释放重试机会。 */
 export function abortStaleConversationTurn(turnId: string, error = 'The previous process did not complete this turn.'): boolean {
   const result = getDatabase().prepare(`
     UPDATE conversation_turns
@@ -211,6 +228,7 @@ export function abortStaleConversationTurn(turnId: string, error = 'The previous
   return Number(result.changes) > 0;
 }
 
+/** 查询当前 Investigation 是否存在 running turn。 */
 export function getRunningConversationTurn(sessionName: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
     SELECT turn_id, session_name, status, result, error, created_at, updated_at
@@ -231,6 +249,7 @@ export function getRunningConversationTurn(sessionName: string): ConversationTur
   };
 }
 
+/** 根据 turnId 获取完整 durable turn 状态。 */
 export function getConversationTurn(turnId: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
     SELECT turn_id, session_name, status, result, error, created_at, updated_at
@@ -248,6 +267,7 @@ export function getConversationTurn(turnId: string): ConversationTurn | undefine
   };
 }
 
+/** 幂等写入一条对话消息；重复 message id 会返回已有记录。 */
 export function saveConversationMessage(input: MessageWrite): ConversationMessage & { rowId: number } {
   const db = getDatabase();
   const id = input.id ?? randomUUID();
@@ -281,6 +301,7 @@ export function saveConversationMessage(input: MessageWrite): ConversationMessag
   return { ...toMessage(row), rowId: row.id };
 }
 
+/** 按时间顺序读取最近一段对话，限制最大返回量避免 UI/Agent 上下文过大。 */
 export function listConversationMessages(
   sessionName: string,
   limit = 200,
@@ -297,6 +318,7 @@ export function listConversationMessages(
   return rows.reverse().map(toMessage);
 }
 
+/** 使用 SQLite FTS5 检索历史对话，把当前问题相关的旧消息提供给 Agent。 */
 export function searchConversation(
   sessionName: string,
   query: string,
@@ -340,6 +362,7 @@ export function searchConversation(
   }));
 }
 
+/** 返回对话数量和最后消息时间，用于 Session 列表和 UI 摘要。 */
 export function getConversationSummary(sessionName: string): ConversationSummary {
   const row = dbOrThrow().prepare(`
     SELECT COUNT(*) AS count, MAX(created_at) AS last_message_at
@@ -353,6 +376,7 @@ export function getConversationSummary(sessionName: string): ConversationSummary
   };
 }
 
+/** 把旧 context.json 中的 conversation inputs 一次性迁入 SQLite，并从 context 中删除副本。 */
 export function migrateLegacyConversationInputs(
   sessionName: string,
   inputs: WorkspaceInput[],
@@ -379,16 +403,19 @@ export function migrateLegacyConversationInputs(
   );
 }
 
+/** 关闭当前 SQLite 连接，供服务 shutdown 和测试 teardown 使用。 */
 export function closeConversationStore(): void {
   database?.close();
   database = undefined;
   databasePath = undefined;
 }
 
+/** 获取可用数据库连接；所有查询都通过统一入口建立。 */
 function dbOrThrow(): DatabaseSync {
   return getDatabase();
 }
 
+/** 把中英文查询拆成适合 FTS5 trigram 检索的词片，降低中文搜索对空格的依赖。 */
 function extractSearchTerms(value: string): string[] {
   const segments = value.match(/[\u3400-\u9fff]{2,}|[\p{L}\p{N}_]{3,}/gu) ?? [];
   const terms: string[] = [];
