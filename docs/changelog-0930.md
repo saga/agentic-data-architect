@@ -1,3 +1,10 @@
+## 2026-09-30 — 外部研究证据边界说明
+
+- 明确 GitHub / LeanIX / Confluence research artifacts 目前属于持久化 workspace input，还没有自动进入 Evidence Catalog。
+- V1.1 的 Claim evidence 仍以 deterministic discovery / profiling / targeted query evidence 为主。
+- 将 research-evidence registration 列为 V1.2 的小能力：先在 Investigation 内把 research artifact 转成可引用 EvidenceRef，不新建独立 Catalog 服务。
+
+---
 # Changelog
 
 ## 2026-09-30 — 依赖审计与最终收口
