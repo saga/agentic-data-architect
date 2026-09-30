@@ -401,22 +401,6 @@ body {
   margin-bottom: 8px;
 }
 
-.agent-profile {
-  display: grid;
-  gap: 10px;
-}
-
-.agent-profile-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.agent-profile-description {
-  margin-bottom: 0 !important;
-}
-
 .selected-skill-main {
   display: grid;
   gap: 2px;
