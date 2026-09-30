@@ -3,7 +3,7 @@ import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
-import { beginConversationTurn, finishConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
+import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import {
   appendAuditEvent,
   buildResearchConfigPrompt,
@@ -31,7 +31,17 @@ export async function answerQuestion(
   const turn = beginConversationTurn(investigationName, turnId);
   if (turn.status === 'completed' && turn.result) return JSON.parse(turn.result) as AnswerSummary;
   if (turn.status === 'running') {
-    throw new Error('This investigation already has an active turn.');
+    // A running row without a live Copilot turn is stale (for example after a
+    // server-side failure between persistence and session registration).
+    // Do not leave the investigation permanently locked.
+    const recovered = await import('../agent/copilot.js').then(({ hasActiveCopilotTurn }) =>
+      hasActiveCopilotTurn(turn.turnId),
+    );
+    if (!recovered) {
+      abortStaleConversationTurn(turn.turnId);
+    } else {
+      throw new Error('This investigation already has an active turn.');
+    }
   }
   if (turn.status === 'failed' || turn.status === 'aborted') {
     throw new Error('This turn ID has already finished and cannot be retried.');
