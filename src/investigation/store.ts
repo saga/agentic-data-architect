@@ -52,6 +52,9 @@ export function newInvestigation(name: string, userPrompt = ''): Investigation {
 }
 
 export function investigationRoot(name: string): string {
+  if (!name || name !== path.basename(name) || name === '.' || name === '..') {
+    throw new Error(`非法 Investigation 名称：${name}`);
+  }
   return path.join(config.investigationDir, name);
 }
 
