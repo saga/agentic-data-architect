@@ -37,6 +37,8 @@ export async function stopClient(): Promise<void> {
   }
 }
 
+type CreateSessionConfig = Parameters<CopilotClient['createSession']>[0];
+
 export interface AskInput {
   prompt: string;
   systemPrompt: string;
@@ -46,16 +48,18 @@ export interface AskInput {
   model?: string;
   skills?: string[];
   skillDirectories?: string[];
+  mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
 }
 
 export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
-  const sessionConfig = {
+  const sessionConfig: CreateSessionConfig = {
     model: input.model ?? config.model,
     workingDirectory: input.workingDirectory ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
+    ...(input.mcpServers && Object.keys(input.mcpServers).length ? { mcpServers: input.mcpServers } : {}),
     customAgents: [
       {
         name: 'lead-data-agent',
