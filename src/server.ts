@@ -171,7 +171,7 @@ export function createApp(vite?: ViteDevServer) {
   });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
-    const name = sessionKey(req.params.name);
+    const name = sessionKey(String(req.params.name));
     const body = req.body as Partial<InvestigationControl>;
     if (!body.research || !body.agent) {
       res.status(400).json({ error: 'research and agent configuration are required' });
@@ -185,7 +185,7 @@ export function createApp(vite?: ViteDevServer) {
   });
 
   app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
-    const name = sessionKey(req.params.name);
+    const name = sessionKey(String(req.params.name));
     if (!req.file) {
       res.status(400).json({ error: 'file is required' });
       return;
