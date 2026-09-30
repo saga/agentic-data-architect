@@ -6,15 +6,18 @@
  */
 import * as z from 'zod';
 
+/** Claim 的可信状态枚举；verified 只允许 deterministic 校验阶段授予。 */
 export const ClaimStatusSchema = z.enum(['verified', 'supported', 'inferred', 'unknown', 'contradicted']);
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
 
+/** Evidence 来源类型枚举，用于区分 SQL、metadata、profiling 等证据。 */
 export const EvidenceTypeSchema = z.enum([
   'source_file', 'sql_statement', 'lineage', 'metadata',
   'profiling', 'query_result', 'documentation', 'runtime',
 ]);
 export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
 
+/** Evidence 持久化结构 Schema，保证每条证据都能关联 Investigation 和 DiscoveryRun。 */
 export const EvidenceRefSchema = z.object({
   id: z.string().min(1),
   type: EvidenceTypeSchema,
@@ -33,6 +36,7 @@ export const EvidenceRefSchema = z.object({
 }).strict();
 export type EvidenceRef = z.infer<typeof EvidenceRefSchema>;
 
+/** Claim 持久化结构 Schema，只保存 evidenceIds，不嵌套完整 Evidence。 */
 export const ClaimSchema = z.object({
   id: z.string().min(1),
   claim: z.string().min(1),
@@ -41,9 +45,11 @@ export const ClaimSchema = z.object({
 }).strict();
 export type Claim = z.infer<typeof ClaimSchema>;
 
+/** Finding 严重程度枚举。 */
 export const FindingSeveritySchema = z.enum(['info', 'low', 'medium', 'high']);
 export type FindingSeverity = z.infer<typeof FindingSeveritySchema>;
 
+/** 通用 Finding 类型枚举，领域专项规则由 Skill 负责。 */
 export const FindingTypeSchema = z.enum([
   'multiple_sources_of_truth',
   'duplicate_transformation',
@@ -56,6 +62,7 @@ export const FindingTypeSchema = z.enum([
 ]);
 export type FindingType = z.infer<typeof FindingTypeSchema>;
 
+/** Finding 持久化结构 Schema。 */
 export const FindingSchema = z.object({
   id: z.string().min(1),
   type: FindingTypeSchema,
@@ -70,6 +77,7 @@ export const FindingSchema = z.object({
 }).strict();
 export type Finding = z.infer<typeof FindingSchema>;
 
+/** DiscoveryRun 持久化结构 Schema，用于记录一次扫描的范围和 parser 版本。 */
 export const DiscoveryRunSchema = z.object({
   id: z.string().min(1),
   root: z.string(),
@@ -82,6 +90,7 @@ export const DiscoveryRunSchema = z.object({
 }).strict();
 export type DiscoveryRun = z.infer<typeof DiscoveryRunSchema>;
 
+/** 根据确定性 Evidence 数量校正 Agent 声称的 Claim 状态，防止模型自行授予 verified。 */
 export function calibrateStatus(evidenceCount: number, claimed: ClaimStatus): ClaimStatus {
   if (evidenceCount === 0) return 'unknown';
   if (claimed === 'verified') return 'inferred';
