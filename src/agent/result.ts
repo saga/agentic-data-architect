@@ -9,7 +9,7 @@ export const AgentClaimDraftSchema = z.object({
   claim: z.string().trim().min(1).max(2000).catch(''),
   status: ClaimStatusSchema.catch('inferred'),
   evidenceIds: z.array(z.string()).catch([]),
-}).strict();
+});
 
 export type AgentClaimDraft = z.infer<typeof AgentClaimDraftSchema>;
 
@@ -20,7 +20,7 @@ export const AgentAnswerSchema = z.object({
     .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
   unknowns: z.array(z.string().max(500)).catch([]),
   followUpQuestions: z.array(z.string().max(500)).catch([]),
-}).strict();
+});
 
 export type AgentAnswer = z.infer<typeof AgentAnswerSchema>;
 
