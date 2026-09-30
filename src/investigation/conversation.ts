@@ -263,7 +263,7 @@ function dbOrThrow(): DatabaseSync {
 }
 
 function extractSearchTerms(value: string): string[] {
-  const segments = value.match(/[\u3400-\u9fff]{2,}|[\\p{L}\\p{N}_]{3,}/gu) ?? [];
+  const segments = value.match(/[\u3400-\u9fff]{2,}|[\p{L}\p{N}_]{3,}/gu) ?? [];
   const terms: string[] = [];
 
   for (const segment of segments) {
