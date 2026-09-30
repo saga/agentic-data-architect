@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Evidence-backed Data Modernization Workbench (V1: Current-State Discovery). See docs/architecture_0930.md",
   "scripts": {
+    "start": "tsx src/cli.ts start",
+    "dev": "tsx src/cli.ts start",
     "init": "tsx src/cli.ts init",
     "discover": "tsx src/cli.ts discover",
     "ask": "tsx src/cli.ts ask",
