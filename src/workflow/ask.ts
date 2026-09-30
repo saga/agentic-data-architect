@@ -14,11 +14,12 @@ import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../inv
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
-const activeInvestigationTurns = new Map<string, string>();
+const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
 const abortRequestedTurns = new Set<string>();
 
 export function requestAbort(investigationName: string, turnId: string): boolean {
-  if (activeInvestigationTurns.get(investigationName) !== turnId) return false;
+  const active = activeInvestigationTurns.get(investigationName);
+  if (!active || active.turnId !== turnId || active.phase !== 'executing') return false;
   abortRequestedTurns.add(turnId);
   return true;
 }
@@ -39,7 +40,7 @@ export async function answerQuestion(
   if (!turnId) turnId = nextId('turn');
 
   const reservedTurn = activeInvestigationTurns.get(investigationName);
-  if (reservedTurn && reservedTurn !== turnId) {
+  if (reservedTurn && reservedTurn.turnId !== turnId) {
     throw new Error('This investigation already has an active turn.');
   }
 
@@ -56,7 +57,7 @@ export async function answerQuestion(
 
   if (turn.status === 'running') {
     const sameTurnActive =
-      activeInvestigationTurns.get(investigationName) === turn.turnId ||
+      activeInvestigationTurns.get(investigationName)?.turnId === turn.turnId ||
       hasActiveCopilotTurn(turn.turnId);
     if (sameTurnActive) {
       throw new Error('This investigation already has an active turn.');
@@ -68,7 +69,7 @@ export async function answerQuestion(
     throw new Error('This turn ID has already finished and cannot be retried.');
   }
 
-  activeInvestigationTurns.set(investigationName, turnId);
+  activeInvestigationTurns.set(investigationName, { turnId, phase: 'executing' });
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
@@ -147,6 +148,16 @@ export async function answerQuestion(
     shouldAbort: () => abortRequestedTurns.has(turnId),
   });
   if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
+
+  // Once the model has returned, move into a non-cancelable commit phase.
+  // This prevents a Stop request from leaving context state and conversation
+  // history half-committed.
+  const activeAfterExecution = activeInvestigationTurns.get(investigationName);
+  if (activeAfterExecution?.turnId === turnId) {
+    activeAfterExecution.phase = 'committing';
+  }
+  abortRequestedTurns.delete(turnId);
+
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
@@ -157,14 +168,11 @@ export async function answerQuestion(
 
   const answer = parsed.answer || raw.slice(0, 2000);
   await saveInvestigation(inv);
-  if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
   saveConversationMessage({
     sessionName: investigationName,
     role: 'assistant',
     content: answer,
   });
-  if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
-
   const result: AnswerSummary = {
     answer,
     claimIds: claims.map((c) => `${c.id}[${c.status}]`),
@@ -178,7 +186,7 @@ export async function answerQuestion(
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
-    if (activeInvestigationTurns.get(investigationName) === turnId) {
+    if (activeInvestigationTurns.get(investigationName)?.turnId === turnId) {
       activeInvestigationTurns.delete(investigationName);
     }
     abortRequestedTurns.delete(turnId);
