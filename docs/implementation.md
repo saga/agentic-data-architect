@@ -129,3 +129,13 @@ Lead Data Agent 的 workingDirectory 指向当前 Investigation 的 workspace，
 - Targeted Query 的目标表检查改成边界匹配，避免 orders 被 my_orders 误命中。
 - SELECT FOR UPDATE / FOR SHARE / SELECT INTO 也纳入只读查询禁止范围。
 - Profile 与 column lineage 都必须带可回指的 evidence id。
+## 外部研究证据的当前边界
+
+GitHub / LeanIX / Confluence 的研究记录已经持久化到 Investigation workspace，并通过 context.json 保留 query、来源和重要发现。
+
+当前 V1.1 仍有一个明确边界：这些 research artifacts 还不会自动转换成 `EvidenceRef` 并进入 Claim 的 evidenceIds。V1.1 的 Agent Claim 证据链仍以 deterministic discovery / profiling / query evidence 为主。
+
+因此：
+- workspace research 可以作为后续分析输入，但不要把它在没有注册的情况下写成已经进入 Evidence Catalog 的事实。
+- V1.2 可以增加一个轻量的 research-evidence registration，把研究 artifact、来源 URI、page/repository id、时间和摘要转换成可引用 EvidenceRef。
+- 不需要为此引入新的 Catalog 服务；先在 Investigation 内完成 registration 即可。
