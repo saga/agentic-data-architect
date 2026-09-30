@@ -223,6 +223,15 @@ function AppInner() {
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  const [leftWidth, setLeftWidth] = useState(270);
+  const [rightWidth, setRightWidth] = useState(330);
+  const [resizing, setResizing] = useState<'left' | 'right' | null>(null);
+  const [showLeftTip, setShowLeftTip] = useState(() => {
+    try { return localStorage.getItem('ada.tip.left') !== 'dismissed'; } catch { return true; }
+  });
+  const [showRightTip, setShowRightTip] = useState(() => {
+    try { return localStorage.getItem('ada.tip.right') !== 'dismissed'; } catch { return true; }
+  });
 
   const reloadSessions = async (selectLatest = true) => {
     const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
@@ -274,6 +283,24 @@ function AppInner() {
       setMcpDraft(JSON.stringify(next.agent.mcpServers, null, 2));
     }
   }, [settingsOpen, current?.control]);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (event: MouseEvent) => {
+      if (resizing === 'left') {
+        setLeftWidth(Math.max(220, Math.min(380, event.clientX)));
+      } else {
+        setRightWidth(Math.max(280, Math.min(460, window.innerWidth - event.clientX)));
+      }
+    };
+    const onUp = () => setResizing(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizing]);
 
   const bubbleItems = useMemo(
     () =>
@@ -441,8 +468,8 @@ function AppInner() {
     )) ?? [];
 
   return (
-    <Layout className="app-shell">
-      <Sider width={280} theme="light" className="session-sider">
+    <Layout className={`app-shell${resizing ? ' is-resizing' : ''}`}>
+      <Sider width={leftWidth} theme="light" className="session-sider">
         <div className="brand">
           <div className="brand-mark">DA</div>
           <div>
@@ -465,13 +492,20 @@ function AppInner() {
           </Button>
         </div>
 
-        <Alert
-          className="sider-tip"
-          type="info"
-          showIcon
-          icon={<InfoCircleOutlined />}
-          message="Each investigation has its own research scope, files and agent configuration."
-        />
+        {showLeftTip ? (
+          <Alert
+            className="sider-tip"
+            type="info"
+            showIcon
+            closable
+            icon={<InfoCircleOutlined />}
+            message="Each investigation has its own research scope, files and agent configuration."
+            onClose={() => {
+              setShowLeftTip(false);
+              try { localStorage.setItem('ada.tip.left', 'dismissed'); } catch {}
+            }}
+          />
+        ) : null}
 
         <Conversations
           activeKey={active}
@@ -483,6 +517,16 @@ function AppInner() {
           className="conversations"
         />
       </Sider>
+
+      <div
+        className="resize-handle resize-handle-left"
+        role="separator"
+        aria-label="Resize session sidebar"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          setResizing('left');
+        }}
+      />
 
       <Layout>
         <Header className="topbar">
@@ -636,81 +680,117 @@ function AppInner() {
 
           <Divider type="vertical" className="content-divider" />
 
-          <aside className="context-panel">
-            <Flex vertical gap={12}>
-              <div>
-                <Text type="secondary">SESSION</Text>
-                <Title level={5}>{current?.context.name || '—'}</Title>
+          <div
+            className="right-panel-shell"
+            style={{ width: rightWidth, flex: `0 0 ${rightWidth}px` }}
+          >
+            <div
+              className="resize-handle resize-handle-right"
+              role="separator"
+              aria-label="Resize investigation sidebar"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                setResizing('right');
+              }}
+            />
+            <aside className="context-panel">
+              <div className="panel-header">
+                <div>
+                  <Text className="eyebrow">INVESTIGATION</Text>
+                  <Title level={5} style={{ margin: '3px 0 0' }}>{current?.context.name || '—'}</Title>
+                </div>
+                <Button type="text" icon={<SettingOutlined />} aria-label="Open investigation configuration" onClick={() => setSettingsOpen(true)} />
               </div>
 
-              <Alert
-                type="info"
-                showIcon
-                icon={<FileSearchOutlined />}
-                message="What this panel shows"
-                description="Current investigation state and the controls that shape what the agent can research and use."
-              />
+              {showRightTip ? (
+                <Alert
+                  className="context-tip"
+                  type="info"
+                  showIcon
+                  closable
+                  icon={<FileSearchOutlined />}
+                  message="Investigation controls"
+                  description="Research sources, Skills, prompts and MCP are configured per investigation."
+                  onClose={() => {
+                    setShowRightTip(false);
+                    try { localStorage.setItem('ada.tip.right', 'dismissed'); } catch {}
+                  }}
+                />
+              ) : null}
 
-              <Card size="small" title="Research scope">
-                <Flex vertical gap={7}>
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>Research</Text>
+                    <Text type="secondary" className="section-subtitle">
+                      {(current?.control?.research.githubRepositories.length ?? 0)} repositories · {(current?.control?.research.keywords.length ?? 0)} keywords
+                    </Text>
+                  </div>
+                  <Button size="small" type="link" onClick={() => { setSettingsTab('research'); setSettingsOpen(true); }}>Configure</Button>
+                </div>
+                <div className="status-line">
+                  <Text type="secondary">Search</Text>
                   <Text>
-                    GitHub: {current?.control?.research.githubRepositories.length
-                      ? current.control.research.githubSearchMode === 'only_selected'
-                        ? 'selected repos only'
-                        : 'selected repos + broader search'
-                      : 'not configured'}
+                    {current?.control?.research.githubRepositories.length
+                      ? current.control.research.githubSearchMode === 'only_selected' ? 'Selected only' : 'Selected + broader'
+                      : 'Not configured'}
                   </Text>
-                  <Text>Keywords: {current?.control?.research.keywords.length ?? 0}</Text>
-                  <Text>Important docs: {current?.control?.research.importantDocuments.length ?? 0}</Text>
-                  <Button type="link" icon={<SettingOutlined />} onClick={() => { setSettingsTab('research'); setSettingsOpen(true); }}>
-                    Configure research
-                  </Button>
-                </Flex>
-              </Card>
+                </div>
+                <div className="status-line">
+                  <Text type="secondary">Important docs</Text>
+                  <Text>{current?.control?.research.importantDocuments.length ?? 0}</Text>
+                </div>
+              </section>
 
-              <Card size="small" title="Agent controls">
-                <Flex vertical gap={7}>
-                  <Text>System prompt v{current?.control?.agent.systemPrompt.version ?? 1}</Text>
-                  <Text>Skills: {current?.control?.agent.skills.length ?? 0}</Text>
-                  <Text>MCP: {current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} enabled</Text>
-                  <Button type="link" icon={<ToolOutlined />} onClick={() => { setSettingsTab('agent'); setSettingsOpen(true); }}>
-                    Configure agent
-                  </Button>
-                </Flex>
-              </Card>
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>Agent</Text>
+                    <Text type="secondary" className="section-subtitle">Prompt v{current?.control?.agent.systemPrompt.version ?? 1}</Text>
+                  </div>
+                  <Button size="small" type="link" onClick={() => { setSettingsTab('agent'); setSettingsOpen(true); }}>Configure</Button>
+                </div>
+                <div className="status-line"><Text type="secondary">Skills</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} enabled</Text></div>
+              </section>
 
-              <Card size="small" title="Coverage">
-                <Flex vertical gap={6}>
-                  <Text>Evidence: {current?.context.evidence.length ?? 0}</Text>
-                  <Text>Findings: {current?.context.findings.length ?? 0}</Text>
-                  <Text>Claims: {current?.context.claims.length ?? 0}</Text>
-                  <Text>Unknowns: {current?.context.unknowns.length ?? 0}</Text>
-                </Flex>
-              </Card>
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>Coverage</Text>
+                    <Text type="secondary" className="section-subtitle">Current evidence state</Text>
+                  </div>
+                </div>
+                <div className="coverage-grid">
+                  <div><span>{current?.context.evidence.length ?? 0}</span><Text type="secondary">Evidence</Text></div>
+                  <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">Findings</Text></div>
+                  <div><span>{current?.context.claims.length ?? 0}</span><Text type="secondary">Claims</Text></div>
+                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">Unknowns</Text></div>
+                </div>
+              </section>
 
-              <Card
-                size="small"
-                title={
-                  <Flex justify="space-between" align="center">
-                    <span>Recent activity</span>
-                    <Button type="link" size="small" icon={<HistoryOutlined />} onClick={() => setAuditOpen(true)}>View all</Button>
-                  </Flex>
-                }
-              >
-                <Flex vertical gap={8}>
-                  {(current?.recentAudit ?? []).slice(0, 4).map((event) => (
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>Recent activity</Text>
+                    <Text type="secondary" className="section-subtitle">Configuration and workspace changes</Text>
+                  </div>
+                  <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setAuditOpen(true)}>All</Button>
+                </div>
+                <div className="activity-list">
+                  {(current?.recentAudit ?? []).slice(0, 3).map((event) => (
                     <div key={event.id} className="activity-item">
-                      <Text>{event.summary}</Text>
+                      <Text ellipsis>{event.summary}</Text>
                       <Text type="secondary">{formatTime(event.timestamp)}</Text>
                     </div>
                   ))}
                   {!current?.recentAudit.length ? <Text type="secondary">No activity recorded yet.</Text> : null}
-                </Flex>
-              </Card>
+                </div>
+              </section>
 
-              <Text type="secondary">Updated {current ? formatTime(current.context.updatedAt) : '—'}</Text>
-            </Flex>
-          </aside>
+              <Text type="secondary" className="panel-updated">Updated {current ? formatTime(current.context.updatedAt) : '—'}</Text>
+            </aside>
+          </div>>
         </Content>
       </Layout>
 
