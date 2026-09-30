@@ -5,9 +5,10 @@ import { checkDomainGaps } from '../analysis/finance-rules.js';
 import { discoverDirectory, type Inventory } from '../discovery/scanner.js';
 import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
-import { appendContextInput } from '../investigation/workspace.js';
+import { appendContextInput, redactSensitiveUri } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
 import type { DiscoveryRun } from '../evidence/types.js';
+import type { DataProfile } from '../adapters/database.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -26,7 +27,7 @@ export interface DiscoverySnapshot {
   inventory: Inventory | null;
   lineage: LineageGraph | null;
   estate: DataEstate;
-  profiles: { dataset: string; rowCount: number }[];
+  profiles: DataProfile[];
   findingIds: string[];
 }
 
@@ -46,7 +47,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   await appendContextInput(name, {
     kind: 'discovery',
     title: 'Discovery run',
-    content: JSON.stringify(opts),
+    content: JSON.stringify({ ...opts, ...(opts.database ? { database: redactSensitiveUri(opts.database) } : {}) }),
     source: 'agentic-data-architect discover',
     important: true,
   });
@@ -59,7 +60,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   const estate = emptyEstate();
   let inventory: Inventory | null = null;
   let lineage: LineageGraph | null = null;
-  const profiles: { dataset: string; rowCount: number }[] = [];
+  const profiles: DataProfile[] = [];
   const unknowns: string[] = [];
 
   if (opts.path) {
@@ -93,10 +94,10 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     mergeEstate(estate, db.estate);
   }
 
-  const tables = lineage?.tables.filter((t) => !t.startsWith('file:')) ?? [];
+  const tables = lineage?.tables.filter((t) => !t.startsWith('file:')) ?? estate.nodes.filter((n) => n.type === 'dataset').map((n) => n.name);
   const run: DiscoveryRun = {
     id: runId,
-    root: opts.path ?? opts.database ?? '',
+    root: opts.path ?? (opts.database ? redactSensitiveUri(opts.database) : ''),
     startedAt,
     completedAt: new Date().toISOString(),
     parserVersion: PARSER_VERSION,
@@ -107,12 +108,13 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   inv.discoveryRuns.push(run);
 
   // findings（deterministic，有证据才建）
-  if (lineage && inventory) {
+  if (lineage || opts.database) {
+    const findingLineage = lineage ?? lineageFromEstate(estate);
     const newFindings = runAllFindings({
       investigationId: name,
-      lineage,
-      profiles: [],
-      inventory,
+      lineage: findingLineage,
+      profiles,
+      inventory: inventory ?? undefined,
       evidence: inv.evidence,
     });
     const known = new Set(inv.findings.map((f) => `${f.type}:${f.title}`));
@@ -130,7 +132,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
       list.push(...cols);
       colsByDs.set(ds, list);
     };
-    for (const c of lineage.columns) {
+    for (const c of findingLineage.columns) {
       addCols(c.targetDataset, c.targetColumn);
       addCols(c.sourceDataset, c.sourceColumn);
     }
@@ -158,7 +160,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     filesScanned: run.filesScanned,
     datasetsFound: run.datasetsFound,
     lineageEdgesFound: run.lineageEdgesFound,
-    columnsFound: lineage?.columns.length ?? 0,
+    columnsFound: lineage?.columns.length ?? estate.nodes.filter((n) => n.type === 'column').length,
     findingsFound: inv.findings.length,
     unknowns: inv.unknowns,
     snapshotPath,
@@ -188,7 +190,8 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
     if (st.target) {
       const dsId = nodeId('dataset', st.target);
       ensure(dsId, 'dataset', st.target);
-      estate.edges.push({ id: nextEstateId(), from: fileId, to: dsId, type: 'writes_to', evidenceIds: [] });
+      const ev = lineage.evidence.find((e) => e.type === 'sql_statement' && e.file === st.file && e.lineStart === st.lineStart && e.lineEnd === st.lineEnd);
+      estate.edges.push({ id: nextEstateId(), from: fileId, to: dsId, type: 'writes_to', evidenceIds: ev ? [ev.id] : [] });
     }
   }
   for (const e of lineage.edges) {
@@ -203,7 +206,7 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
     const to = nodeId('column', `${c.targetDataset}.${c.targetColumn}`);
     ensure(from, 'column', `${c.sourceDataset}.${c.sourceColumn}`, { ...(c.expression ? { expression: c.expression } : {}) });
     ensure(to, 'column', `${c.targetDataset}.${c.targetColumn}`);
-    estate.edges.push({ id: nextEstateId(), from, to, type: 'derived_from', evidenceIds: [] });
+    estate.edges.push({ id: nextEstateId(), from, to, type: 'derived_from', evidenceIds: c.evidenceId ? [c.evidenceId] : [] });
     estate.edges.push({
       id: nextEstateId(),
       from: nodeId('dataset', c.targetDataset),
@@ -212,4 +215,24 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
       evidenceIds: [],
     });
   }
+}
+
+
+function lineageFromEstate(estate: DataEstate): LineageGraph {
+  const tables = estate.nodes.filter((n) => n.type === 'dataset').map((n) => n.name);
+  const columns = estate.nodes
+    .filter((n) => n.type === 'column')
+    .map((n) => {
+      const dot = n.name.lastIndexOf('.');
+      const dataset = dot > 0 ? n.name.slice(0, dot) : n.name;
+      const column = dot > 0 ? n.name.slice(dot + 1) : n.name;
+      return {
+        sourceDataset: dataset,
+        sourceColumn: column,
+        targetDataset: dataset,
+        targetColumn: column,
+        statementId: `metadata:${n.id}`,
+      };
+    });
+  return { edges: [], tables, columns, statements: [], evidence: [] };
 }
