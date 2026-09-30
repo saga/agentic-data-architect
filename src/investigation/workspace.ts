@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import type { Claim, DiscoveryRun, EvidenceRef, Finding } from '../evidence/types.js';
+import { migrateLegacyConversationInputs } from './conversation.js';
 
 export type WorkspaceInputKind =
   | 'user_prompt'
@@ -26,7 +27,7 @@ export interface WorkspaceInput {
 }
 
 export interface WorkspaceContext {
-  schemaVersion: 2;
+  schemaVersion: 3;
   name: string;
   userPrompt: string;
   goal: string;
@@ -152,7 +153,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
   } catch {
     const now = new Date().toISOString();
     const context: WorkspaceContext = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       name,
       userPrompt: seed.userPrompt ?? seed.goal ?? '',
       goal: seed.goal ?? '',
@@ -192,8 +193,8 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
 export async function loadWorkspaceContext(name: string): Promise<WorkspaceContext> {
   await ensureWorkspace(name);
   const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<WorkspaceContext>;
-  return {
-    schemaVersion: 2,
+  const context: WorkspaceContext = {
+    schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? '',
     goal: raw.goal ?? '',
@@ -210,6 +211,15 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
+
+  const remainingInputs = migrateLegacyConversationInputs(name, context.inputs);
+  if (remainingInputs.length !== context.inputs.length) {
+    context.inputs = remainingInputs;
+    context.updatedAt = new Date().toISOString();
+    await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+  }
+
+  return context;
 }
 
 export async function appendContextInput(
