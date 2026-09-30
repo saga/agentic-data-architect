@@ -17,6 +17,11 @@ function copilotSessionId(name: string): string {
   return 'agentic-data-architect-' + name;
 }
 
+async function createInvestigation(name: string) {
+  await saveInvestigation(newInvestigation(name));
+  return loadInvestigation(name);
+}
+
 async function loadSessionSkill(): Promise<string> {
   const file = path.resolve(process.cwd(), 'skills/investigation-session/SKILL.md');
   return fs.readFile(file, 'utf-8');
@@ -25,12 +30,11 @@ async function loadSessionSkill(): Promise<string> {
 export async function runInteractiveSession(requestedName?: string): Promise<void> {
   const name = requestedName?.trim() || defaultSessionName();
   const existed = await investigationExists(name);
-  if (existed) await loadInvestigation(name);
-  else await saveInvestigation(newInvestigation(name));
+  const investigation = existed ? await loadInvestigation(name) : await createInvestigation(name);
 
   const skill = await loadSessionSkill();
-  const sessionId = copilotSessionId(name);
-  await setCopilotSessionId(name, sessionId);
+  const sessionId = investigation.copilotSessionId ?? copilotSessionId(name);
+  if (!investigation.copilotSessionId) await setCopilotSessionId(name, sessionId);
 
   console.log('\nInvestigation: ' + name);
   console.log('Workspace: .workspace/' + name);
