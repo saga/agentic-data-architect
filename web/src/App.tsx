@@ -540,10 +540,11 @@ function AppInner() {
               </Text>
             </div>
             <Space>
-              {current?.control ? <Tag>Config v{current.control.version}</Tag> : null}
-              {current?.context.evidence.length ? <Tag color="blue">Evidence {current.context.evidence.length}</Tag> : null}
-              {current?.context.findings.length ? <Tag color="gold">Findings {current.context.findings.length}</Tag> : null}
-              {current?.context.unknowns.length ? <Tag color="orange">Unknowns {current.context.unknowns.length}</Tag> : null}
+              <Tag className="workspace-status" bordered={false}>Ready</Tag>
+              {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
+              {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
+              {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
+              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">Unknowns {current.context.unknowns.length}</Tag> : null}
               <Tooltip title="Research and agent configuration">
                 <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
                   Configure
@@ -566,58 +567,79 @@ function AppInner() {
               />
             ) : (
               <div className="welcome">
-                <div className="welcome-inner">
+                <div className="welcome-stage">
+                  <div className="welcome-brand">
+                    <div className="welcome-orb">DA</div>
+                    <div>
+                      <Text strong>Evidence-first data investigation</Text>
+                      <div><Text type="secondary">Discover the estate, trace lineage, verify facts, then decide what to investigate next.</Text></div>
+                    </div>
+                  </div>
+
                   <Welcome
                     variant="borderless"
                     icon={<FileTextOutlined />}
-                    title="Start this investigation"
-                    description="Tell the agent what you need to understand. You do not need to prepare a formal specification first."
+                    title="What are we investigating?"
+                    description="Start with a goal or a question. Add context, files or research sources whenever you have them."
                   />
 
-                  <div className="investigation-guide">
-                    <Card size="small" className="guide-card">
-                      <Flex align="flex-start" gap={12}>
-                        <CheckCircleOutlined className="guide-icon" />
-                        <div>
-                          <Text strong>1. Describe the goal</Text>
-                          <div><Text type="secondary">What decision or data question are you trying to answer?</Text></div>
-                        </div>
-                      </Flex>
-                    </Card>
-                    <Card size="small" className="guide-card">
-                      <Flex align="flex-start" gap={12}>
-                        <FolderOpenOutlined className="guide-icon" />
-                        <div>
-                          <Text strong>2. Give it some context</Text>
-                          <div><Text type="secondary">Mention the system, datasets, SQL, documents, or source paths you already know. Missing information can be discovered during the investigation.</Text></div>
-                        </div>
-                      </Flex>
-                    </Card>
-                    <Card size="small" className="guide-card">
-                      <Flex align="flex-start" gap={12}>
-                        <FileTextOutlined className="guide-icon" />
-                        <div>
-                          <Text strong>3. Ask the first question</Text>
-                          <div><Text type="secondary">The agent will inspect available evidence, identify gaps, and suggest the next investigation step.</Text></div>
-                        </div>
-                      </Flex>
-                    </Card>
+                  <div className="starter-grid">
+                    {[
+                      {
+                        icon: <CheckCircleOutlined />,
+                        title: 'Define the goal',
+                        description: 'What business or data decision are you trying to make?',
+                        prompt: 'Help me define the investigation goal and the key questions we should answer.',
+                      },
+                      {
+                        icon: <FileSearchOutlined />,
+                        title: 'Trace a data flow',
+                        description: 'Find sources, transformations and lineage for an important dataset.',
+                        prompt: 'Trace the lineage of the most important data flow in this investigation.',
+                      },
+                      {
+                        icon: <GithubOutlined />,
+                        title: 'Research the domain',
+                        description: 'Compare repositories, documents and existing implementation patterns.',
+                        prompt: 'Research the relevant domain patterns and summarize what we can verify.',
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.title}
+                        className="starter-card"
+                        type="button"
+                        onClick={() => send(item.prompt)}
+                      >
+                        <span className="starter-icon">{item.icon}</span>
+                        <span className="starter-copy">
+                          <Text strong>{item.title}</Text>
+                          <Text type="secondary">{item.description}</Text>
+                        </span>
+                      </button>
+                    ))}
                   </div>
 
                   <div className="quick-start">
-                    <Text type="secondary">Try one of these:</Text>
+                    <Text className="quick-start-label" type="secondary">Quick start</Text>
                     <Flex wrap gap={8}>
                       {[
                         'Where does Position come from in the legacy platform?',
                         'Map the lineage of portfolio market value.',
                         'What do we know about the current data model?',
                       ].map((prompt) => (
-                        <Button key={prompt} size="small" onClick={() => send(prompt)}>{prompt}</Button>
+                        <Button key={prompt} className="quick-chip" size="small" onClick={() => send(prompt)}>
+                          {prompt}
+                        </Button>
                       ))}
                     </Flex>
                   </div>
+
+                  <div className="welcome-footnote">
+                    <PaperClipOutlined />
+                    <Text type="secondary">Upload files, configure GitHub sources, Skills and MCP as the investigation evolves.</Text>
+                  </div>
                 </div>
-              </div>
+              </div>              </div>
             )}
 
             {error ? (
