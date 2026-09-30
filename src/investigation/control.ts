@@ -69,6 +69,23 @@ function controlFile(name: string): string {
   return path.join(workspaceRoot(name), 'control.json');
 }
 
+const controlUpdateLocks = new Map<string, Promise<void>>();
+
+async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  const previous = controlUpdateLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  controlUpdateLocks.set(name, queued);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (controlUpdateLocks.get(name) === queued) controlUpdateLocks.delete(name);
+  }
+}
+
 function auditFile(name: string): string {
   return path.join(workspaceRoot(name), 'audit.jsonl');
 }
@@ -235,6 +252,16 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
 }
 
 export async function updateInvestigationControl(
+  name: string,
+  next: Pick<InvestigationControl, 'research' | 'agent'>,
+  reason = 'configuration updated',
+): Promise<InvestigationControl> {
+  return withControlUpdateLock(name, () =>
+    updateInvestigationControlImpl(name, next, reason),
+  );
+}
+
+async function updateInvestigationControlImpl(
   name: string,
   next: Pick<InvestigationControl, 'research' | 'agent'>,
   reason = 'configuration updated',
