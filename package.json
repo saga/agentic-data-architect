@@ -1,7 +1,7 @@
 {
   "name": "agentic-data-architect",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "Evidence-backed Data Modernization Workbench (V1: Current-State Discovery). See docs/architecture_0930.md",
   "scripts": {
