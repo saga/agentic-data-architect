@@ -18,6 +18,12 @@ jobs:
           python-version: '3.12'
       - run: pip install sqlglot
       - run: npm install
+      - name: upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-package-lock
+          path: package-lock.json
+          retention-days: 1
       - name: block critical production dependency vulnerabilities
         run: npm audit --omit=dev --audit-level=critical
       - name: report high production dependency vulnerabilities
