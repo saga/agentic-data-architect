@@ -75,7 +75,7 @@ export function findMultipleSourcesOfTruth(ctx: FindingContext): Finding[] {
       const f = mk(
         ctx,
         'multiple_sources_of_truth',
-        `多个候选数据源都声称提供 ${concept}`,
+        `发现多个疑似 ${concept} 数据集`,
         `发现 ${unique.length} 个疑似 ${concept} 的 dataset：${unique.join('、')}。需要确认哪个是权威源，哪些只是缓存或派生。`,
         'high',
         unique,
@@ -264,8 +264,9 @@ export function findTemporalRisks(ctx: FindingContext): Finding[] {
     }
   }
   const out: Finding[] = [];
+  const temporalDomains = ['position', 'holding', 'price', 'valuation', 'portfolio', 'transaction', 'trade', 'performance', 'research', 'fundamental', 'estimate'];
   for (const [ds, cols] of colsByDataset) {
-    if (ds.startsWith('file:')) continue;
+    if (ds.startsWith('file:') || !temporalDomains.some((h) => ds.toLowerCase().includes(h))) continue;
     const hasTime = cols.some((c) => TIME_HINTS.some((h) => c.toLowerCase().includes(h)));
     if (!hasTime) {
       const f = mk(
