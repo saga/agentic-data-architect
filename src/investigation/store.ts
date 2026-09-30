@@ -119,7 +119,7 @@ export async function investigationExists(name: string): Promise<boolean> {
   } catch {
     try {
       await fs.access(path.join(config.investigationDir, `${name}.json`));
-      return false;
+      return true;
     } catch {
       return false;
     }
