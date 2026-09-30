@@ -50,12 +50,38 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
     }
     for (const t of picked) {
       const dsId = nodeId('dataset', t.qualifiedName);
+      const schemaName = t.schema ?? 'PUBLIC';
+      const schemaKey = (t.database ? t.database + '.' : '') + schemaName;
+      const schemaId = nodeId('schema', schemaKey);
+      if (!estate.nodes.some((n) => n.id === schemaId)) {
+        estate.nodes.push({
+          id: schemaId,
+          type: 'schema',
+          name: schemaKey,
+          attributes: { adapter: adapter.type, database: t.database },
+        });
+      }
+      if (t.database) {
+        const databaseId = nodeId('database', t.database);
+        if (!estate.nodes.some((n) => n.id === databaseId)) {
+          estate.nodes.push({
+            id: databaseId,
+            type: 'database',
+            name: t.database,
+            attributes: { adapter: adapter.type },
+          });
+        }
+        if (!estate.edges.some((e) => e.from === databaseId && e.to === schemaId && e.type === 'contains')) {
+          estate.edges.push({ id: nextId('e'), from: databaseId, to: schemaId, type: 'contains', evidenceIds: [] });
+        }
+      }
       estate.nodes.push({
         id: dsId,
         type: 'dataset',
         name: t.qualifiedName,
         attributes: { adapter: adapter.type, schema: t.schema },
       });
+      estate.edges.push({ id: nextId('e'), from: schemaId, to: dsId, type: 'contains', evidenceIds: [] });
       let meta;
       try {
         meta = await adapter.getTableMetadata(t.qualifiedName);
