@@ -4,13 +4,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentic-data-architect-'));
-process.env.DATA_DIR = dataDir;
+const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentic-data-architect-'));
+process.env.WORKSPACE_DIR = workspaceDir;
 
-const { ensureWorkspace, contextFile, researchDir, appendContextInput, loadWorkspaceContext, redactSensitiveUri } =
-  await import('../src/investigation/workspace.js');
+const {
+  ensureWorkspace,
+  contextFile,
+  sharedIndexFile,
+  appendContextInput,
+  loadWorkspaceContext,
+  redactSensitiveUri,
+  addSharedDocument,
+} = await import('../src/investigation/workspace.js');
 
-test('workspace creates context and research folders', async () => {
+test('workspace creates a minimal session root and shared index', async () => {
   const root = await ensureWorkspace('demo', {
     userPrompt: 'Modernize proxy voting',
     goal: 'Replace legacy workflow',
@@ -18,40 +25,57 @@ test('workspace creates context and research folders', async () => {
     systems: ['ISS'],
   });
   const context = JSON.parse(await fs.readFile(contextFile('demo'), 'utf8'));
-  assert.equal(root.endsWith(path.join('demo', 'workspace')), true);
+  assert.equal(root, path.join(workspaceDir, 'demo'));
   assert.equal(context.userPrompt, 'Modernize proxy voting');
   assert.equal(context.inputs.length, 1);
-  assert.equal(await exists(path.join(researchDir('demo'), 'github')), true);
-  assert.equal(await exists(path.join(researchDir('demo'), 'leanix')), true);
-  assert.equal(await exists(path.join(researchDir('demo'), 'confluence')), true);
+  assert.equal(await exists(path.join(workspaceDir, 'demo', 'transcript.md')), true);
+  assert.equal(await exists(path.join(workspaceDir, 'shared', 'index.json')), true);
 });
 
-test('workspace appends inputs without overwriting earlier research context', async () => {
+test('workspace appends inputs without overwriting earlier context', async () => {
   await ensureWorkspace('demo', { userPrompt: 'Initial prompt' });
   await appendContextInput('demo', {
     kind: 'research',
     title: 'GitHub search',
     source: 'github',
     uri: 'https://github.com/example/repo',
-    artifactPath: 'research/github/001-search.md',
+    artifactPath: 'shared/github/001-search.md',
     content: 'Search query and important findings',
     important: true,
   });
   const context = await loadWorkspaceContext('demo');
   assert.equal(context.userPrompt, 'Modernize proxy voting');
   assert.equal(context.inputs.length, 2);
-  assert.equal(context.inputs[1]?.artifactPath, 'research/github/001-search.md');
+  assert.equal(context.inputs[1]?.artifactPath, 'shared/github/001-search.md');
+});
+
+test('shared index records reusable documents', async () => {
+  await addSharedDocument(
+    'confluence',
+    'page-123',
+    'Position model',
+    '# Position\n\nCurrent model.',
+    { uri: 'https://example.atlassian.net/wiki/page-123', source: 'confluence', sessionNames: ['demo'] },
+  );
+  const index = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf8')) as {
+    artifacts: Array<{ id: string; path: string }>;
+  };
+  assert.equal(index.artifacts[0]?.id, 'page-123');
+  assert.equal(index.artifacts[0]?.path, 'shared/confluence/page-123.md');
+  assert.equal(await exists(path.join(workspaceDir, 'shared', 'confluence', 'page-123.md')), true);
 });
 
 test('redactSensitiveUri never persists database credentials', () => {
-  const redacted = redactSensitiveUri('snowflake://user:secret@example.acct/DB/SCHEMA?warehouse=WH&role=ROLE&token=abc');
+  const redacted = redactSensitiveUri(
+    'snowflake://user:secret@example.acct/DB/SCHEMA?warehouse=WH&role=ROLE&token=abc',
+  );
   assert.equal(redacted.includes('secret'), false);
   assert.equal(redacted.includes('abc'), false);
   assert.ok(redacted.includes('REDACTED'));
 });
 
 test.after(async () => {
-  await fs.rm(dataDir, { recursive: true, force: true });
+  await fs.rm(workspaceDir, { recursive: true, force: true });
 });
 
 async function exists(file: string): Promise<boolean> {
