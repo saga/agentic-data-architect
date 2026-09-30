@@ -170,7 +170,9 @@ export async function saveDiscoverySnapshot(name: string, runId: string, snapsho
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, runId + '.json');
-  await fs.writeFile(fp, JSON.stringify(snapshot, null, 2));
+  // Discovery snapshots are later used as agent evidence, so never leave a
+  // partially written JSON file behind.
+  await writeJsonAtomic(fp, snapshot);
   return fp;
 }
 
