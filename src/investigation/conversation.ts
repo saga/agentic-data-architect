@@ -199,6 +199,15 @@ export function recoverRunningConversationTurns(): number {
   return Number(result.changes);
 }
 
+export function abortStaleConversationTurn(turnId: string, error = 'The previous process did not complete this turn.'): boolean {
+  const result = getDatabase().prepare(`
+    UPDATE conversation_turns
+    SET status = 'aborted', error = ?, updated_at = ?
+    WHERE turn_id = ? AND status = 'running'
+  `).run(error, new Date().toISOString(), turnId);
+  return Number(result.changes) > 0;
+}
+
 export function getConversationTurn(turnId: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
     SELECT turn_id, session_name, status, result, error, created_at, updated_at
