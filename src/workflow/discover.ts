@@ -1,7 +1,6 @@
 import { PARSER_VERSION } from '../analysis/sql-parser.js';
 import { buildLineage, type LineageGraph } from '../analysis/lineage.js';
 import { runAllFindings } from '../analysis/findings.js';
-import { checkDomainGaps } from '../analysis/finance-rules.js';
 import { discoverDirectory, type Inventory } from '../discovery/scanner.js';
 import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
@@ -127,21 +126,8 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
         inv.findings.push(f);
       }
     }
-    // 金融清单缺口 → unknowns（证据不足时提问，不硬判）
-    // 目标列和源列都计入：只当过源的表（如 security_price）否则列清单为空、乱问一气
-    const colsByDs = new Map<string, string[]>();
-    const addCols = (ds: string, ...cols: string[]) => {
-      const list = colsByDs.get(ds) ?? [];
-      list.push(...cols);
-      colsByDs.set(ds, list);
-    };
-    for (const c of findingLineage.columns) {
-      addCols(c.targetDataset, c.targetColumn);
-      addCols(c.sourceDataset, c.sourceColumn);
-    }
-    for (const g of checkDomainGaps(tables.map((t) => ({ name: t, columns: colsByDs.get(t) ?? [] })))) {
-      if (!inv.unknowns.includes(g.question)) inv.unknowns.push(g.question);
-    }
+    // 领域专项检查不在 discovery core 中硬编码。
+    // 对金融场景，financial-data-review Skill 会按需运行 deterministic review script。
   }
 
   for (const u of unknowns) {
