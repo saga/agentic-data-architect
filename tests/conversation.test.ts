@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import {
+  abortStaleConversationTurn,
+  beginConversationTurn,
   getConversationSummary,
+  getRunningConversationTurn,
   listConversationMessages,
   migrateLegacyConversationInputs,
   saveConversationMessage,
@@ -101,4 +104,21 @@ test('migrates legacy chat inputs out of workspace state', () => {
   ]);
   assert.equal(listConversationMessages(otherSessionName).length, 1);
   assert.equal(listConversationMessages(otherSessionName)[0]?.sessionName, otherSessionName);
+});
+
+test('allows stale running turns to be recovered before a new turn starts', () => {
+  const sessionName = 'conversation-turn-test-' + randomUUID();
+  const first = beginConversationTurn(sessionName, 'turn-' + randomUUID());
+
+  assert.equal(first.status, 'running');
+  assert.equal(getRunningConversationTurn(sessionName)?.turnId, first.turnId);
+  assert.throws(
+    () => beginConversationTurn(sessionName, 'turn-' + randomUUID()),
+  );
+
+  assert.equal(abortStaleConversationTurn(first.turnId), true);
+  assert.equal(getRunningConversationTurn(sessionName), undefined);
+
+  const second = beginConversationTurn(sessionName, 'turn-' + randomUUID());
+  assert.equal(second.status, 'running');
 });
