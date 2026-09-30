@@ -18,6 +18,8 @@ jobs:
           python-version: '3.12'
       - run: pip install sqlglot
       - run: npm ci
+      - name: audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
         env:
