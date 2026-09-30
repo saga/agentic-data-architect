@@ -16,7 +16,7 @@ V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
 ---
-## Skill / Core 边界
+## Skill / Core / Agent 边界
 
 当前架构明确把容易变化的业务知识从核心 workflow 中拿出来：
 
@@ -1689,30 +1689,30 @@ Agent 不是“聊天几轮以后记住上下文”。
 
 ---
 
-# 二十九、推荐的 Agent 结构：不要做成 Agent Swarm
+# 二十九、Agent 与 Skill 的边界
 
-你这个项目不需要几十个 agent。
+当前实现不是 multi-agent swarm，也没有单独的 `lead-data-agent` custom agent。
 
-我建议：
+运行时只有一个 Investigation 主 Agent：
 
 ```text
-                 Lead Data Agent
-                       │
-          ┌────────────┼────────────┐
-          │            │            │
-      Analyst Skill  Architect   Reviewer
-                         Skill      Skill
-          │            │            │
-          └────────────┼────────────┘
-                       │
-                 Tool / Engine Layer
+Investigation
+      │
+      ▼
+Copilot SDK default agent
+      │
+      ├── platform system rules
+      ├── research configuration
+      ├── investigation-specific guidance
+      ├── selected Skills
+      └── configured MCP / explicit built-in tools
 ```
 
-也就是说：
+## Agent
 
-## 1 个主要 Agent
+Agent 是运行时角色，不是用户需要维护的一套业务能力包。
 
-负责：
+当前主 Agent 负责：
 
 ```text
 planning
@@ -1723,40 +1723,55 @@ communication
 architecture decisions
 ```
 
-## 下面是 deterministic engines
+这些平台级规则不放进某一个 Skill，也不要求用户配置。
+
+## Skill
+
+Skill 是平级、可复用、可按 Investigation 配置启用的能力模块：
 
 ```text
-parser
+skills/
+  investigation-session/
+  financial-data-review/
+  search-github/
+  search-confluence/
+  search-leanix/
+  working-directory/
+```
+
+每个 Skill 通过 `SKILL.md` 描述能力；需要确定性计算时，可以带 `scripts/`。
+
+一次 Investigation 的 `control.json` 固定本轮可用 Skill。没有选择的 Skill 在 Copilot session 中显式禁用。
+
+## 为什么现在不使用 Custom Agent
+
+Copilot SDK 的 Custom Agent 适合真正存在不同 Agent 角色时，例如：
+
+```text
+Data Architect Agent
+Security Reviewer Agent
+Financial Domain Agent
+```
+
+当前项目只有一个主推理角色，因此再包一层 `lead-data-agent` 只会增加配置和 UI 概念，没有增加实际能力。
+
+以后真的需要多个 Agent 时，再引入 Custom Agent；届时每个 Agent 可以拥有自己的 prompt、model、tools、MCP 和 Skill 集合。
+
+## Deterministic engine
+
+确定性能力仍然独立于 Agent：
+
+```text
+SQL parser
 profiler
 lineage
 query engine
-comparison engine
-validation engine
+findings
+validation
+report
 ```
 
-## Skills
-
-```text
-data-analysis
-data-modeling
-investment-data
-migration
-semantic-modeling
-data-quality
-```
-
-而不是：
-
-```text
-SecurityAgent
-PriceAgent
-PositionAgent
-ResearchAgent
-PortfolioAgent
-...
-```
-
-这种方案很容易变成 multi-agent orchestration 地狱。
+Agent 负责理解和综合这些结果，不能把它们的确定性约束改成 prompt 中的“建议”。
 
 ---
 
