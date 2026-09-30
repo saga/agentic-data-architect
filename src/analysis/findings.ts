@@ -1,3 +1,8 @@
+/**
+ * Deterministic Findings Engine。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import { nextId, type EvidenceRef, type Finding, type FindingType } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
 import type { LineageGraph } from './lineage.js';
@@ -16,6 +21,7 @@ export interface FindingContext {
   evidence: EvidenceRef[];
 }
 
+/** 查找能够证明某个业务资产相关 Finding 的 Evidence ID。 */
 function evidenceFor(ctx: FindingContext, asset: string): string[] {
   const lower = asset.toLowerCase();
   return ctx.evidence
@@ -28,6 +34,7 @@ function evidenceFor(ctx: FindingContext, asset: string): string[] {
     .map((e) => e.id);
 }
 
+/** 创建一个带 Evidence 的 Finding；没有任何证据时返回 null，避免生成无依据的问题。 */
 function mk(
   ctx: FindingContext,
   type: FindingType,
@@ -53,6 +60,7 @@ function mk(
   };
 }
 
+/** 找出多个目标列重复使用同一转换表达式的情况。 */
 export function findDuplicateTransformations(ctx: FindingContext): Finding[] {
   const byExpr = new Map<string, { target: string; file: string }[]>();
   for (const st of ctx.lineage.statements) {
@@ -83,6 +91,7 @@ export function findDuplicateTransformations(ctx: FindingContext): Finding[] {
   return out;
 }
 
+/** 找出扫描到但没有上下游连接的孤立数据集。 */
 export function findMissingLineage(ctx: FindingContext): Finding[] {
   if (ctx.lineage.statements.length === 0) return [];
   const connected = new Set<string>();
@@ -104,6 +113,7 @@ export function findMissingLineage(ctx: FindingContext): Finding[] {
   return f ? [f] : [];
 }
 
+/** 找出表达式结构相似但定义在不同目标列上的潜在语义冲突。 */
 export function findSemanticConflicts(ctx: FindingContext): Finding[] {
   // 不同目标列用了同构的派生表达式（去标识符后的形状相同）→ 可能是同一业务定义被各说各话
   // 裸列直通不算（那是 rename/lineage，不是语义冲突）
@@ -146,6 +156,7 @@ export function findSemanticConflicts(ctx: FindingContext): Finding[] {
   return out;
 }
 
+/** 根据 profiling 结果识别空表、高空值率等基础数据质量问题。 */
 export function findDataQualityIssues(ctx: FindingContext): Finding[] {
   const out: Finding[] = [];
   for (const p of ctx.profiles) {
