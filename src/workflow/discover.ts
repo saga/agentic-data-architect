@@ -5,6 +5,7 @@
  */
 import { PARSER_VERSION } from '../analysis/sql-parser.js';
 import { buildLineage, type LineageGraph } from '../analysis/lineage.js';
+import { buildCurrentStateIntelligence } from '../analysis/current-state.js';
 import { runAllFindings } from '../analysis/findings.js';
 import { discoverDirectory, type Inventory } from '../discovery/scanner.js';
 import { discoverDatabase } from '../discovery/database.js';
@@ -13,6 +14,7 @@ import { appendContextInput, redactSensitiveUri } from '../investigation/workspa
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
 import type { DiscoveryRun } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
+import type { SemanticAsset } from '../semantic/types.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -33,6 +35,8 @@ export interface DiscoverySnapshot {
   lineage: LineageGraph | null;
   estate: DataEstate;
   profiles: DataProfile[];
+  semanticAssets: SemanticAsset[];
+  currentState: ReturnType<typeof buildCurrentStateIntelligence>;
   findingIds: string[];
 }
 
@@ -44,6 +48,8 @@ export interface DiscoverSummary {
   lineageEdgesFound: number;
   columnsFound: number;
   findingsFound: number;
+  parseFailures: number;
+  semanticAssetsFound: number;
   unknowns: string[];
   snapshotPath: string;
 }
@@ -72,6 +78,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
   let inventory: Inventory | null = null;
   let lineage: LineageGraph | null = null;
   const profiles: DataProfile[] = [];
+  const semanticAssets: SemanticAsset[] = [];
   const unknowns: string[] = [];
 
   if (opts.path) {
@@ -88,6 +95,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
         })),
     );
     inv.evidence.push(...lineage.evidence);
+    unknowns.push(...lineage.parseFailures.map((failure) => 'SQL 无法解析：' + failure.file + ':' + failure.lineStart + '-' + failure.lineEnd + '：' + failure.error));
     mergeEstateFromLineage(estate, lineage, inventory);
   }
 
@@ -102,6 +110,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
     inv.evidence.push(...db.evidence);
     unknowns.push(...db.unknowns);
     profiles.push(...db.profiles);
+    semanticAssets.push(...db.semanticAssets);
     mergeEstate(estate, db.estate);
   }
 
@@ -118,6 +127,8 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
     filesScanned: inventory?.files.length ?? 0,
     datasetsFound: tables.length,
     lineageEdgesFound: lineage?.edges.length ?? 0,
+    sqlParseFailures: lineage?.parseFailures.length ?? 0,
+    semanticAssetsFound: semanticAssets.length,
   };
   inv.discoveryRuns.push(run);
 
@@ -146,12 +157,16 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
     if (!inv.unknowns.includes(u)) inv.unknowns.push(u);
   }
 
+  const currentState = buildCurrentStateIntelligence({ inventory, estate, lineage, profiles, semanticAssets });
+
   const snapshot: DiscoverySnapshot = {
     run,
     inventory,
     lineage,
     estate,
     profiles,
+    semanticAssets,
+    currentState,
     findingIds: inv.findings.map((f) => f.id),
   };
   // snapshot 先独立原子写入，再保存 Investigation context；二者共同组成本次 Discovery 的可恢复状态。
@@ -164,6 +179,8 @@ const snapshotPath = await saveDiscoverySnapshot(name, runId, snapshot);
     lineageEdgesFound: run.lineageEdgesFound,
     columnsFound: lineage?.columns.length ?? estate.nodes.filter((n) => n.type === 'column').length,
     findingsFound: inv.findings.length,
+    parseFailures: lineage?.parseFailures.length ?? 0,
+    semanticAssetsFound: semanticAssets.length,
     unknowns: inv.unknowns,
     snapshotPath,
   };
@@ -217,6 +234,8 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
       to,
       type: 'contains',
       evidenceIds: c.evidenceId ? [c.evidenceId] : [],
+      relationMode: 'static',
+      ...(c.expression ? { expression: c.expression } : {}),
     });
   }
 }
@@ -239,5 +258,5 @@ function lineageFromEstate(estate: DataEstate): LineageGraph {
         statementId: `metadata:${n.id}`,
       };
     });
-  return { edges: [], tables, columns, statements: [], evidence: [] };
+  return { edges: [], tables, columns, statements: [], parseFailures: [], evidence: [] };
 }
