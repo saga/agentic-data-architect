@@ -18,6 +18,7 @@ import {
 import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
 import {
   closeConversationStore,
+  recoverRunningConversationTurns,
   getConversationSummary,
   listConversationMessages,
   searchConversation,
@@ -332,8 +333,8 @@ export function createApp(vite?: ViteDevServer) {
       finished = true;
       res.end();
     } catch (error) {
-      finished = true;
       send('error', { error: error instanceof Error ? error.message : String(error) });
+      finished = true;
       res.end();
     } finally {
       clearInterval(heartbeat);
@@ -399,6 +400,9 @@ async function main(): Promise<void> {
       appType: 'spa',
     });
   }
+
+  const recoveredTurns = recoverRunningConversationTurns();
+  if (recoveredTurns > 0) console.warn(`Recovered ${recoveredTurns} interrupted investigation turn(s).`);
 
   const app = createApp(vite);
   const server = createHttpServer(app);
