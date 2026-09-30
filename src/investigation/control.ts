@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { config } from '../config.js';
-import { workspaceRoot } from './workspace.js';
+import { workspaceRoot, writeJsonAtomic } from './workspace.js';
 
 export type GitHubSearchMode = 'only_selected' | 'selected_and_broad';
 
@@ -224,7 +224,7 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
       snapshot: base,
     }],
   };
-  await fs.writeFile(controlFile(name), JSON.stringify(control, null, 2));
+  await writeJsonAtomic(controlFile(name), control);
   await appendAuditEvent(name, {
     actor: 'system',
     action: 'configuration.created',
@@ -303,7 +303,7 @@ export async function updateInvestigationControl(
     },
   ].slice(-30);
 
-  await fs.writeFile(controlFile(name), JSON.stringify(control, null, 2));
+  await writeJsonAtomic(controlFile(name), control);
 
   const changed: string[] = [];
   if (JSON.stringify(current.research) !== JSON.stringify(control.research)) changed.push('research');
