@@ -123,7 +123,6 @@ export async function answerQuestion(
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
-  try {
   const raw = await askCopilot({
     prompt,
     systemPrompt: [
