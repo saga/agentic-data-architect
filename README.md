@@ -59,7 +59,16 @@ npm run dev
     artifacts/
 ```
 
-`.workspace/<session-name>/context.json` 是当前 Investigation 的主要状态入口。
+`.workspace/<session-name>/context.json` 是当前 Investigation 的状态入口，只保存 goal、scope、evidence、claims、findings、unknowns 等状态，不再保存多轮聊天正文。
+
+`.workspace/conversations.db` 保存所有 session 的 user / assistant / system 消息。多轮对话不会随着轮数增长而不断膨胀 `context.json`。
+
+对话表同时建立 SQLite FTS5 索引。当前主要用于两件事：
+
+- 用户重新追问已经讨论过的主题时，按问题检索少量相关历史消息，补充给 Agent，而不是把整段历史全部塞进 prompt。
+- Web API 可以按关键词搜索某个 session 的历史消息，后续可用于历史定位、会话恢复和审计查看。
+
+当前检索只取相关历史消息的一个小窗口；SQLite 是长期消息存储，`context.json` 仍然是当前调查状态。
 
 `.workspace/shared/` 是跨 session 可复用资料区。例如 Confluence 页面保存为：
 
@@ -84,6 +93,7 @@ GET  /api/sessions
 POST /api/sessions
 
 GET  /api/sessions/:name
+GET  /api/sessions/:name/messages?q=...
 POST /api/sessions/:name/messages
 GET  /api/sessions/:name/report
 
