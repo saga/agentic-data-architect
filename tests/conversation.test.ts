@@ -42,7 +42,7 @@ test('stores conversation turns in sqlite and searches them with fts5', () => {
   assert.match(chineseHits[0]?.content ?? '', /权威来源/);
 
   const summary = getConversationSummary(sessionName);
-  assert.equal(summary.count, 2);
+  assert.equal(summary.count, 3);
   assert.ok(summary.lastMessageAt);
 });
 
