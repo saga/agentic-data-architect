@@ -112,6 +112,8 @@ const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
     profiles: snapshot?.profiles ?? [],
     findings: inv.findings,
     evidence: inv.evidence,
+    currentState: snapshot?.currentState ?? null,
+    semanticAssets: snapshot?.semanticAssets ?? [],
   });
   // 历史对话只作为 conversation context，不提升成 Evidence，避免旧模型回答污染当前事实来源。
 const priorConversation = searchConversation(investigationName, question, {
