@@ -545,11 +545,7 @@ function AppInner() {
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
               {current?.context.unknowns.length ? <Tag bordered={false} color="orange">Unknowns {current.context.unknowns.length}</Tag> : null}
-              <Tooltip title="Research and agent configuration">
-                <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
-                  Configure
-                </Button>
-              </Tooltip>
+
             </Space>
           </Flex>
         </Header>
@@ -721,7 +717,9 @@ function AppInner() {
                   <Text className="eyebrow">INVESTIGATION</Text>
                   <Title level={5} style={{ margin: '3px 0 0' }}>{current?.context.name || '—'}</Title>
                 </div>
-                <Button type="text" icon={<SettingOutlined />} aria-label="Open investigation configuration" onClick={() => setSettingsOpen(true)} />
+                <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
+                  Configure
+                </Button>
               </div>
 
               {showRightTip ? (
@@ -748,7 +746,7 @@ function AppInner() {
                       {(current?.control?.research.githubRepositories.length ?? 0)} repositories · {(current?.control?.research.keywords.length ?? 0)} keywords
                     </Text>
                   </div>
-                  <Button size="small" type="link" onClick={() => { setSettingsTab('research'); setSettingsOpen(true); }}>Configure</Button>
+
                 </div>
                 <div className="status-line">
                   <Text type="secondary">Search</Text>
@@ -770,7 +768,7 @@ function AppInner() {
                     <Text strong>Agent</Text>
                     <Text type="secondary" className="section-subtitle">Prompt v{current?.control?.agent.systemPrompt.version ?? 1}</Text>
                   </div>
-                  <Button size="small" type="link" onClick={() => { setSettingsTab('agent'); setSettingsOpen(true); }}>Configure</Button>
+
                 </div>
                 <div className="status-line"><Text type="secondary">Skills</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
                 <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} enabled</Text></div>
