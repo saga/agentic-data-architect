@@ -74,9 +74,9 @@ export async function answerQuestion(
           const excerpt = item.content.length > 1200 ? item.content.slice(0, 1200) + '…' : item.content;
           return `[${item.role}] ${excerpt}`;
         }),
-      ].join('\\n')
+      ].join('\n')
     : '';
-  const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\\n\\n');
+  const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
 
   const existingIds = new Set(inv.evidence.map((e) => e.id));
   const prompt = buildQuestionPrompt({
