@@ -1,3 +1,8 @@
+/**
+ * CLI 命令行入口。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 #!/usr/bin/env tsx
 import { stopClient } from './agent/copilot.js';
 import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
@@ -5,6 +10,7 @@ import { runDiscovery } from './workflow/discover.js';
 import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
 
+/** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
   if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2]');
@@ -19,6 +25,7 @@ async function cmdInit(args: string[]): Promise<void> {
   console.log('session created: ' + await saveInvestigation(inv));
 }
 
+/** CLI discover 命令：校验 Session、解析发现参数，并调用共享 discovery workflow。 */
 async function cmdDiscover(args: string[]): Promise<void> {
   const [name, ...rest] = args;
   if (!name) throw new Error('usage: discover <name> [--path ./dir] [--database URL] [--schema S] [--profile]');
@@ -38,6 +45,7 @@ async function cmdDiscover(args: string[]): Promise<void> {
   console.log('snapshot: ' + s.snapshotPath);
 }
 
+/** CLI ask 命令：把命令行问题交给统一的 Agent workflow，输出答案和结构化 Claim。 */
 async function cmdAsk(args: string[]): Promise<void> {
   const [name, ...q] = args;
   const question = q.join(' ').trim();
@@ -48,6 +56,7 @@ async function cmdAsk(args: string[]): Promise<void> {
   for (const w of r.warnings) console.log('warning: ' + w);
 }
 
+/** CLI report 命令：生成当前 Investigation 报告并打印，同时写入报告文件。 */
 async function cmdReport(args: string[]): Promise<void> {
   const [name] = args;
   if (!name) throw new Error('usage: report <name>');
@@ -56,6 +65,7 @@ async function cmdReport(args: string[]): Promise<void> {
   console.error('written: ' + r.path);
 }
 
+/** CLI 主入口：根据第一个参数选择 init/discover/ask/report，并保证退出时停止 CopilotClient。 */
 async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
   try {
