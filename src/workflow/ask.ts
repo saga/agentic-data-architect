@@ -62,10 +62,9 @@ export async function answerQuestion(
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
-  const skill = await loadInvestigationSkill();
   const raw = await askCopilot({
     prompt,
-    systemPrompt: LEAD_SYSTEM_PROMPT + '\n\nINVESTIGATION SKILL:\n' + skill,
+    systemPrompt: LEAD_SYSTEM_PROMPT,
     workingDirectory: workspaceRoot(inv.name),
     ...(onDelta ? { onDelta } : {}),
   });
