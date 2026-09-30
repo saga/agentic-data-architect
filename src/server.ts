@@ -77,6 +77,10 @@ async function listSkills(): Promise<Array<{ name: string; description: string }
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] ?? '' : value;
+}
+
 function sessionKey(name: string): string {
   const safe = path.basename(name);
   if (!name || safe !== name || name === '.' || name === '..') {
@@ -171,7 +175,7 @@ export function createApp(vite?: ViteDevServer) {
   });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
-    const name = sessionKey(String(req.params.name));
+    const name = sessionKey(routeParam(req.params.name));
     const body = req.body as Partial<InvestigationControl>;
     if (!body.research || !body.agent) {
       res.status(400).json({ error: 'research and agent configuration are required' });
