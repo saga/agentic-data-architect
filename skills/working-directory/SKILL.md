@@ -1,3 +1,8 @@
+---
+name: working-directory
+description: Workspace conventions for investigation state, shared research artifacts, evidence, reports, and generated files.
+---
+
 # Workspace 约定
 
 当前 workspace 只有两层：session 和 shared。
@@ -22,17 +27,17 @@
 
 ## Session
 
-`.workspace/<session-name>/context.json` 是 Investigation 的第一入口，也是当前业务状态的唯一持久化文件。
+`.workspace/<session-name>/context.json` 是 Investigation 状态入口；user/assistant/system 多轮消息存放在 `.workspace/conversations.db`。
 
 它记录：
 - 用户最初要求
 - goal / scope / systems
-- 每轮用户输入与研究输入索引
+- 研究输入、重要事实和状态索引
 - importantInformation / unknowns
 - discovery runs / evidence / findings / claims
 - 可恢复 Copilot session id
 
-对话过程写入 `transcript.md`；大量分析结果、临时文件或生成物写到当前 session 的 `artifacts/`。
+长篇分析结果、临时文件或生成物写到当前 session 的 `artifacts/`；聊天历史由 SQLite 保存。
 
 ## Shared
 
