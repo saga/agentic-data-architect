@@ -22,6 +22,20 @@ describe('scanner fingerprint', () => {
     const second = await discoverDirectory(dir, 'run-002');
     assert.notEqual(second.files[0]?.sha256, first.files[0]?.sha256);
   });
+
+  it('does not follow symbolic links', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'scan-link-'));
+    const outside = mkdtempSync(path.join(tmpdir(), 'scan-outside-'));
+    writeFileSync(path.join(outside, 'secret.sql'), 'SELECT secret FROM private_table;');
+    try {
+      await import('node:fs/promises').then((fs) => fs.symlink(path.join(outside, 'secret.sql'), path.join(dir, 'secret.sql')));
+      const inv = await discoverDirectory(dir, 'run-link');
+      assert.equal(inv.files.some((f) => f.path.endsWith('secret.sql')), false);
+    } finally {
+      const fs = await import('node:fs/promises');
+      await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('assertReadOnly', () => {
