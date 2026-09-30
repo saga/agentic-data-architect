@@ -83,7 +83,8 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
 
 export async function loadInvestigation(name: string): Promise<Investigation> {
   try {
-    const inv = JSON.parse(await fs.readFile(investigationFile(name), 'utf-8')) as Partial<Investigation>;
+    const raw = await fs.readFile(investigationFile(name), 'utf-8');
+    const inv = JSON.parse(raw) as Partial<Investigation>;
     const normalized = newInvestigation(name, inv.userPrompt ?? '');
     Object.assign(normalized, inv);
     await ensureWorkspace(normalized.name, {
@@ -93,23 +94,27 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
       systems: normalized.systems,
     });
     return normalized;
-  } catch {
-    // 兼容 V1.0 扁平布局（demo.json），读到就地迁移。
-    const legacy = path.join(config.investigationDir, `${name}.json`);
-    const raw = JSON.parse(await fs.readFile(legacy, 'utf-8')) as Partial<Investigation> & {
-      claims?: { claim: string; status: Claim['status']; evidence: unknown[] }[];
-    };
-    const inv = newInvestigation(name, raw.userPrompt ?? raw.goal ?? '');
-    inv.goal = raw.goal ?? '';
-    inv.scope = raw.scope ?? [];
-    inv.systems = raw.systems ?? [];
-    inv.unknowns = raw.unknowns ?? [];
-    for (const c of raw.claims ?? []) {
-      inv.claims.push({ id: `legacy-${inv.claims.length}`, claim: c.claim, status: c.status, evidenceIds: [] });
+  } catch (e) {
+    if (!(e instanceof Error) || !('code' in e) || (e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw e;
     }
-    await saveInvestigation(inv);
-    return inv;
   }
+
+  // 兼容 V1.0 扁平布局（demo.json），读到就地迁移。
+  const legacy = path.join(config.investigationDir, `${name}.json`);
+  const raw = JSON.parse(await fs.readFile(legacy, 'utf-8')) as Partial<Investigation> & {
+    claims?: { claim: string; status: Claim['status']; evidence: unknown[] }[];
+  };
+  const inv = newInvestigation(name, raw.userPrompt ?? raw.goal ?? '');
+  inv.goal = raw.goal ?? '';
+  inv.scope = raw.scope ?? [];
+  inv.systems = raw.systems ?? [];
+  inv.unknowns = raw.unknowns ?? [];
+  for (const c of raw.claims ?? []) {
+    inv.claims.push({ id: `legacy-${inv.claims.length}`, claim: c.claim, status: c.status, evidenceIds: [] });
+  }
+  await saveInvestigation(inv);
+  return inv;
 }
 
 export async function investigationExists(name: string): Promise<boolean> {
