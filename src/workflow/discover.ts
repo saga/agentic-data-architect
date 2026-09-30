@@ -5,6 +5,7 @@ import { checkDomainGaps } from '../analysis/finance-rules.js';
 import { discoverDirectory, type Inventory } from '../discovery/scanner.js';
 import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
+import { appendContextInput } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
 import type { DiscoveryRun } from '../evidence/types.js';
 
@@ -42,6 +43,13 @@ export interface DiscoverSummary {
 
 export async function runDiscovery(name: string, opts: DiscoverOptions): Promise<DiscoverSummary> {
   const inv = await loadInvestigation(name);
+  await appendContextInput(name, {
+    kind: 'discovery',
+    title: 'Discovery run',
+    content: JSON.stringify(opts),
+    source: 'agentic-data-architect discover',
+    important: true,
+  });
   if (!opts.path && !opts.database) {
     throw new Error('usage: discover <name> [--path ./dir] [--database postgres://...]（至少给一个来源）');
   }
