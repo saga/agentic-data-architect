@@ -27,7 +27,7 @@ Copilot session 本身不作为业务状态源，而是由 context.json 保存�
 7. workspace JSON 使用临时文件 + rename 原子更新。
 8. Investigation 保存不会覆盖回答期间新上传的文件/input。
 9. 同一个 session 的 context 写入和 configuration 写入分别做轻量串行化。
-10. 取消状态在 Copilot session 创建前后都能被感知。
+10. 取消状态在 Copilot session 创建前后都能被感知；模型返回后进入不可取消的 commit phase，避免半提交。
 
 仍然需要注意：当前项目是单 Node 进程模型。这些进程内 reservation / write lock 不是分布式锁。如果以后运行多个 API replica，需要把 turn lease / session ownership / workspace state 迁移到共享存储。
 
@@ -255,7 +255,22 @@ turn = aborted
 
 浏览器的 SSE fetch 同时使用 AbortController 断开网络读取。
 
-## 7. 网络断开与重试
+## 7. Execution / Commit 两阶段
+
+Agent turn 在模型执行阶段允许 Stop；模型已经返回后进入 commit phase：
+
+~~~text
+executing
+  ↓ model final
+committing
+  ↓ save Investigation
+  ↓ save assistant message
+  ↓ completed
+~~~
+
+commit phase 不再接受新的 abort 请求。这样不会出现 context 已保存、assistant message 未保存、turn 却被标记为 aborted 的半提交状态。
+
+## 8. 网络断开与重试
 
 turnId 是一次用户操作的幂等键。
 
@@ -286,7 +301,7 @@ same turnId + completed
 
 不同 turnId + 相同 user text 仍然被认为是新的业务操作。
 
-## 8. context.json 的竞争风险
+## 9. context.json 的竞争风险
 
 ### 原来的危险操作
 
@@ -318,7 +333,7 @@ flowchart LR
 
 因此 Agent 回答期间上传文件，不应该再因为最后的 saveInvestigation 而消失。
 
-## 9. Control configuration 的竞争
+## 10. Control configuration 的竞争
 
 配置更新本质上是：
 
@@ -349,7 +364,7 @@ B: load v11 -> write v12
 
 所以至少在单 Node process 中，version 不会因为并发 PUT 而发生简单覆盖。
 
-## 10. Configuration 与正在执行的 Agent
+## 11. Configuration 与正在执行的 Agent
 
 一次 Agent turn 在开始时读取：
 
@@ -383,7 +398,7 @@ Next turn -> uses v11
 
 否则同一个执行的可重放性很差。
 
-## 11. Conversation 与 Investigation state 的边界
+## 12. Conversation 与 Investigation state 的边界
 
 ### Conversation DB
 
@@ -434,7 +449,7 @@ copilot session reference
 
 Agent 不会把整个历史对话塞回 prompt，而是从 FTS5 检索少量相关历史作为补充。
 
-## 12. 当前实际控制流
+## 13. 当前实际控制流
 
 ~~~mermaid
 flowchart TD
@@ -472,7 +487,7 @@ flowchart TD
     P --> AB
 ~~~
 
-## 13. 当前仍然存在的边界
+## 14. 当前仍然存在的边界
 
 ### 13.1 单进程假设
 
@@ -525,7 +540,7 @@ control version
 
 决定。
 
-## 14. 关键不变量
+## 15. 关键不变量
 
 后续修改代码时，优先保护下面这些 invariant。
 
@@ -581,7 +596,7 @@ server restart
   => 不允许旧 running turn 永久锁死 Investigation
 ~~~
 
-## 15. 检查结论
+## 16. 检查结论
 
 当前比较大的数据流 / 控制流问题已经收敛到：
 
