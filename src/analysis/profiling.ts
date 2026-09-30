@@ -1,3 +1,8 @@
+/**
+ * 轻量 profiling 结果与 Evidence 生成。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import type { DatabaseAdapter, DataProfile } from '../adapters/database.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 
@@ -11,6 +16,7 @@ export interface ProfileResult {
   evidence: EvidenceRef[];
 }
 
+/** 通过 DatabaseAdapter 获取表 metadata 和 profiling，并把关键统计转换成 Evidence。 */
 export async function profileDataset(
   adapter: DatabaseAdapter,
   table: string,
