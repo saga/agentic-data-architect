@@ -71,7 +71,7 @@ export function assertReadOnly(sql: string): void {
   }
 
   const dangerous = /\b(insert|update|delete|merge|alter|drop|create|truncate|grant|revoke|copy|call|execute|put|get|remove)\b/i;
-  if (dangerous.test(safe)) {
+  if (dangerous.test(safe) || /\bFOR\s+(UPDATE|SHARE)\b/i.test(safe) || /^\s*SELECT\b[\s\S]*\bINTO\s+/i.test(safe)) {
     throw new Error(`查询包含不允许的写入或执行命令，已拒绝：${sql.slice(0, 120)}`);
   }
 
