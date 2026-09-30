@@ -324,7 +324,7 @@ export function createApp(vite?: ViteDevServer) {
         void abortCopilotTurn(turnId);
       }
     };
-    req.on('close', onClose);
+    res.on('close', onClose);
 
     try {
       const result = await answerQuestion(
@@ -342,7 +342,7 @@ export function createApp(vite?: ViteDevServer) {
       res.end();
     } finally {
       clearInterval(heartbeat);
-      req.off('close', onClose);
+      res.off('close', onClose);
     }
   });
 
