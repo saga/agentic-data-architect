@@ -9,7 +9,7 @@ Browser
   → Express 5
   → Investigation API
   → existing workflow / Evidence / Copilot
-  → .workspace/<session>/context.json
+  → SQLite conversation history + .workspace/<session>/context.json
 ```
 
 前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。
@@ -24,7 +24,8 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 已经具备：
 
 - 持续 Investigation session 和可恢复 Copilot session
-- `.workspace/<session>/context.json` 持久化上下文、evidence、claims、findings
+- `.workspace/<session>/context.json` 持久化 goal、scope、evidence、claims、findings、unknowns 等调查状态
+- `.workspace/conversations.db` 持久化 user / assistant / system 消息，并使用 SQLite FTS5 建立全文索引
 - `.workspace/shared/index.json` 和共享研究资料
 - 本地 SQL / PostgreSQL / Snowflake discovery
 - SQLGlot dataset / column lineage
@@ -59,7 +60,7 @@ npm run start
     artifacts/
 ```
 
-`context.json` 是主要持久化状态；shared 是可复用资料，不再为每个 session 建一套 research/source/findings/notes 目录。
+`context.json` 是当前 Investigation 状态；多轮聊天不再写入这里。`.workspace/conversations.db` 保存所有 session 的消息历史，并通过 FTS5 为相关历史检索提供索引。shared 是可复用资料，不再为每个 session 建一套 research/source/findings/notes 目录。
 
 ## Skill / Script 原则
 
