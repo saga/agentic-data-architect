@@ -4,7 +4,6 @@ import { investigationExists, newInvestigation, saveInvestigation } from './inve
 import { runDiscovery } from './workflow/discover.js';
 import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
-import { runInteractiveSession } from './workflow/session.js';
 
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
@@ -60,13 +59,13 @@ async function cmdReport(args: string[]): Promise<void> {
 async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
   try {
-    if (!cmd || cmd === 'start' || cmd === 'dev') await runInteractiveSession(args[0]);
-    else if (cmd === 'init') await cmdInit(args);
+    if (!cmd) { console.log('usage: npm run start | init | discover | ask | report'); return; }
+    if (cmd === 'init') await cmdInit(args);
     else if (cmd === 'discover') await cmdDiscover(args);
     else if (cmd === 'ask') await cmdAsk(args);
     else if (cmd === 'report') await cmdReport(args);
     else {
-      console.log('usage: npm run start [session-name] | init | discover | ask | report');
+      console.log('usage: npm run start | init | discover | ask | report');
       process.exitCode = 2;
     }
   } finally {
