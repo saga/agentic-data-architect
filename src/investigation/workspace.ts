@@ -229,6 +229,9 @@ export async function appendContextInput(
     ...(input.important !== undefined ? { important: input.important } : {}),
   };
   context.inputs.push(item);
+  if (!context.userPrompt && input.kind === 'user_message' && input.content?.trim()) {
+    context.userPrompt = input.content.trim();
+  }
   context.updatedAt = new Date().toISOString();
   await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
   return item;
