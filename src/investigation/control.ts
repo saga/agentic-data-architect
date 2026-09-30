@@ -489,6 +489,7 @@ export function toCopilotMcpServers(control: InvestigationControl): Record<strin
         type: 'http',
         url: resolveEnvReferences(server.url),
         tools: server.tools?.length ? server.tools : ['*'],
+        ...(headers ? { headers } : {}),
       };
     } else if (server.type === 'local' && server.command) {
       result[server.name] = {
