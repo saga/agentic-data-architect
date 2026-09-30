@@ -215,7 +215,7 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
       from: nodeId('dataset', c.targetDataset),
       to,
       type: 'contains',
-      evidenceIds: [],
+      evidenceIds: c.evidenceId ? [c.evidenceId] : [],
     });
   }
 }
