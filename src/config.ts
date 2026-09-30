@@ -1,28 +1,33 @@
 import 'dotenv/config';
 import path from 'node:path';
+import * as z from 'zod';
 
-function env(name: string, fallback = ''): string {
-  return process.env[name] ?? fallback;
-}
+const EnvSchema = z.object({
+  WORKSPACE_DIR: z.string().default('.workspace'),
+  DATA_DIR: z.string().default('.data'),
+  SKILLS_DIR: z.string().default('skills'),
+  COPILOT_SKILLS: z.string().default('investigation-session,financial-data-review'),
+  GITHUB_TOKEN: z.string().optional(),
+  COPILOT_MODEL: z.string().default('gpt-5-mini'),
+  TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+  HOST: z.string().min(1).default('127.0.0.1'),
+  NODE_ENV: z.string().min(1).default('development'),
+}).strict();
 
-const workspaceDir = path.resolve(env('WORKSPACE_DIR', '.workspace'));
-const legacyDataDir = path.resolve(env('DATA_DIR', '.data'));
-const skillsDir = path.resolve(env('SKILLS_DIR', 'skills'));
-const copilotSkills = env('COPILOT_SKILLS', 'investigation-session,financial-data-review')
-  .split(',')
-  .map((skill) => skill.trim())
-  .filter(Boolean);
+const envConfig = EnvSchema.parse(process.env);
+const copilotSkills = envConfig.COPILOT_SKILLS.split(',').map((skill) => skill.trim()).filter(Boolean);
 
 export const config = {
-  workspaceDir,
-  sharedDir: path.join(workspaceDir, 'shared'),
-  legacyDataDir,
-  skillsDir,
+  workspaceDir: path.resolve(envConfig.WORKSPACE_DIR),
+  sharedDir: path.resolve(envConfig.WORKSPACE_DIR, 'shared'),
+  legacyDataDir: path.resolve(envConfig.DATA_DIR),
+  skillsDir: path.resolve(envConfig.SKILLS_DIR),
   copilotSkills,
-  githubToken: env('GITHUB_TOKEN', '') || undefined,
-  model: env('COPILOT_MODEL', 'gpt-5-mini'),
-  turnTimeoutMs: Number(env('TURN_TIMEOUT_MS', '300000')) || 300_000,
-  port: Number(env('PORT', '3000')) || 3000,
-  host: env('HOST', '127.0.0.1'),
-  nodeEnv: env('NODE_ENV', 'development'),
+  githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
+  model: envConfig.COPILOT_MODEL,
+  turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
+  port: envConfig.PORT,
+  host: envConfig.HOST,
+  nodeEnv: envConfig.NODE_ENV,
 } as const;
