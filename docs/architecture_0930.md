@@ -2,8 +2,8 @@
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
-（PostgreSQL/Snowflake）、真实 profiling、确定性 findings（含金融审查清单）、
-结构化 Agent 结果（含状态校正）、按问题检索证据、golden benchmark + CI。
+（PostgreSQL/Snowflake）、真实 profiling、domain-agnostic deterministic findings、
+Skill-driven financial review、结构化 Agent 结果（含状态校正）、按问题检索证据、golden benchmark + CI。
 
 V1.1 优先完成（本节是对照清单，做完即勾）：
 1. Evidence provenance ✓ 2. SQL AST / column lineage ✓ 3. Estate Graph ✓
