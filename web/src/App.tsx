@@ -26,6 +26,7 @@ import {
   FolderOpenOutlined,
   GithubOutlined,
   HistoryOutlined,
+  LoadingOutlined,
   InfoCircleOutlined,
   PaperClipOutlined,
   PlusOutlined,
