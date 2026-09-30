@@ -113,6 +113,32 @@ Evidence
 
 Web 层没有重新实现这一套逻辑。
 
+## Skills
+
+Copilot SDK 负责加载 `skills/*/SKILL.md`，而不是在 TypeScript workflow 里手工拼接 Skill 文本。
+
+当前 Skill 分工：
+
+```text
+skills/
+  investigation-session/      # 基础调查行为，session 默认预加载
+  financial-data-review/      # 金融领域知识，按问题按需使用
+    SKILL.md
+    scripts/review.mjs        # deterministic 金融检查
+  search-github/              # GitHub 研究方法
+  search-confluence/          # Confluence 研究方法
+  search-leanix/              # LeanIX 研究方法
+```
+
+边界：
+
+- 核心代码保留安全、持久化、Evidence 校验、SQL read-only、Lineage/Profiling 等必须确定执行的逻辑。
+- 领域知识、业务检查清单、追问方法放在 Skill。
+- Skill 中需要确定性计算的部分放进同一个 Skill 的 `scripts/`，由 Copilot 调用，而不是复制一份算法到 prompt。
+- Skill 内容本身不是 Evidence；脚本结果和原始 Evidence 才是事实依据。
+
+Copilot SDK 支持通过 `skillDirectories` 发现 Skill，并可以用 `skills.reload()` 刷新目录变化。
+
 ## Research Skills
 
 研究流程尽量由 SKILL 定义，而不是硬编码在 UI 或 prompt 中：
