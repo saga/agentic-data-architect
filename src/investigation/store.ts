@@ -144,7 +144,7 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     inputs: raw.inputs ?? [],
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
-  };
+  });
 }
 
 export async function investigationExists(name: string): Promise<boolean> {
