@@ -241,7 +241,7 @@ export function migrateLegacyConversationInputs(
 ): Array<typeof inputs[number]> {
   const legacyMessages = inputs.filter(
     (input) =>
-      (input.kind === 'question' || input.kind === 'assistant_message') &&
+      (input.kind === 'question' || input.kind === 'user_message' || input.kind === 'assistant_message') &&
       Boolean(input.content?.trim()),
   );
   if (legacyMessages.length === 0) return inputs;
@@ -250,14 +250,14 @@ export function migrateLegacyConversationInputs(
     saveConversationMessage({
       id: input.id,
       sessionName,
-      role: input.kind === 'question' ? 'user' : 'assistant',
+      role: input.kind === 'assistant_message' ? 'assistant' : 'user',
       content: input.content ?? '',
       createdAt: input.capturedAt,
     });
   }
 
   return inputs.filter(
-    (input) => input.kind !== 'question' && input.kind !== 'assistant_message',
+    (input) => input.kind !== 'question' && input.kind !== 'user_message' && input.kind !== 'assistant_message',
   );
 }
 
