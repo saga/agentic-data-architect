@@ -27,7 +27,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 - 持续 Investigation session 和可恢复 Copilot session
 - `.workspace/<session>/context.json` 持久化 goal、scope、evidence、claims、findings、unknowns 等调查状态
 - `.workspace/conversations.db` 持久化 user / assistant / system 消息，并使用 SQLite FTS5 建立全文索引
-- Copilot SDK 从 `skills/` 发现和加载 Skill；`investigation-session` 默认预加载，其它领域 Skill 按需激活
+- Copilot SDK 从 `skills/` 发现和加载 Skill；每个 Investigation 通过 `control.json` 选择启用哪些 Skill，未选择的 Skill 会显式禁用
 - 金融领域检查放在 `skills/financial-data-review/`，其中 deterministic 检查放在 `scripts/review.mjs`
 - `.workspace/shared/index.json` 和共享研究资料
 - 本地 SQL / PostgreSQL / Snowflake discovery
@@ -65,9 +65,11 @@ npm run start
 
 `context.json` 是当前 Investigation 状态；多轮聊天不再写入这里。`.workspace/conversations.db` 保存所有 session 的消息历史，并通过 FTS5 为相关历史检索提供索引。shared 是可复用资料，不再为每个 session 建一套 research/source/findings/notes 目录。
 
-## Skill / Script 原则
+## Agent / Skill / Script 原则
 
-Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
+当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。
+
+Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
 不要把会变化的命令、tool schema 或研究流程再复制成大量 prompt 文本。
 
