@@ -56,7 +56,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
     workingDirectory: input.workingDirectory ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
-    skills: input.skills ?? ['investigation-session'],
+    customAgents: [
+      {
+        name: 'lead-data-agent',
+        description: 'Lead Data Agent for evidence-backed data modernization investigation and architecture analysis.',
+        prompt: 'Act as the lead data agent. Follow the loaded Skills for investigation and domain-specific methodology. Do not invent enterprise facts.',
+        skills: input.skills ?? ['investigation-session', 'financial-data-review'],
+      },
+    ],
+    agent: 'lead-data-agent',
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
