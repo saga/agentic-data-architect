@@ -810,7 +810,7 @@ function AppInner() {
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
                         value={draft.research.importantDocuments.map((item) => item.reference)}
-                        options={documentReferences(current).map((reference) => ({ label: reference, value: reference }))}
+                        options={documentReferences(current?.context ? current.context : undefined).map((reference) => ({ label: reference, value: reference }))}
                         placeholder="Select uploaded documents or type a document URL/path"
                         onChange={(references) => updateDraft((next) => {
                           next.research.importantDocuments = references.map((reference) => ({
