@@ -1,0 +1,277 @@
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { config } from '../config.js';
+
+export type ConversationRole = 'user' | 'assistant' | 'system';
+
+export interface ConversationMessage {
+  id: string;
+  sessionName: string;
+  role: ConversationRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationSearchHit extends ConversationMessage {
+  score: number;
+}
+
+export interface ConversationSummary {
+  count: number;
+  lastMessageAt?: string;
+}
+
+interface MessageRow {
+  message_id: string;
+  session_name: string;
+  role: ConversationRole;
+  content: string;
+  created_at: string;
+  score?: number;
+}
+
+interface MessageWrite {
+  id?: string;
+  sessionName: string;
+  role: ConversationRole;
+  content: string;
+  createdAt?: string;
+}
+
+let database: DatabaseSync | undefined;
+let databasePath: string | undefined;
+
+export function conversationDbFile(): string {
+  return path.join(config.workspaceDir, 'conversations.db');
+}
+
+function getDatabase(): DatabaseSync {
+  const file = conversationDbFile();
+  if (database && databasePath === file) return database;
+
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  database?.close();
+
+  database = new DatabaseSync(file);
+  databasePath = file;
+  database.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+    PRAGMA busy_timeout = 5000;
+
+    CREATE TABLE IF NOT EXISTS conversation_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id TEXT NOT NULL UNIQUE,
+      session_name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    ) STRICT;
+
+    CREATE INDEX IF NOT EXISTS idx_conversation_messages_session_id
+      ON conversation_messages(session_name, id);
+
+    CREATE INDEX IF NOT EXISTS idx_conversation_messages_session_created
+      ON conversation_messages(session_name, created_at);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS conversation_messages_fts USING fts5(
+      content,
+      content='conversation_messages',
+      content_rowid='id',
+      tokenize='trigram'
+    );
+
+    CREATE TRIGGER IF NOT EXISTS conversation_messages_ai
+    AFTER INSERT ON conversation_messages
+    BEGIN
+      INSERT INTO conversation_messages_fts(rowid, content)
+      VALUES (new.id, new.content);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS conversation_messages_ad
+    AFTER DELETE ON conversation_messages
+    BEGIN
+      INSERT INTO conversation_messages_fts(conversation_messages_fts, rowid, content)
+      VALUES ('delete', old.id, old.content);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS conversation_messages_au
+    AFTER UPDATE OF content ON conversation_messages
+    BEGIN
+      INSERT INTO conversation_messages_fts(conversation_messages_fts, rowid, content)
+      VALUES ('delete', old.id, old.content);
+      INSERT INTO conversation_messages_fts(rowid, content)
+      VALUES (new.id, new.content);
+    END;
+  `);
+
+  return database;
+}
+
+function toMessage(row: MessageRow): ConversationMessage {
+  return {
+    id: row.message_id,
+    sessionName: row.session_name,
+    role: row.role,
+    content: row.content,
+    createdAt: row.created_at,
+  };
+}
+
+export function saveConversationMessage(input: MessageWrite): ConversationMessage & { rowId: number } {
+  const db = getDatabase();
+  const id = input.id ?? randomUUID();
+  const createdAt = input.createdAt ?? new Date().toISOString();
+
+  const result = db.prepare(`
+    INSERT INTO conversation_messages (
+      message_id, session_name, role, content, created_at
+    ) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(message_id) DO NOTHING
+  `).run(id, input.sessionName, input.role, input.content, createdAt);
+
+  if (Number(result.changes) === 0) {
+    const row = db.prepare(`
+      SELECT id, message_id, session_name, role, content, created_at
+      FROM conversation_messages
+      WHERE message_id = ?
+    `).get(id) as (MessageRow & { id: number }) | undefined;
+
+    if (!row) throw new Error('Conversation message could not be stored: ' + id);
+    return { ...toMessage(row), rowId: row.id };
+  }
+
+  const row = db.prepare(`
+    SELECT id, message_id, session_name, role, content, created_at
+    FROM conversation_messages
+    WHERE message_id = ?
+  `).get(id) as (MessageRow & { id: number }) | undefined;
+
+  if (!row) throw new Error('Conversation message could not be loaded: ' + id);
+  return { ...toMessage(row), rowId: row.id };
+}
+
+export function listConversationMessages(
+  sessionName: string,
+  limit = 200,
+): ConversationMessage[] {
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 1000));
+  const rows = dbOrThrow().prepare(`
+    SELECT message_id, session_name, role, content, created_at
+    FROM conversation_messages
+    WHERE session_name = ?
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(sessionName, safeLimit) as MessageRow[];
+
+  return rows.reverse().map(toMessage);
+}
+
+export function searchConversation(
+  sessionName: string,
+  query: string,
+  options: { limit?: number; beforeRowId?: number } = {},
+): ConversationSearchHit[] {
+  const terms = extractSearchTerms(query);
+  if (terms.length === 0) return [];
+
+  const safeLimit = Math.max(1, Math.min(Math.trunc(options.limit ?? 8), 50));
+  const matchQuery = terms
+    .slice(0, 12)
+    .map((term) => `"${term.replace(/"/g, '""')}"`)
+    .join(' OR ');
+
+  const beforeClause = options.beforeRowId === undefined ? '' : 'AND m.id < ?';
+  const params: Array<string | number> = [matchQuery, sessionName];
+  if (options.beforeRowId !== undefined) params.push(options.beforeRowId);
+  params.push(safeLimit);
+
+  const rows = dbOrThrow().prepare(`
+    SELECT
+      m.message_id,
+      m.session_name,
+      m.role,
+      m.content,
+      m.created_at,
+      bm25(conversation_messages_fts) AS score
+    FROM conversation_messages_fts
+    JOIN conversation_messages m
+      ON m.id = conversation_messages_fts.rowid
+    WHERE conversation_messages_fts MATCH ?
+      AND m.session_name = ?
+      ${beforeClause}
+    ORDER BY score ASC, m.id DESC
+    LIMIT ?
+  `).all(...params) as MessageRow[];
+
+  return rows.map((row) => ({
+    ...toMessage(row),
+    score: Number(row.score ?? 0),
+  }));
+}
+
+export function getConversationSummary(sessionName: string): ConversationSummary {
+  const row = dbOrThrow().prepare(`
+    SELECT COUNT(*) AS count, MAX(created_at) AS last_message_at
+    FROM conversation_messages
+    WHERE session_name = ?
+  `).get(sessionName) as { count: number; last_message_at?: string | null };
+
+  return {
+    count: Number(row.count ?? 0),
+    ...(row.last_message_at ? { lastMessageAt: row.last_message_at } : {}),
+  };
+}
+
+export function migrateLegacyConversationInputs(
+  sessionName: string,
+  inputs: Array<{
+    id: string;
+    kind: string;
+    capturedAt: string;
+    title: string;
+    content?: string;
+    source?: string;
+    uri?: string;
+    artifactPath?: string;
+    important?: boolean;
+  }>,
+): Array<typeof inputs[number]> {
+  const legacyMessages = inputs.filter(
+    (input) =>
+      (input.kind === 'question' || input.kind === 'assistant_message') &&
+      Boolean(input.content?.trim()),
+  );
+  if (legacyMessages.length === 0) return inputs;
+
+  for (const input of legacyMessages) {
+    saveConversationMessage({
+      id: input.id,
+      sessionName,
+      role: input.kind === 'question' ? 'user' : 'assistant',
+      content: input.content ?? '',
+      createdAt: input.capturedAt,
+    });
+  }
+
+  return inputs.filter(
+    (input) => input.kind !== 'question' && input.kind !== 'assistant_message',
+  );
+}
+
+export function closeConversationStore(): void {
+  database?.close();
+  database = undefined;
+  databasePath = undefined;
+}
+
+function dbOrThrow(): DatabaseSync {
+  return getDatabase();
+}
+
+function extractSearchTerms(value: string): string[] {
+  const terms = value.match(/[\\p{L}\\p{N}_]{3,}/gu) ?? [];
+  return [...new Set(terms.map((term) => term.trim()).filter(Boolean))];
+}
