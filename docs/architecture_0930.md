@@ -2265,3 +2265,76 @@ Evidence
 [11]: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-portfolio-playbook/discovery.html?utm_source=chatgpt.com "Task 1: Performing the initial discovery - AWS Prescriptive Guidance"
 [12]: https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-application-portfolio-assessment-migration/introduction.html?utm_source=chatgpt.com "Application portfolio assessment strategy for AWS Cloud migration - AWS Prescriptive Guidance"
 [13]: https://aws.amazon.com/blogs/migration-and-modernization/a-framework-for-accelerated-modernization-and-technical-debt-reduction/?utm_source=chatgpt.com "A Framework for Accelerated Modernization and Technical Debt Reduction | Migration & Modernization"
+
+
+---
+
+# Investigation Workspace 与外部企业知识
+
+真人做 Brownfield Data Analysis 时，不会只依靠一次 Agent prompt。研究会持续几天甚至几周，输入来自代码、数据库、GitHub、企业架构库、Confluence、访谈和历史研究。因此 Investigation 必须有独立、可持续的 workspace。
+
+目录：
+
+~~~text
+.data/investigations/<name>/
+  investigation.json
+  discovery/
+  reports/
+  workspace/
+    context.json
+    inputs/
+    research/
+      github/
+      leanix/
+      confluence/
+      web/
+    sources/
+      github/
+    findings/
+    artifacts/
+    notes/
+~~~
+
+## context.json 是研究上下文的入口
+
+context.json 至少记录：
+
+- 用户最初 prompt
+- 每次新的 input / question / research query
+- 重要事实、约束和决定
+- 长研究结果对应的 artifactPath
+
+它是工作记忆和研究索引，不替代 investigation.json 中的规范化业务状态，也不替代 Evidence Catalog。
+
+## 企业研究来源的优先级
+
+### GitHub
+
+代码研究开始时由用户选择：
+
+1. 直接 GitHub Tool：通过 repository URL/API 读取，适合公司 GitHub Organization 和小范围检查。
+2. Clone 到 workspace/sources/github/：使用本地 find / grep / rg / git 做大范围、跨文件、反复分析。
+
+代码、README、Issue/PR 分别视为实现证据、文档证据、讨论证据。不要把 README 当成比实际代码更高优先级的事实来源。
+
+### SAP LeanIX
+
+企业架构 Fact Sheet、应用关系、owner、lifecycle 等信息优先从 SAP LeanIX 官方 MCP 获取。LeanIX 官方 MCP 的作用就是让 AI Agent 安全访问企业架构 inventory、Fact Sheet 和关系，因此不应在项目里重新实现一个专用 LeanIX REST connector。
+
+LeanIX 的登记状态仍然只是一个 Evidence Source。若与代码、运行数据或业务确认冲突，应记录 conflict，而不是自动覆盖其它证据。
+
+### Confluence
+
+企业内部架构、ADR、流程和运行文档优先通过 Atlassian 官方 Rovo MCP 查询。Confluence 是重要 documentation evidence，但不能假设它就是当前真实状态；必须关注更新时间、owner、版本、superseded/obsolete 标记，以及是否描述 current state 或 target state。
+
+## 研究结果必须落盘
+
+研究记录不得只存在 chat history：
+
+- search / query 记录放 workspace/research/
+- 重要结论放 workspace/findings/
+- 外部源码副本放 workspace/sources/
+- 可复用中间产物放 workspace/artifacts/
+- context.json 保留索引和重要信息
+
+这样 Agent 才能在多轮、多天的 Investigation 中继续工作，而不是每次重新研究一遍。
