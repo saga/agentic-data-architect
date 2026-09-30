@@ -3,7 +3,7 @@ import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
-import { saveConversationMessage, searchConversation } from '../investigation/conversation.js';
+import { beginConversationTurn, finishConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import {
   appendAuditEvent,
   buildResearchConfigPrompt,
@@ -25,8 +25,20 @@ export async function answerQuestion(
   investigationName: string,
   question: string,
   onDelta?: (delta: string) => void,
+  turnId?: string,
 ): Promise<AnswerSummary> {
+  if (!turnId) turnId = nextId('turn');
+  const turn = beginConversationTurn(investigationName, turnId);
+  if (turn.status === 'completed' && turn.result) return JSON.parse(turn.result) as AnswerSummary;
+  if (turn.status === 'running') {
+    throw new Error('This investigation already has an active turn.');
+  }
+  if (turn.status === 'failed' || turn.status === 'aborted') {
+    throw new Error('This turn ID has already finished and cannot be retried.');
+  }
+
   const userMessage = saveConversationMessage({
+    id: turnId + ':user',
     sessionName: investigationName,
     role: 'user',
     content: question,
@@ -76,6 +88,7 @@ export async function answerQuestion(
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
+  try {
   const raw = await askCopilot({
     prompt,
     systemPrompt: [
@@ -93,6 +106,7 @@ export async function answerQuestion(
     skills: control.agent.skills.map((item) => item.name),
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
+    turnId,
   });
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
@@ -110,10 +124,17 @@ export async function answerQuestion(
     content: answer,
   });
 
-  return {
+  const result: AnswerSummary = {
     answer,
     claimIds: claims.map((c) => `${c.id}[${c.status}]`),
     warnings: parsed.warnings,
     unknowns: parsed.unknowns,
   };
+  finishConversationTurn(turnId, 'completed', JSON.stringify(result));
+  return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
+    throw error;
+  }
 }
