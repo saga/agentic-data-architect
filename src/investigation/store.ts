@@ -6,6 +6,7 @@ import {
   discoveryDir,
   ensureWorkspace,
   workspaceRoot,
+  withWorkspaceContextLock,
   writeJsonAtomic,
   type WorkspaceContext,
 } from './workspace.js';
@@ -46,40 +47,42 @@ export function reportsDir(name: string): string {
 }
 
 export async function saveInvestigation(inv: Investigation): Promise<string> {
-  await ensureWorkspace(inv.name, {
-    userPrompt: inv.userPrompt,
-    goal: inv.goal,
-    scope: inv.scope,
-    systems: inv.systems,
-  });
+  return withWorkspaceContextLock(inv.name, async () => {
+    await ensureWorkspace(inv.name, {
+      userPrompt: inv.userPrompt,
+      goal: inv.goal,
+      scope: inv.scope,
+      systems: inv.systems,
+    });
 
-  // Merge investigation-owned state into the latest workspace snapshot.
-  // Inputs/files may have been added while the agent was thinking; never
-  // overwrite those newer workspace inputs with an older in-memory snapshot.
-  const current = await loadWorkspaceContext(inv.name);
-  const next: Investigation = {
-    ...current,
-    schemaVersion: 3,
-    name: inv.name,
-    userPrompt: inv.userPrompt,
-    goal: inv.goal,
-    scope: inv.scope,
-    systems: inv.systems,
-    questions: inv.questions,
-    discoveryRuns: inv.discoveryRuns,
-    evidence: inv.evidence,
-    claims: inv.claims,
-    findings: inv.findings,
-    unknowns: inv.unknowns,
-    importantInformation: inv.importantInformation,
-    ...(inv.copilotSessionId ? { copilotSessionId: inv.copilotSessionId } : {}),
-    ...(typeof inv.copilotConfigurationVersion === 'number'
-      ? { copilotConfigurationVersion: inv.copilotConfigurationVersion }
-      : {}),
-    updatedAt: new Date().toISOString(),
-  };
-  await writeJsonAtomic(contextFile(inv.name), next);
-  return contextFile(inv.name);
+    // Merge investigation-owned state into the latest workspace snapshot.
+    // Inputs/files may have been added while the agent was thinking; never
+    // overwrite those newer workspace inputs with an older in-memory snapshot.
+    const current = await loadWorkspaceContext(inv.name);
+    const next: Investigation = {
+      ...current,
+      schemaVersion: 3,
+      name: inv.name,
+      userPrompt: inv.userPrompt,
+      goal: inv.goal,
+      scope: inv.scope,
+      systems: inv.systems,
+      questions: inv.questions,
+      discoveryRuns: inv.discoveryRuns,
+      evidence: inv.evidence,
+      claims: inv.claims,
+      findings: inv.findings,
+      unknowns: inv.unknowns,
+      importantInformation: inv.importantInformation,
+      ...(inv.copilotSessionId ? { copilotSessionId: inv.copilotSessionId } : {}),
+      ...(typeof inv.copilotConfigurationVersion === 'number'
+        ? { copilotConfigurationVersion: inv.copilotConfigurationVersion }
+        : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    await writeJsonAtomic(contextFile(inv.name), next);
+    return contextFile(inv.name);
+  });
 }
 
 export async function loadInvestigation(name: string): Promise<Investigation> {
