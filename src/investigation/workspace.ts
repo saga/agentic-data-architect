@@ -1,3 +1,8 @@
+/**
+ * Workspace 文件系统状态、原子写和并发保护。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -15,6 +20,7 @@ import {
 
 export type { WorkspaceContext, WorkspaceInput, WorkspaceSeed, SharedArtifactIndexEntry, SharedIndex } from './schemas.js';
 
+/** 校验 Session 名称只能是单层安全路径名，阻止通过 workspace 路径逃逸。 */
 function safeName(name: string): string {
   if (!name || name !== path.basename(name) || name === '.' || name === '..') {
     throw new Error('Invalid Session name: ' + name);
@@ -22,15 +28,18 @@ function safeName(name: string): string {
   return name;
 }
 
+/** 返回指定 Investigation 的工作目录；同时执行 Session 名称安全校验。 */
 export function workspaceRoot(name: string): string {
   return path.join(config.workspaceDir, safeName(name));
 }
 
+/** 返回 context.json 的标准路径。 */
 export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
 // Replace the target in one rename so readers never observe a half-written JSON document.
+/** 使用临时文件+rename 原子替换 JSON，避免读取者看到半写入文件。 */
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   const directory = path.dirname(file);
   const temporary = path.join(directory, '.tmp-' + randomUUID() + '-' + path.basename(file));
@@ -41,6 +50,7 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
 const contextWriteLocks = new Map<string, Promise<void>>();
 const sharedIndexWriteLocks = new Map<string, Promise<void>>();
 
+/** 串行化全局 shared index 的读改写操作，防止不同 Session 覆盖彼此的 Artifact。 */
 async function withSharedIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
   const previous = sharedIndexWriteLocks.get('shared') ?? Promise.resolve();
   let release!: () => void;
@@ -56,6 +66,7 @@ async function withSharedIndexWriteLock<T>(operation: () => Promise<T>): Promise
   }
 }
 
+/** 确保 shared/index.json 存在；只负责初始化，不持有外层锁。 */
 async function ensureSharedIndexFile(): Promise<void> {
   try {
     await fs.access(sharedIndexFile());
@@ -73,6 +84,7 @@ async function ensureSharedIndex(): Promise<void> {
   await withSharedIndexWriteLock(() => ensureSharedIndexFile());
 }
 
+/** 串行化同一 Session 的 context.json 修改，保护并发请求和 Agent commit。 */
 export async function withWorkspaceContextLock<T>(
   name: string,
   operation: () => Promise<T>,
@@ -92,34 +104,42 @@ export async function withWorkspaceContextLock<T>(
   }
 }
 
+/** 返回 Investigation transcript.md 路径。 */
 export function transcriptFile(name: string): string {
   return path.join(workspaceRoot(name), 'transcript.md');
 }
 
+/** 返回 Discovery 快照目录。 */
 export function discoveryDir(name: string): string {
   return path.join(workspaceRoot(name), 'discovery');
 }
 
+/** 返回 Investigation 报告目录。 */
 export function reportsDir(name: string): string {
   return path.join(workspaceRoot(name), 'reports');
 }
 
+/** 返回 Investigation artifact 目录。 */
 export function artifactsDir(name: string): string {
   return path.join(workspaceRoot(name), 'artifacts');
 }
 
+/** 返回跨 Investigation 的 shared 目录。 */
 export function sharedDir(): string {
   return config.sharedDir;
 }
 
+/** 返回指定共享 Artifact 类型的存储目录。 */
 export function sharedArtifactDir(kind: SharedArtifactIndexEntry['kind']): string {
   return path.join(config.sharedDir, kind);
 }
 
+/** 返回共享 Artifact 索引文件路径。 */
 export function sharedIndexFile(): string {
   return path.join(config.sharedDir, 'index.json');
 }
 
+/** 对连接串 URI 中的用户名、密码和常见 secret 参数脱敏，用于日志和 Evidence 描述。 */
 export function redactSensitiveUri(value: string): string {
   try {
     const u = new URL(value);
@@ -134,6 +154,7 @@ export function redactSensitiveUri(value: string): string {
   }
 }
 
+/** 创建 Investigation 所需目录和初始 context/transcript；已有 workspace 时保持现有状态。 */
 export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): Promise<string> {
   const root = workspaceRoot(name);
   await Promise.all([
@@ -196,6 +217,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
   }
 }
 
+/** 读取并通过 Zod 校验 context.json，同时处理旧 conversation input 迁移。 */
 export async function loadWorkspaceContext(name: string): Promise<WorkspaceContext> {
   await ensureWorkspace(name);
   const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<WorkspaceContext>;
@@ -235,6 +257,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
 }
 
 // All context mutations must serialize against other mutations in the same session.
+/** 向 Workspace inputs 追加一条输入事件，并在同一 Session 锁内原子保存。 */
 export async function appendContextInput(
   name: string,
   input: Omit<WorkspaceInput, 'id' | 'capturedAt'> & { id?: string; capturedAt?: string },
@@ -265,6 +288,7 @@ export async function appendContextInput(
   });
 }
 
+/** 向当前 Investigation 追加去重后的重要上下文信息。 */
 export async function addImportantInformation(name: string, information: string[]): Promise<void> {
   await withWorkspaceContextLock(name, async () => {
     const context = await loadWorkspaceContext(name);
@@ -277,6 +301,7 @@ export async function addImportantInformation(name: string, information: string[
   });
 }
 
+/** 把可恢复的 Copilot Session ID 和对应状态版本写回 Workspace。 */
 export async function setCopilotSessionId(name: string, sessionId: string): Promise<void> {
   await withWorkspaceContextLock(name, async () => {
     const context = await loadWorkspaceContext(name);
@@ -286,6 +311,7 @@ export async function setCopilotSessionId(name: string, sessionId: string): Prom
   });
 }
 
+/** 追加人可读的 transcript.md 记录，用于人工回看，不作为唯一业务状态源。 */
 export async function appendTranscript(name: string, role: 'user' | 'assistant' | 'system', content: string): Promise<void> {
   await ensureWorkspace(name);
   const label = role === 'assistant' ? 'Agent' : role === 'user' ? 'User' : 'System';
@@ -293,6 +319,7 @@ export async function appendTranscript(name: string, role: 'user' | 'assistant' 
   await fs.appendFile(transcriptFile(name), text, 'utf-8');
 }
 
+/** 以读改写方式注册共享 Artifact，并在全局锁内原子更新 index.json。 */
 export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntry, 'updatedAt'>): Promise<void> {
   await withSharedIndexWriteLock(async () => {
     await fs.mkdir(config.sharedDir, { recursive: true });
@@ -308,6 +335,7 @@ export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntr
   });
 }
 
+/** 保存共享文档内容并同步注册到 shared index。 */
 export async function addSharedDocument(
   kind: SharedArtifactIndexEntry['kind'],
   id: string,
