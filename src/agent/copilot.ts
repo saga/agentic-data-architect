@@ -52,6 +52,7 @@ export interface AskInput {
   onDelta?: (delta: string) => void;
   onSessionId?: (sessionId: string) => void;
   turnId?: string;
+  shouldAbort?: () => boolean;
 }
 
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
@@ -100,6 +101,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
     activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
   }
   try {
+    if (input.shouldAbort?.()) {
+      await session.abort();
+      throw new Error('Turn aborted.');
+    }
     await session.rpc.skills.reload();
   } catch {
     // Skill reload is best-effort; session creation still works on older runtimes.
@@ -113,6 +118,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
   });
   try {
+    if (input.shouldAbort?.()) {
+      await session.abort();
+      throw new Error('Turn aborted.');
+    }
     const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
     return final?.data.content || content;
   } catch (e) {
