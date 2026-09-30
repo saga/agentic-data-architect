@@ -15,6 +15,7 @@ import {
   type TableInfo,
   type TableMetadata,
 } from './database.js';
+import type { SemanticAsset } from '../semantic/types.js';
 
 /**
  * Snowflake 只读实现（企业侧 target 用）。驱动懒加载，没装时报错指路。
@@ -245,5 +246,34 @@ async query(sql: string): Promise<QueryResult> {
     const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
     return { columns, rows: rows.slice(0, 1000), rowCount: rows.length, truncated: rows.length >= 1000 };
+  }
+  /**
+   * 发现当前账号可见的 Semantic View。
+   * 返回通用 SemanticAsset，不让核心 workflow 依赖 Snowflake。
+   */
+  async listSemanticAssets(schema?: string): Promise<SemanticAsset[]> {
+    const rows = await this.q('SHOW SEMANTIC VIEWS');
+    return rows
+      .filter((row) => {
+        const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
+        return !schema || rowSchema.toUpperCase() === schema.toUpperCase();
+      })
+      .map((row) => {
+        const database = String(row['database_name'] ?? row['DATABASE_NAME'] ?? '');
+        const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
+        const name = String(row['name'] ?? row['NAME'] ?? '');
+        const qualifiedName = [database, rowSchema, name].filter(Boolean).join('.');
+        const description = String(row['comment'] ?? row['COMMENT'] ?? '').trim();
+        return {
+          id: 'snowflake:semantic_view:' + qualifiedName.toLowerCase(),
+          kind: 'semantic_view' as const,
+          provider: 'snowflake',
+          name,
+          qualifiedName,
+          ...(description ? { description } : {}),
+          attributes: { database, schema: rowSchema },
+        };
+      })
+      .filter((asset) => Boolean(asset.name));
   }
 }
