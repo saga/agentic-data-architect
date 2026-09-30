@@ -1,3 +1,8 @@
+---
+name: search-leanix
+description: Research SAP LeanIX application facts, relationships, ownership, lifecycle, dependencies, and enterprise architecture evidence.
+---
+
 # Search LeanIX
 
 用途：研究 SAP LeanIX 的 Fact Sheets、关系、生命周期、owner、应用依赖和其它企业架构事实。
