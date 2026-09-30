@@ -188,6 +188,17 @@ export function finishConversationTurn(
   `).run(status, result ?? null, error ?? null, new Date().toISOString(), turnId);
 }
 
+export function recoverRunningConversationTurns(): number {
+  const result = getDatabase().prepare(`
+    UPDATE conversation_turns
+    SET status = 'aborted',
+        error = 'Server restarted while this turn was running.',
+        updated_at = ?
+    WHERE status = 'running'
+  `).run(new Date().toISOString());
+  return Number(result.changes);
+}
+
 export function getConversationTurn(turnId: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
     SELECT turn_id, session_name, status, result, error, created_at, updated_at
