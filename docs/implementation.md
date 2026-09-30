@@ -106,3 +106,20 @@ context.json 是每次 Investigation 的第一入口：
 ### Copilot working directory
 
 Lead Data Agent 的 workingDirectory 指向当前 Investigation 的 workspace，而不是项目根目录。这样 Agent 产生的研究记录、源码副本、临时分析和重要发现都留在 Investigation 内。
+
+
+## 当前代码审查后的 V1.1 修正
+
+已补齐几个会直接影响真实 Investigation 的问题：
+
+- DB profiling 保留完整 DataProfile，不再只保存 row count；Agent 问答和 findings 都能读取列级 profile。
+- Column lineage 带 evidenceId，列级结论可以回指对应 SQL statement。
+- DB-only discovery 也会运行适用的 deterministic findings，而不是只有带 SQL 文件的 discovery 才有 findings。
+- Data Estate 的 database / schema / dataset 层级现在会一起保存。
+- DiscoveryRun 和 workspace context 中不再保存数据库连接密码、token 等凭据。
+- 只读查询守卫禁止 CTE 中的 DML，并对实际数据库查询加结果上限，避免 Agent 一条查询拉回整个大表。
+- Snowflake 的动态表名、schema、database 名都经过标识符校验和引用，避免把对象名直接拼进 SQL。
+- Investigation 文件损坏时不再被错误地当作旧版文件自动迁移。
+- Evidence context 会把 profile 和 column lineage 的 evidence id 一起交给 Agent。
+
+这些修改仍然不增加 vector DB、Neo4j、multi-agent 或 workflow engine；目标只是让 V1.1 的 Evidence-first 闭环在真实项目里可用。
