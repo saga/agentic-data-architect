@@ -11,7 +11,7 @@ npm install
 npm run start
 ```
 
-也可以指定 session：
+不带参数时会进入可持续复用的 `default` session；也可以指定 session：
 
 ```bash
 npm run start portfolio-analytics
