@@ -123,3 +123,9 @@ Lead Data Agent 的 workingDirectory 指向当前 Investigation 的 workspace，
 - Evidence context 会把 profile 和 column lineage 的 evidence id 一起交给 Agent。
 
 这些修改仍然不增加 vector DB、Neo4j、multi-agent 或 workflow engine；目标只是让 V1.1 的 Evidence-first 闭环在真实项目里可用。
+### 后续审查补充
+
+- PostgreSQL / Snowflake profiling 改为每张表一次聚合 + 一次小样本，避免按列重复全表扫描。
+- Targeted Query 的目标表检查改成边界匹配，避免 orders 被 my_orders 误命中。
+- SELECT FOR UPDATE / FOR SHARE / SELECT INTO 也纳入只读查询禁止范围。
+- Profile 与 column lineage 都必须带可回指的 evidence id。
