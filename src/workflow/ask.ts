@@ -32,7 +32,7 @@ export async function answerQuestion(investigationName: string, question: string
   const ctx = buildQuestionContext({
     question,
     lineage: snapshot?.lineage ?? null,
-    profiles: [],
+    profiles: snapshot?.profiles ?? [],
     findings: inv.findings,
     evidence: inv.evidence,
   });
