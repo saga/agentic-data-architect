@@ -1,4 +1,6 @@
 import { CopilotClient } from '@github/copilot-sdk';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { config } from '../config.js';
 
 let client: CopilotClient | null = null;
@@ -58,6 +60,26 @@ export interface AskInput {
 
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
 
+async function listSkillNames(): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
+    const names: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const skillFile = await fs.readFile(path.join(config.skillsDir, entry.name, 'SKILL.md'), 'utf8');
+        const name = /^name:\s*(.+)$/m.exec(skillFile)?.[1]?.trim() || entry.name;
+        if (name) names.push(name);
+      } catch {
+        // Ignore invalid skill directories; the SDK will not load them either.
+      }
+    }
+    return [...new Set(names)];
+  } catch {
+    return [];
+  }
+}
+
 export function hasActiveCopilotTurn(turnId: string): boolean {
   return activeSessions.has(turnId);
 }
@@ -75,21 +97,17 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 
 export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
+  const availableSkillNames = await listSkillNames();
+  const selectedSkillNames = new Set(input.skills ?? config.copilotSkills);
+  const disabledSkills = availableSkillNames.filter((name) => !selectedSkillNames.has(name));
+
   const sessionConfig: CreateSessionConfig = {
     model: input.model ?? config.model,
     workingDirectory: input.workingDirectory ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
+    disabledSkills,
     ...(input.mcpServers && Object.keys(input.mcpServers).length ? { mcpServers: input.mcpServers } : {}),
-    customAgents: [
-      {
-        name: 'lead-data-agent',
-        description: 'Lead Data Agent for evidence-backed data modernization investigation and architecture analysis.',
-        prompt: 'Act as the lead data agent. Follow the loaded Skills for investigation and domain-specific methodology. Do not invent enterprise facts.',
-        skills: input.skills ?? config.copilotSkills,
-      },
-    ],
-    agent: 'lead-data-agent',
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
