@@ -4,24 +4,30 @@
  */
 
 export interface DatabaseInfo { name: string; }
+/** 数据库 Schema 的最小描述，用于发现和过滤范围。 */
 export interface SchemaInfo { database?: string; name: string; }
+/** 表/数据集的统一元数据，屏蔽不同数据库驱动的差异。 */
 export interface TableInfo {
   database?: string;
   schema?: string;
   name: string;
   qualifiedName: string;
 }
+/** 数据库列的基本结构信息。 */
 export interface ColumnInfo { name: string; dataType: string; nullable: boolean; }
+/** 一张表的完整 metadata，包括列和可选的行数估计。 */
 export interface TableMetadata extends TableInfo {
   columns: ColumnInfo[];
   rowCountEstimate?: number;
 }
+/** 只读 SQL 的标准化执行结果，避免上层依赖具体驱动返回值。 */
 export interface QueryResult {
   columns: string[];
   rows: Record<string, unknown>[];
   rowCount: number;
   truncated: boolean;
 }
+/** 数据库适配器统一契约：连接、metadata、sample、profiling 和只读查询。 */
 export interface DatabaseAdapter {
   readonly type: string;
   connect(): Promise<void>;
@@ -34,6 +40,7 @@ export interface DatabaseAdapter {
   profile(table: string, columns?: string[]): Promise<DataProfile>;
   query(sql: string): Promise<QueryResult>;
 }
+/** 单列 profiling 结果，记录空值、distinct、范围和少量样本。 */
 export interface ColumnProfile {
   column: string;
   dataType: string;
@@ -47,6 +54,7 @@ export interface ColumnProfile {
   max?: string;
   sampleValues?: unknown[];
 }
+/** 单个数据集的 profiling 汇总结果。 */
 export interface DataProfile {
   dataset: string;
   rowCount: number;
@@ -54,6 +62,7 @@ export interface DataProfile {
   profiledAt: string;
 }
 
+/** 清理注释和字符串字面量，避免 SQL 只读守卫被字符串内容误导。 */
 function sanitizeSqlForGuard(sql: string): string {
   return sql
     .replace(/--[^\n]*(?:\n|$)/g, ' ')
@@ -82,6 +91,7 @@ export function assertReadOnly(sql: string): void {
   }
 }
 
+/** 在只读校验后统一增加结果行数上限，防止一次读取过多数据。 */
 export function boundedReadOnlyQuery(sql: string, limit = 1000): string {
   assertReadOnly(sql);
   const trimmed = sql.trim().replace(/;\s*$/g, '');
