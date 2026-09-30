@@ -9,6 +9,7 @@ description: Workspace conventions for investigation state, shared research arti
 
 ```text
 .workspace/
+  conversations.db
   shared/
     index.json
     confluence/
