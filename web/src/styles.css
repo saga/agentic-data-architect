@@ -1,8 +1,10 @@
 html,
 body,
 #root {
+  width: 100%;
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
@@ -14,11 +16,15 @@ body {
 }
 
 .app-shell {
-  height: 100%;
+  width: 100%;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .session-sider {
+  height: 100vh;
+  overflow: hidden;
   border-right: 1px solid #f0f0f0;
   padding: 16px 12px;
 }
@@ -54,17 +60,22 @@ body {
 }
 
 .topbar {
+  flex: 0 0 64px;
+  height: 64px;
+  line-height: 64px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   padding: 0 20px;
+  overflow: hidden;
 }
 
 .chat-layout {
   display: flex;
   min-height: 0;
   height: calc(100vh - 64px);
+  overflow: hidden;
   background: #fff;
 }
 
@@ -132,4 +143,38 @@ body {
   .composer {
     padding: 10px 12px 14px;
   }
+}
+
+
+.welcome {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 40px 32px;
+}
+
+.welcome-inner {
+  width: min(760px, 100%);
+}
+
+.investigation-guide {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 20px;
+}
+
+.guide-card {
+  border-color: #f0f0f0;
+}
+
+.guide-icon {
+  margin-top: 3px;
+  color: #1677ff;
+}
+
+.quick-start {
+  display: grid;
+  gap: 8px;
 }
