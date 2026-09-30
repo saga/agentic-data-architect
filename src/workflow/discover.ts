@@ -1,3 +1,8 @@
+/**
+ * Discovery Workflow：把文件、数据库和分析结果汇总成可追溯的 Investigation 状态。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import { PARSER_VERSION } from '../analysis/sql-parser.js';
 import { buildLineage, type LineageGraph } from '../analysis/lineage.js';
 import { runAllFindings } from '../analysis/findings.js';
@@ -21,6 +26,7 @@ export interface DiscoverOptions {
   profile?: boolean;
 }
 
+/** 一次完整 Discovery 的不可变结果快照，供后续 Agent 问答检索。 */
 export interface DiscoverySnapshot {
   run: DiscoveryRun;
   inventory: Inventory | null;
@@ -30,6 +36,7 @@ export interface DiscoverySnapshot {
   findingIds: string[];
 }
 
+/** Discovery workflow 给 CLI/UI 的轻量执行摘要。 */
 export interface DiscoverSummary {
   runId: string;
   filesScanned: number;
@@ -41,6 +48,7 @@ export interface DiscoverSummary {
   snapshotPath: string;
 }
 
+/** 执行文件/数据库发现、lineage、estate、profiling 和 deterministic findings，并持久化本次 run。 */
 export async function runDiscovery(name: string, opts: DiscoverOptions): Promise<DiscoverSummary> {
   // Validate before recording the run in workspace state; a rejected request
   // should not leave a misleading discovery entry behind.
@@ -57,7 +65,8 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     important: true,
   });
   const startedAt = new Date().toISOString();
-  const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
+  // runId 按 Investigation 顺序递增，用于把本轮 Evidence、snapshot 和审计范围关联起来。
+const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
 
   const estate = emptyEstate();
   let inventory: Inventory | null = null;
@@ -145,7 +154,8 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     profiles,
     findingIds: inv.findings.map((f) => f.id),
   };
-  const snapshotPath = await saveDiscoverySnapshot(name, runId, snapshot);
+  // snapshot 先独立原子写入，再保存 Investigation context；二者共同组成本次 Discovery 的可恢复状态。
+const snapshotPath = await saveDiscoverySnapshot(name, runId, snapshot);
   await saveInvestigation(inv);
   return {
     runId,
@@ -159,6 +169,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   };
 }
 
+/** 把不同 Discovery 来源得到的 Estate 节点/边合并到当前 Investigation 的统一图。 */
 function mergeEstate(estate: DataEstate, extra: DataEstate): void {
   const nodeIds = new Set(estate.nodes.map((n) => n.id));
   for (const n of extra.nodes) {
@@ -170,6 +181,7 @@ function mergeEstate(estate: DataEstate, extra: DataEstate): void {
   estate.edges.push(...extra.edges);
 }
 
+/** 把 SQL lineage 转成 Data Estate 节点和关系，并把 SQL Evidence 绑定到这些关系。 */
 function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inventory: Inventory): void {
   const filesByPath = new Map(inventory.files.map((f) => [f.path, f]));
   const ensure = (id: string, type: Parameters<typeof nodeId>[0], name: string, attributes: Record<string, unknown> = {}) => {
@@ -210,6 +222,7 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
 }
 
 
+/** 在只有 metadata/estate 没有 SQL lineage 时构造最小 LineageGraph，供通用 Finding 规则继续运行。 */
 function lineageFromEstate(estate: DataEstate): LineageGraph {
   const tables = estate.nodes.filter((n) => n.type === 'dataset').map((n) => n.name);
   const columns = estate.nodes
