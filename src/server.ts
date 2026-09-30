@@ -11,7 +11,6 @@ import {
   ensureWorkspace,
   loadWorkspaceContext,
   workspaceRoot,
-  type WorkspaceContext,
 } from './investigation/workspace.js';
 import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
 import {
