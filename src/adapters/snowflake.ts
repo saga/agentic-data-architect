@@ -253,27 +253,42 @@ async query(sql: string): Promise<QueryResult> {
    */
   async listSemanticAssets(schema?: string): Promise<SemanticAsset[]> {
     const rows = await this.q('SHOW SEMANTIC VIEWS');
-    return rows
-      .filter((row) => {
-        const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
-        return !schema || rowSchema.toUpperCase() === schema.toUpperCase();
-      })
-      .map((row) => {
-        const database = String(row['database_name'] ?? row['DATABASE_NAME'] ?? '');
-        const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
-        const name = String(row['name'] ?? row['NAME'] ?? '');
-        const qualifiedName = [database, rowSchema, name].filter(Boolean).join('.');
-        const description = String(row['comment'] ?? row['COMMENT'] ?? '').trim();
-        return {
-          id: 'snowflake:semantic_view:' + qualifiedName.toLowerCase(),
-          kind: 'semantic_view' as const,
-          provider: 'snowflake',
-          name,
-          qualifiedName,
-          ...(description ? { description } : {}),
-          attributes: { database, schema: rowSchema },
-        };
-      })
-      .filter((asset) => Boolean(asset.name));
+    const visible = rows.filter((row) => {
+      const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
+      return !schema || rowSchema.toUpperCase() === schema.toUpperCase();
+    });
+
+    const assets: SemanticAsset[] = [];
+    for (const row of visible) {
+      const database = String(row['database_name'] ?? row['DATABASE_NAME'] ?? '');
+      const rowSchema = String(row['schema_name'] ?? row['SCHEMA_NAME'] ?? '');
+      const name = String(row['name'] ?? row['NAME'] ?? '');
+      if (!name) continue;
+      const qualifiedName = [database, rowSchema, name].filter(Boolean).join('.');
+      const description = String(row['comment'] ?? row['COMMENT'] ?? '').trim();
+      const semanticName = [database, rowSchema, name].filter(Boolean).map((part) => ident(part)).join('.');
+
+      let definition: Record<string, unknown>[] = [];
+      try {
+        definition = await this.q('DESC SEMANTIC VIEW ' + semanticName);
+      } catch {
+        // DESCRIBE 需要额外权限；拿不到定义时，仍保留 Semantic View 的基础 metadata。
+      }
+
+      assets.push({
+        id: 'snowflake:semantic_view:' + qualifiedName.toLowerCase(),
+        kind: 'semantic_view',
+        provider: 'snowflake',
+        name,
+        qualifiedName,
+        ...(description ? { description } : {}),
+        attributes: {
+          database,
+          schema: rowSchema,
+          definition: definition.slice(0, 500),
+        },
+      });
+    }
+    return assets;
   }
 }
