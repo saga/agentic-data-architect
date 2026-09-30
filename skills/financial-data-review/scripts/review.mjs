@@ -132,10 +132,7 @@ for (const [domain, rule] of Object.entries(domainRules)) {
   for (const dataset of candidates) {
     const datasetColumns = (cols.get(dataset) ?? []).map((column) => column.toLowerCase());
     for (const [check, hints] of Object.entries(rule.checks)) {
-      if (hints.length === 0) {
-        questions.push(dataset + '：需要确认 ' + check);
-        continue;
-      }
+      if (hints.length === 0) continue;
       const present = hints.some((hint) => datasetColumns.some((column) => column.includes(hint)));
       if (!present) questions.push(dataset + '：缺少可识别的 ' + check + ' 语义，需要确认字段或业务定义。');
     }
