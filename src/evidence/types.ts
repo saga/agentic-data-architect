@@ -87,6 +87,8 @@ export const DiscoveryRunSchema = z.object({
   filesScanned: z.number().int().nonnegative(),
   datasetsFound: z.number().int().nonnegative(),
   lineageEdgesFound: z.number().int().nonnegative(),
+  sqlParseFailures: z.number().int().nonnegative().optional(),
+  semanticAssetsFound: z.number().int().nonnegative().optional(),
 }).strict();
 export type DiscoveryRun = z.infer<typeof DiscoveryRunSchema>;
 
