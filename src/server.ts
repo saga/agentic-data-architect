@@ -307,6 +307,8 @@ export function createApp(vite?: ViteDevServer) {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    // SSE is the browser's live execution channel. answerQuestion commits the
+    // durable result before the final "completed" event is sent.
     let finished = false;
     const send = (event: string, data: unknown) => {
       if (finished || res.writableEnded) return;
@@ -318,6 +320,8 @@ export function createApp(vite?: ViteDevServer) {
     const heartbeat = setInterval(() => send('heartbeat', { timestamp: new Date().toISOString() }), 15000);
     heartbeat.unref?.();
 
+    // A disconnected browser behaves like Stop while execution is cancelable.
+    // The commit phase intentionally ignores late cancellation.
     const onClose = () => {
       if (!finished) {
         requestAbort(name, turnId);
