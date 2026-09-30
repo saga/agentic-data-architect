@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 
 function execBridge(python: string, script: string, input: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -54,9 +55,15 @@ export interface SqlParser {
 }
 
 function resolvePython(): string {
-  // SQLGLOT_PYTHON 指向装了 sqlglot 的解释器（pip install sqlglot）。
-  // 本机多 Python 时必须指对，桥接报错会直接告诉你当前用的是哪个。
-  return process.env['SQLGLOT_PYTHON'] ?? 'python3';
+  // 显式配置优先；否则使用项目级 .venv，避免依赖用户机器的全局 Python。
+  if (process.env['SQLGLOT_PYTHON']) return process.env['SQLGLOT_PYTHON'];
+
+  const localPython = process.platform === 'win32'
+    ? path.resolve('.venv', 'Scripts', 'python.exe')
+    : path.resolve('.venv', 'bin', 'python');
+
+  if (existsSync(localPython)) return localPython;
+  return process.platform === 'win32' ? 'python' : 'python3';
 }
 
 function bridgeScript(): string {
