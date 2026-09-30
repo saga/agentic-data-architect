@@ -653,3 +653,16 @@ Copilot 使用 `mode: "empty"`，只显式开启本 Workbench 需要的 built-in
 
 HTTP MCP 的 headers 与 URL 一样从配置中解析环境变量后传入 runtime；secret 本身不写入 `control.json`。
 
+
+
+## 18. Schema 与边界验证（当前实现）
+
+运行时数据不再只靠 TypeScript interface 约束。当前代码使用 Zod 作为 JSON / API 边界的运行时 Schema：
+
+- `src/evidence/types.ts` 定义 Evidence / Claim / Finding / DiscoveryRun 的 Schema，并由 Schema 推导 TypeScript 类型。
+- `src/investigation/schemas.ts` 定义 `context.json`、`control.json`、shared index、audit event 的 Schema；读取持久化数据时重新校验。
+- `src/agent/result.ts` 对模型结构化输出做 Zod 校验，再做 Evidence ownership 校验和状态校正。
+- `src/api/schemas.ts` 校验创建 Investigation、配置保存、消息发送、Stop 请求的 HTTP body。
+- `src/config.ts` 校验环境变量，并对端口、超时等数值做类型转换和范围约束。
+
+原则是：TypeScript 用于开发期类型安全，Zod 用于运行时不可信输入；Schema 是类型和验证规则的单一来源，避免 `as Type` 把未经验证的 JSON 当成可信对象。
