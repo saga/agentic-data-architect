@@ -2,44 +2,44 @@
 
 使用 AI Agent 做 Data Architect / Data Analyst，重点解决老系统 modernize / replatform 时的 data model、source、transformation、lineage 和业务上下文分析。
 
-## 现在怎么用
+## Web UI
 
-安装后直接进入持续 Investigation session：
+现在的主入口是 Web UI，不再使用命令行 readline 作为主要交互方式。
 
 ```bash
 npm install
 npm run start
 ```
 
-不带参数时会进入可持续复用的 `default` session；也可以指定 session：
-
-```bash
-npm run start portfolio-analytics
-npm run dev portfolio-analytics
-```
-
-启动后 Agent 会逐步了解：
-- 要做什么分析、最终要回答什么问题
-- 业务上下文、范围、时间点、约束
-- 相关文件、文档、Confluence、GitHub repository
-- 希望得到什么产出
-
-之后保持同一个 session。用户可以继续补充、提问、提供新的资料或纠正方向，不需要重新执行一串命令。
-
-交互命令：
+打开：
 
 ```text
-/report   生成当前 Current-State Report
-/context  显示当前 context.json
-/help     查看命令
-/exit     保存并退出
+http://127.0.0.1:3000
 ```
 
-退出后再次使用同一个 session name，会尝试恢复同一个 Copilot session，并继续读取已有 workspace context。
+也可以：
+
+```bash
+PORT=8080 npm run start
+```
+
+开发模式同样由 Express 5 托管，并通过 Vite middleware 提供前端 HMR：
+
+```bash
+npm run dev
+```
+
+### UI
+
+前端使用：
+
+- Ant Design 6
+- Ant Design X 2.9
+- @ant-design/x-markdown 2.9
+
+聊天界面使用 Ant Design X 的 Conversations、Bubble.List、Sender、Welcome 等组件。Markdown 使用 XMarkdown，支持 CommonMark/GFM、代码高亮、公式和 Mermaid；Mermaid 图可以直接在回答中交互查看。 citeturn200179search0turn702320search0turn702320search1
 
 ## Workspace
-
-当前唯一主目录是 `.workspace`：
 
 ```text
 .workspace/
@@ -51,7 +51,7 @@ npm run dev portfolio-analytics
     web/
     document/
     other/
-  portfolio-analytics/
+  <session-name>/
     context.json
     transcript.md
     discovery/
@@ -59,19 +59,53 @@ npm run dev portfolio-analytics
     artifacts/
 ```
 
-`context.json` 是当前 Investigation 的主要状态入口。
+`.workspace/<session-name>/context.json` 是当前 Investigation 的主要状态入口。
 
-`.workspace/shared/` 是跨 session 可复用资料区。例如 Confluence 页面下载为：
+`.workspace/shared/` 是跨 session 可复用资料区。例如 Confluence 页面保存为：
 
 ```text
 .workspace/shared/confluence/<page-id>.md
 ```
 
-可复用资料同时登记在 `.workspace/shared/index.json`。
+并登记到：
+
+```text
+.workspace/shared/index.json
+```
+
+## API
+
+Web UI 后面的 Express server 提供：
+
+```text
+GET  /api/health
+
+GET  /api/sessions
+POST /api/sessions
+
+GET  /api/sessions/:name
+POST /api/sessions/:name/messages
+GET  /api/sessions/:name/report
+
+GET  /api/shared
+```
+
+Agent 问答仍然复用现有：
+
+```text
+Evidence
+→ Question Context
+→ Copilot
+→ Structured Agent Result
+→ Claim / Unknown / Finding
+→ context.json
+```
+
+Web 层没有重新实现这一套逻辑。
 
 ## Research Skills
 
-研究流程尽量由 SKILL 定义，而不是硬编码在 TypeScript prompt 中：
+研究流程尽量由 SKILL 定义，而不是硬编码在 UI 或 prompt 中：
 
 ```text
 skills/investigation-session/SKILL.md
@@ -109,7 +143,7 @@ V4    Controlled Write / PR / Deployment
 
 ## 兼容 CLI
 
-持续 session 是默认入口，旧 CLI 仍保留用于脚本化场景：
+旧 CLI 仍保留用于脚本化场景：
 
 ```bash
 npm run init -- demo --goal "Modernize Portfolio Analytics"
@@ -118,11 +152,15 @@ npm run ask -- demo "Where does Position come from?"
 npm run report -- demo
 ```
 
+它们共享 `.workspace/<session-name>/context.json`，不是另一套状态存储。
+
 ## 环境
 
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | `WORKSPACE_DIR` | 当前 workspace 根目录 | `.workspace` |
+| `PORT` | Express Web server 端口 | `3000` |
+| `HOST` | Express Web server bind 地址 | `127.0.0.1` |
 | `COPILOT_MODEL` | Agent 使用的模型 | `gpt-5-mini` |
 | `GITHUB_TOKEN` | 服务端模式使用；本机可直接复用 copilot 登录 | 空 |
 | `TURN_TIMEOUT_MS` | 单轮等待上限 | `300000` |
@@ -133,4 +171,9 @@ npm run report -- demo
 ```bash
 npm run typecheck
 npm test
+npm run build
 ```
+
+## 技术资料
+
+Express 5 保持 Express 4 的大部分 API，同时对 wildcard 路由等行为有调整；本项目使用 Express 5 的 `/{*splat}` 形式处理 SPA fallback。 citeturn736251search0
