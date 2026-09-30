@@ -8,8 +8,9 @@
 Browser
   → Express 5
   → Investigation API
-  → existing workflow / Evidence / Copilot
+  → existing workflow / Evidence / Copilot SDK
   → SQLite conversation history + .workspace/<session>/context.json
+                           ↘ Skills / Skill scripts
 ```
 
 前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。
@@ -26,6 +27,8 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 - 持续 Investigation session 和可恢复 Copilot session
 - `.workspace/<session>/context.json` 持久化 goal、scope、evidence、claims、findings、unknowns 等调查状态
 - `.workspace/conversations.db` 持久化 user / assistant / system 消息，并使用 SQLite FTS5 建立全文索引
+- Copilot SDK 从 `skills/` 发现和加载 Skill；`investigation-session` 默认预加载，其它领域 Skill 按需激活
+- 金融领域检查放在 `skills/financial-data-review/`，其中 deterministic 检查放在 `scripts/review.mjs`
 - `.workspace/shared/index.json` 和共享研究资料
 - 本地 SQL / PostgreSQL / Snowflake discovery
 - SQLGlot dataset / column lineage
@@ -85,3 +88,16 @@ Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaS
 Controlled Write / PR / Deployment。
 
 暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具或大量数据库 adapter。
+## Skill 边界
+
+核心代码负责安全和一致性：Evidence 校验、Claim 状态校正、SQL read-only、workspace/state persistence、lineage/profile 等确定性基础能力不交给模型。
+
+Skill 负责容易变化的领域知识、调查方法、问题清单和专业解释。需要精确计算或扫描时，Skill 自带 scripts，由 Agent 调用并读取生成 artifact。Skill 内容不是 Evidence，脚本结果仍必须回指原始 Evidence。
+
+当前金融 Skill 示例：
+
+~~~text
+skills/financial-data-review/
+  SKILL.md
+  scripts/review.mjs
+~~~
