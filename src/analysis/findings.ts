@@ -12,7 +12,7 @@ export interface FindingContext {
   investigationId: string;
   lineage: LineageGraph;
   profiles: DataProfile[];
-  inventory: Inventory;
+  inventory?: Inventory;
   evidence: EvidenceRef[];
 }
 
@@ -160,6 +160,7 @@ export function findIdentifierFragmentation(ctx: FindingContext): Finding[] {
 }
 
 export function findMissingLineage(ctx: FindingContext): Finding[] {
+  if (ctx.lineage.statements.length === 0) return [];
   const connected = new Set<string>();
   for (const e of ctx.lineage.edges) {
     connected.add(e.source.toLowerCase());
