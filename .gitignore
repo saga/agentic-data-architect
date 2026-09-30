@@ -23,6 +23,8 @@
 
 # Local investigation state (JSON snapshots, never commit)
 /.data/
+/.workspace/
+/web/dist/
 
 # Logs
 npm-debug.log*
