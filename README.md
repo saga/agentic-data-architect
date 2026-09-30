@@ -47,7 +47,7 @@ npm run report -- demo
 npm run discover -- demo --database "postgres://user:pass@localhost:5432/db" --schema public --profile
 ```
 
-质量门：`npm run typecheck`，`npm test`（24 测试，含 golden precision/recall）。
+质量门：`npm run typecheck`，`npm test`（包含 golden precision/recall、证据追踪和 workspace 安全性测试）。
 
 环境变量（都有默认值，可不配）：
 
