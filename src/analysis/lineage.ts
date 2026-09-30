@@ -84,7 +84,7 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
         edges.push({ source: src, target, viaFile: input.path, evidenceId: edgeEvidence.id });
       }
       for (const c of st.columns) {
-        columns.push({ ...c, targetDataset: target, statementId: st.id });
+        columns.push({ ...c, targetDataset: target, statementId: st.id, evidenceId: stmtEvidence.id });
       }
     }
   }
