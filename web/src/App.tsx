@@ -423,7 +423,6 @@ function AppInner() {
         content: currentStreamingAnswer.content
           ? <ChatMarkdown content={currentStreamingAnswer.content} />
           : <Text type="secondary">Thinking…</Text>,
-        footer: <Text type="secondary">Live</Text>,
       });
     }
     return items;
@@ -833,13 +832,6 @@ function AppInner() {
               <Card size="small" className="error-card">
                 <Text type="danger">{error}</Text>
               </Card>
-            ) : null}
-
-            {loading ? (
-              <div className="agent-turn-status">
-                <LoadingOutlined spin />
-                <Text type="secondary">{turnStatus}</Text>
-              </div>
             ) : null}
 
             <div className="composer">
