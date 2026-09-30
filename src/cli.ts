@@ -1,57 +1,32 @@
 #!/usr/bin/env tsx
-/**
- * V1.1 CLI（瘦身）：
- *   init <name> [--prompt "..."] [--goal ...] [--scope a,b] [--system s1,s2]
- *   discover <name> [--path ./dir] [--database URL] [--schema S] [--profile]
- *   ask <name> "question"
- *   report <name>
- *
- * Investigation 的 workspace 会在 init 时创建：
- * .data/investigations/<name>/workspace/
- *   context.json
- *   research/{github,leanix,confluence,web}/
- *   findings/
- *   artifacts/
- *   notes/
- */
 import { stopClient } from './agent/copilot.js';
-import { investigationExists, loadInvestigation, newInvestigation, saveInvestigation } from './investigation/store.js';
+import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
 import { runDiscovery } from './workflow/discover.js';
 import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
+import { runInteractiveSession } from './workflow/session.js';
 
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
-  if (!name) {
-    throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2]');
-  }
+  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2]');
   let userPrompt = '';
   const inv = newInvestigation(name, userPrompt);
   for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === '--prompt') {
-      userPrompt = rest[++i] ?? '';
-      inv.userPrompt = userPrompt;
-    }
+    if (rest[i] === '--prompt') { userPrompt = rest[++i] ?? ''; inv.userPrompt = userPrompt; }
     if (rest[i] === '--goal') inv.goal = rest[++i] ?? '';
     if (rest[i] === '--scope') inv.scope = (rest[++i] ?? '').split(',').filter(Boolean);
     if (rest[i] === '--system') inv.systems = (rest[++i] ?? '').split(',').filter(Boolean);
   }
-  console.log(`investigation created: ${await saveInvestigation(inv)}`);
+  console.log('session created: ' + await saveInvestigation(inv));
 }
 
 async function cmdDiscover(args: string[]): Promise<void> {
   const [name, ...rest] = args;
   if (!name) throw new Error('usage: discover <name> [--path ./dir] [--database URL] [--schema S] [--profile]');
-  if (!(await investigationExists(name))) {
-    throw new Error(`investigation 不存在：${name}（先 npm run init -- ${name}）`);
-  }
-  await loadInvestigation(name);
+  if (!(await investigationExists(name))) throw new Error('session 不存在：' + name + '（直接 npm run start ' + name + ' 开始）');
   const opts: { path?: string; database?: string; schema?: string; profile?: boolean } = {};
   const maybePath = rest[0];
-  if (maybePath !== undefined && !maybePath.startsWith('--')) {
-    opts.path = maybePath;
-    rest.shift();
-  }
+  if (maybePath !== undefined && !maybePath.startsWith('--')) { opts.path = maybePath; rest.shift(); }
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--path') opts.path = rest[++i];
     else if (rest[i] === '--database') opts.database = rest[++i];
@@ -59,9 +34,9 @@ async function cmdDiscover(args: string[]): Promise<void> {
     else if (rest[i] === '--profile') opts.profile = true;
   }
   const s = await runDiscovery(name, opts);
-  console.log(`run ${s.runId}: ${s.filesScanned} files, ${s.datasetsFound} datasets, ${s.lineageEdgesFound} edges, ${s.columnsFound} column edges`);
-  console.log(`findings: ${s.findingsFound}, unknowns: ${s.unknowns.length}`);
-  console.log(`snapshot: ${s.snapshotPath}`);
+  console.log('run ' + s.runId + ': ' + s.filesScanned + ' files, ' + s.datasetsFound + ' datasets, ' + s.lineageEdgesFound + ' edges, ' + s.columnsFound + ' column edges');
+  console.log('findings: ' + s.findingsFound + ', unknowns: ' + s.unknowns.length);
+  console.log('snapshot: ' + s.snapshotPath);
 }
 
 async function cmdAsk(args: string[]): Promise<void> {
@@ -70,8 +45,8 @@ async function cmdAsk(args: string[]): Promise<void> {
   if (!name || !question) throw new Error('usage: ask <name> "question"');
   const r = await answerQuestion(name, question);
   console.log(r.answer);
-  console.log(`\nclaims: ${r.claimIds.join(', ') || '(none)'}`);
-  for (const w of r.warnings) console.log(`warning: ${w}`);
+  console.log('claims: ' + (r.claimIds.join(', ') || '(none)'));
+  for (const w of r.warnings) console.log('warning: ' + w);
 }
 
 async function cmdReport(args: string[]): Promise<void> {
@@ -79,18 +54,19 @@ async function cmdReport(args: string[]): Promise<void> {
   if (!name) throw new Error('usage: report <name>');
   const r = await runReport(name);
   console.log(r.markdown);
-  console.error(`\nwritten: ${r.path}`);
+  console.error('written: ' + r.path);
 }
 
 async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
   try {
-    if (cmd === 'init') await cmdInit(args);
+    if (!cmd || cmd === 'start' || cmd === 'dev') await runInteractiveSession(args[0]);
+    else if (cmd === 'init') await cmdInit(args);
     else if (cmd === 'discover') await cmdDiscover(args);
     else if (cmd === 'ask') await cmdAsk(args);
     else if (cmd === 'report') await cmdReport(args);
     else {
-      console.log('usage: cli.ts <init|discover|ask|report> ...');
+      console.log('usage: npm run start [session-name] | init | discover | ask | report');
       process.exitCode = 2;
     }
   } finally {
