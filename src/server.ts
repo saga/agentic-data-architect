@@ -1,3 +1,8 @@
+/**
+ * Web API、SSE 和服务生命周期。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键边界，方便后续维护。
+ */
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { createServer as createHttpServer } from 'node:http';
 import fs from 'node:fs/promises';
@@ -45,6 +50,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
 const webDist = path.join(webRoot, 'dist');
 
+/** Session 列表给 UI 使用的轻量摘要，避免每次列表请求都返回完整 Investigation。 */
 interface SessionSummary {
   key: string;
   label: string;
@@ -60,11 +66,13 @@ const upload = multer({
   },
 });
 
+/** 清理用户上传文件名，只保留安全文件名字符并限制长度。 */
 function safeUploadName(name: string): string {
   const base = path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 160);
   return base || 'uploaded-file';
 }
 
+/** 从 skills 目录读取每个 Skill 的 name/description，供 Settings UI 展示。 */
 async function listSkills(): Promise<Array<{ name: string; description: string }>> {
   let entries;
   try {
@@ -87,10 +95,12 @@ async function listSkills(): Promise<Array<{ name: string; description: string }
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** 兼容 Express 路由参数可能为 string|string[] 的情况，统一取第一个值。 */
 function routeParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
 
+/** 校验 URL 中的 Session 名称，拒绝路径穿越。 */
 function sessionKey(name: string): string {
   const safe = path.basename(name);
   if (!name || safe !== name || name === '.' || name === '..') {
@@ -99,6 +109,7 @@ function sessionKey(name: string): string {
   return safe;
 }
 
+/** 枚举 workspace 下的 Investigation，并组合 context 与 conversation 摘要返回给 UI。 */
 async function listSessions(): Promise<SessionSummary[]> {
   await fs.mkdir(config.workspaceDir, { recursive: true });
   const entries = await fs.readdir(config.workspaceDir, { withFileTypes: true });
@@ -121,6 +132,7 @@ async function listSessions(): Promise<SessionSummary[]> {
   return result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** 创建新的 Investigation、默认 Control 和初始审计事件；已存在时直接返回。 */
 async function createSession(name?: string, userPrompt?: string) {
   const key = sessionKey(
     name?.trim() ||
@@ -142,20 +154,24 @@ async function createSession(name?: string, userPrompt?: string) {
   return loadWorkspaceContext(key);
 }
 
+/** 创建 Express 应用和全部 Web API/SSE 路由；主进程负责 listen，这里只负责组装。 */
 export function createApp(vite?: ViteDevServer) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '2mb' }));
 
-  app.get('/api/health', (_req, res) => {
+  // 健康检查：只验证 Web service 能正常响应，不触发模型或数据库连接。
+app.get('/api/health', (_req, res) => {
     res.json({ ok: true, service: 'agentic-data-architect' });
   });
 
-  app.get('/api/sessions', async (_req, res) => {
+  // Session 列表 API：返回 UI 左侧历史 Investigation。
+app.get('/api/sessions', async (_req, res) => {
     res.json({ sessions: await listSessions() });
   });
 
-  app.post('/api/sessions', async (req, res) => {
+  // 创建 Session API：body 先经 Zod，再进入业务层。
+app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(CreateSessionBodySchema, req.body);
     const context = await createSession(body.name, body.userPrompt);
     res.status(201).json({ context });
@@ -195,7 +211,8 @@ export function createApp(vite?: ViteDevServer) {
     res.json({ control });
   });
 
-  app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
+  // 文件上传 API：把文件存入当前 Investigation workspace，并记录 sha256/Evidence 输入。
+app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
     const name = sessionKey(String(req.params.name));
     if (!req.file) {
       res.status(400).json({ error: '没有收到文件，请重新选择要上传的文件。' });
@@ -292,7 +309,8 @@ export function createApp(vite?: ViteDevServer) {
     res.json(result);
   });
 
-  app.post('/api/sessions/:name/messages/stream', async (req, res) => {
+  // Agent SSE API：把执行中的 delta/status/heartbeat/completed/error 实时推送给浏览器。
+app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(MessageBodySchema, req.body);
     const message = body.message;
@@ -349,7 +367,8 @@ export function createApp(vite?: ViteDevServer) {
     }
   });
 
-  app.post('/api/sessions/:name/messages/abort', async (req, res) => {
+  // Stop API：只允许取消当前可取消的 executing turn，commit 阶段不会被打断。
+app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     const name = sessionKey(req.params.name);
     const { turnId } = parseRequest(AbortBodySchema, req.body);
     const turn = getConversationTurn(turnId);
@@ -404,6 +423,7 @@ export function createApp(vite?: ViteDevServer) {
   return app;
 }
 
+/** 生产 Web server 主入口：准备 Vite/静态文件、恢复异常 turn、启动 HTTP server，并注册优雅退出。 */
 async function main(): Promise<void> {
   const dev = config.nodeEnv !== 'production';
   let vite: ViteDevServer | undefined;
