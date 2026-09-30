@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import {
   contextFile,
   discoveryDir,
+  loadWorkspaceContext,
   ensureWorkspace,
   workspaceRoot,
   withWorkspaceContextLock,
