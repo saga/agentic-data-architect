@@ -652,10 +652,12 @@ function AppInner() {
                 </div>
               ) : null}
               <Sender
+                key={active ?? 'new-investigation'}
                 value={value}
-                onChange={setValue}
+                onChange={(nextValue) => setValue(nextValue)}
                 loading={loading}
-                onSubmit={send}
+                submitType="enter"
+                onSubmit={(message) => { void send(message); }}
                 onCancel={() => setLoading(false)}
                 placeholder="Ask about the data estate, lineage, sources, transformations, findings, or next investigation step"
                 prefix={
@@ -691,7 +693,12 @@ function AppInner() {
                     />
                   </Sender.Header>
                 }
-                suffix={<SendOutlined />}
+                suffix={(_, { components }) => (
+                  <components.SendButton
+                    type="primary"
+                    disabled={!value.trim() || loading}
+                  />
+                )}
               />
             </div>
           </div>
