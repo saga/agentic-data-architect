@@ -74,6 +74,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
     fs.mkdir(findingsDir(name), { recursive: true }),
     fs.mkdir(artifactsDir(name), { recursive: true }),
     fs.mkdir(notesDir(name), { recursive: true }),
+    fs.mkdir(path.join(root, 'sources', 'github'), { recursive: true }),
   ]);
 
   const fp = contextFile(name);
