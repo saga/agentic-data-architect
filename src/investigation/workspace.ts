@@ -2,78 +2,15 @@ import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
-import type { Claim, DiscoveryRun, EvidenceRef, Finding } from '../evidence/types.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
-
-export type WorkspaceInputKind =
-  | 'user_prompt'
-  | 'user_message'
-  | 'assistant_message'
-  | 'question'
-  | 'discovery'
-  | 'research'
-  | 'decision'
-  | 'note'
-  | 'document';
-
-export interface WorkspaceInput {
-  id: string;
-  kind: WorkspaceInputKind;
-  capturedAt: string;
-  title: string;
-  content?: string;
-  source?: string;
-  uri?: string;
-  artifactPath?: string;
-  important?: boolean;
-  mimeType?: string;
-  sizeBytes?: number;
-  sha256?: string;
-}
-
-export interface WorkspaceContext {
-  schemaVersion: 3;
-  name: string;
-  userPrompt: string;
-  goal: string;
-  scope: string[];
-  systems: string[];
-  questions: string[];
-  discoveryRuns: DiscoveryRun[];
-  evidence: EvidenceRef[];
-  claims: Claim[];
-  findings: Finding[];
-  unknowns: string[];
-  importantInformation: string[];
-  inputs: WorkspaceInput[];
-  copilotSessionId?: string;
-  copilotConfigurationVersion?: number;
-  updatedAt: string;
-}
-
-export interface WorkspaceSeed {
-  userPrompt?: string;
-  goal?: string;
-  scope?: string[];
-  systems?: string[];
-}
-
-export interface SharedArtifactIndexEntry {
-  id: string;
-  kind: 'confluence' | 'github' | 'leanix' | 'web' | 'document' | 'other';
-  path: string;
-  title: string;
-  source?: string;
-  uri?: string;
-  updatedAt: string;
-  sessionNames?: string[];
-}
-
-export interface SharedIndex {
-  schemaVersion: 1;
-  artifacts: SharedArtifactIndexEntry[];
-  updatedAt: string;
-}
+import {
+  WorkspaceContextSchema,
+  type WorkspaceContext,
+  type WorkspaceInput,
+  type WorkspaceSeed,
+  type SharedArtifactIndexEntry,
+  type SharedIndex,
+} from './schemas.js';
 
 function safeName(name: string): string {
   if (!name || name !== path.basename(name) || name === '.' || name === '..') {
@@ -258,7 +195,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
 export async function loadWorkspaceContext(name: string): Promise<WorkspaceContext> {
   await ensureWorkspace(name);
   const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<WorkspaceContext>;
-  const context: WorkspaceContext = {
+  let context = WorkspaceContextSchema.parse({
     schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? '',
@@ -274,14 +211,19 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     importantInformation: raw.importantInformation ?? [],
     inputs: raw.inputs ?? [],
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
-    ...(typeof raw.copilotConfigurationVersion === 'number' ? { copilotConfigurationVersion: raw.copilotConfigurationVersion } : {}),
+    ...(typeof raw.copilotConfigurationVersion === 'number'
+      ? { copilotConfigurationVersion: raw.copilotConfigurationVersion }
+      : {}),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
-  };
+  });
 
   const remainingInputs = migrateLegacyConversationInputs(name, context.inputs);
   if (remainingInputs.length !== context.inputs.length) {
-    context.inputs = remainingInputs;
-    context.updatedAt = new Date().toISOString();
+    context = WorkspaceContextSchema.parse({
+      ...context,
+      inputs: remainingInputs,
+      updatedAt: new Date().toISOString(),
+    });
     await writeJsonAtomic(contextFile(name), context);
   }
 
