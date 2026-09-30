@@ -262,7 +262,7 @@ export async function appendContextInput(
   input: Omit<WorkspaceInput, 'id' | 'capturedAt'> & { id?: string; capturedAt?: string },
 ): Promise<WorkspaceInput> {
   return withWorkspaceContextLock(name, async () => {
-  const context = await loadWorkspaceContext(name);
+    const context = await loadWorkspaceContext(name);
     const item: WorkspaceInput = {
       id: input.id ?? 'input-' + String(context.inputs.length + 1).padStart(3, '0'),
       capturedAt: input.capturedAt ?? new Date().toISOString(),
@@ -284,9 +284,8 @@ export async function appendContextInput(
     context.updatedAt = new Date().toISOString();
     await writeJsonAtomic(contextFile(name), context);
     return item;
-  }
-  
   });
+}
 
 export async function addImportantInformation(name: string, information: string[]): Promise<void> {
   const context = await loadWorkspaceContext(name);
@@ -295,14 +294,14 @@ export async function addImportantInformation(name: string, information: string[
     if (value && !context.importantInformation.includes(value)) context.importantInformation.push(value);
   }
   context.updatedAt = new Date().toISOString();
-  await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+  await writeJsonAtomic(contextFile(name), context);
 }
 
 export async function setCopilotSessionId(name: string, sessionId: string): Promise<void> {
   const context = await loadWorkspaceContext(name);
   context.copilotSessionId = sessionId;
   context.updatedAt = new Date().toISOString();
-  await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+  await writeJsonAtomic(contextFile(name), context);
 }
 
 export async function appendTranscript(name: string, role: 'user' | 'assistant' | 'system', content: string): Promise<void> {
