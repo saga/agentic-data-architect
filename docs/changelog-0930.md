@@ -1,3 +1,24 @@
+## 2026-09-30 — Skill-driven domain logic
+
+### 为什么改
+
+原来 discovery / findings 里混合了平台逻辑和金融业务知识。这样每增加一个领域就要修改 TypeScript 核心代码，也不利于让 Copilot 自己根据当前问题选择合适的方法。
+
+### 现在怎么分
+
+- `src/agent/copilot.ts`：通过 Copilot SDK `skillDirectories` 加载项目 Skill；`investigation-session` 默认预加载，并在每次 session 使用前执行 skill reload。
+- `src/workflow/ask.ts`：不再读取 `SKILL.md` 并手工拼接进 system prompt。
+- `src/analysis/findings.ts`：只保留 domain-agnostic deterministic findings。
+- 删除 `src/analysis/finance-rules.ts`。
+- `skills/financial-data-review/SKILL.md`：承载金融领域知识、检查重点和交互方法。
+- `skills/financial-data-review/scripts/review.mjs`：承载确定性的金融 schema/review 检查，并写入 session artifact。
+- `skills/*/SKILL.md` 增加 description frontmatter，便于 Copilot Skill discovery。
+
+### 边界
+
+不要把安全和一致性规则放 Skill：SQL read-only、Evidence ID 校验、Claim status calibration、持久化和核心状态仍由代码控制。
+
+不要把可确定执行的算法写成 prompt：放到 Skill 的 `scripts/`，由 Agent 执行。
 ## 2026-09-30 — SQLite Conversation History / FTS5
 
 ### 为什么改
