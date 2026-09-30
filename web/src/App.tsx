@@ -420,6 +420,7 @@ function AppInner() {
         content: currentStreamingAnswer.content
           ? <ChatMarkdown content={currentStreamingAnswer.content} />
           : <Text type="secondary">Thinking…</Text>,
+        footer: undefined,
       });
     }
     return items;
