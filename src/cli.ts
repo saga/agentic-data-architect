@@ -1,10 +1,18 @@
 #!/usr/bin/env tsx
 /**
- * V1.1 CLI（瘦身，§三十四）：只解析参数、调 workflow、打印结果。
- *   init <name> [--goal ...] [--scope a,b] [--system s1,s2]
+ * V1.1 CLI（瘦身）：
+ *   init <name> [--prompt "..."] [--goal ...] [--scope a,b] [--system s1,s2]
  *   discover <name> [--path ./dir] [--database URL] [--schema S] [--profile]
  *   ask <name> "question"
  *   report <name>
+ *
+ * Investigation 的 workspace 会在 init 时创建：
+ * .data/investigations/<name>/workspace/
+ *   context.json
+ *   research/{github,leanix,confluence,web}/
+ *   findings/
+ *   artifacts/
+ *   notes/
  */
 import { stopClient } from './agent/copilot.js';
 import { investigationExists, loadInvestigation, newInvestigation, saveInvestigation } from './investigation/store.js';
@@ -14,9 +22,16 @@ import { runReport } from './workflow/report.js';
 
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
-  if (!name) throw new Error('usage: init <name> [--goal "..."] [--scope a,b] [--system s1,s2]');
-  const inv = newInvestigation(name);
+  if (!name) {
+    throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2]');
+  }
+  let userPrompt = '';
+  const inv = newInvestigation(name, userPrompt);
   for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === '--prompt') {
+      userPrompt = rest[++i] ?? '';
+      inv.userPrompt = userPrompt;
+    }
     if (rest[i] === '--goal') inv.goal = rest[++i] ?? '';
     if (rest[i] === '--scope') inv.scope = (rest[++i] ?? '').split(',').filter(Boolean);
     if (rest[i] === '--system') inv.systems = (rest[++i] ?? '').split(',').filter(Boolean);
@@ -30,9 +45,8 @@ async function cmdDiscover(args: string[]): Promise<void> {
   if (!(await investigationExists(name))) {
     throw new Error(`investigation 不存在：${name}（先 npm run init -- ${name}）`);
   }
-  await loadInvestigation(name); // 提前报错，避免扫完才发现名字写错
+  await loadInvestigation(name);
   const opts: { path?: string; database?: string; schema?: string; profile?: boolean } = {};
-  // 兼容 V1.0：discover <name> <path>
   const maybePath = rest[0];
   if (maybePath !== undefined && !maybePath.startsWith('--')) {
     opts.path = maybePath;
