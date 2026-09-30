@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import path from 'node:path';
+
+const root = process.cwd();
+const venvDir = path.join(root, '.venv');
+const requirements = path.join(root, 'requirements-dev.txt');
+const python = process.env['PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3');
+const venvPython = process.platform === 'win32'
+  ? path.join(venvDir, 'Scripts', 'python.exe')
+  : path.join(venvDir, 'bin', 'python');
+
+function run(command, args) {
+  execFileSync(command, args, {
+    cwd: root,
+    stdio: 'inherit',
+    env: process.env,
+  });
+}
+
+function hasSqlglot() {
+  try {
+    execFileSync(venvPython, ['-c', 'import sqlglot'], {
+      cwd: root,
+      stdio: 'ignore',
+      env: process.env,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!existsSync(venvPython)) {
+  console.log('Creating local Python test environment: .venv');
+  run(python, ['-m', 'venv', venvDir]);
+}
+
+if (!hasSqlglot()) {
+  if (!existsSync(requirements)) {
+    console.error('Missing requirements-dev.txt');
+    process.exit(1);
+  }
+
+  console.log('Installing Python test dependencies into .venv');
+  run(venvPython, ['-m', 'pip', 'install', '-r', requirements]);
+}
+
+console.log(`SQLGlot test interpreter: ${venvPython}`);
