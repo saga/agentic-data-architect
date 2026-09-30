@@ -22,7 +22,7 @@ import {
   listConversationMessages,
   searchConversation,
 } from './investigation/conversation.js';
-import { stopClient } from './agent/copilot.js';
+import { abortCopilotTurn, stopClient } from './agent/copilot.js';
 import {
   appendAuditEvent,
   loadInvestigationControl,
@@ -279,14 +279,72 @@ export function createApp(vite?: ViteDevServer) {
   app.post('/api/sessions/:name/messages', async (req, res) => {
     const name = sessionKey(req.params.name);
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
+    if (!message) {
+      res.status(400).json({ error: 'message is required' });
+      return;
+    }
+    await ensureWorkspace(name);
+    const result = await answerQuestion(name, message, undefined, turnId || undefined);
+    res.json(result);
+  });
+
+  app.post('/api/sessions/:name/messages/stream', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : randomUUID();
     if (!message) {
       res.status(400).json({ error: 'message is required' });
       return;
     }
 
     await ensureWorkspace(name);
-    const result = await answerQuestion(name, message);
-    res.json(result);
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    let finished = false;
+    const send = (event: string, data: unknown) => {
+      if (finished || res.writableEnded) return;
+      res.write(`event: ${event}\\n`);
+      res.write(`data: ${JSON.stringify(data)}\\n\\n`);
+    };
+
+    send('started', { turnId });
+
+    const onClose = () => {
+      if (!finished) void abortCopilotTurn(turnId);
+    };
+    req.on('close', onClose);
+
+    try {
+      const result = await answerQuestion(
+        name,
+        message,
+        (delta) => send('delta', { delta }),
+        turnId,
+      );
+      finished = true;
+      send('completed', result);
+      res.end();
+    } catch (error) {
+      finished = true;
+      send('error', { error: error instanceof Error ? error.message : String(error) });
+      res.end();
+    } finally {
+      req.off('close', onClose);
+    }
+  });
+
+  app.post('/api/sessions/:name/messages/abort', async (req, res) => {
+    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
+    if (!turnId) {
+      res.status(400).json({ error: 'turnId is required' });
+      return;
+    }
+    res.json({ aborted: await abortCopilotTurn(turnId) });
   });
 
   if (vite) {
