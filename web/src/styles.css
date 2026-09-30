@@ -191,6 +191,20 @@ body {
   max-width: min(860px, 70vw);
 }
 
+.agent-turn-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 2px 8px;
+  color: #595959;
+  font-size: 12px;
+}
+
+.agent-turn-status .anticon {
+  color: #1677ff;
+}
+
 .composer {
   padding: 12px 24px 18px;
   border-top: 1px solid #f0f0f0;
