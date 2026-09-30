@@ -207,6 +207,15 @@ npm run report -- demo
 
 ## 检查
 
+首次运行需要安装 SQLGlot：
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+npm install
+```
+
+然后：
+
 ```bash
 npm run typecheck
 npm test
