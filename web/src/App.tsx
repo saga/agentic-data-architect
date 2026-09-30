@@ -205,6 +205,20 @@ function ChatMarkdown({ content }: { content: string }) {
 }
 
 function AppInner() {
+  const routeSession = () => {
+    const match = window.location.pathname.match(/^\/investigations\/([^/]+)\/?$/);
+    return match ? decodeURIComponent(match[1]) : undefined;
+  };
+
+  const navigateToSession = (key: string, replace = false) => {
+    const nextPath = `/investigations/${encodeURIComponent(key)}`;
+    if (window.location.pathname !== nextPath) {
+      if (replace) window.history.replaceState({ session: key }, '', nextPath);
+      else window.history.pushState({ session: key }, '', nextPath);
+    }
+    setActive(key);
+  };
+
   const { message: toast } = AntApp.useApp();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
@@ -236,14 +250,26 @@ function AppInner() {
   const reloadSessions = async (selectLatest = true) => {
     const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
     setSessions(result.sessions);
+    const routed = routeSession();
+    const routedExists = routed && result.sessions.some((session) => session.key === routed);
+
+    if (routedExists) {
+      setActive(routed);
+      return;
+    }
+
     if (selectLatest && !active && result.sessions[0]) {
-      setActive(result.sessions[0].key);
+      navigateToSession(result.sessions[0].key, true);
     }
   };
 
   const loadSession = async (key: string) => {
     setError(undefined);
+    setCurrent(undefined);
+    setValue('');
+    setAttachmentsOpen(false);
     const result = await getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`);
+    if (key !== active) return;
     setCurrent(result);
 
     const existing = result.context.inputs
@@ -268,12 +294,22 @@ function AppInner() {
   };
 
   useEffect(() => {
+    const onPopState = () => {
+      const key = routeSession();
+      if (key) setActive(key);
+    };
+    window.addEventListener('popstate', onPopState);
     reloadSessions().catch((e) => setError(e.message));
     loadSkills().catch(() => undefined);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
-    if (active) loadSession(active).catch((e) => setError(e.message));
+    if (active) {
+      loadSession(active).catch((e) => setError(e.message));
+    } else {
+      setCurrent(undefined);
+    }
   }, [active]);
 
   useEffect(() => {
@@ -377,7 +413,7 @@ function AppInner() {
       setNewSessionOpen(false);
       setNewSessionName('');
       await reloadSessions(false);
-      setActive(created.context.name);
+      navigateToSession(created.context.name);
       setTimeout(() => setSettingsOpen(true), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create session');
@@ -509,7 +545,7 @@ function AppInner() {
 
         <Conversations
           activeKey={active}
-          onActiveChange={(key) => setActive(key)}
+          onActiveChange={(key) => navigateToSession(key)}
           items={sessions.map((session) => ({
             key: session.key,
             label: session.label,
