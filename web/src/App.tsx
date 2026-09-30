@@ -919,93 +919,65 @@ function AppInner() {
                 </Button>
               </div>
 
-              {showRightTip ? (
-                <Alert
-                  className="context-tip"
-                  type="info"
-                  showIcon
-                  closable
-                  icon={<FileSearchOutlined />}
-                  message="Investigation controls"
-                  description="Research sources, Skills, prompts and MCP are configured per investigation."
-                  onClose={() => {
-                    setShowRightTip(false);
-                    try { localStorage.setItem('ada.tip.right', 'dismissed'); } catch {}
-                  }}
-                />
-              ) : null}
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>Goal</Text>
+                    <Text type="secondary" className="section-subtitle">What this investigation is trying to answer</Text>
+                  </div>
+                </div>
+                <Paragraph
+                  ellipsis={{ rows: 5, tooltip: current?.context.goal || current?.context.userPrompt }}
+                  style={{ marginBottom: 0 }}
+                >
+                  {current?.context.goal || current?.context.userPrompt || 'No goal defined yet.'}
+                </Paragraph>
+              </section>
 
               <section className="panel-section">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Research</Text>
-                    <Text type="secondary" className="section-subtitle">
-                      {(current?.control?.research.githubRepositories.length ?? 0)} repositories · {(current?.control?.research.keywords.length ?? 0)} keywords
-                    </Text>
+                    <Text strong>Sources</Text>
+                    <Text type="secondary" className="section-subtitle">Available context for the agent</Text>
                   </div>
-
                 </div>
                 <div className="status-line">
-                  <Text type="secondary">Search</Text>
-                  <Text>
-                    {current?.control?.research.githubRepositories.length
-                      ? current.control.research.githubSearchMode === 'only_selected' ? 'Selected only' : 'Selected + broader'
-                      : 'Not configured'}
-                  </Text>
+                  <Text type="secondary">Documents</Text>
+                  <Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text>
                 </div>
                 <div className="status-line">
-                  <Text type="secondary">Important docs</Text>
-                  <Text>{current?.control?.research.importantDocuments.length ?? 0}</Text>
+                  <Text type="secondary">Repositories</Text>
+                  <Text>{current?.control?.research.githubRepositories.length ?? 0}</Text>
+                </div>
+                <div className="status-line">
+                  <Text type="secondary">Keywords</Text>
+                  <Text>{current?.control?.research.keywords.length ?? 0}</Text>
                 </div>
               </section>
 
               <section className="panel-section">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Agent</Text>
-                    <Text type="secondary" className="section-subtitle">Prompt v{current?.control?.agent.systemPrompt.version ?? 1}</Text>
-                  </div>
-
-                </div>
-                <div className="status-line"><Text type="secondary">Skills</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} enabled</Text></div>
-              </section>
-
-              <section className="panel-section">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>Coverage</Text>
-                    <Text type="secondary" className="section-subtitle">Current evidence state</Text>
+                    <Text strong>Current state</Text>
+                    <Text type="secondary" className="section-subtitle">Evidence-backed progress</Text>
                   </div>
                 </div>
-                <div className="coverage-grid">
+                <div className="coverage-grid compact">
                   <div><span>{current?.context.evidence.length ?? 0}</span><Text type="secondary">Evidence</Text></div>
                   <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">Findings</Text></div>
-                  <div><span>{current?.context.claims.length ?? 0}</span><Text type="secondary">Claims</Text></div>
                   <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">Unknowns</Text></div>
                 </div>
               </section>
 
-              <section className="panel-section">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>Recent activity</Text>
-                    <Text type="secondary" className="section-subtitle">Configuration and workspace changes</Text>
-                  </div>
-                  <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setAuditOpen(true)}>All</Button>
-                </div>
-                <div className="activity-list">
-                  {(current?.recentAudit ?? []).slice(0, 3).map((event) => (
-                    <div key={event.id} className="activity-item">
-                      <Text ellipsis>{event.summary}</Text>
-                      <Text type="secondary">{formatTime(event.timestamp)}</Text>
-                    </div>
-                  ))}
-                  {!current?.recentAudit.length ? <Text type="secondary">No activity recorded yet.</Text> : null}
-                </div>
-              </section>
-
-              <Text type="secondary" className="panel-updated">Updated {current ? formatTime(current.context.updatedAt) : '—'}</Text>
+              <Text type="secondary" className="panel-updated">
+                Config v{current?.control?.version ?? 1}
+                {' · '}
+                {current?.control?.agent.skills.length ?? 0} Skills
+                {' · '}
+                {current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} MCP
+                {' · Updated '}
+                {current ? formatTime(current.context.updatedAt) : '—'}
+              </Text>
             </aside>
           </div>
         </Content>
