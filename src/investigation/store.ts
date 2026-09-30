@@ -12,6 +12,7 @@ import {
   type WorkspaceContext,
 } from './workspace.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
+import { WorkspaceContextSchema } from './schemas.js';
 
 export type Investigation = WorkspaceContext;
 
@@ -121,7 +122,7 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
 }
 
 function normalizeInvestigation(name: string, raw: Partial<Investigation>): Investigation {
-  return {
+  return WorkspaceContextSchema.parse({
     schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
