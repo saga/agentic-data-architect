@@ -61,6 +61,20 @@ export function notesDir(name: string): string {
   return path.join(workspaceRoot(name), 'notes');
 }
 
+export function redactSensitiveUri(value: string): string {
+  try {
+    const u = new URL(value);
+    if (u.username) u.username = 'REDACTED';
+    if (u.password) u.password = 'REDACTED';
+    for (const key of ['token', 'access_token', 'api_key', 'apikey', 'secret', 'password']) {
+      if (u.searchParams.has(key)) u.searchParams.set(key, 'REDACTED');
+    }
+    return u.toString();
+  } catch {
+    return value.replace(/((?:password|token|secret|api[_-]?key)=)[^&\s]+/gi, '$1REDACTED');
+  }
+}
+
 export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): Promise<string> {
   const root = workspaceRoot(name);
   await Promise.all([
