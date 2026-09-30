@@ -313,6 +313,8 @@ export function createApp(vite?: ViteDevServer) {
     };
 
     send('started', { turnId });
+    const heartbeat = setInterval(() => send('heartbeat', { timestamp: new Date().toISOString() }), 15000);
+    heartbeat.unref?.();
 
     const onClose = () => {
       if (!finished) void abortCopilotTurn(turnId);
@@ -334,6 +336,7 @@ export function createApp(vite?: ViteDevServer) {
       send('error', { error: error instanceof Error ? error.message : String(error) });
       res.end();
     } finally {
+      clearInterval(heartbeat);
       req.off('close', onClose);
     }
   });
