@@ -25,8 +25,9 @@ description: Continuous human-agent data investigation: clarify goals, preserve 
 - 用户可以随时补充资料、提出问题或纠正方向；不要把一次回答视为任务结束。
 
 ## 文件沉淀
-- 当前 session 的工作状态放在 `.workspace/<session-name>/context.json`。
-- 长篇过程和对话记录可以写入当前 session 的文件；不要把大量历史全部塞进 context.json。
+- 当前 session 的调查状态放在 `.workspace/<session-name>/context.json`。
+- user / assistant / system 多轮对话放在 `.workspace/conversations.db`；不要把聊天正文复制进 context.json。
+- 长篇分析结果、脚本输出和生成物放到当前 session 的 `artifacts/`。
 - 可复用外部资料放到 `.workspace/shared/`。
 - Confluence 页面 Markdown 放到 `.workspace/shared/confluence/`；GitHub / LeanIX / Web / 用户文档按来源放入对应 shared 目录。
 - 可复用资料必须登记到 `.workspace/shared/index.json`。
