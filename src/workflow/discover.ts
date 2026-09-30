@@ -117,7 +117,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
       investigationId: name,
       lineage: findingLineage,
       profiles,
-      inventory: inventory ?? undefined,
+      ...(inventory ? { inventory } : {}),
       evidence: inv.evidence,
     });
     const known = new Set(inv.findings.map((f) => `${f.type}:${f.title}`));
