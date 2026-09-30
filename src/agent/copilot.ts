@@ -50,6 +50,7 @@ export interface AskInput {
   skillDirectories?: string[];
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
+  onSessionId?: (sessionId: string) => void;
 }
 
 export async function askCopilot(input: AskInput): Promise<string> {
@@ -76,6 +77,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ? await resumeOrCreate(c, input.sessionId, sessionConfig)
     : await c.createSession(sessionConfig);
 
+  input.onSessionId?.(session.sessionId);
   try {
     await session.rpc.skills.reload();
   } catch {
