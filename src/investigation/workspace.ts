@@ -13,6 +13,8 @@ import {
   type SharedIndex,
 } from './schemas.js';
 
+export type { WorkspaceContext, WorkspaceInput, WorkspaceSeed, SharedArtifactIndexEntry, SharedIndex } from './schemas.js';
+
 function safeName(name: string): string {
   if (!name || name !== path.basename(name) || name === '.' || name === '..') {
     throw new Error('Invalid Session name: ' + name);
