@@ -14,7 +14,7 @@ export type Investigation = WorkspaceContext;
 
 export function newInvestigation(name: string, userPrompt = ''): Investigation {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name,
     userPrompt,
     goal: '',
@@ -93,7 +93,7 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
 
 function normalizeInvestigation(name: string, raw: Partial<Investigation>): Investigation {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
     goal: raw.goal ?? '',
