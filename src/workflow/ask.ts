@@ -78,7 +78,17 @@ export async function answerQuestion(
   });
   const raw = await askCopilot({
     prompt,
-    systemPrompt: [LEAD_SYSTEM_PROMPT, control.agent.systemPrompt.content.trim()].filter(Boolean).join('\n\n'),
+    systemPrompt: [
+      LEAD_SYSTEM_PROMPT,
+      buildResearchConfigPrompt(control),
+      control.agent.systemPrompt.content.trim(),
+    ].filter(Boolean).join('\n\n'),
+    sessionId: inv.copilotSessionId,
+    onSessionId: (sessionId) => {
+      if (sessionId !== inv.copilotSessionId) {
+        inv.copilotSessionId = sessionId;
+      }
+    },
     workingDirectory: workspaceRoot(inv.name),
     skills: control.agent.skills.map((item) => item.name),
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
