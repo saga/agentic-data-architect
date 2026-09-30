@@ -62,7 +62,7 @@ interface SessionData {
 }
 
 const markdownComponents = {
-  mermaid: Mermaid,
+  mermaid: Mermaid as React.ComponentType<any>,
 };
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
