@@ -1,3 +1,14 @@
+## 2026-09-30 — 依赖审计与最终收口
+
+- `package-lock.json` 顶层版本与 `package.json` 从 0.3.1/0.3.2 不一致，已同步为 0.3.2。
+- `snowflake-sdk@3.3.0` 当前仍是最新发布版；其 `toml@3.x` 传递依赖触发 npm 的 high severity advisories。当前上游没有可直接通过 semver 升级得到的修复，npm 建议的 `snowflake-sdk@1.11.0` 是破坏性降级，因此没有使用 `audit fix --force`。
+- CI 改为：critical 生产依赖漏洞阻断；high severity audit 保留为 informational，以免把一个已知的上游传递依赖问题隐藏成“绿色安全门”。
+- 该 Snowflake 依赖问题已经作为已知技术债记录；在 Snowflake driver 发布兼容修复后应恢复 high-severity blocking。
+- `src/investigation/store.ts` 增加 Investigation 名称路径穿越防护，`tests/store.test.ts` 增加回归测试。
+
+当前审查没有增加 multi-agent、Neo4j、vector DB、workflow engine 等复杂基础设施；目标仍是把 V1.1 的可靠性和证据链做好。
+
+---
 ## 2026-09-30 — Review follow-up
 
 在第一轮审查修改后，CI 又暴露了两个 TypeScript 类型问题，已在 main 修正并通过最新 CI。随后继续做了运行时安全和性能检查：
