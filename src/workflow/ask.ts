@@ -51,7 +51,7 @@ export async function answerQuestion(
     prompt,
     systemPrompt: LEAD_SYSTEM_PROMPT,
     workingDirectory: workspaceRoot(inv.name),
-    onDelta,
+    ...(onDelta ? { onDelta } : {}),
   });
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
