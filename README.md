@@ -43,6 +43,7 @@ npm run dev
 
 ```text
 .workspace/
+  conversations.db
   shared/
     index.json
     confluence/
@@ -201,6 +202,7 @@ npm run report -- demo
 | `GITHUB_TOKEN` | 服务端模式使用；本机可直接复用 copilot 登录 | 空 |
 | `TURN_TIMEOUT_MS` | 单轮等待上限 | `300000` |
 | `SQLGLOT_PYTHON` | SQLGlot Python 解释器 | `python3` |
+| `SKILLS_DIR` | Copilot SDK Skill 根目录 | `skills` |
 
 ## 检查
 
