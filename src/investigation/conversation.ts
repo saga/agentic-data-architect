@@ -68,6 +68,7 @@ function getDatabase(): DatabaseSync {
   database = new DatabaseSync(file);
   databasePath = file;
   database.exec(`
+    -- WAL lets reads continue while a turn/message write is in progress.
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
     PRAGMA busy_timeout = 5000;
@@ -148,6 +149,8 @@ function toMessage(row: MessageRow): ConversationMessage {
   };
 }
 
+// The partial unique index below makes "one running turn per investigation" a
+// database invariant, not just a convention in the workflow code.
 export function beginConversationTurn(sessionName: string, turnId: string): ConversationTurn {
   const db = getDatabase();
   const now = new Date().toISOString();
