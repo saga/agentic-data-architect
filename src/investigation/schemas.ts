@@ -1,10 +1,17 @@
+/**
+ * Investigation 持久化和运行时配置 Schema。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import * as z from 'zod';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema } from '../evidence/types.js';
 
+/** Workspace 输入事件的来源类型；用于区分用户、Agent、Discovery 和外部文档。 */
 export const WorkspaceInputKindSchema = z.enum([
   'user_prompt', 'user_message', 'assistant_message', 'question',
   'discovery', 'research', 'decision', 'note', 'document',
 ]);
+/** Workspace 输入的持久化 Schema。 */
 export const WorkspaceInputSchema = z.object({
   id: z.string().min(1),
   kind: WorkspaceInputKindSchema,
@@ -21,6 +28,7 @@ export const WorkspaceInputSchema = z.object({
 }).strict();
 export type WorkspaceInput = z.infer<typeof WorkspaceInputSchema>;
 
+/** Investigation 的核心 context.json Schema；它是持久化状态的运行时边界。 */
 export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
   name: z.string().min(1),
@@ -42,6 +50,7 @@ export const WorkspaceContextSchema = z.object({
 }).strict();
 export type WorkspaceContext = z.infer<typeof WorkspaceContextSchema>;
 
+/** 创建新 Workspace 时允许传入的初始化字段 Schema。 */
 export const WorkspaceSeedSchema = z.object({
   userPrompt: z.string().optional(),
   goal: z.string().optional(),
@@ -50,9 +59,11 @@ export const WorkspaceSeedSchema = z.object({
 }).strict();
 export type WorkspaceSeed = z.infer<typeof WorkspaceSeedSchema>;
 
+/** Shared Artifact 来源类型枚举。 */
 export const SharedArtifactKindSchema = z.enum([
   'confluence', 'github', 'leanix', 'web', 'document', 'other',
 ]);
+/** shared/index.json 中单个 Artifact 的结构 Schema。 */
 export const SharedArtifactIndexEntrySchema = z.object({
   id: z.string().min(1),
   kind: SharedArtifactKindSchema,
@@ -65,6 +76,7 @@ export const SharedArtifactIndexEntrySchema = z.object({
 }).strict();
 export type SharedArtifactIndexEntry = z.infer<typeof SharedArtifactIndexEntrySchema>;
 
+/** 跨 Investigation 共享 Artifact 索引的完整 Schema。 */
 export const SharedIndexSchema = z.object({
   schemaVersion: z.literal(1),
   artifacts: z.array(SharedArtifactIndexEntrySchema),
@@ -72,9 +84,11 @@ export const SharedIndexSchema = z.object({
 }).strict();
 export type SharedIndex = z.infer<typeof SharedIndexSchema>;
 
+/** GitHub 搜索范围策略。 */
 export const GitHubSearchModeSchema = z.enum(['only_selected', 'selected_and_broad']);
 export type GitHubSearchMode = z.infer<typeof GitHubSearchModeSchema>;
 
+/** 用户指定的重要文档引用结构。 */
 export const ImportantDocumentRefSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -82,6 +96,7 @@ export const ImportantDocumentRefSchema = z.object({
 }).strict();
 export type ImportantDocumentRef = z.infer<typeof ImportantDocumentRefSchema>;
 
+/** Investigation 内一个 MCP Server 配置的运行时 Schema。 */
 export const McpServerSettingSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -95,6 +110,7 @@ export const McpServerSettingSchema = z.object({
 }).strict();
 export type McpServerSetting = z.infer<typeof McpServerSettingSchema>;
 
+/** Investigation 选中的 Skill 及其版本/内容指纹。 */
 export const SkillSettingSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -102,6 +118,7 @@ export const SkillSettingSchema = z.object({
 }).strict();
 export type SkillSetting = z.infer<typeof SkillSettingSchema>;
 
+/** Research configuration 的持久化 Schema。 */
 export const ControlResearchSchema = z.object({
   githubRepositories: z.array(z.string()),
   githubSearchMode: GitHubSearchModeSchema,
@@ -110,6 +127,7 @@ export const ControlResearchSchema = z.object({
 }).strict();
 export type ControlResearch = z.infer<typeof ControlResearchSchema>;
 
+/** Agent 侧 configuration 的持久化 Schema，包括 system prompt、Skills 和 MCP。 */
 export const ControlAgentSchema = z.object({
   systemPrompt: z.object({
     version: z.number().int().positive(),
@@ -120,6 +138,7 @@ export const ControlAgentSchema = z.object({
 }).strict();
 export type ControlAgent = z.infer<typeof ControlAgentSchema>;
 
+/** 不包含 history 的当前 Control 配置 Schema。 */
 export const InvestigationControlBaseSchema = z.object({
   schemaVersion: z.literal(1),
   version: z.number().int().positive(),
@@ -135,11 +154,13 @@ const ControlHistoryEntrySchema = z.object({
   snapshot: InvestigationControlBaseSchema,
 }).strict();
 
+/** 完整 control.json Schema，包括配置历史。 */
 export const InvestigationControlSchema = InvestigationControlBaseSchema.extend({
   history: z.array(ControlHistoryEntrySchema),
 }).strict();
 export type InvestigationControl = z.infer<typeof InvestigationControlSchema>;
 
+/** audit.jsonl 单条审计事件的 Schema。 */
 export const AuditEventSchema = z.object({
   id: z.string().min(1),
   timestamp: z.string().min(1),
