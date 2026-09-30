@@ -1,3 +1,8 @@
+/**
+ * 本地源代码目录 Discovery。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -16,6 +21,7 @@ export interface SourceFile {
   sha256: string;
 }
 
+/** 一次目录 Discovery 的完整清单，包括源文件、SQL 文件和扫描阶段未知项。 */
 export interface Inventory {
   root: string;
   discoveryRunId: string;
@@ -32,6 +38,7 @@ const YAML_EXT = new Set(['.yml', '.yaml']);
 const JSON_EXT = new Set(['.json']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.data', '__pycache__']);
 
+/** 递归扫描目录、跳过无关目录、计算文件指纹，并生成统一 Inventory。 */
 export async function discoverDirectory(root: string, discoveryRunId: string): Promise<Inventory> {
   const abs = path.resolve(root);
   const files: SourceFile[] = [];
@@ -43,6 +50,7 @@ export async function discoverDirectory(root: string, discoveryRunId: string): P
   return { root: abs, discoveryRunId, scannedAt: new Date().toISOString(), files, sqlFiles, unknowns };
 }
 
+/** 递归遍历目录并为每个真实文件收集大小、行数、mtime 和 sha256。 */
 async function walk(dir: string, out: SourceFile[]): Promise<void> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const e of entries) {
