@@ -1,0 +1,2 @@
+# agentic-data-architect
+使用AI Agent，完成Data Architect和Data Analyst的工作。尤其是在一个老项目进行modernize或者replatform的时候，对当前data model，data source，transformation等数据相关问题进行分析和设计
