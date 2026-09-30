@@ -94,7 +94,7 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     questions: raw.questions ?? [],
     discoveryRuns: raw.discoveryRuns ?? [],
     evidence: raw.evidence ?? [],
-    claims: raw.claims ?? [],
+    claims: (raw.claims ?? []).map((c, i) => ({\n      id: c.id ?? ('legacy-' + i),\n      claim: c.claim,\n      status: c.status,\n      evidenceIds: c.evidenceIds ?? [],\n    })),
     findings: raw.findings ?? [],
     unknowns: raw.unknowns ?? [],
     importantInformation: raw.importantInformation ?? [],
