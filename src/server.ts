@@ -332,6 +332,7 @@ export function createApp(vite?: ViteDevServer) {
         message,
         (delta) => send('delta', { delta }),
         turnId,
+        (status) => send('status', { status }),
       );
       send('completed', result);
       finished = true;
