@@ -73,6 +73,15 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 
 不要把会变化的命令、tool schema 或研究流程再复制成大量 prompt 文本。
 
+## V1.2
+
+1. Canonical Estate 扩展到 application / data store / job / job run / API / dashboard 等资产类型
+2. SQL parse failure / discovery coverage
+3. provider-neutral Semantic Context
+4. Snowflake Semantic View discovery，并把定义转换成通用 SemanticAsset
+5. Source-of-Truth Candidates / Semantic Candidates
+6. graph-aware + semantic-aware question retrieval
+
 ## V2
 
 1. BusinessConcept / SemanticMapping
