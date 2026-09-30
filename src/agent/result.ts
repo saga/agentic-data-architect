@@ -1,33 +1,36 @@
-import { calibrateStatus, type Claim, type ClaimStatus } from '../evidence/types.js';
+import * as z from 'zod';
+import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus } from '../evidence/types.js';
 
 /**
- * 结构化 Agent 结果（§十六、§十七）：
- * 自然语言 → JSON 抽取 → schema 校验 → evidenceId 存在性校验 → 状态校正 → 保存。
- * 模型自报的 status 只做输入，系统按证据数量重算（verified 永不直接采信）。
+ * 结构化 Agent 结果：
+ * 自然语言 → JSON 抽取 → Zod schema 校验 → evidenceId 所属校验 → 状态校正 → 保存。
  */
+export const AgentClaimDraftSchema = z.object({
+  claim: z.string().trim().min(1).max(2000).catch(''),
+  status: ClaimStatusSchema.catch('inferred'),
+  evidenceIds: z.array(z.string()).catch([]),
+}).strict();
 
-export interface AgentClaimDraft {
-  claim: string;
-  status: ClaimStatus;
-  evidenceIds: string[];
-}
+export type AgentClaimDraft = z.infer<typeof AgentClaimDraftSchema>;
 
-export interface AgentAnswer {
-  answer: string;
-  claims: AgentClaimDraft[];
-  unknowns: string[];
-  followUpQuestions: string[];
-}
+export const AgentAnswerSchema = z.object({
+  answer: z.string().max(8000).catch(''),
+  claims: z.array(AgentClaimDraftSchema.catch(null))
+    .catch([])
+    .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
+  unknowns: z.array(z.string().max(500)).catch([]),
+  followUpQuestions: z.array(z.string().max(500)).catch([]),
+}).strict();
+
+export type AgentAnswer = z.infer<typeof AgentAnswerSchema>;
 
 export interface ParsedAnswer extends AgentAnswer {
   warnings: string[];
   droppedEvidenceRefs: string[];
 }
 
-const VALID_STATUS: ClaimStatus[] = ['verified', 'supported', 'inferred', 'unknown', 'contradicted'];
-
 function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const fenced = raw.match(new RegExp('\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\x60{3}'));
   if (fenced?.[1]) return fenced[1].trim();
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
@@ -35,13 +38,12 @@ function extractJson(raw: string): string {
   return raw;
 }
 
-/** 解析并校验模型输出；existingIds 是本 investigation 真实存在的 evidence id。 */
 export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedAnswer {
   const warnings: string[] = [];
   const droppedEvidenceRefs: string[] = [];
-  let data: Record<string, unknown>;
+  let data: unknown;
   try {
-    data = JSON.parse(extractJson(raw)) as Record<string, unknown>;
+    data = JSON.parse(extractJson(raw)) as unknown;
   } catch {
     return {
       answer: raw.slice(0, 2000),
@@ -52,35 +54,43 @@ export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedA
       droppedEvidenceRefs,
     };
   }
+
+  const parsed = AgentAnswerSchema.safeParse(data);
+  if (!parsed.success) {
+    return {
+      answer: raw.slice(0, 2000),
+      claims: [],
+      unknowns: ['模型返回的结构化结果不符合预期，需要重问或收紧提示词'],
+      followUpQuestions: [],
+      warnings: ['这次回答不符合结构化结果 Schema，系统只保存了原始回答，没有保存 Claims。'],
+      droppedEvidenceRefs,
+    };
+  }
+
   const claims: AgentClaimDraft[] = [];
-  const rawClaims = Array.isArray(data['claims']) ? (data['claims'] as unknown[]) : [];
-  for (const rc of rawClaims) {
-    if (typeof rc !== 'object' || rc === null) continue;
-    const r = rc as Record<string, unknown>;
-    if (typeof r['claim'] !== 'string' || !r['claim'].trim()) continue;
-    const status = VALID_STATUS.includes(r['status'] as ClaimStatus) ? (r['status'] as ClaimStatus) : 'inferred';
-    const ids = Array.isArray(r['evidenceIds']) ? r['evidenceIds'].filter((x): x is string => typeof x === 'string') : [];
-    const kept = ids.filter((id) => {
+  for (const draft of parsed.data.claims) {
+    const kept = draft.evidenceIds.filter((id) => {
       if (existingIds.has(id)) return true;
       droppedEvidenceRefs.push(id);
       return false;
     });
-    if (kept.length < ids.length) warnings.push(`回答引用了不存在的 Evidence，系统已删除 ${ids.length - kept.length} 个无效引用。`);
-    claims.push({ claim: (r['claim'] as string).slice(0, 2000), status: calibrateStatus(kept.length, status), evidenceIds: kept });
+    if (kept.length < draft.evidenceIds.length) {
+      warnings.push(`回答引用了不存在的 Evidence，系统已删除 ${draft.evidenceIds.length - kept.length} 个无效引用。`);
+    }
+    const status: ClaimStatus = calibrateStatus(kept.length, draft.status);
+    claims.push({ claim: draft.claim.slice(0, 2000), status, evidenceIds: kept });
   }
-  const strings = (v: unknown): string[] =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((s) => s.slice(0, 500)) : [];
+
   return {
-    answer: typeof data['answer'] === 'string' ? (data['answer'] as string).slice(0, 8000) : '',
+    answer: parsed.data.answer,
     claims,
-    unknowns: strings(data['unknowns']),
-    followUpQuestions: strings(data['followUpQuestions']),
+    unknowns: parsed.data.unknowns,
+    followUpQuestions: parsed.data.followUpQuestions,
     warnings,
     droppedEvidenceRefs,
   };
 }
 
-/** ParsedAnswer → 可存盘的 Claim（id 由调用方生成后传入或这里生成）。 */
 export function toClaims(parsed: ParsedAnswer, mkId: () => string): Claim[] {
   return parsed.claims.map((c) => ({ id: mkId(), claim: c.claim, status: c.status, evidenceIds: c.evidenceIds }));
 }
