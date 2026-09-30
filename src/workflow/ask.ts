@@ -5,8 +5,9 @@ import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
+import { saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
-import { appendContextInput, appendTranscript, workspaceRoot } from '../investigation/workspace.js';
+import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
 export interface AnswerSummary {
@@ -26,14 +27,11 @@ export async function answerQuestion(
   question: string,
   onDelta?: (delta: string) => void,
 ): Promise<AnswerSummary> {
-  await appendContextInput(investigationName, {
-    kind: 'question',
-    title: question,
+  const userMessage = saveConversationMessage({
+    sessionName: investigationName,
+    role: 'user',
     content: question,
-    source: 'agentic-data-architect',
-    important: true,
   });
-  await appendTranscript(investigationName, 'user', question);
   const inv = await loadInvestigation(investigationName);
 
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
@@ -44,13 +42,29 @@ export async function answerQuestion(
     findings: inv.findings,
     evidence: inv.evidence,
   });
+  const priorConversation = searchConversation(investigationName, question, {
+    limit: 8,
+    beforeRowId: userMessage.rowId,
+  });
+  const conversationText = priorConversation.length > 0
+    ? [
+        '## Relevant conversation history',
+        'The following earlier messages were retrieved by full-text search. Treat them as conversation context, not as evidence; current evidence and verified findings take precedence.',
+        '',
+        ...priorConversation.slice().reverse().map((item) =>
+          `[${item.role}] ${item.content}`,
+        ),
+      ].join('\\n')
+    : '';
+  const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\\n\\n');
+
   const existingIds = new Set(inv.evidence.map((e) => e.id));
   const prompt = buildQuestionPrompt({
     investigationName: inv.name,
     goal: inv.goal,
     scope: inv.scope,
     question,
-    contextText: ctx.text,
+    contextText: questionContextText,
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
@@ -71,14 +85,11 @@ export async function answerQuestion(
 
   const answer = parsed.answer || raw.slice(0, 2000);
   await saveInvestigation(inv);
-  await appendContextInput(investigationName, {
-    kind: 'assistant_message',
-    title: 'Agent answer',
+  saveConversationMessage({
+    sessionName: investigationName,
+    role: 'assistant',
     content: answer,
-    source: 'agentic-data-architect',
-    artifactPath: 'transcript.md',
   });
-  await appendTranscript(investigationName, 'assistant', answer);
 
   return {
     answer,
