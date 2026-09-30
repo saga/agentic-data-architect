@@ -1,3 +1,69 @@
+# Changelog
+
+## 2026-09-30 — V1.1 全仓审查与可靠性修正
+
+### 为什么改
+
+这次检查不是增加新能力，而是修正当前 V1.1 在真实 Brownfield Investigation 中会直接影响结果可信度的几个问题：
+
+1. 数据库 profiling 原本只把 row count 带到 snapshot，列级 null/distinct/min/max 没有进入 Agent context，也无法驱动 data-quality findings。
+2. Column lineage 原本没有自己的 evidence 引用，列级结论无法精确回指对应 SQL。
+3. DB-only discovery 原本没有进入 findings 流程，导致不经过本地 SQL 的真实数据库调查能力明显不完整。
+4. Estate Graph 的 database/schema 层缺失，数据库发现只有 dataset/column，无法表示真实层级。
+5. DiscoveryRun 和 workspace context 原本可能把带密码的 DB connection URL 原样持久化。
+6. 只读查询守卫原本允许 WITH ... DELETE 这类 CTE 写操作，同时数据库 query 会先把大量结果拉回进程再截断。
+7. Snowflake 的对象名在部分查询路径里直接拼 SQL，没有统一的 identifier validation。
+8. Investigation 当前 JSON 损坏时可能被误判为旧版 flat investigation 并进入迁移。
+9. Workspace、Evidence 和 Agent context 已经建立，但测试没有覆盖这些关键安全/可追溯性要求。
+
+### 本次修改文件
+
+#### 运行时代码
+
+- src/adapters/database.ts：加强只读 SQL 检查；禁止 CTE 中的 DML/DDL；对实际 query 增加 server-side 结果上限。
+- src/adapters/postgres.ts：使用统一的 bounded read-only query。
+- src/adapters/snowflake.ts：对 database/schema/table 做 identifier validation + quoting；使用统一的 bounded read-only query。
+- src/discovery/database.ts：保存完整 DataProfile；Data Estate 增加 database/schema/dataset 层级。
+- src/workflow/discover.ts：profile 结果完整写入 snapshot；DB-only discovery 也运行适用 findings；mixed-source discovery 合并全部 dataset；DiscoveryRun / context 中的数据库 URL 脱敏；SQL graph edge 绑定 statement/column evidence。
+- src/workflow/ask.ts：把实际 profile 传给 Agent context。
+- src/analysis/context.ts：profile 和 column lineage 都显示可引用的 evidence id。
+- src/analysis/sql-parser.ts：ColumnLineage 支持 evidence id。
+- src/analysis/lineage.ts：每条 column lineage 绑定对应 SQL statement evidence。
+- src/analysis/findings.ts：metadata-only discovery 不再制造假的 missing-lineage；限制 temporal-risk 检查到时间语义真正相关的金融数据集；source-of-truth finding 文案避免把“疑似候选”直接写成“已证明的权威源”。
+- src/investigation/workspace.ts：增加敏感 URI 脱敏。
+- src/investigation/store.ts：只有真正的 ENOENT 才进入旧版迁移；JSON 损坏/其它读取错误直接报错。
+
+#### Tests
+
+- tests/workspace.test.ts：增加 DB credential redaction 检查。
+- tests/lineage.test.ts：增加 column lineage evidenceId 检查。
+- tests/scanner-profiling.test.ts：增加 CTE write 和 SQL 字符串中的分号安全检查。
+- tests/context.test.ts：新增 profile / column lineage evidence traceability 测试。
+
+#### 文档
+
+- README.md：删除过时的固定测试数量说法。
+- docs/implementation.md：记录本轮 V1.1 reliability fixes。
+- docs/architecture_0930.md：保留并延续 Investigation Workspace / 企业研究来源设计。
+- skills/search-github/SKILL.md：GitHub Tool / local clone 两种研究路径。
+- skills/search-leanix/SKILL.md：LeanIX 官方 MCP 为默认事实来源。
+- skills/search-confluence/SKILL.md：Atlassian 官方 Rovo MCP 为默认事实来源。
+- skills/working-directory/SKILL.md：统一 workspace / context / research 落盘约定。
+
+### 设计边界
+
+本次没有增加：
+
+- Neo4j / vector DB
+- multi-agent
+- BPMN / workflow engine
+- autonomous write
+- 大量数据库 adapter
+- 完整 FIBO runtime
+
+目的仍然是先把 V1.1 的 Current-State Discovery 做到证据可追溯、只读安全、profile 可用、Agent 上下文完整。
+
+---
 我检查了当前 `main` 的最新代码。现在这个仓库已经有了正确的骨架，但**还停留在“V1 demo skeleton”**：真正决定这个项目价值的几个基础能力还没有落地，而且有几处代码已经违反了你自己在 `docs/architecture_0930.md` 里定下的 Evidence-first 原则。
 
 我不建议现在直接跳到完整的 Target Architecture / Migration Agent。应该先把 **Current-State Discovery 做成真正可靠的闭环**，然后再进入 V2。
