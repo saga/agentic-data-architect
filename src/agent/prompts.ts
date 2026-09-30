@@ -14,6 +14,7 @@ Rules:
 - If a required business definition is not established by Evidence or the user, ask a focused clarification question rather than inventing it.
 - Output STRICT JSON only, no markdown fences, matching the requested schema.`;
 
+/** 根据 Investigation 状态、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
 export function buildQuestionPrompt(args: {
   investigationName: string;
   goal: string;
