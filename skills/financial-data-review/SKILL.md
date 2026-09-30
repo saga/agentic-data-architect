@@ -24,7 +24,7 @@ description: Financial-services data investigation and review for investment man
 需要金融领域检查时，先运行本 skill 的脚本：
 
 ~~~bash
-node skills/financial-data-review/scripts/review.mjs <session-name>
+PROJECT_ROOT="$(git rev-parse --show-toplevel)" && node "$PROJECT_ROOT/skills/financial-data-review/scripts/review.mjs" <session-name>
 ~~~
 
 脚本会读取当前 investigation 的 context.json 和最新 discovery snapshot，生成：
