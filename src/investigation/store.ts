@@ -2,18 +2,26 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import type { Claim, DiscoveryRun, EvidenceRef, Finding } from '../evidence/types.js';
+import { ensureWorkspace } from './workspace.js';
 
 /**
- * Investigation 是 Agent 的工作状态（§二十八），不是 chat session。
- * 目录布局（§三十三）：
+ * Investigation 是 Agent 的工作状态（不是 chat session）。
+ * 目录布局：
  *   .data/investigations/<name>/
- *     investigation.json   唯一真相：evidence / claims / findings / runs 全在这里
- *     discovery/<runId>.json  每次 discover 的快照（可对比 run-1 vs run-2）
- *     reports/report.md    最新报告
+ *     investigation.json   业务状态的唯一真相
+ *     discovery/<runId>.json  每次 discover 的快照
+ *     reports/report.md    当前报告
+ *     workspace/           Agent / research 的实际工作目录
+ *       context.json      用户 prompt + 每次 input + 重要信息
+ *       research/{github,leanix,confluence,web}/
+ *       findings/
+ *       artifacts/
+ *       notes/
  */
 
 export interface Investigation {
   name: string;
+  userPrompt: string;
   goal: string;
   scope: string[];
   systems: string[];
@@ -26,9 +34,10 @@ export interface Investigation {
   updatedAt: string;
 }
 
-export function newInvestigation(name: string): Investigation {
+export function newInvestigation(name: string, userPrompt = ''): Investigation {
   return {
     name,
+    userPrompt,
     goal: '',
     scope: [],
     systems: [],
@@ -63,19 +72,34 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   await fs.mkdir(investigationRoot(inv.name), { recursive: true });
   const fp = investigationFile(inv.name);
   await fs.writeFile(fp, JSON.stringify(inv, null, 2));
+  await ensureWorkspace(inv.name, {
+    userPrompt: inv.userPrompt,
+    goal: inv.goal,
+    scope: inv.scope,
+    systems: inv.systems,
+  });
   return fp;
 }
 
 export async function loadInvestigation(name: string): Promise<Investigation> {
   try {
-    return JSON.parse(await fs.readFile(investigationFile(name), 'utf-8')) as Investigation;
+    const inv = JSON.parse(await fs.readFile(investigationFile(name), 'utf-8')) as Partial<Investigation>;
+    const normalized = newInvestigation(name, inv.userPrompt ?? '');
+    Object.assign(normalized, inv);
+    await ensureWorkspace(normalized.name, {
+      userPrompt: normalized.userPrompt,
+      goal: normalized.goal,
+      scope: normalized.scope,
+      systems: normalized.systems,
+    });
+    return normalized;
   } catch {
-    // 兼容 V1.0 扁平布局（demo.json），读到就地迁移
+    // 兼容 V1.0 扁平布局（demo.json），读到就地迁移。
     const legacy = path.join(config.investigationDir, `${name}.json`);
     const raw = JSON.parse(await fs.readFile(legacy, 'utf-8')) as Partial<Investigation> & {
       claims?: { claim: string; status: Claim['status']; evidence: unknown[] }[];
     };
-    const inv = newInvestigation(name);
+    const inv = newInvestigation(name, raw.userPrompt ?? raw.goal ?? '');
     inv.goal = raw.goal ?? '';
     inv.scope = raw.scope ?? [];
     inv.systems = raw.systems ?? [];
@@ -95,7 +119,7 @@ export async function investigationExists(name: string): Promise<boolean> {
   } catch {
     try {
       await fs.access(path.join(config.investigationDir, `${name}.json`));
-      return true;
+      return false;
     } catch {
       return false;
     }
