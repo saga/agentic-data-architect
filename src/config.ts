@@ -11,9 +11,11 @@ const legacyDataDir = path.resolve(env('DATA_DIR', '.data'));
 export const config = {
   workspaceDir,
   sharedDir: path.join(workspaceDir, 'shared'),
-  /** V1 old layout: migration read-only, never written again. */
   legacyDataDir,
   githubToken: env('GITHUB_TOKEN', '') || undefined,
   model: env('COPILOT_MODEL', 'gpt-5-mini'),
   turnTimeoutMs: Number(env('TURN_TIMEOUT_MS', '300000')) || 300_000,
+  port: Number(env('PORT', '3000')) || 3000,
+  host: env('HOST', '127.0.0.1'),
+  nodeEnv: env('NODE_ENV', 'development'),
 } as const;
