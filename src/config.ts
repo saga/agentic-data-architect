@@ -13,7 +13,7 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   HOST: z.string().min(1).default('127.0.0.1'),
   NODE_ENV: z.string().min(1).default('development'),
-}).strict();
+});
 
 const envConfig = EnvSchema.parse(process.env);
 const copilotSkills = envConfig.COPILOT_SKILLS.split(',').map((skill) => skill.trim()).filter(Boolean);
