@@ -61,3 +61,17 @@ test('disabled MCP servers are not exposed to Copilot', () => {
 
   assert.deepEqual(toCopilotMcpServers(current), {});
 });
+
+
+test('Investigation control schema rejects invalid MCP settings', async () => {
+  const { InvestigationControlSchema } = await import('../src/investigation/schemas.js');
+  const current = control();
+  const result = InvestigationControlSchema.safeParse({
+    ...current,
+    agent: {
+      ...current.agent,
+      mcpServers: [{ name: 'broken', version: 1, enabled: true, type: 'unknown' }],
+    },
+  });
+  assert.equal(result.success, false);
+});
