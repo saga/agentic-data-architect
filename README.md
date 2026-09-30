@@ -37,7 +37,7 @@ npm run dev
 - Ant Design X 2.9
 - @ant-design/x-markdown 2.9
 
-聊天界面使用 Ant Design X 的 Conversations、Bubble.List、Sender、Welcome 等组件。Markdown 使用 XMarkdown，支持 CommonMark/GFM、代码高亮、公式和 Mermaid；Mermaid 图可以直接在回答中交互查看。 citeturn200179search0turn702320search0turn702320search1
+聊天界面使用 Ant Design X 的 Conversations、Bubble.List、Sender、Welcome 等组件。Markdown 使用 XMarkdown，支持 CommonMark/GFM、代码高亮、公式和 Mermaid；Mermaid 图可以直接在回答中交互查看。
 
 ## Workspace
 
@@ -176,4 +176,4 @@ npm run build
 
 ## 技术资料
 
-Express 5 保持 Express 4 的大部分 API，同时对 wildcard 路由等行为有调整；本项目使用 Express 5 的 `/{*splat}` 形式处理 SPA fallback。 citeturn736251search0
+Express 5 对 wildcard 路由等行为有调整；本项目使用 Express 5 的 `/{*splat}` 形式处理 SPA fallback。参见 https://expressjs.com/en/guide/migrating-5/。
