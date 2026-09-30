@@ -14,7 +14,14 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { FileTextOutlined, PlusOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SendOutlined,
+} from '@ant-design/icons';
 import {
   Bubble,
   Conversations,
@@ -274,12 +281,78 @@ function AppInner() {
               />
             ) : (
               <div className="welcome">
-                <Welcome
-                  variant="borderless"
-                  icon={<FileTextOutlined />}
-                  title="What do you need to understand?"
-                  description="Start with a data question. The agent will keep the investigation context in the session workspace and ground claims in available evidence."
-                />
+                <div className="welcome-inner">
+                  <Welcome
+                    variant="borderless"
+                    icon={<FileTextOutlined />}
+                    title="Start this investigation"
+                    description="Tell the agent what you need to understand. You do not need to prepare a formal specification first."
+                  />
+
+                  <div className="investigation-guide">
+                    <Card size="small" className="guide-card">
+                      <Flex align="flex-start" gap={12}>
+                        <CheckCircleOutlined className="guide-icon" />
+                        <div>
+                          <Text strong>1. Describe the goal</Text>
+                          <div>
+                            <Text type="secondary">
+                              What decision or data question are you trying to answer?
+                            </Text>
+                          </div>
+                        </div>
+                      </Flex>
+                    </Card>
+
+                    <Card size="small" className="guide-card">
+                      <Flex align="flex-start" gap={12}>
+                        <FolderOpenOutlined className="guide-icon" />
+                        <div>
+                          <Text strong>2. Give it some context</Text>
+                          <div>
+                            <Text type="secondary">
+                              Mention the system, datasets, SQL, documents, or source paths you already know.
+                              Missing information can be discovered during the investigation.
+                            </Text>
+                          </div>
+                        </div>
+                      </Flex>
+                    </Card>
+
+                    <Card size="small" className="guide-card">
+                      <Flex align="flex-start" gap={12}>
+                        <FileTextOutlined className="guide-icon" />
+                        <div>
+                          <Text strong>3. Ask the first question</Text>
+                          <div>
+                            <Text type="secondary">
+                              The agent will inspect available evidence, identify gaps, and suggest the next investigation step.
+                            </Text>
+                          </div>
+                        </div>
+                      </Flex>
+                    </Card>
+                  </div>
+
+                  <div className="quick-start">
+                    <Text type="secondary">Try one of these:</Text>
+                    <Flex wrap gap={8}>
+                      {[
+                        'Where does Position come from in the legacy platform?',
+                        'Map the lineage of portfolio market value.',
+                        'What do we know about the current data model?',
+                      ].map((prompt) => (
+                        <Button
+                          key={prompt}
+                          size="small"
+                          onClick={() => send(prompt)}
+                        >
+                          {prompt}
+                        </Button>
+                      ))}
+                    </Flex>
+                  </div>
+                </div>
               </div>
             )}
 
