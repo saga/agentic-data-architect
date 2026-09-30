@@ -12,8 +12,9 @@
     "ask": "tsx src/cli.ts ask",
     "report": "tsx src/cli.ts report",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
-    "test": "tsx --test \"tests/**/*.test.ts\"",
-    "build": "vite build && tsc"
+    "test": "npm run test:python && tsx --test \"tests/**/*.test.ts\"",
+    "build": "vite build && tsc",
+    "test:python": "node scripts/ensure-python-deps.mjs"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
