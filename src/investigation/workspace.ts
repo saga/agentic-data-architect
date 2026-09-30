@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
 import type { Claim, DiscoveryRun, EvidenceRef, Finding } from '../evidence/types.js';
@@ -89,6 +90,13 @@ export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
+export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
+  const directory = path.dirname(file);
+  const temporary = path.join(directory, '.tmp-' + randomUUID() + '-' + path.basename(file));
+  await fs.writeFile(temporary, JSON.stringify(value, null, 2), 'utf8');
+  await fs.rename(temporary, file);
+}
+
 export function transcriptFile(name: string): string {
   return path.join(workspaceRoot(name), 'transcript.md');
 }
@@ -148,7 +156,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
     await fs.access(sharedIndexFile());
   } catch {
     const index: SharedIndex = { schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() };
-    await fs.writeFile(sharedIndexFile(), JSON.stringify(index, null, 2));
+    await writeJsonAtomic(sharedIndexFile(), index);
   }
 
   const fp = contextFile(name);
@@ -189,7 +197,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
         important: true,
       });
     }
-    await fs.writeFile(fp, JSON.stringify(context, null, 2));
+    await writeJsonAtomic(fp, context);
     await fs.writeFile(transcriptFile(name), '# Investigation Session ' + name + '\n\n');
     return root;
   }
@@ -222,7 +230,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
   if (remainingInputs.length !== context.inputs.length) {
     context.inputs = remainingInputs;
     context.updatedAt = new Date().toISOString();
-    await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+    await writeJsonAtomic(contextFile(name), context);
   }
 
   return context;
@@ -252,7 +260,7 @@ export async function appendContextInput(
     context.userPrompt = input.content.trim();
   }
   context.updatedAt = new Date().toISOString();
-  await fs.writeFile(contextFile(name), JSON.stringify(context, null, 2));
+  await writeJsonAtomic(contextFile(name), context);
   return item;
 }
 
