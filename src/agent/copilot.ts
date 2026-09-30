@@ -50,6 +50,7 @@ export interface AskInput {
   skillDirectories?: string[];
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
+  onStatus?: (status: string) => void;
   onSessionId?: (sessionId: string) => void;
   turnId?: string;
   shouldAbort?: () => boolean;
@@ -111,11 +112,31 @@ export async function askCopilot(input: AskInput): Promise<string> {
   }
 
   let content = '';
-  const off = session.on('assistant.message_delta', (e) => {
+  const offMessageDelta = session.on('assistant.message_delta', (e) => {
     if (e.data.deltaContent) {
       content += e.data.deltaContent;
       input.onDelta?.(e.data.deltaContent);
     }
+  });
+  const offIntent = session.on('assistant.intent', (e) => {
+    const intent = typeof e.data.intent === 'string' ? e.data.intent.trim() : '';
+    if (intent) input.onStatus?.(intent);
+  });
+  const offReasoning = session.on('assistant.reasoning_delta', () => {
+    input.onStatus?.('Thinking…');
+  });
+  const offToolStart = session.on('tool.execution_start', (e) => {
+    const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
+    input.onStatus?.(toolName ? `Running ${toolName}…` : 'Running a tool…');
+  });
+  const offToolComplete = session.on('tool.execution_complete', () => {
+    input.onStatus?.('Thinking…');
+  });
+  const offPermission = session.on('permission.requested', () => {
+    input.onStatus?.('Waiting for approval…');
+  });
+  const offCompaction = session.on('session.compaction_start', () => {
+    input.onStatus?.('Summarizing context…');
   });
   try {
     if (input.shouldAbort?.()) {
@@ -135,7 +156,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
     throw e;
   } finally {
     if (input.turnId) activeSessions.delete(input.turnId);
-    off();
+    offMessageDelta();
+    offIntent();
+    offReasoning();
+    offToolStart();
+    offToolComplete();
+    offPermission();
+    offCompaction();
     try {
       await session.disconnect();
     } catch {
