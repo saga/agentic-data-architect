@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { askCopilot } from '../agent/copilot.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
@@ -12,6 +14,11 @@ export interface AnswerSummary {
   claimIds: string[];
   warnings: string[];
   unknowns: string[];
+}
+
+async function loadInvestigationSkill(): Promise<string> {
+  const file = path.resolve(process.cwd(), 'skills/investigation-session/SKILL.md');
+  return fs.readFile(file, 'utf8');
 }
 
 export async function answerQuestion(
@@ -47,9 +54,10 @@ export async function answerQuestion(
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
+  const skill = await loadInvestigationSkill();
   const raw = await askCopilot({
     prompt,
-    systemPrompt: LEAD_SYSTEM_PROMPT,
+    systemPrompt: LEAD_SYSTEM_PROMPT + '\n\nINVESTIGATION SKILL:\n' + skill,
     workingDirectory: workspaceRoot(inv.name),
     ...(onDelta ? { onDelta } : {}),
   });
