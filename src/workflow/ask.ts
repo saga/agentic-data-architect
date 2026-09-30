@@ -4,11 +4,12 @@ import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
 import { investigationRoot, loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
+import { appendContextInput, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
 /**
- * answerQuestion：瘦 CLI 背后的问答逻辑（§三十四）。
- * 最新 snapshot → 按问题检索证据 → 结构化回答 → 校验+校正 → 存盘。
+ * answerQuestion：瘦 CLI 背后的问答逻辑。
+ * 每个问题都进入 workspace/context.json，并使用 workspace 作为 Agent working directory。
  */
 export interface AnswerSummary {
   answer: string;
@@ -19,6 +20,14 @@ export interface AnswerSummary {
 
 export async function answerQuestion(investigationName: string, question: string): Promise<AnswerSummary> {
   const inv = await loadInvestigation(investigationName);
+  await appendContextInput(investigationName, {
+    kind: 'question',
+    title: question,
+    content: question,
+    source: 'agentic-data-architect ask',
+    important: true,
+  });
+
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
     question,
@@ -40,8 +49,8 @@ export async function answerQuestion(investigationName: string, question: string
   const raw = await askCopilot({
     prompt,
     systemPrompt: LEAD_SYSTEM_PROMPT,
-    // Agent 工作目录固定到 investigation workspace（§三十二），不污染项目目录
-    workingDirectory: investigationRoot(inv.name),
+    // Agent 的实际工作目录是可持久化 workspace，不污染 investigation.json。
+    workingDirectory: workspaceRoot(inv.name),
   });
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
