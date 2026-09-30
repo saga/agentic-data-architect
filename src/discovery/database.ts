@@ -7,6 +7,7 @@ import { createAdapter } from '../adapters/postgres.js';
 import { SnowflakeAdapter } from '../adapters/snowflake.js';
 import { profileDataset } from '../analysis/profiling.js';
 import type { DatabaseAdapter, DataProfile } from '../adapters/database.js';
+import type { SemanticAsset } from '../semantic/types.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 import { emptyEstate, nodeId, type DataEstate } from '../model/estate.js';
 
@@ -30,6 +31,7 @@ export interface DatabaseDiscoveryResult {
   adapterType: string;
   estate: DataEstate;
   profiles: DataProfile[];
+  semanticAssets: SemanticAsset[];
   evidence: EvidenceRef[];
   unknowns: string[];
 }
@@ -139,8 +141,37 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
     } else {
       unknowns.push('本次只扫了 metadata，没有做 profiling（加 --profile 才做）');
     }
+    if (adapter.listSemanticAssets) {
+      try {
+        const discovered = await adapter.listSemanticAssets(input.schema);
+        for (const asset of discovered) {
+          const evidenceId = nextId('ev');
+          const enriched = {
+            ...asset,
+            evidenceIds: [...new Set([...(asset.evidenceIds ?? []), evidenceId])],
+          };
+          semanticAssets.push(enriched);
+          evidence.push({
+            id: evidenceId,
+            type: 'semantic_context',
+            investigationId: input.investigationId,
+            discoveryRunId: input.discoveryRunId,
+            source: asset.provider + ':' + (asset.qualifiedName ?? asset.name),
+            value: asset,
+            collectedAt: now(),
+          });
+        }
+      } catch (error) {
+        unknowns.push(
+          '读取业务语义资产失败：' +
+          (error instanceof Error ? error.message : String(error)) +
+          '。这不会影响表和列的发现。',
+        );
+      }
+    }
+
   } finally {
     await adapter.close();
   }
-  return { adapterType: adapter.type, estate, profiles, evidence, unknowns };
+  return { adapterType: adapter.type, estate, profiles, semanticAssets, evidence, unknowns };
 }
