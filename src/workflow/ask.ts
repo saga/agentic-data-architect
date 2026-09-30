@@ -70,11 +70,13 @@ export async function answerQuestion(
     throw new Error('This turn ID has already finished and cannot be retried.');
   }
 
+  // Reserve before the first await so another request cannot mistake this turn
+  // for stale work while the Copilot session is still being created.
   activeInvestigationTurns.set(investigationName, { turnId, phase: 'executing' });
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
-  const userMessage = saveConversationMessage({
+    const userMessage = saveConversationMessage({
     id: turnId + ':user',
     sessionName: investigationName,
     role: 'user',
@@ -125,7 +127,9 @@ export async function answerQuestion(
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
-  const raw = await askCopilot({
+    // The prompt and configuration snapshot are fixed for this turn; later
+    // UI changes apply only to the next turn.
+    const raw = await askCopilot({
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
