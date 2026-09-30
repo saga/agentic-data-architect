@@ -1775,74 +1775,63 @@ Agent 负责理解和综合这些结果，不能把它们的确定性约束改�
 
 ---
 
-# 三十、Repository 建议从一开始就按这些边界设计
+# 三十、当前 Repository 边界
 
-考虑到现在项目几乎是空的，我建议：
+当前代码已经形成下面这套实际边界，不再需要 `planner.ts / analyst.ts / architect.ts / reviewer.ts` 这种预先拆开的多 Agent 目录：
 
 ```text
 agentic-data-architect/
-│
-├── README.md
-│
-├── docs/
-│   ├── architecture.md
-│   ├── workflow.md
-│   ├── finance-domain.md
-│   ├── evidence-model.md
-│   └── evaluation.md
-│
 ├── src/
-│   │
 │   ├── agent/
-│   │   ├── planner.ts
-│   │   ├── analyst.ts
-│   │   ├── architect.ts
-│   │   └── reviewer.ts
-│   │
-│   ├── discovery/
-│   │   ├── catalog.ts
-│   │   ├── schema.ts
-│   │   ├── source.ts
-│   │   └── runtime.ts
-│   │
+│   │   ├── copilot.ts       # Copilot SDK runtime integration
+│   │   ├── prompts.ts       # platform-level investigation rules
+│   │   └── result.ts        # structured result parsing / claim validation
 │   ├── analysis/
-│   │   ├── profiling.ts
+│   │   ├── context.ts       # question-scoped evidence retrieval
+│   │   ├── findings.ts
 │   │   ├── lineage.ts
-│   │   ├── reconciliation.ts
-│   │   └── transformation.ts
-│   │
-│   ├── modeling/
-│   │   ├── domain.ts
-│   │   ├── logical.ts
-│   │   ├── physical.ts
-│   │   └── semantic.ts
-│   │
-│   ├── migration/
-│   │   ├── mapping.ts
-│   │   ├── waves.ts
-│   │   └── validation.ts
-│   │
-│   └── evidence/
-│       ├── claim.ts
-│       ├── finding.ts
-│       └── artifact.ts
-│
-├── adapters/
-│   ├── postgres/
-│   ├── snowflake/
-│   ├── oracle/
-│   ├── sqlserver/
-│   ├── files/
-│   ├── git/
-│   └── catalog/
-│
-└── examples/
-    ├── investment/
-    ├── portfolio/
-    └── modernization/
+│   │   ├── profiling.ts
+│   │   ├── query.ts
+│   │   ├── report.ts
+│   │   └── sql-parser.ts
+│   ├── discovery/
+│   ├── investigation/
+│   │   ├── control.ts       # research / skills / guidance / MCP / versions
+│   │   ├── conversation.ts  # SQLite messages + durable turns
+│   │   ├── store.ts         # Investigation state
+│   │   └── workspace.ts     # filesystem / workspace persistence
+│   ├── workflow/
+│   │   ├── ask.ts
+│   │   ├── discover.ts
+│   │   └── report.ts
+│   ├── adapters/
+│   ├── evidence/
+│   ├── model/
+│   └── server.ts
+├── skills/
+│   └── <skill>/SKILL.md
+├── tests/
+└── web/
+    └── src/App.tsx
 ```
 
-不过这些只是逻辑边界，不代表第一版全部实现。
+这套结构的核心边界是：
+
+```text
+Workflow
+   ↓
+Investigation state / Evidence
+   ↓
+Copilot default agent
+   ↓
+Selected Skills + MCP
+   ↓
+Structured result
+   ↓
+Evidence / claims / findings
+```
+
+不要为了“Agent 架构完整”再拆出一层假的 Agent 类。
 
 ---
 
