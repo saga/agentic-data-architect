@@ -12,7 +12,8 @@ export type WorkspaceInputKind =
   | 'discovery'
   | 'research'
   | 'decision'
-  | 'note';
+  | 'note'
+  | 'document';
 
 export interface WorkspaceInput {
   id: string;
@@ -24,6 +25,9 @@ export interface WorkspaceInput {
   uri?: string;
   artifactPath?: string;
   important?: boolean;
+  mimeType?: string;
+  sizeBytes?: number;
+  sha256?: string;
 }
 
 export interface WorkspaceContext {
@@ -237,6 +241,9 @@ export async function appendContextInput(
     ...(input.uri !== undefined ? { uri: input.uri } : {}),
     ...(input.artifactPath !== undefined ? { artifactPath: input.artifactPath } : {}),
     ...(input.important !== undefined ? { important: input.important } : {}),
+    ...(input.mimeType !== undefined ? { mimeType: input.mimeType } : {}),
+    ...(input.sizeBytes !== undefined ? { sizeBytes: input.sizeBytes } : {}),
+    ...(input.sha256 !== undefined ? { sha256: input.sha256 } : {}),
   };
   context.inputs.push(item);
   if (!context.userPrompt && input.kind === 'user_message' && input.content?.trim()) {
