@@ -639,7 +639,8 @@ function AppInner() {
                     <Text type="secondary">Upload files, configure GitHub sources, Skills and MCP as the investigation evolves.</Text>
                   </div>
                 </div>
-              </div>              </div>
+              </div>
+              </div>
             )}
 
             {error ? (
