@@ -49,6 +49,7 @@ export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<D
   const evidence: EvidenceRef[] = [];
   const unknowns: string[] = [];
   const profiles: DataProfile[] = [];
+  const semanticAssets: SemanticAsset[] = [];
   const now = () => new Date().toISOString();
   const maxTables = input.maxTables ?? 200;
 
