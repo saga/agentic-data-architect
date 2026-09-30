@@ -3,6 +3,7 @@ import test from 'node:test';
 import { parseAgentAnswer } from '../src/agent/result.js';
 import { ClaimSchema } from '../src/evidence/types.js';
 import { WorkspaceContextSchema } from '../src/investigation/schemas.js';
+import { SemanticAssetSchema } from '../src/semantic/types.js';
 import { MessageBodySchema, parseRequest, RequestValidationError } from '../src/api/schemas.js';
 
 test('Zod validates persisted investigation context and nested evidence', () => {
@@ -55,4 +56,10 @@ test('API request bodies are schema validated before workflow code', () => {
     () => parseRequest(MessageBodySchema, { turnId: 't1' }),
     (error) => error instanceof RequestValidationError && error.message.includes('请求参数不正确'),
   );
+});
+
+
+test('Semantic assets are runtime validated', () => {
+  assert.equal(SemanticAssetSchema.safeParse({ id: 'sv:1', kind: 'semantic_view', provider: 'snowflake', name: 'Position' }).success, true);
+  assert.equal(SemanticAssetSchema.safeParse({ id: 'sv:1', kind: 'unknown', provider: 'snowflake', name: 'Position' }).success, false);
 });
