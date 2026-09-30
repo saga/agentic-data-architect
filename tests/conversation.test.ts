@@ -41,6 +41,13 @@ test('migrates legacy chat inputs out of workspace state', () => {
   const sessionName = 'conversation-migration-test-' + randomUUID();
   const inputs = [
     {
+      id: 'legacy-user-message-' + randomUUID(),
+      kind: 'user_message',
+      capturedAt: '2026-09-30T09:59:59.000Z',
+      title: 'Legacy user message',
+      content: 'Please trace the Position source.',
+    },
+    {
       id: 'legacy-question-' + randomUUID(),
       kind: 'question',
       capturedAt: '2026-09-30T10:00:00.000Z',
@@ -68,7 +75,8 @@ test('migrates legacy chat inputs out of workspace state', () => {
   assert.equal(remaining[0]?.kind, 'note');
 
   const messages = listConversationMessages(sessionName);
-  assert.equal(messages.length, 2);
+  assert.equal(messages.length, 3);
   assert.equal(messages[0]?.role, 'user');
-  assert.equal(messages[1]?.role, 'assistant');
+  assert.equal(messages[1]?.role, 'user');
+  assert.equal(messages[2]?.role, 'assistant');
 });
