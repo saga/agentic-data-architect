@@ -1,3 +1,8 @@
+/**
+ * Evidence Retrieval：按问题组织有限上下文。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import type { DataProfile } from '../adapters/database.js';
 import type { EvidenceRef, Finding } from '../evidence/types.js';
 import type { LineageGraph } from './lineage.js';
@@ -12,10 +17,12 @@ export interface QuestionContext {
   evidenceIds: string[];
 }
 
+/** 把自然语言问题切成用于数据集粗匹配的关键词；这里只做轻量检索，不做语义模型。 */
 function tokens(text: string): string[] {
   return text.toLowerCase().split(/[^a-z0-9_]+/).filter((t) => t.length > 2);
 }
 
+/** 根据问题关键词和数据集名称计算简单相关性分数，用于控制 Agent 上下文规模。 */
 function scoreDataset(questionTokens: string[], dataset: string): number {
   const parts = dataset.toLowerCase().split(/[._]+/);
   let score = 0;
@@ -28,6 +35,7 @@ function scoreDataset(questionTokens: string[], dataset: string): number {
   return score;
 }
 
+/** 从 lineage、profile、finding 和 evidence 中挑选与问题最相关的上下文，避免把整个 snapshot 塞给模型。 */
 export function buildQuestionContext(args: {
   question: string;
   lineage: LineageGraph | null;
