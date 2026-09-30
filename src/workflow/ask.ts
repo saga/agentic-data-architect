@@ -1,3 +1,8 @@
+/**
+ * 问答 Workflow：把概率性 Agent 执行包在确定性的状态机和持久化边界内。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import { askCopilot, hasActiveCopilotTurn } from '../agent/copilot.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
@@ -14,9 +19,12 @@ import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../inv
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
+// 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
+// 用户已经发出 Stop 的 turn 集合；只用于执行阶段的协作式取消检查。
 const abortRequestedTurns = new Set<string>();
 
+/** 请求取消指定 Investigation 的当前 turn；commit 阶段故意拒绝取消，避免留下半提交状态。 */
 export function requestAbort(investigationName: string, turnId: string): boolean {
   const active = activeInvestigationTurns.get(investigationName);
   if (!active || active.turnId !== turnId || active.phase !== 'executing') return false;
@@ -24,6 +32,7 @@ export function requestAbort(investigationName: string, turnId: string): boolean
   return true;
 }
 
+/** workflow 返回给 API/UI 的稳定答案摘要，不把 Copilot 原始运行时对象泄漏出去。 */
 export interface AnswerSummary {
   answer: string;
   claimIds: string[];
@@ -31,6 +40,7 @@ export interface AnswerSummary {
   unknowns: string[];
 }
 
+/** 完整执行一轮 Investigation 问答：抢占 turn → 固定 Control → 构造证据上下文 → 执行 Agent → 解析答案 → 原子提交结果。 */
 export async function answerQuestion(
   investigationName: string,
   question: string,
@@ -40,7 +50,8 @@ export async function answerQuestion(
 ): Promise<AnswerSummary> {
   if (!turnId) turnId = nextId('turn');
 
-  const reservedTurn = activeInvestigationTurns.get(investigationName);
+  // 第一层并发保护：同一 Investigation 在进程内只能有一个活动 turn。
+const reservedTurn = activeInvestigationTurns.get(investigationName);
   if (reservedTurn && reservedTurn.turnId !== turnId) {
     throw new Error('这个 Investigation 正在处理上一轮问题，请等它完成，或者先点 Stop。');
   }
@@ -76,7 +87,8 @@ export async function answerQuestion(
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
-    const userMessage = saveConversationMessage({
+    // 先写 durable user message，再创建 Agent 上下文；这样重复请求/恢复时仍有稳定的 turn/message 标识。
+const userMessage = saveConversationMessage({
     id: turnId + ':user',
     sessionName: investigationName,
     role: 'user',
@@ -92,7 +104,8 @@ export async function answerQuestion(
     details: { questionLength: question.length },
   });
 
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
+  // 本轮只读取一个固定的 Discovery snapshot；后续 UI/Discovery 变化不应影响已经开始的模型请求。
+const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
     question,
     lineage: snapshot?.lineage ?? null,
@@ -100,7 +113,8 @@ export async function answerQuestion(
     findings: inv.findings,
     evidence: inv.evidence,
   });
-  const priorConversation = searchConversation(investigationName, question, {
+  // 历史对话只作为 conversation context，不提升成 Evidence，避免旧模型回答污染当前事实来源。
+const priorConversation = searchConversation(investigationName, question, {
     limit: 6,
     beforeRowId: userMessage.rowId,
   });
@@ -117,8 +131,10 @@ export async function answerQuestion(
     : '';
   const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
 
-  const existingIds = new Set(inv.evidence.map((e) => e.id));
-  const prompt = buildQuestionPrompt({
+  // Evidence ownership 边界：模型只能引用当前 Investigation 已存在的 Evidence ID。
+const existingIds = new Set(inv.evidence.map((e) => e.id));
+  // Prompt 在本次 turn 内固定；之后用户修改配置只影响下一轮，避免 TOCTOU。
+const prompt = buildQuestionPrompt({
     investigationName: inv.name,
     goal: inv.goal,
     scope: inv.scope,
@@ -129,7 +145,8 @@ export async function answerQuestion(
   });
     // The prompt and configuration snapshot are fixed for this turn; later
     // UI changes apply only to the next turn.
-    const raw = await askCopilot({
+    // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
+const raw = await askCopilot({
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
@@ -160,7 +177,8 @@ export async function answerQuestion(
   // history half-committed.
   const activeAfterExecution = activeInvestigationTurns.get(investigationName);
   if (activeAfterExecution?.turnId === turnId) {
-    activeAfterExecution.phase = 'committing';
+    // 一旦模型返回，切换到不可取消的 commit 阶段，保证 context/claims/conversation 一致落盘。
+activeAfterExecution.phase = 'committing';
   }
   abortRequestedTurns.delete(turnId);
 
@@ -185,7 +203,8 @@ export async function answerQuestion(
     warnings: parsed.warnings,
     unknowns: parsed.unknowns,
   };
-  finishConversationTurn(turnId, 'completed', JSON.stringify(result));
+  // durable turn 最后才标记 completed，保证数据库状态代表已经真正写完结果。
+finishConversationTurn(turnId, 'completed', JSON.stringify(result));
   return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
