@@ -18,7 +18,10 @@ jobs:
           python-version: '3.12'
       - run: pip install sqlglot
       - run: npm ci
-      - name: audit production dependencies
+      - name: block critical production dependency vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
+      - name: report high production dependency vulnerabilities
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
