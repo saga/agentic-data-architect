@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
-import { answerQuestion } from './workflow/ask.js';
+import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
 import { config } from './config.js';
 import {
@@ -20,6 +20,7 @@ import {
   closeConversationStore,
   recoverRunningConversationTurns,
   getConversationSummary,
+  getConversationTurn,
   listConversationMessages,
   searchConversation,
 } from './investigation/conversation.js';
@@ -318,7 +319,10 @@ export function createApp(vite?: ViteDevServer) {
     heartbeat.unref?.();
 
     const onClose = () => {
-      if (!finished) void abortCopilotTurn(turnId);
+      if (!finished) {
+        requestAbort(name, turnId);
+        void abortCopilotTurn(turnId);
+      }
     };
     req.on('close', onClose);
 
@@ -343,12 +347,20 @@ export function createApp(vite?: ViteDevServer) {
   });
 
   app.post('/api/sessions/:name/messages/abort', async (req, res) => {
+    const name = sessionKey(req.params.name);
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
     if (!turnId) {
       res.status(400).json({ error: 'turnId is required' });
       return;
     }
-    res.json({ aborted: await abortCopilotTurn(turnId) });
+    const turn = getConversationTurn(turnId);
+    if (!turn || turn.sessionName !== name) {
+      res.status(404).json({ error: 'turn not found' });
+      return;
+    }
+    const requested = requestAbort(name, turnId);
+    const aborted = requested || await abortCopilotTurn(turnId);
+    res.json({ aborted });
   });
 
   if (vite) {
