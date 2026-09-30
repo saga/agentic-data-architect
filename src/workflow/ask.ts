@@ -43,7 +43,7 @@ export async function answerQuestion(
     evidence: inv.evidence,
   });
   const priorConversation = searchConversation(investigationName, question, {
-    limit: 8,
+    limit: 6,
     beforeRowId: userMessage.rowId,
   });
   const conversationText = priorConversation.length > 0
@@ -51,9 +51,10 @@ export async function answerQuestion(
         '## Relevant conversation history',
         'The following earlier messages were retrieved by full-text search. Treat them as conversation context, not as evidence; current evidence and verified findings take precedence.',
         '',
-        ...priorConversation.slice().reverse().map((item) =>
-          `[${item.role}] ${item.content}`,
-        ),
+        ...priorConversation.slice().reverse().map((item) => {
+          const excerpt = item.content.length > 1200 ? item.content.slice(0, 1200) + '…' : item.content;
+          return `[${item.role}] ${excerpt}`;
+        }),
       ].join('\\n')
     : '';
   const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\\n\\n');
