@@ -70,6 +70,7 @@ export async function answerQuestion(
   }
 
   const answer = parsed.answer || raw.slice(0, 2000);
+  await saveInvestigation(inv);
   await appendContextInput(investigationName, {
     kind: 'assistant_message',
     title: 'Agent answer',
@@ -78,7 +79,6 @@ export async function answerQuestion(
     artifactPath: 'transcript.md',
   });
   await appendTranscript(investigationName, 'assistant', answer);
-  await saveInvestigation(inv);
 
   return {
     answer,
