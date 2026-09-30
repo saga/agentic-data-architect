@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { workspaceRoot } from './workspace.js';
 
@@ -96,7 +96,7 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
 async function skillSourceHash(name: string): Promise<string | undefined> {
   try {
     const content = await fs.readFile(path.join(config.skillsDir, name, 'SKILL.md'));
-    return (await import('node:crypto')).createHash('sha256').update(content).digest('hex');
+    return createHash('sha256').update(content).digest('hex');
   } catch {
     return undefined;
   }
