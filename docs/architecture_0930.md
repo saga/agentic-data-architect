@@ -13,6 +13,7 @@ V1.1 优先完成（本节是对照清单，做完即勾）：
 V2 做 Semantic / Source-to-Target / Target Architecture。
 V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
+数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
 ---
 ## Skill / Core 边界
