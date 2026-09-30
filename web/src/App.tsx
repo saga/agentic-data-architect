@@ -165,6 +165,48 @@ function cloneControl(control: InvestigationControl): InvestigationControl {
   return JSON.parse(JSON.stringify(control)) as InvestigationControl;
 }
 
+interface StreamEvent {
+  event: string;
+  data: unknown;
+}
+
+async function consumeSse(
+  response: Response,
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Streaming response is not available.');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const processBlock = (block: string) => {
+    const lines = block.split(/\r?\n/);
+    let event = 'message';
+    const data: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+    }
+    if (!data.length) return;
+    onEvent({ event, data: JSON.parse(data.join('\n')) });
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const blocks = buffer.split('\n\n');
+    buffer = blocks.pop() ?? '';
+    for (const block of blocks) {
+      if (block.trim()) processBlock(block);
+    }
+    if (done) break;
+  }
+
+  const tail = buffer.trim();
+  if (tail) processBlock(tail);
+}
+
 function documentReferences(context?: SessionContext): string[] {
   return (context?.inputs ?? [])
     .filter((input) => input.kind === 'document' && input.artifactPath)
@@ -225,6 +267,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streamingAnswer, setStreamingAnswer] = useState<string>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [error, setError] = useState<string>();
@@ -248,6 +291,7 @@ function AppInner() {
   });
   const activeRef = useRef<string>();
   const loadRequestRef = useRef(0);
+  const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController }>();
 
   useEffect(() => {
     activeRef.current = active;
@@ -348,24 +392,47 @@ function AppInner() {
     };
   }, [resizing]);
 
-  const bubbleItems = useMemo(
-    () =>
-      (current?.messages ?? []).map((message) => ({
-        key: message.id,
-        role: message.role,
-        content:
-          message.role === 'assistant' ? (
-            <ChatMarkdown content={message.content} />
-          ) : (
-            <Typography.Text>{message.content}</Typography.Text>
-          ),
-        footer:
-          message.role === 'assistant'
-            ? <Text type="secondary">{formatTime(message.capturedAt)}</Text>
-            : undefined,
-      })),
-    [current?.messages],
-  );
+  const bubbleItems = useMemo(() => {
+    const items = (current?.messages ?? []).map((message) => ({
+      key: message.id,
+      role: message.role,
+      content:
+        message.role === 'assistant' ? (
+          <ChatMarkdown content={message.content} />
+        ) : (
+          <Typography.Text>{message.content}</Typography.Text>
+        ),
+      footer:
+        message.role === 'assistant'
+          ? <Text type="secondary">{formatTime(message.capturedAt)}</Text>
+          : undefined,
+    }));
+
+    if (streamingAnswer !== undefined) {
+      items.push({
+        key: 'streaming-assistant',
+        role: 'assistant',
+        content: streamingAnswer
+          ? <ChatMarkdown content={streamingAnswer} />
+          : <Text type="secondary">Thinking…</Text>,
+        footer: <Text type="secondary">Live</Text>,
+      });
+    }
+    return items;
+  }, [current?.messages, streamingAnswer]);
+
+  const cancelActiveTurn = () => {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn) return;
+
+    void fetch(`/api/sessions/${encodeURIComponent(activeTurn.key)}/messages/abort`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turnId: activeTurn.turnId }),
+    }).catch(() => undefined);
+
+    activeTurn.controller.abort();
+  };
 
   const send = async (text?: string) => {
     const message = (text ?? value).trim();
@@ -374,6 +441,10 @@ function AppInner() {
     setValue('');
     setLoading(true);
     setError(undefined);
+    setStreamingAnswer('');
+
+    const turnId = crypto.randomUUID();
+    const controller = new AbortController();
 
     try {
       let key = active;
@@ -388,15 +459,14 @@ function AppInner() {
         navigateToSession(key);
       }
 
-      // Show the user's message immediately. The agent request can take several
-      // seconds, so waiting for the server response before rendering it makes
-      // the composer look frozen.
+      activeTurnRef.current = { key: key as string, turnId, controller };
+
       setCurrent((existing) => existing ? {
         ...existing,
         messages: [
           ...existing.messages,
           {
-            id: `local-user-${Date.now()}`,
+            id: `local-user-${turnId}`,
             role: 'user',
             content: message,
             capturedAt: new Date().toISOString(),
@@ -404,16 +474,40 @@ function AppInner() {
         ],
       } : existing);
 
-      const result = await getJson<{
+      const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, turnId }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || response.statusText);
+      }
+
+      let result: {
         answer: string;
         claimIds: string[];
         warnings: string[];
         unknowns: string[];
-      }>(`/api/sessions/${encodeURIComponent(key)}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+      } | undefined;
+
+      await consumeSse(response, ({ event, data }) => {
+        if (event === 'delta') {
+          const delta = (data as { delta?: unknown }).delta;
+          if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => (currentAnswer ?? '') + delta);
+          return;
+        }
+        if (event === 'error') {
+          throw new Error(String((data as { error?: unknown }).error ?? 'Request failed'));
+        }
+        if (event === 'completed') {
+          result = data as typeof result;
+        }
       });
+
+      if (!result) throw new Error('Agent stream ended without a completed result.');
 
       if (activeRef.current === key) {
         await loadSession(key);
@@ -424,8 +518,14 @@ function AppInner() {
         setError(result.warnings.join('; '));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setError('Turn stopped.');
+      } else {
+        setError(e instanceof Error ? e.message : 'Request failed');
+      }
     } finally {
+      setStreamingAnswer(undefined);
+      if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
   };
@@ -723,7 +823,7 @@ function AppInner() {
                 loading={loading}
                 submitType="enter"
                 onSubmit={(message) => { void send(message); }}
-                onCancel={() => setLoading(false)}
+                onCancel={cancelActiveTurn}
                 placeholder="Ask about the data estate, lineage, sources, transformations, findings, or next investigation step"
                 prefix={
                   <Tooltip title="Upload files">
