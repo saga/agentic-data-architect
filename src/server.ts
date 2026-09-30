@@ -294,12 +294,9 @@ export function createApp(vite?: ViteDevServer) {
 
   app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : randomUUID();
-    if (!message) {
-      res.status(400).json({ error: 'message is required' });
-      return;
-    }
+    const body = parseRequest(MessageBodySchema, req.body);
+    const message = body.message;
+    const turnId = body.turnId ?? randomUUID();
 
     await ensureWorkspace(name);
     res.status(200);
