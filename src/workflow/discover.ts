@@ -94,7 +94,10 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     mergeEstate(estate, db.estate);
   }
 
-  const tables = lineage?.tables.filter((t) => !t.startsWith('file:')) ?? estate.nodes.filter((n) => n.type === 'dataset').map((n) => n.name);
+  const tables = [...new Set([
+    ...(lineage?.tables.filter((t) => !t.startsWith('file:')) ?? []),
+    ...estate.nodes.filter((n) => n.type === 'dataset').map((n) => n.name),
+  ])].sort();
   const run: DiscoveryRun = {
     id: runId,
     root: opts.path ?? (opts.database ? redactSensitiveUri(opts.database) : ''),
