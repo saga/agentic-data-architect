@@ -1,3 +1,23 @@
+## 2026-09-30 — SQLite Conversation History / FTS5
+
+### 为什么改
+
+多轮对话继续写入 `context.json` 会让 Investigation 状态文件随着聊天轮数不断膨胀。现在把 conversation 与 Investigation state 分开：SQLite 保存 user / assistant / system message，`context.json` 只保存当前调查状态。
+
+### 实现
+
+- `src/investigation/conversation.ts`：基于 Node 22 `node:sqlite` 的 SQLite message store。
+- `conversation_messages`：按 session 保存消息。
+- `conversation_messages_fts`：SQLite FTS5 external-content 索引，使用 trigram tokenizer。
+- 旧 `context.json` 中的 `question` / `assistant_message` 会在读取时自动迁移到 SQLite。
+- `src/workflow/ask.ts`：写入 SQLite，并按当前问题检索少量相关历史消息补充到 Agent context。
+- `src/server.ts`：Web UI 从 SQLite 读取最近消息，并增加 `GET /api/sessions/:name/messages?q=...` 搜索接口。
+
+### FTS5 当前用途
+
+当前最直接的用途是长对话中的“相关历史召回”：用户隔了几十轮重新讨论 Position、Price、Security Master 等主题时，不需要把全部历史重新放进 prompt，只检索相关消息。相同索引也可以用于 Web UI 的历史消息定位。
+
+---
 ## 2026-09-30 — Web UI / Express 5 / Ant Design X
 
 ### 为什么改
@@ -9,7 +29,7 @@ readline 形式不适合作为长期 Data Investigation 工作台。真实使用
 - `src/server.ts`：新增 Express 5 server，提供 session / message / report / shared API，并在开发环境挂 Vite middleware、生产环境直接服务 `web/dist`。
 - `src/config.ts`：增加 `PORT` / `HOST` / `NODE_ENV`。
 - `src/agent/copilot.ts`：增加可选 delta callback，为后续 X Chat streaming 保留接口。
-- `src/workflow/ask.ts`：Web 对话和 CLI 统一复用；记录 user/assistant transcript。
+- `src/workflow/ask.ts`：Web 对话和 CLI 统一复用；user/assistant message 写入 SQLite。
 - `web/index.html`：Vite HTML 入口。
 - `web/src/main.tsx`：React 入口。
 - `web/src/App.tsx`：Ant Design X Conversations / Bubble / Sender / Welcome，以及 Ant Design context panel。
