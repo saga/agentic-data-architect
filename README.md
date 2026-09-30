@@ -116,7 +116,11 @@ Web 层没有重新实现这一套逻辑。
 
 ## Skills
 
-Copilot SDK 负责加载 `skills/*/SKILL.md`，而不是在 TypeScript workflow 里手工拼接 Skill 文本。当前由一个 `lead-data-agent` custom agent 预加载默认 Skill；Skill 集合可通过 `COPILOT_SKILLS` 调整。
+当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK 的默认 Agent，不再额外注册 `lead-data-agent` custom agent。
+
+Skill 是独立、平级、可配置的能力模块。当前 Investigation 通过 `control.json` 选择哪些 Skill 可用，运行时由 Copilot SDK 从 `skills/` 发现它们；未选择的 Skill 会通过 `disabledSkills` 明确关闭。
+
+`COPILOT_SKILLS` 只用于创建 Investigation 时设置默认选择，不是 Agent 定义。
 
 当前 Skill 分工：
 
@@ -203,7 +207,7 @@ npm run report -- demo
 | `TURN_TIMEOUT_MS` | 单轮等待上限 | `300000` |
 | `SQLGLOT_PYTHON` | SQLGlot Python 解释器 | `python3` |
 | `SKILLS_DIR` | Copilot SDK Skill 根目录 | `skills` |
-| `COPILOT_SKILLS` | Copilot Lead Agent 默认预加载 Skill，逗号分隔 | `investigation-session,financial-data-review` |
+| `COPILOT_SKILLS` | 新 Investigation 默认选择的 Skill，逗号分隔 | `investigation-session,financial-data-review` |
 
 ## 检查
 
