@@ -67,7 +67,7 @@ test('financial review skill script produces deterministic review artifact', asy
           },
           {
             sourceDataset: 'position_b',
-            sourceColumn: 'security_id',
+            sourceColumn: 'sec_id',
             targetDataset: 'position_b',
             targetColumn: 'security_id',
           },
