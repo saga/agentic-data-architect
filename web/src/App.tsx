@@ -376,10 +376,10 @@ function AppInner() {
   );
 
   const send = async (text?: string) => {
-    const turnId = crypto.randomUUID();
-    turnIdRef.current = turnId;
     const message = (text ?? value).trim();
     if (!message || loading) return;
+    const turnId = crypto.randomUUID();
+    turnIdRef.current = turnId;
 
     setValue('');
     setLoading(true);
