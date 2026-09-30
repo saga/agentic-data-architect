@@ -3,7 +3,7 @@ import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
-import { investigationRoot, loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
 import { appendContextInput, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
