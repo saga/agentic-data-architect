@@ -204,15 +204,61 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
   const ensure = (id: string, type: Parameters<typeof nodeId>[0], name: string, attributes: Record<string, unknown> = {}) => {
     if (!estate.nodes.some((n) => n.id === id)) estate.nodes.push({ id, type, name, attributes });
   };
+  const jobs = new Map<string, string>();
+
   for (const st of lineage.statements) {
     const f = filesByPath.get(st.file);
     const fileId = nodeId('file', st.file);
+    const jobId = nodeId('job', 'sql-file:' + st.file);
+    const jobName = 'SQL file: ' + st.file;
+
     ensure(fileId, 'file', st.file, f ? { sha256: f.sha256, lineCount: f.lineCount } : {});
+    ensure(jobId, 'job', jobName, { kind: 'sql_file', sourceFile: st.file });
+
+    if (!jobs.has(st.file)) {
+      jobs.set(st.file, jobId);
+      estate.edges.push({
+        id: nextEstateId(),
+        from: fileId,
+        to: jobId,
+        type: 'implements',
+        evidenceIds: [],
+        relationMode: 'static',
+      });
+    }
+
+    const evidence = lineage.evidence.find(
+      (item) =>
+        item.type === 'sql_statement' &&
+        item.file === st.file &&
+        item.lineStart === st.lineStart &&
+        item.lineEnd === st.lineEnd,
+    );
+
+    for (const source of st.sources) {
+      const sourceId = nodeId('dataset', source);
+      ensure(sourceId, 'dataset', source);
+      estate.edges.push({
+        id: nextEstateId(),
+        from: sourceId,
+        to: jobId,
+        type: 'reads_from',
+        evidenceIds: evidence ? [evidence.id] : [],
+        relationMode: 'static',
+      });
+    }
+
     if (st.target) {
-      const dsId = nodeId('dataset', st.target);
-      ensure(dsId, 'dataset', st.target);
-      const ev = lineage.evidence.find((e) => e.type === 'sql_statement' && e.file === st.file && e.lineStart === st.lineStart && e.lineEnd === st.lineEnd);
-      estate.edges.push({ id: nextEstateId(), from: fileId, to: dsId, type: 'writes_to', evidenceIds: ev ? [ev.id] : [] });
+      const targetId = nodeId('dataset', st.target);
+      ensure(targetId, 'dataset', st.target);
+      estate.edges.push({
+        id: nextEstateId(),
+        from: jobId,
+        to: targetId,
+        type: 'writes_to',
+        evidenceIds: evidence ? [evidence.id] : [],
+        relationMode: 'static',
+      });
     }
   }
   for (const e of lineage.edges) {
@@ -220,7 +266,7 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
     const to = nodeId('dataset', e.target);
     ensure(from, 'dataset', e.source);
     ensure(to, 'dataset', e.target);
-    estate.edges.push({ id: nextEstateId(), from, to, type: 'derived_from', evidenceIds: [e.evidenceId] });
+    estate.edges.push({ id: nextEstateId(), from, to, type: 'derived_from', evidenceIds: [e.evidenceId], relationMode: 'static' });
   }
   for (const c of lineage.columns) {
     const from = nodeId('column', `${c.sourceDataset}.${c.sourceColumn}`);
@@ -235,7 +281,6 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
       type: 'contains',
       evidenceIds: c.evidenceId ? [c.evidenceId] : [],
       relationMode: 'static',
-      ...(c.expression ? { expression: c.expression } : {}),
     });
   }
 }
