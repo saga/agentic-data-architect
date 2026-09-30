@@ -1,3 +1,8 @@
+/**
+ * Current-State Report 生成器。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
