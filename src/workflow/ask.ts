@@ -1,9 +1,9 @@
-import { askCopilot } from '../agent/copilot.js';
+import { askCopilot, hasActiveCopilotTurn } from '../agent/copilot.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
-import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
+import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, getRunningConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import {
   appendAuditEvent,
   buildResearchConfigPrompt,
@@ -13,6 +13,15 @@ import {
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
+
+const activeInvestigationTurns = new Map<string, string>();
+const abortRequestedTurns = new Set<string>();
+
+export function requestAbort(investigationName: string, turnId: string): boolean {
+  if (activeInvestigationTurns.get(investigationName) !== turnId) return false;
+  abortRequestedTurns.add(turnId);
+  return true;
+}
 
 export interface AnswerSummary {
   answer: string;
@@ -28,24 +37,40 @@ export async function answerQuestion(
   turnId?: string,
 ): Promise<AnswerSummary> {
   if (!turnId) turnId = nextId('turn');
-  const turn = beginConversationTurn(investigationName, turnId);
+
+  const reservedTurn = activeInvestigationTurns.get(investigationName);
+  if (reservedTurn && reservedTurn !== turnId) {
+    throw new Error('This investigation already has an active turn.');
+  }
+
+  let turn;
+  try {
+    turn = beginConversationTurn(investigationName, turnId);
+  } catch (error) {
+    const running = getRunningConversationTurn(investigationName);
+    if (running) throw new Error('This investigation already has an active turn.');
+    throw error;
+  }
+
   if (turn.status === 'completed' && turn.result) return JSON.parse(turn.result) as AnswerSummary;
+
   if (turn.status === 'running') {
-    // A running row without a live Copilot turn is stale (for example after a
-    // server-side failure between persistence and session registration).
-    // Do not leave the investigation permanently locked.
-    const recovered = await import('../agent/copilot.js').then(({ hasActiveCopilotTurn }) =>
-      hasActiveCopilotTurn(turn.turnId),
-    );
-    if (!recovered) {
-      abortStaleConversationTurn(turn.turnId);
-    } else {
+    const sameTurnActive =
+      activeInvestigationTurns.get(investigationName) === turn.turnId ||
+      hasActiveCopilotTurn(turn.turnId);
+    if (sameTurnActive) {
       throw new Error('This investigation already has an active turn.');
     }
+    abortStaleConversationTurn(turn.turnId);
   }
+
   if (turn.status === 'failed' || turn.status === 'aborted') {
     throw new Error('This turn ID has already finished and cannot be retried.');
   }
+
+  activeInvestigationTurns.set(investigationName, turnId);
+  try {
+    if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
   const userMessage = saveConversationMessage({
     id: turnId + ':user',
@@ -120,7 +145,9 @@ export async function answerQuestion(
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
     turnId,
+    shouldAbort: () => abortRequestedTurns.has(turnId),
   });
+  if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
@@ -149,5 +176,10 @@ export async function answerQuestion(
     const message = error instanceof Error ? error.message : String(error);
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
+  } finally {
+    if (activeInvestigationTurns.get(investigationName) === turnId) {
+      activeInvestigationTurns.delete(investigationName);
+    }
+    abortRequestedTurns.delete(turnId);
   }
 }
