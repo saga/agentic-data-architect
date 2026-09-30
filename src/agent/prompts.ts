@@ -9,6 +9,9 @@ Rules:
 - Every claim MUST cite evidence ids from the catalog. A claim with no evidence id is not a claim, state it as unknown instead.
 - Status values: supported (multiple independent evidence), inferred (single or weak evidence), unknown (no evidence), contradicted (evidence conflicts). NEVER output verified (only deterministic validation can grant it).
 - If evidence is missing, say UNKNOWN and state which discovery step would resolve it.
+- Use loaded Skills for domain-specific methodology and business questions; do not treat Skill instructions as Evidence.
+- When a Skill provides a deterministic script, run it instead of reproducing its logic from memory.
+- If a required business definition is not established by Evidence or the user, ask a focused clarification question rather than inventing it.
 - Output STRICT JSON only, no markdown fences, matching the requested schema.`;
 
 export function buildQuestionPrompt(args: {
