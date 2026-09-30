@@ -164,43 +164,61 @@ export class SnowflakeAdapter implements DatabaseAdapter {
   async profile(table: string, columns?: string[]): Promise<DataProfile> {
     const meta = await this.getTableMetadata(table);
     const from = qualifiedTable(table);
-    const [c] = await this.q(`SELECT COUNT(*) AS C FROM ${from}`);
-    const rowCount = Number(c?.['C'] ?? 0);
     const wanted = columns?.length ? new Set(columns.map((x) => x.toUpperCase())) : null;
-    const profiles: ColumnProfile[] = [];
-    for (const col of meta.columns) {
-      if (wanted && !wanted.has(col.name.toUpperCase())) continue;
-      const id = `"${col.name.replace(/"/g, '""')}"`;
-      const [agg] = await this.q(
-        `SELECT COUNT(*) AS N, COUNT(${id}) AS NN, COUNT(DISTINCT ${id}) AS D FROM ${from}`,
-      );
-      const n = Number(agg?.['N'] ?? 0);
-      const nonNull = Number(agg?.['NN'] ?? 0);
-      let min: string | undefined;
-      let max: string | undefined;
-      try {
-        const [mm] = await this.q(`SELECT MIN(${id})::STRING AS LO, MAX(${id})::STRING AS HI FROM ${from}`);
-        if (mm?.['LO'] != null) min = String(mm['LO']);
-        if (mm?.['HI'] != null) max = String(mm['HI']);
-      } catch {
-        /* 半结构化类型跳过 min/max */
+    const selected = meta.columns.filter((col) => !wanted || wanted.has(col.name.toUpperCase()));
+    const supportsMinMax = (type: string): boolean => {
+      const t = type.toUpperCase();
+      return [
+        'NUMBER', 'DECIMAL', 'NUMERIC', 'INT', 'INTEGER', 'BIGINT', 'SMALLINT',
+        'FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'VARCHAR', 'CHAR', 'CHARACTER', 'TEXT',
+        'DATE', 'TIMESTAMP', 'TIMESTAMP_LTZ', 'TIMESTAMP_NTZ', 'TIMESTAMP_TZ', 'TIME',
+      ].includes(t);
+    };
+    const aggregateParts = selected.flatMap((col, i) => {
+      const id = ident(col.name);
+      const parts = [
+        'COUNT(' + id + ') AS "nn_' + i + '"',
+        'COUNT(DISTINCT ' + id + ') AS "d_' + i + '"',
+      ];
+      if (supportsMinMax(col.dataType)) {
+        parts.push('TO_VARCHAR(MIN(' + id + ')) AS "lo_' + i + '"', 'TO_VARCHAR(MAX(' + id + ')) AS "hi_' + i + '"');
       }
-      profiles.push({
+      return parts;
+    });
+    const aggregateSql = 'SELECT COUNT(*) AS "__row_count__"' +
+      (aggregateParts.length ? ', ' + aggregateParts.join(', ') : '') +
+      ' FROM ' + from;
+    const [agg] = await this.q(aggregateSql);
+    const rowCount = Number(agg?.['__row_count__'] ?? agg?.['__ROW_COUNT__'] ?? 0);
+    const sampleRows = await this.sample(table, 100);
+    const profiles: ColumnProfile[] = selected.map((col, i) => {
+      const nonNull = Number(agg?.['nn_' + i] ?? agg?.['NN_' + i] ?? 0);
+      const distinctCount = Number(agg?.['d_' + i] ?? agg?.['D_' + i] ?? 0);
+      const samples: unknown[] = [];
+      for (const row of sampleRows) {
+        const value = row[col.name] ?? row[col.name.toUpperCase()];
+        if (value == null || samples.some((v) => Object.is(v, value))) continue;
+        samples.push(value);
+        if (samples.length >= 5) break;
+      }
+      const lo = agg?.['lo_' + i] ?? agg?.['LO_' + i];
+      const hi = agg?.['hi_' + i] ?? agg?.['HI_' + i];
+      return {
         column: col.name,
         dataType: col.dataType,
         nullable: col.nullable,
-        rowCount: n,
-        nullCount: n - nonNull,
-        nullRate: n === 0 ? 0 : (n - nonNull) / n,
-        distinctCount: Number(agg?.['D'] ?? 0),
-        distinctRate: n === 0 ? 0 : Number(agg?.['D'] ?? 0) / n,
-        ...(min !== undefined ? { min } : {}),
-        ...(max !== undefined ? { max } : {}),
-      });
-    }
+        rowCount,
+        nullCount: rowCount - nonNull,
+        nullRate: rowCount === 0 ? 0 : (rowCount - nonNull) / rowCount,
+        distinctCount,
+        distinctRate: rowCount === 0 ? 0 : distinctCount / rowCount,
+        ...(lo != null ? { min: String(lo) } : {}),
+        ...(hi != null ? { max: String(hi) } : {}),
+        ...(samples.length ? { sampleValues: samples } : {}),
+      };
+    });
     return { dataset: meta.qualifiedName, rowCount, columns: profiles, profiledAt: new Date().toISOString() };
   }
-
   async query(sql: string): Promise<QueryResult> {
     const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
