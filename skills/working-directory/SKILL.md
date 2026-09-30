@@ -1,59 +1,63 @@
+# Workspace 约定
 
-# Working Directory 约定
+当前 workspace 只有两层：session 和 shared。
 
-所有 Investigation 都有一个可持续的 workspace：
-
-.data/investigations/<name>/workspace/
-
-~~~text
-workspace/
-  context.json
-  inputs/
-  research/
+```text
+.workspace/
+  shared/
+    index.json
+    confluence/
     github/
     leanix/
-    confluence/
     web/
-  sources/
-    github/
-  findings/
-  artifacts/
-  notes/
-~~~
+    document/
+    other/
+  <session-name>/
+    context.json
+    transcript.md
+    discovery/
+    reports/
+    artifacts/
+```
 
-## context.json
+## Session
 
-这是 workspace 的第一入口，不能删除，也不要用一次性的临时文件替代。
+`.workspace/<session-name>/context.json` 是 Investigation 的第一入口，也是当前业务状态的唯一持久化文件。
 
-~~~json
-{
-  "schemaVersion": 1,
-  "userPrompt": "最初用户要求",
-  "importantInformation": [
-    "已经确认的重要事实、约束、决定"
-  ],
-  "inputs": [
-    {
-      "id": "input-001",
-      "kind": "research",
-      "capturedAt": "2026-09-30T00:00:00Z",
-      "title": "研究主题",
-      "content": "本次输入、问题或研究 query",
-      "source": "github",
-      "uri": "https://github.com/...",
-      "artifactPath": "research/github/001-xxx.md",
-      "important": true
-    }
-  ],
-  "updatedAt": "2026-09-30T00:00:00Z"
-}
-~~~
+它记录：
+- 用户最初要求
+- goal / scope / systems
+- 每轮用户输入与研究输入索引
+- importantInformation / unknowns
+- discovery runs / evidence / findings / claims
+- 可恢复 Copilot session id
 
-规则：
+对话过程写入 `transcript.md`；大量分析结果、临时文件或生成物写到当前 session 的 `artifacts/`。
 
-1. 用户最初 prompt 放在 userPrompt。
-2. 每次新的用户问题、研究 query、外部事实输入、重要决策，都追加到 inputs，不要覆盖历史记录。
-3. 长内容放到 research/、findings/、notes/ 等文件，context.json 用 artifactPath 指向它。
-4. 只能把已经核实的重要事实放入 importantInformation；推测写进研究文件并标明状态。
-5. 不要把密码、token、cookie、OAuth access token 等敏感凭据写进 workspace。
-6. 研究记录要能复现：至少保存 query / source / uri / 时间 / commit 或 page id / 简短结果摘要。
+## Shared
+
+`.workspace/shared/` 保存跨 session 可以复用的资料。
+
+`index.json` 只做轻量索引，至少包含：
+- id
+- kind
+- path
+- title
+- source / uri
+- updatedAt
+- sessionNames（有需要时）
+
+Confluence 下载页面保存为：
+
+`.workspace/shared/confluence/<id>.md`
+
+其它外部资料按来源放到对应目录。
+
+## 规则
+
+1. 新用户输入追加到 session context，不覆盖历史。
+2. 长内容落文件，context.json 保留摘要和 artifactPath。
+3. 外部研究资料优先沉淀到 shared，避免重复下载和重复研究。
+4. 不保存 password、token、cookie、OAuth access token 等凭据。
+5. 能由脚本确定性获得的事实，直接运行脚本；不要在 SKILL 或 prompt 中写一份会漂移的“内置答案”。
+6. GitHub / LeanIX / Confluence 的具体访问流程由对应 SKILL 决定。
