@@ -180,7 +180,7 @@ export function createApp(vite?: ViteDevServer) {
     const name = sessionKey(routeParam(req.params.name));
     const body = req.body as Partial<InvestigationControl>;
     if (!body.research || !body.agent) {
-      res.status(400).json({ error: 'research and agent configuration are required' });
+      res.status(400).json({ error: '缺少研究范围或 Agent 配置，请重新打开配置并保存。' });
       return;
     }
     const control = await updateInvestigationControl(name, {
@@ -193,7 +193,7 @@ export function createApp(vite?: ViteDevServer) {
   app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
     const name = sessionKey(String(req.params.name));
     if (!req.file) {
-      res.status(400).json({ error: 'file is required' });
+      res.status(400).json({ error: '没有收到文件，请重新选择要上传的文件。' });
       return;
     }
 
@@ -283,7 +283,7 @@ export function createApp(vite?: ViteDevServer) {
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
     if (!message) {
-      res.status(400).json({ error: 'message is required' });
+      res.status(400).json({ error: '没有收到问题，请先输入要问的问题。' });
       return;
     }
     await ensureWorkspace(name);
@@ -355,12 +355,12 @@ export function createApp(vite?: ViteDevServer) {
     const name = sessionKey(req.params.name);
     const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
     if (!turnId) {
-      res.status(400).json({ error: 'turnId is required' });
+      res.status(400).json({ error: '请求编号缺失，请重新发送问题。' });
       return;
     }
     const turn = getConversationTurn(turnId);
     if (!turn || turn.sessionName !== name) {
-      res.status(404).json({ error: 'turn not found' });
+      res.status(404).json({ error: '找不到这次请求，请刷新页面后重试。' });
       return;
     }
     const requested = requestAbort(name, turnId);
@@ -395,11 +395,11 @@ export function createApp(vite?: ViteDevServer) {
     console.error(error);
     if (res.headersSent) return;
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      res.status(413).json({ error: 'File is too large. Maximum size is 50 MB.' });
+      res.status(413).json({ error: '文件太大，单个文件最多 50 MB。' });
       return;
     }
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
+      error: error instanceof Error ? error.message : '服务暂时无法处理这个请求，请稍后重试。',
     });
   });
 
