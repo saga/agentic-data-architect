@@ -208,6 +208,26 @@ export function abortStaleConversationTurn(turnId: string, error = 'The previous
   return Number(result.changes) > 0;
 }
 
+export function getRunningConversationTurn(sessionName: string): ConversationTurn | undefined {
+  const row = getDatabase().prepare(`
+    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    FROM conversation_turns
+    WHERE session_name = ? AND status = 'running'
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `).get(sessionName) as Record<string, unknown> | undefined;
+  if (!row) return undefined;
+  return {
+    turnId: String(row.turn_id),
+    sessionName: String(row.session_name),
+    status: row.status as ConversationTurn['status'],
+    ...(typeof row.result === 'string' ? { result: row.result } : {}),
+    ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
 export function getConversationTurn(turnId: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
     SELECT turn_id, session_name, status, result, error, created_at, updated_at
