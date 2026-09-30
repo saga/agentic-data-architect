@@ -416,7 +416,7 @@ function AppInner() {
     }));
 
     const currentStreamingAnswer = streamingAnswer;
-    if (currentStreamingAnswer?.key === active) {
+    if (currentStreamingAnswer && currentStreamingAnswer.key === active) {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
