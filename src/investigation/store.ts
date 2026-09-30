@@ -8,6 +8,7 @@ import {
   workspaceRoot,
   type WorkspaceContext,
 } from './workspace.js';
+import { migrateLegacyConversationInputs } from './conversation.js';
 
 export type Investigation = WorkspaceContext;
 
@@ -59,7 +60,13 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
 export async function loadInvestigation(name: string): Promise<Investigation> {
   try {
     const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<Investigation>;
-    return normalizeInvestigation(name, raw);
+    const inv = normalizeInvestigation(name, raw);
+    const remainingInputs = migrateLegacyConversationInputs(name, inv.inputs);
+    if (remainingInputs.length !== inv.inputs.length) {
+      inv.inputs = remainingInputs;
+      await saveInvestigation(inv);
+    }
+    return inv;
   } catch (e) {
     if (!(e instanceof Error) || !('code' in e) || (e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
   }
@@ -72,6 +79,7 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
     try {
       const raw = JSON.parse(await fs.readFile(legacy, 'utf-8')) as Partial<Investigation>;
       const inv = normalizeInvestigation(name, raw);
+      inv.inputs = migrateLegacyConversationInputs(name, inv.inputs);
       await saveInvestigation(inv);
       return inv;
     } catch (e) {
