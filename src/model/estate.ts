@@ -7,13 +7,20 @@ import { randomBytes } from 'node:crypto';
 /** Data Estate 节点类型；统一描述系统、数据库、表、列、文件等资产。 */
 export type EstateNodeType =
   | 'system'
+  | 'application'
+  | 'interface'
   | 'database'
   | 'schema'
+  | 'data_store'
   | 'dataset'
   | 'column'
   | 'file'
+  | 'api'
+  | 'message_topic'
   | 'job'
+  | 'job_run'
   | 'report'
+  | 'dashboard'
   | 'business_concept';
 
 /** Data Estate 中一个实体节点。attributes 保留来源适配器等扩展信息。 */
@@ -43,6 +50,8 @@ export interface EstateEdge {
   to: string;
   type: EstateRelationType;
   evidenceIds: string[];
+  relationMode?: 'static' | 'runtime' | 'semantic';
+  expression?: string;
 }
 
 /** 一次 Discovery 得到的统一数据资产图，包含节点和关系。 */
