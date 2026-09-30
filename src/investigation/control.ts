@@ -70,6 +70,7 @@ function controlFile(name: string): string {
 }
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
+const controlInitLocks = new Map<string, Promise<void>>();
 
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
   const previous = controlUpdateLocks.get(name) ?? Promise.resolve();
@@ -115,10 +116,39 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
     .filter((item) => item.name);
 }
 
+/**
+ * Hash every file in a Skill bundle, not only SKILL.md.
+ * A change to a deterministic script/reference must create a new Skill version too.
+ */
 async function skillSourceHash(name: string): Promise<string | undefined> {
+  const root = path.join(config.skillsDir, name);
   try {
-    const content = await fs.readFile(path.join(config.skillsDir, name, 'SKILL.md'));
-    return createHash('sha256').update(content).digest('hex');
+    const files: string[] = [];
+
+    const visit = async (directory: string, relative = ''): Promise<void> => {
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+      for (const entry of entries) {
+        const nextRelative = path.join(relative, entry.name);
+        const nextAbsolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          await visit(nextAbsolute, nextRelative);
+        } else if (entry.isFile()) {
+          files.push(nextRelative);
+        }
+      }
+    };
+
+    await visit(root);
+    files.sort();
+
+    const hash = createHash('sha256');
+    for (const relative of files) {
+      hash.update(relative);
+      hash.update('\0');
+      hash.update(await fs.readFile(path.join(root, relative)));
+      hash.update('\0');
+    }
+    return hash.digest('hex');
   } catch {
     return undefined;
   }
@@ -231,24 +261,46 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
     }
   }
 
-  const base = defaultControl();
-  const control: InvestigationControl = {
-    ...base,
-    history: [{
-      version: 1,
-      updatedAt: base.updatedAt,
-      reason: 'initial',
-      snapshot: base,
-    }],
-  };
-  await writeJsonAtomic(controlFile(name), control);
-  await appendAuditEvent(name, {
-    actor: 'system',
-    action: 'configuration.created',
-    summary: 'Created default investigation configuration.',
-    configurationVersion: 1,
-  });
-  return control;
+  // First access can race with another request. Re-check after serialization so
+  // both requests observe the same version-1 control file and audit event.
+  const previous = controlInitLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  controlInitLocks.set(name, queued);
+  await previous.catch(() => undefined);
+
+  try {
+    try {
+      return normalizeControl(JSON.parse(await fs.readFile(controlFile(name), 'utf8')) as Partial<InvestigationControl>);
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    const base = defaultControl();
+    const control: InvestigationControl = {
+      ...base,
+      history: [{
+        version: 1,
+        updatedAt: base.updatedAt,
+        reason: 'initial',
+        snapshot: base,
+      }],
+    };
+    await writeJsonAtomic(controlFile(name), control);
+    await appendAuditEvent(name, {
+      actor: 'system',
+      action: 'configuration.created',
+      summary: 'Created default investigation configuration.',
+      configurationVersion: 1,
+    });
+    return control;
+  } finally {
+    release();
+    if (controlInitLocks.get(name) === queued) controlInitLocks.delete(name);
+  }
 }
 
 export async function updateInvestigationControl(
@@ -269,6 +321,8 @@ async function updateInvestigationControlImpl(
   const current = await loadInvestigationControl(name);
   const now = new Date().toISOString();
 
+  // Skill version is tied to the complete bundle hash, so scripts/references
+  // cannot change underneath a configuration version without being recorded.
   const nextSkills = await Promise.all(next.agent.skills
     .map(async (item) => {
       const old = current.agent.skills.find((candidate) => candidate.name === item.name);
