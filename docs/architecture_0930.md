@@ -26,7 +26,7 @@ Express 5 API
    ↓
 Investigation / Evidence / Copilot
    ↓
-.workspace/<session>/context.json
+SQLite conversation history + .workspace/<session>/context.json
 ```
 
 浏览器中的 session 可以持续切换和恢复；用户可以在同一个 session 中连续补充上下文、提问、提供资料和纠正方向。
@@ -52,7 +52,9 @@ UI 使用 Ant Design + Ant Design X；XMarkdown 负责 Markdown、代码、公�
     artifacts/
 ```
 
-`.workspace/<session-name>/context.json` 是当前 Investigation 的主要状态入口。跨 session 可以复用的研究资料统一放在 `.workspace/shared/`，例如 Confluence 页面保存在 `.workspace/shared/confluence/`，并登记到 `.workspace/shared/index.json`。
+`.workspace/<session-name>/context.json` 是当前 Investigation 的状态入口，只保存调查状态，不保存多轮聊天正文。`.workspace/conversations.db` 保存 user / assistant / system 消息，并使用 FTS5 做全文检索。跨 session 可以复用的研究资料统一放在 `.workspace/shared/`，例如 Confluence 页面保存在 `.workspace/shared/confluence/`，并登记到 `.workspace/shared/index.json`。
+
+Agent 不把整个聊天历史重新塞进每轮 prompt；当前实现只按问题从 FTS5 检索少量相关历史消息，作为补充上下文。
 
 研究流程尽量由 SKILL 定义；确定性事实通过现有 TypeScript / JavaScript / Python 工具执行，不在 prompt 里硬编码一套会漂移的操作说明。
 
