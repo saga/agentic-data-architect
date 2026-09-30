@@ -8,12 +8,17 @@ function env(name: string, fallback = ''): string {
 const workspaceDir = path.resolve(env('WORKSPACE_DIR', '.workspace'));
 const legacyDataDir = path.resolve(env('DATA_DIR', '.data'));
 const skillsDir = path.resolve(env('SKILLS_DIR', 'skills'));
+const copilotSkills = env('COPILOT_SKILLS', 'investigation-session,financial-data-review')
+  .split(',')
+  .map((skill) => skill.trim())
+  .filter(Boolean);
 
 export const config = {
   workspaceDir,
   sharedDir: path.join(workspaceDir, 'shared'),
   legacyDataDir,
   skillsDir,
+  copilotSkills,
   githubToken: env('GITHUB_TOKEN', '') || undefined,
   model: env('COPILOT_MODEL', 'gpt-5-mini'),
   turnTimeoutMs: Number(env('TURN_TIMEOUT_MS', '300000')) || 300_000,
