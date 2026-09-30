@@ -85,7 +85,8 @@ export function buildQuestionContext(args: {
   for (const c of lineage.columns) {
     if (!topNames.has(c.targetDataset.toLowerCase()) && !topNames.has(c.sourceDataset.toLowerCase())) continue;
     if (colCount >= 30) break;
-    out.push(`- ${c.targetDataset}.${c.targetColumn} ← ${c.sourceDataset}.${c.sourceColumn} (${c.expression?.slice(0, 120) ?? ''})`);
+    const ref = c.evidenceId ? use(c.evidenceId) : null;
+    out.push(`- ${c.targetDataset}.${c.targetColumn} ← ${c.sourceDataset}.${c.sourceColumn} (${c.expression?.slice(0, 120) ?? ''})${ref ? ` ${ref}` : ''}`);
     colCount++;
   }
   if (colCount === 0) out.push('(no column lineage)');
@@ -95,9 +96,13 @@ export function buildQuestionContext(args: {
     out.push('');
     out.push('Profiles:');
     for (const p of relProfiles) {
-      out.push(`- ${p.dataset}: rows=${p.rowCount}`);
+      const profileEvidence = evidence.find((e) => e.type === 'profiling' && e.dataset?.toLowerCase() === p.dataset.toLowerCase() && !e.column);
+      const profileRef = profileEvidence ? use(profileEvidence.id) : null;
+      out.push(`- ${p.dataset}: rows=${p.rowCount}${profileRef ? ` ${profileRef}` : ''}`);
       for (const c of p.columns.slice(0, 12)) {
-        out.push(`  - ${c.column} [${c.dataType}] null=${(c.nullRate * 100).toFixed(1)}% distinct=${(c.distinctRate * 100).toFixed(1)}%`);
+        const columnEvidence = evidence.find((e) => e.type === 'profiling' && e.dataset?.toLowerCase() === p.dataset.toLowerCase() && e.column?.toLowerCase() === c.column.toLowerCase());
+        const columnRef = columnEvidence ? use(columnEvidence.id) : null;
+        out.push(`  - ${c.column} [${c.dataType}] null=${(c.nullRate * 100).toFixed(1)}% distinct=${(c.distinctRate * 100).toFixed(1)}%${columnRef ? ` ${columnRef}` : ''}`);
       }
     }
   }
