@@ -263,11 +263,13 @@ function AppInner() {
     }
   };
 
-  const loadSession = async (key: string) => {
+  const loadSession = async (key: string, clearFirst = false) => {
     setError(undefined);
-    setCurrent(undefined);
-    setValue('');
-    setAttachmentsOpen(false);
+    if (clearFirst) {
+      setCurrent(undefined);
+      setValue('');
+      setAttachmentsOpen(false);
+    }
     const result = await getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`);
     if (key !== active) return;
     setCurrent(result);
@@ -306,7 +308,7 @@ function AppInner() {
 
   useEffect(() => {
     if (active) {
-      loadSession(active).catch((e) => setError(e.message));
+      loadSession(active, true).catch((e) => setError(e.message));
     } else {
       setCurrent(undefined);
     }
@@ -374,8 +376,24 @@ function AppInner() {
           body: JSON.stringify({ userPrompt: message }),
         });
         key = created.context.name;
-        setActive(key);
+        navigateToSession(key);
       }
+
+      // Show the user's message immediately. The agent request can take several
+      // seconds, so waiting for the server response before rendering it makes
+      // the composer look frozen.
+      setCurrent((existing) => existing ? {
+        ...existing,
+        messages: [
+          ...existing.messages,
+          {
+            id: `local-user-${Date.now()}`,
+            role: 'user',
+            content: message,
+            capturedAt: new Date().toISOString(),
+          },
+        ],
+      } : existing);
 
       const result = await getJson<{
         answer: string;
