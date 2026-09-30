@@ -6,6 +6,7 @@ import {
   discoveryDir,
   ensureWorkspace,
   workspaceRoot,
+  writeJsonAtomic,
   type WorkspaceContext,
 } from './workspace.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
@@ -51,9 +52,33 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
     scope: inv.scope,
     systems: inv.systems,
   });
-  inv.schemaVersion = 3;
-  inv.updatedAt = new Date().toISOString();
-  await fs.writeFile(contextFile(inv.name), JSON.stringify(inv, null, 2));
+
+  // Merge investigation-owned state into the latest workspace snapshot.
+  // Inputs/files may have been added while the agent was thinking; never
+  // overwrite those newer workspace inputs with an older in-memory snapshot.
+  const current = await loadWorkspaceContext(inv.name);
+  const next: Investigation = {
+    ...current,
+    schemaVersion: 3,
+    name: inv.name,
+    userPrompt: inv.userPrompt,
+    goal: inv.goal,
+    scope: inv.scope,
+    systems: inv.systems,
+    questions: inv.questions,
+    discoveryRuns: inv.discoveryRuns,
+    evidence: inv.evidence,
+    claims: inv.claims,
+    findings: inv.findings,
+    unknowns: inv.unknowns,
+    importantInformation: inv.importantInformation,
+    ...(inv.copilotSessionId ? { copilotSessionId: inv.copilotSessionId } : {}),
+    ...(typeof inv.copilotConfigurationVersion === 'number'
+      ? { copilotConfigurationVersion: inv.copilotConfigurationVersion }
+      : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeJsonAtomic(contextFile(inv.name), next);
   return contextFile(inv.name);
 }
 
