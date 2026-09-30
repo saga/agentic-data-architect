@@ -61,7 +61,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         name: 'lead-data-agent',
         description: 'Lead Data Agent for evidence-backed data modernization investigation and architecture analysis.',
         prompt: 'Act as the lead data agent. Follow the loaded Skills for investigation and domain-specific methodology. Do not invent enterprise facts.',
-        skills: input.skills ?? ['investigation-session', 'financial-data-review'],
+        skills: input.skills ?? config.copilotSkills,
       },
     ],
     agent: 'lead-data-agent',
