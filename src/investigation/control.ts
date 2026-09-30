@@ -83,7 +83,7 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
       name: String(item.name ?? '').trim(),
       version: Number(item.version ?? 1) || 1,
       enabled: item.enabled !== false,
-      type: item.type === 'http' ? 'http' : 'local',
+      type: (item.type === 'http' ? 'http' : 'local') as McpServerSetting['type'],
       ...(typeof item.command === 'string' && item.command.trim() ? { command: item.command.trim() } : {}),
       ...(Array.isArray(item.args) ? { args: item.args.filter((arg): arg is string => typeof arg === 'string') } : {}),
       ...(typeof item.url === 'string' && item.url.trim() ? { url: item.url.trim() } : {}),
@@ -168,7 +168,6 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       },
       skills: Array.isArray(agent.skills)
         ? agent.skills
-            .filter((item): item is { name?: unknown; version?: unknown } => Boolean(item) && typeof item === 'object')
             .map((item) => ({ name: String(item.name ?? '').trim(), version: Number(item.version ?? 1) || 1 }))
             .filter((item) => item.name)
         : defaults.agent.skills,
@@ -221,7 +220,6 @@ export async function updateInvestigationControl(
   const current = await loadInvestigationControl(name);
   const now = new Date().toISOString();
 
-  const currentSkills = new Map(current.agent.skills.map((item) => [item.name, item.version]));
   const nextSkills = next.agent.skills
     .map((item) => {
       const old = current.agent.skills.find((candidate) => candidate.name === item.name);
