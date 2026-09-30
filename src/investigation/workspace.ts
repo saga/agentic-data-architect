@@ -90,6 +90,7 @@ export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
+// Replace the target in one rename so readers never observe a half-written JSON document.
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   const directory = path.dirname(file);
   const temporary = path.join(directory, '.tmp-' + randomUUID() + '-' + path.basename(file));
@@ -98,6 +99,7 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
 }
 
 const contextWriteLocks = new Map<string, Promise<void>>();
+const sharedIndexWriteLocks = new Map<string, Promise<void>>();
 
 export async function withWorkspaceContextLock<T>(
   name: string,
@@ -257,6 +259,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
   return context;
 }
 
+// All context mutations must serialize against other mutations in the same session.
 export async function appendContextInput(
   name: string,
   input: Omit<WorkspaceInput, 'id' | 'capturedAt'> & { id?: string; capturedAt?: string },
@@ -288,20 +291,24 @@ export async function appendContextInput(
 }
 
 export async function addImportantInformation(name: string, information: string[]): Promise<void> {
-  const context = await loadWorkspaceContext(name);
-  for (const item of information) {
-    const value = item.trim();
-    if (value && !context.importantInformation.includes(value)) context.importantInformation.push(value);
-  }
-  context.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(contextFile(name), context);
+  await withWorkspaceContextLock(name, async () => {
+    const context = await loadWorkspaceContext(name);
+    for (const item of information) {
+      const value = item.trim();
+      if (value && !context.importantInformation.includes(value)) context.importantInformation.push(value);
+    }
+    context.updatedAt = new Date().toISOString();
+    await writeJsonAtomic(contextFile(name), context);
+  });
 }
 
 export async function setCopilotSessionId(name: string, sessionId: string): Promise<void> {
-  const context = await loadWorkspaceContext(name);
-  context.copilotSessionId = sessionId;
-  context.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(contextFile(name), context);
+  await withWorkspaceContextLock(name, async () => {
+    const context = await loadWorkspaceContext(name);
+    context.copilotSessionId = sessionId;
+    context.updatedAt = new Date().toISOString();
+    await writeJsonAtomic(contextFile(name), context);
+  });
 }
 
 export async function appendTranscript(name: string, role: 'user' | 'assistant' | 'system', content: string): Promise<void> {
@@ -312,17 +319,36 @@ export async function appendTranscript(name: string, role: 'user' | 'assistant' 
 }
 
 export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntry, 'updatedAt'>): Promise<void> {
-  await fs.mkdir(config.sharedDir, { recursive: true });
+  const previous = sharedIndexWriteLocks.get('shared') ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  sharedIndexWriteLocks.set('shared', queued);
+  await previous.catch(() => undefined);
+
   try {
-    await fs.access(sharedIndexFile());
-  } catch {
-    const index: SharedIndex = { schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() };
-    await fs.writeFile(sharedIndexFile(), JSON.stringify(index, null, 2));
+    await fs.mkdir(config.sharedDir, { recursive: true });
+    let raw: SharedIndex;
+    try {
+      raw = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')) as SharedIndex;
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+      raw = { schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() };
+    }
+
+    const artifacts = raw.artifacts.filter((item) => item.id !== entry.id);
+    artifacts.push({ ...entry, updatedAt: new Date().toISOString() });
+    await writeJsonAtomic(sharedIndexFile(), {
+      schemaVersion: 1,
+      artifacts,
+      updatedAt: new Date().toISOString(),
+    });
+  } finally {
+    release();
+    if (sharedIndexWriteLocks.get('shared') === queued) sharedIndexWriteLocks.delete('shared');
   }
-  const raw = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')) as SharedIndex;
-  const artifacts = raw.artifacts.filter((item) => item.id !== entry.id);
-  artifacts.push({ ...entry, updatedAt: new Date().toISOString() });
-  await fs.writeFile(sharedIndexFile(), JSON.stringify({ schemaVersion: 1, artifacts, updatedAt: new Date().toISOString() }, null, 2));
 }
 
 export async function addSharedDocument(
