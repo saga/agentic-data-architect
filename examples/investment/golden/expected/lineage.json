@@ -1,0 +1,17 @@
+{
+  "edges": [
+    ["ibor_position", "portfolio_position"],
+    ["security_price", "portfolio_position"],
+    ["legacy_position", "legacy_portfolio_value"],
+    ["legacy_price", "legacy_portfolio_value"],
+    ["raw_vendor_price", "price_master"],
+    ["portfolio_position", "portfolio_nav"]
+  ],
+  "columns": [
+    ["ibor_position.position_qty", "portfolio_position.market_value"],
+    ["security_price.close_price", "portfolio_position.market_value"],
+    ["legacy_position.pos_qty", "legacy_portfolio_value.mv_amt"],
+    ["legacy_price.px_adj", "legacy_portfolio_value.mv_amt"],
+    ["portfolio_position.market_value", "portfolio_nav.nav_value"]
+  ]
+}

@@ -1,61 +1,92 @@
 import fs from 'node:fs/promises';
+import { nextId, type EvidenceRef } from '../evidence/types.js';
+import { SqlglotParser, type ColumnLineage, type ParsedStatement } from './sql-parser.js';
 
 /**
- * Lineage L1（dataset 级，§十六 Level 1）：A → B → C。
- * 实现：正则提取 FROM/JOIN 源表 + 输出目标（CREATE VIEW/TABLE AS / INSERT INTO）。
- * L2 列级 / L3 变换语义是 V2 的事，这里只输出“表从哪来、到哪去”，LLM 负责解释。
+ * Lineage（AST 驱动，§十六）：L1 dataset + L2 column。
+ * 正则已删除。每个 statement 发射 sql_statement 证据，每条边发射 lineage 证据，
+ * 全部绑定 file + 行号 + 源 hash + discoveryRun，便于过期判定。
  */
 
 export interface DatasetEdge {
   source: string;
   target: string;
   viaFile: string;
+  evidenceId: string;
 }
 
 export interface LineageGraph {
   edges: DatasetEdge[];
   tables: string[];
+  columns: ColumnLineage[];
+  statements: ParsedStatement[];
+  evidence: EvidenceRef[];
 }
 
-const FROM_JOIN = /\b(?:from|join)\s+([a-zA-Z_][\w.]*)/gi;
-const CREATE_AS = /create\s+(?:or\s+replace\s+)?(?:view|table)\s+(?:if\s+not\s+exists\s+)?([a-zA-Z_][\w.]*)/i;
-const INSERT_INTO = /insert\s+(?:overwrite\s+)?(?:into\s+)?(?:table\s+)?([a-zA-Z_][\w.]*)/i;
+export interface LineageInput {
+  path: string;
+  sha256: string;
+  investigationId: string;
+  discoveryRunId: string;
+  dialect?: string;
+}
 
-export async function buildLineage(sqlFiles: string[]): Promise<LineageGraph> {
+export async function buildLineage(inputs: LineageInput[], parser = new SqlglotParser()): Promise<LineageGraph> {
   const edges: DatasetEdge[] = [];
   const tables = new Set<string>();
-  for (const file of sqlFiles) {
-    const sql = await fs.readFile(file, 'utf-8');
-    const target = extractTarget(sql) ?? fileLabel(file);
-    tables.add(target);
-    for (const src of extractSources(sql)) {
-      tables.add(src);
-      if (src.toLowerCase() !== target.toLowerCase()) {
-        edges.push({ source: src, target, viaFile: file });
+  const columns: ColumnLineage[] = [];
+  const statements: ParsedStatement[] = [];
+  const evidence: EvidenceRef[] = [];
+  const seenEdge = new Set<string>();
+
+  for (const input of inputs) {
+    const sql = await fs.readFile(input.path, 'utf-8');
+    const parsed = await parser.parseFile(input.path, sql, input.dialect);
+    for (const st of parsed) {
+      statements.push(st);
+      const stmtEvidence: EvidenceRef = {
+        id: nextId('ev'),
+        type: 'sql_statement',
+        investigationId: input.investigationId,
+        discoveryRunId: input.discoveryRunId,
+        source: `${input.path}:${st.lineStart}-${st.lineEnd}`,
+        file: input.path,
+        lineStart: st.lineStart,
+        lineEnd: st.lineEnd,
+        statement: sql.split('\n').slice(st.lineStart - 1, st.lineEnd).join('\n').slice(0, 2000),
+        ...(st.target ? { dataset: st.target } : {}),
+        sourceHash: input.sha256,
+        collectedAt: new Date().toISOString(),
+      };
+      evidence.push(stmtEvidence);
+
+      const target = st.target ?? `file:${input.path.split('/').pop()?.replace(/\.sql$/i, '')}`;
+      tables.add(target);
+      for (const src of st.sources) {
+        tables.add(src);
+        const key = `${src.toLowerCase()}→${target.toLowerCase()}`;
+        if (src.toLowerCase() === target.toLowerCase() || seenEdge.has(key)) continue;
+        seenEdge.add(key);
+        const edgeEvidence: EvidenceRef = {
+          id: nextId('ev'),
+          type: 'lineage',
+          investigationId: input.investigationId,
+          discoveryRunId: input.discoveryRunId,
+          source: `${src} → ${target} (${input.path}:${st.lineStart}-${st.lineEnd})`,
+          file: input.path,
+          lineStart: st.lineStart,
+          lineEnd: st.lineEnd,
+          dataset: target,
+          sourceHash: input.sha256,
+          collectedAt: new Date().toISOString(),
+        };
+        evidence.push(edgeEvidence);
+        edges.push({ source: src, target, viaFile: input.path, evidenceId: edgeEvidence.id });
+      }
+      for (const c of st.columns) {
+        columns.push({ ...c, targetDataset: target, statementId: st.id });
       }
     }
   }
-  return { edges, tables: [...tables].sort() };
-}
-
-function extractTarget(sql: string): string | null {
-  return CREATE_AS.exec(sql)?.[1] ?? INSERT_INTO.exec(sql)?.[1] ?? null;
-}
-
-function extractSources(sql: string): string[] {
-  const out = new Set<string>();
-  for (const m of sql.matchAll(FROM_JOIN)) {
-    const name = m[1]?.replace(/;$/, '');
-    if (name && !isKeyword(name)) out.add(name);
-  }
-  return [...out];
-}
-
-function isKeyword(name: string): boolean {
-  return /^(select|where|lateral|unnest)$/i.test(name);
-}
-
-function fileLabel(file: string): string {
-  const base = file.split('/').pop() ?? file;
-  return `file:${base.replace(/\.sql$/i, '')}`;
+  return { edges, tables: [...tables].sort(), columns, statements, evidence };
 }

@@ -1,22 +1,27 @@
 {
   "name": "agentic-data-architect",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Evidence-backed Data Modernization Workbench (V1: Current-State Discovery). See docs/architecture_0930.md",
   "scripts": {
+    "init": "tsx src/cli.ts init",
     "discover": "tsx src/cli.ts discover",
     "ask": "tsx src/cli.ts ask",
     "report": "tsx src/cli.ts report",
-    "init": "tsx src/cli.ts init",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"tests/**/*.test.ts\"",
+    "build": "tsc"
   },
   "dependencies": {
     "@github/copilot-sdk": "^1.0.15",
-    "dotenv": "^18.0.4"
+    "dotenv": "^18.0.4",
+    "pg": "^8.23.0",
+    "snowflake-sdk": "^3.3.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },

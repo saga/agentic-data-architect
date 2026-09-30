@@ -1,3 +1,21 @@
+# 当前实现状态（V1.1）
+
+已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
+（文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
+（PostgreSQL/Snowflake）、真实 profiling、确定性 findings（含金融审查清单）、
+结构化 Agent 结果（含状态校正）、按问题检索证据、golden benchmark + CI。
+
+V1.1 优先完成（本节是对照清单，做完即勾）：
+1. Evidence provenance ✓ 2. SQL AST / column lineage ✓ 3. Estate Graph ✓
+4. 只读 database adapter ✓ 5. targeted profiling ✓ 6. findings/conflicts ✓
+7. 结构化 Agent 结果 ✓ 8. evaluation ✓
+
+V2 做 Semantic / Source-to-Target / Target Architecture。
+V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
+详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
+
+---
+
 我看了 `saga/agentic-data-architect` 当前仓库。现在 `main` 基本还是一个空项目：只有 `README.md` 和 `.gitignore`，所以这次不需要围绕现有代码做妥协，可以直接把产品边界和核心模型定下来。
 
 我还针对 8 个方向做了资料检索，并重点核查了 AWS、EY、Databricks、dbt、Snowflake、OpenLineage、EDM Council/FIBO，以及投资管理领域的 Security Master、IBOR、point-in-time 数据实践。比较明显的一条主线是：

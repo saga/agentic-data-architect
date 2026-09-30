@@ -55,28 +55,28 @@ def base_sources(statement: exp.Expression) -> list:
     return out
 
 
+def alias_of(node: exp.Expression) -> str:
+    """Table / Alias 节点上带的别名（sqlglot 30 把表别名存在 Table.args 里）。"""
+    alias = node.args.get("alias")
+    if alias is None:
+        return ""
+    if isinstance(alias, exp.Expression):
+        return alias.alias_or_name or alias.name or ""
+    return str(alias)
+
+
 def alias_map(query: exp.Expression) -> dict:
-    """FROM/JOIN 中的别名 -> 真实表名或 CTE 名。"""
+    """FROM/JOIN 中的别名 -> 真实表名。只收本查询层级的，避免子查询污染外层。"""
     mapping = {}
-    for scope in (query.args.get("from"),):
-        pass
-    for from_ in query.find_all(exp.From):
-        for src in from_.find_all(exp.Table):
-            parent_alias = src.find_ancestor(exp.Alias)
-            name = table_name(src)
-            if parent_alias:
-                mapping[parent_alias.alias_or_name.lower()] = name
-            if src.name:
-                mapping.setdefault(src.name.lower(), name)
-    for join in query.find_all(exp.Join):
-        for src in join.find_all(exp.Table):
-            parent_alias = src.find_ancestor(exp.Alias)
-            name = table_name(src)
-            if parent_alias:
-                mapping[parent_alias.alias_or_name.lower()] = name
-            if src.name:
-                mapping.setdefault(src.name.lower(), name)
-    # CTE 引用本身：FROM cte 名（无 Table 节点时补上，保持小写原名）
+    for table in query.find_all(exp.Table):
+        if _scope_of(table) is not query:
+            continue
+        name = table_name(table)
+        alias = alias_of(table)
+        if alias:
+            mapping[alias.lower()] = name
+        if table.name:
+            mapping.setdefault(table.name.lower(), name)
     return mapping
 
 
@@ -84,6 +84,37 @@ def resolve_cte(statement: exp.Expression) -> dict:
     mapping = {}
     for cte in statement.find_all(exp.CTE):
         mapping[cte.alias_or_name.lower()] = cte.this
+    return mapping
+
+
+from typing import Optional
+
+
+def _scope_of(node: exp.Expression) -> Optional[exp.Expression]:
+    """节点所属的最近查询层（Select / Union），派生表归属判定用。"""
+    parent = node.parent
+    while parent is not None:
+        if isinstance(parent, (exp.Select, exp.Union)):
+            return parent
+        parent = parent.parent
+    return None
+
+
+def subquery_map(query: exp.Expression) -> dict:
+    """FROM/JOIN 里的派生表别名 -> 子查询 Select（只收本查询层级的）。"""
+    mapping = {}
+    for from_ in list(query.find_all(exp.From)) + list(query.find_all(exp.Join)):
+        if _scope_of(from_) is not query:
+            continue
+        for sub in from_.find_all(exp.Subquery, exp.Alias):
+            if _scope_of(sub) is not query:
+                continue
+            inner = sub.args.get("this")
+            if not isinstance(inner, (exp.Select, exp.Union)):
+                continue
+            name = alias_of(sub)
+            if name:
+                mapping[name.lower()] = inner
     return mapping
 
 
@@ -100,19 +131,20 @@ def query_outputs(query: exp.Expression, ctes: dict, depth: int = 0) -> list:
     if not isinstance(query, exp.Select):
         return outputs
     aliases = alias_map(query)
+    derived = subquery_map(query)
     for proj in selects:
         if isinstance(proj, exp.Star):
-            outputs.append({"name": "*", "refs": star_refs(query, aliases, ctes, depth), "expr": proj.sql()})
+            outputs.append({"name": "*", "refs": star_refs(query, aliases, ctes, derived, depth), "expr": proj.sql()})
             continue
         name = proj.alias_or_name or f"col_{len(outputs)}"
         refs = []
         for col in proj.find_all(exp.Column):
-            refs.extend(resolve_column(col, aliases, ctes, depth))
+            refs.extend(resolve_column(col, aliases, ctes, derived, depth))
         outputs.append({"name": name, "refs": refs, "expr": proj.sql()})
     return outputs
 
 
-def star_refs(query, aliases, ctes, depth):
+def star_refs(query, aliases, ctes, derived, depth):
     tables = {table_name(t).lower(): table_name(t) for t in query.find_all(exp.Table)}
     refs = []
     for alias, real in aliases.items():
@@ -120,6 +152,8 @@ def star_refs(query, aliases, ctes, depth):
         if key in ctes and depth < 8:
             for o in query_outputs(ctes[key], ctes, depth + 1):
                 refs.append({"table": real, "column": o["name"]})
+        elif derived_columns(derived, real, depth, ctes):
+            refs.extend(derived_columns(derived, real, depth, ctes))
         elif key in tables or real:
             refs.append({"table": real, "column": "*"})
     for key, real in tables.items():
@@ -128,12 +162,29 @@ def star_refs(query, aliases, ctes, depth):
     return refs
 
 
-def resolve_column(col: exp.Column, aliases: dict, ctes: dict, depth: int) -> list:
+def derived_columns(derived: dict, real: str, depth: int, ctes: dict) -> list:
+    if real.lower() in derived and depth < 8:
+        return [
+            {"table": real, "column": o["name"]}
+            for o in query_outputs(derived[real.lower()], ctes, depth + 1)
+        ]
+    return []
+
+
+def resolve_column(col: exp.Column, aliases: dict, ctes: dict, derived: dict, depth: int) -> list:
     qualifier = (col.table or "").lower()
     col_name = col.name
     real = aliases.get(qualifier, qualifier) if qualifier else ""
     if real.lower() in ctes and depth < 8:
         inner = query_outputs(ctes[real.lower()], ctes, depth + 1)
+        matched = [o for o in inner if o["name"].lower() == col_name.lower()]
+        picked = matched or inner
+        refs = []
+        for o in picked:
+            refs.extend(o["refs"] or [{"table": real, "column": o["name"]}])
+        return refs
+    if real.lower() in derived and depth < 8:
+        inner = query_outputs(derived[real.lower()], ctes, depth + 1)
         matched = [o for o in inner if o["name"].lower() == col_name.lower()]
         picked = matched or inner
         refs = []
@@ -181,6 +232,9 @@ def analyze_statement(statement: exp.Expression) -> dict:
     query = inner if isinstance(inner, (exp.Select, exp.Union)) else (
         statement if kind == "select" else None)
     ctes = resolve_cte(statement)
+    target_lower = (target or "").lower()
+    # 目标表本身也是 exp.Table 节点，必须排除，否则出现 v -> v 自环
+    sources = [s for s in base_sources(statement) if s.lower() != target_lower]
     columns = []
     if query is not None:
         for o in query_outputs(query, ctes):
@@ -196,24 +250,17 @@ def analyze_statement(statement: exp.Expression) -> dict:
     return {
         "target": target,
         "kind": kind,
-        "sources": base_sources(statement),
+        "sources": sources,
         "columns": columns,
         "sql": statement.sql(),
     }
 
 
-def main() -> None:
-    try:
-        payload = json.load(sys.stdin)
-    except Exception as e:
-        print(json.dumps({"statements": [], "error": f"bad stdin: {e}"}))
-        return
-    sql, dialect = payload.get("sql", ""), payload.get("dialect")
+def parse_one(sql: str, dialect) -> dict:
     try:
         parsed = sqlglot.parse(sql, read=dialect) if dialect else sqlglot.parse(sql)
     except Exception as e:
-        print(json.dumps({"statements": [], "error": f"parse failed: {e}"}))
-        return
+        return {"statements": [], "error": f"parse failed: {e}"}
     out = []
     for stmt in parsed:
         if stmt is None:
@@ -222,7 +269,24 @@ def main() -> None:
             out.append(analyze_statement(stmt))
         except Exception:
             continue
-    print(json.dumps({"statements": out, "error": None}))
+    return {"statements": out, "error": None}
+
+
+def main() -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except Exception as e:
+        print(json.dumps({"statements": [], "error": f"bad stdin: {e}"}))
+        return
+    if "batch" in payload:
+        results = [
+            parse_one(item.get("sql", ""), item.get("dialect"))
+            for item in payload["batch"]
+        ]
+        print(json.dumps({"results": results}))
+        return
+    sql, dialect = payload.get("sql", ""), payload.get("dialect")
+    print(json.dumps(parse_one(sql, dialect)))
 
 
 if __name__ == "__main__":
