@@ -1,7 +1,13 @@
+/**
+ * 应用运行时配置。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import 'dotenv/config';
 import path from 'node:path';
 import * as z from 'zod';
 
+/** 运行时环境变量 Schema；把字符串环境变量在服务启动时一次性转换成可靠类型。 */
 const EnvSchema = z.object({
   WORKSPACE_DIR: z.string().default('.workspace'),
   DATA_DIR: z.string().default('.data'),
@@ -15,9 +21,11 @@ const EnvSchema = z.object({
   NODE_ENV: z.string().min(1).default('development'),
 });
 
+// 这里是整个服务的唯一运行时配置输入源，后续模块不直接读取 process.env。
 const envConfig = EnvSchema.parse(process.env);
 const copilotSkills = envConfig.COPILOT_SKILLS.split(',').map((skill) => skill.trim()).filter(Boolean);
 
+/** 全局不可变运行配置。业务代码只消费这里的解析结果，不自行解析环境变量。 */
 export const config = {
   workspaceDir: path.resolve(envConfig.WORKSPACE_DIR),
   sharedDir: path.resolve(envConfig.WORKSPACE_DIR, 'shared'),
