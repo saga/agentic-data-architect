@@ -197,7 +197,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     history: Array.isArray(raw.history)
       ? raw.history.filter((item): item is InvestigationControl['history'][number] => Boolean(item) && typeof item === 'object')
       : [],
-  };
+  });
 }
 
 export async function loadInvestigationControl(name: string): Promise<InvestigationControl> {
