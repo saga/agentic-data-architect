@@ -2,7 +2,7 @@ import { assertReadOnly, type DatabaseAdapter } from '../adapters/database.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 
 /**
- * Targeted Query（§十四）：Agent 先产 query plan → 确定性校验 → 只读执行 → 证据。
+ * Targeted Query：Agent 先产 query plan → 确定性校验 → 只读执行 → 证据。
  * 不是让 LLM 直连数据库。
  */
 
@@ -13,11 +13,13 @@ export interface QueryPlan {
   expectedEvidence: string[];
 }
 
-/** 校验：只读 + 单条 + 必须提到目标 dataset。 */
+/** 校验：只读 + 单条 + 必须引用目标表名。 */
 export function validateQueryPlan(plan: QueryPlan): void {
   assertReadOnly(plan.sql);
   const table = (plan.dataset.split('.').pop() ?? '').replace(/^"|"$/g, '');
-  if (!table || !new RegExp('(?<![A-Za-z0-9_$])' + table.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\  if (!plan.sql.toLowerCase().includes(plan.dataset.toLowerCase().split('.').pop() as string)) {') + '(?![A-Za-z0-9_$])', 'i').test(plan.sql)) {
+  const escaped = table.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
+  const tablePattern = escaped ? new RegExp('(?<![A-Za-z0-9_$])' + escaped + '(?![A-Za-z0-9_$])', 'i') : null;
+  if (!tablePattern || !tablePattern.test(plan.sql)) {
     throw new Error(`查询没有引用目标表 ${plan.dataset}，拒绝执行：${plan.sql.slice(0, 120)}`);
   }
 }
