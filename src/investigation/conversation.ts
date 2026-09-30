@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
+import type { WorkspaceInput } from './workspace.js';
 
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
@@ -164,7 +165,7 @@ export function listConversationMessages(
     WHERE session_name = ?
     ORDER BY id DESC
     LIMIT ?
-  `).all(sessionName, safeLimit) as MessageRow[];
+  `).all(sessionName, safeLimit) as unknown as MessageRow[];
 
   return rows.reverse().map(toMessage);
 }
@@ -204,7 +205,7 @@ export function searchConversation(
       ${beforeClause}
     ORDER BY score ASC, m.id DESC
     LIMIT ?
-  `).all(...params) as MessageRow[];
+  `).all(...params) as unknown as MessageRow[];
 
   return rows.map((row) => ({
     ...toMessage(row),
@@ -227,18 +228,8 @@ export function getConversationSummary(sessionName: string): ConversationSummary
 
 export function migrateLegacyConversationInputs(
   sessionName: string,
-  inputs: Array<{
-    id: string;
-    kind: string;
-    capturedAt: string;
-    title: string;
-    content?: string;
-    source?: string;
-    uri?: string;
-    artifactPath?: string;
-    important?: boolean;
-  }>,
-): Array<typeof inputs[number]> {
+  inputs: WorkspaceInput[],
+): WorkspaceInput[] {
   const legacyMessages = inputs.filter(
     (input) =>
       (input.kind === 'question' || input.kind === 'user_message' || input.kind === 'assistant_message') &&
