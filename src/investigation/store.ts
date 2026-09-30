@@ -51,7 +51,7 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
     scope: inv.scope,
     systems: inv.systems,
   });
-  inv.schemaVersion = 2;
+  inv.schemaVersion = 3;
   inv.updatedAt = new Date().toISOString();
   await fs.writeFile(contextFile(inv.name), JSON.stringify(inv, null, 2));
   return contextFile(inv.name);
