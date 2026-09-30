@@ -96,11 +96,12 @@ export async function answerQuestion(
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
     ].filter(Boolean).join('\n\n'),
-    sessionId: inv.copilotSessionId,
+    sessionId: inv.copilotConfigurationVersion === control.version ? inv.copilotSessionId : undefined,
     onSessionId: (sessionId) => {
       if (sessionId !== inv.copilotSessionId) {
         inv.copilotSessionId = sessionId;
       }
+      inv.copilotConfigurationVersion = control.version;
     },
     workingDirectory: workspaceRoot(inv.name),
     skills: control.agent.skills.map((item) => item.name),
