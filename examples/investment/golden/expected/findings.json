@@ -1,8 +1,5 @@
 {
   "findingTypes": [
-    "multiple_sources_of_truth",
-    "identifier_fragmentation",
-    "semantic_conflict",
-    "temporal_risk"
+    "semantic_conflict"
   ]
 }
