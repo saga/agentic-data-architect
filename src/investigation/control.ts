@@ -41,6 +41,7 @@ export interface InvestigationControl {
     skills: Array<{
       name: string;
       version: number;
+      sourceHash?: string;
     }>;
     mcpServers: McpServerSetting[];
   };
@@ -90,6 +91,15 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
       ...(Array.isArray(item.tools) ? { tools: item.tools.filter((tool): tool is string => typeof tool === 'string') } : {}),
     }))
     .filter((item) => item.name);
+}
+
+async function skillSourceHash(name: string): Promise<string | undefined> {
+  try {
+    const content = await fs.readFile(path.join(config.skillsDir, name, 'SKILL.md'));
+    return (await import('node:crypto')).createHash('sha256').update(content).digest('hex');
+  } catch {
+    return undefined;
+  }
 }
 
 function defaultControl(): Omit<InvestigationControl, 'history'> {
@@ -168,7 +178,13 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       },
       skills: Array.isArray(agent.skills)
         ? agent.skills
-            .map((item) => ({ name: String(item.name ?? '').trim(), version: Number(item.version ?? 1) || 1 }))
+            .map((item) => ({
+              name: String(item.name ?? '').trim(),
+              version: Number(item.version ?? 1) || 1,
+              ...(typeof (item as { sourceHash?: unknown }).sourceHash === 'string'
+                ? { sourceHash: (item as { sourceHash: string }).sourceHash }
+                : {}),
+            }))
             .filter((item) => item.name)
         : defaults.agent.skills,
       mcpServers: normalizeMcpServers(agent.mcpServers),
@@ -220,16 +236,18 @@ export async function updateInvestigationControl(
   const current = await loadInvestigationControl(name);
   const now = new Date().toISOString();
 
-  const nextSkills = next.agent.skills
-    .map((item) => {
+  const nextSkills = await Promise.all(next.agent.skills
+    .map(async (item) => {
       const old = current.agent.skills.find((candidate) => candidate.name === item.name);
-      const semanticChange = !old;
+      const sourceHash = await skillSourceHash(item.name);
+      const changed = Boolean(old && old.sourceHash && sourceHash && old.sourceHash !== sourceHash);
       return {
         name: item.name.trim(),
-        version: semanticChange ? 1 : old.version,
+        version: old ? old.version + (changed ? 1 : 0) : 1,
+        ...(sourceHash ? { sourceHash } : {}),
       };
-    })
-    .filter((item) => item.name);
+    }))
+    .then((items) => items.filter((item) => item.name));
 
   const currentMcp = new Map(current.agent.mcpServers.map((item) => [item.name, item]));
   const nextMcp = normalizeMcpServers(next.agent.mcpServers).map((item) => {
