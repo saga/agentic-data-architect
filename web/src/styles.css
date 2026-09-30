@@ -178,3 +178,26 @@ body {
   display: grid;
   gap: 8px;
 }
+
+
+.sider-tip { margin: 0 4px 12px; }
+
+.topbar-title { min-width: 0; overflow: hidden; }
+
+.topbar-title .ant-typography { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.composer-files { display: grid; gap: 6px; padding: 0 2px 8px; }
+
+.activity-item { display: grid; gap: 2px; padding-bottom: 7px; border-bottom: 1px solid #f0f0f0; }
+
+.activity-item:last-child { border-bottom: 0; padding-bottom: 0; }
+
+.modal-tip { margin-top: 14px; }
+
+.audit-version { margin-top: 6px; margin-inline-start: 0; }
+
+.settings-modal .ant-modal-body { max-height: 70vh; overflow: auto; }
+
+.ant-tabs-content { min-height: 0; }
+
+@media (max-width: 1100px) { .context-panel { width: 300px; } .topbar .ant-space { gap: 6px !important; } }
