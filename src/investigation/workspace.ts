@@ -4,6 +4,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
 import {
+  SharedIndexSchema,
   WorkspaceContextSchema,
   type WorkspaceContext,
   type WorkspaceInput,
@@ -183,10 +184,11 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
           scope: context.scope,
           systems: context.systems,
         }, null, 2),
-        important: true,
+          important: true,
       });
     }
-    await writeJsonAtomic(fp, context);
+    const validatedContext = WorkspaceContextSchema.parse(context);
+    await writeJsonAtomic(fp, validatedContext);
     await fs.writeFile(transcriptFile(name), '# Investigation Session ' + name + '\n\n');
     return root;
   }
@@ -293,7 +295,7 @@ export async function registerSharedArtifact(entry: Omit<SharedArtifactIndexEntr
   await withSharedIndexWriteLock(async () => {
     await fs.mkdir(config.sharedDir, { recursive: true });
     await ensureSharedIndexFile();
-    const raw = JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')) as SharedIndex;
+    const raw = SharedIndexSchema.parse(JSON.parse(await fs.readFile(sharedIndexFile(), 'utf-8')));
     const artifacts = raw.artifacts.filter((item) => item.id !== entry.id);
     artifacts.push({ ...entry, updatedAt: new Date().toISOString() });
     await writeJsonAtomic(sharedIndexFile(), {
