@@ -97,6 +97,10 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 
 export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
+
+  // This application intentionally uses Copilot's default agent. The project
+  // config controls reusable Skills; custom agents are only needed when we
+  // introduce genuinely different agent roles.
   const availableSkillNames = await listSkillNames();
   const selectedSkillNames = new Set(input.skills ?? config.copilotSkills);
   const disabledSkills = availableSkillNames.filter((name) => !selectedSkillNames.has(name));
@@ -111,6 +115,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
+  // A Copilot session is runtime context only. Investigation state and turn
+  // lifecycle remain owned by our workspace/SQLite layers.
   const session = input.sessionId
     ? await resumeOrCreate(c, input.sessionId, sessionConfig)
     : await c.createSession(sessionConfig);
@@ -150,6 +156,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const offToolComplete = session.on('tool.execution_complete', () => {
     input.onStatus?.('Thinking…');
   });
+  // These events are UI status signals, not model chain-of-thought. Keep them
+  // operational so the browser never receives hidden reasoning text.
   const offPermission = session.on('permission.requested', () => {
     input.onStatus?.('Waiting for approval…');
   });
