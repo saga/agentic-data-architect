@@ -1,3 +1,17 @@
+## 2026-09-30 — Review follow-up
+
+在第一轮审查修改后，CI 又暴露了两个 TypeScript 类型问题，已在 main 修正并通过最新 CI。随后继续做了运行时安全和性能检查：
+
+- `src/adapters/postgres.ts` / `src/adapters/snowflake.ts`：profiling 收敛为每表一次聚合 + 一次小样本。
+- `src/discovery/database.ts`：使用 `profileDataset` 保存表级和列级 profiling evidence。
+- `src/analysis/query.ts`：target dataset 匹配改成标识符边界匹配。
+- `src/adapters/database.ts`：拒绝 SELECT FOR UPDATE / FOR SHARE / SELECT INTO；数据库查询结果统一设上限。
+- `tests/query.test.ts`：增加目标表误匹配回归测试。
+- `tests/scanner-profiling.test.ts`：增加锁定查询和 SELECT INTO 回归测试。
+
+最新 main 的 GitHub Actions CI 已通过 typecheck + test。
+
+---
 # Changelog
 
 ## 2026-09-30 — V1.1 全仓审查与可靠性修正
