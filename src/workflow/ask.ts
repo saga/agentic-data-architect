@@ -4,13 +4,9 @@ import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
-import { appendContextInput, workspaceRoot } from '../investigation/workspace.js';
+import { appendContextInput, appendTranscript, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 
-/**
- * answerQuestion：瘦 CLI 背后的问答逻辑。
- * 每个问题都进入 workspace/context.json，并使用 workspace 作为 Agent working directory。
- */
 export interface AnswerSummary {
   answer: string;
   claimIds: string[];
@@ -18,15 +14,20 @@ export interface AnswerSummary {
   unknowns: string[];
 }
 
-export async function answerQuestion(investigationName: string, question: string): Promise<AnswerSummary> {
+export async function answerQuestion(
+  investigationName: string,
+  question: string,
+  onDelta?: (delta: string) => void,
+): Promise<AnswerSummary> {
   const inv = await loadInvestigation(investigationName);
   await appendContextInput(investigationName, {
     kind: 'question',
     title: question,
     content: question,
-    source: 'agentic-data-architect ask',
+    source: 'agentic-data-architect',
     important: true,
   });
+  await appendTranscript(investigationName, 'user', question);
 
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
@@ -49,8 +50,8 @@ export async function answerQuestion(investigationName: string, question: string
   const raw = await askCopilot({
     prompt,
     systemPrompt: LEAD_SYSTEM_PROMPT,
-    // Agent 的实际工作目录是可持久化 workspace，不污染 investigation.json。
     workingDirectory: workspaceRoot(inv.name),
+    onDelta,
   });
   const parsed = parseAgentAnswer(raw, existingIds);
   const claims = toClaims(parsed, () => nextId('c'));
@@ -59,9 +60,20 @@ export async function answerQuestion(investigationName: string, question: string
   for (const u of parsed.unknowns) {
     if (!inv.unknowns.includes(u)) inv.unknowns.push(u);
   }
+
+  const answer = parsed.answer || raw.slice(0, 2000);
+  await appendContextInput(investigationName, {
+    kind: 'assistant_message',
+    title: 'Agent answer',
+    content: answer,
+    source: 'agentic-data-architect',
+    artifactPath: 'transcript.md',
+  });
+  await appendTranscript(investigationName, 'assistant', answer);
   await saveInvestigation(inv);
+
   return {
-    answer: parsed.answer || raw.slice(0, 2000),
+    answer,
     claimIds: claims.map((c) => `${c.id}[${c.status}]`),
     warnings: parsed.warnings,
     unknowns: parsed.unknowns,
