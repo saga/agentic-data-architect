@@ -271,6 +271,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnStage, setTurnStage] = useState<'idle' | 'starting' | 'analyzing' | 'generating' | 'committing'>('idle');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -445,6 +446,7 @@ function AppInner() {
 
     setValue('');
     setLoading(true);
+    setTurnStage('starting');
     setError(undefined);
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
@@ -498,7 +500,12 @@ function AppInner() {
       } | undefined;
 
       await consumeSse(response, ({ event, data }) => {
+        if (event === 'started') {
+          setTurnStage('analyzing');
+          return;
+        }
         if (event === 'delta') {
+          setTurnStage('generating');
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
             ? { ...currentAnswer, content: currentAnswer.content + delta }
@@ -515,6 +522,7 @@ function AppInner() {
 
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
+      setTurnStage('committing');
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
@@ -531,6 +539,7 @@ function AppInner() {
       }
     } finally {
       setStreamingAnswer(undefined);
+      setTurnStage('idle');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
@@ -711,7 +720,15 @@ function AppInner() {
               </Text>
             </div>
             <Space>
-              <Tag className="workspace-status" bordered={false}>Ready</Tag>
+              <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
+                {loading
+                  ? turnStage === 'starting' ? 'Starting agent…'
+                  : turnStage === 'analyzing' ? 'Analyzing…'
+                  : turnStage === 'generating' ? 'Generating answer…'
+                  : turnStage === 'committing' ? 'Saving results…'
+                  : 'Working…'
+                  : 'Ready'}
+              </Tag>
               {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
@@ -813,6 +830,18 @@ function AppInner() {
               <Card size="small" className="error-card">
                 <Text type="danger">{error}</Text>
               </Card>
+            ) : null}
+
+            {loading ? (
+              <div className="agent-turn-status">
+                <LoadingOutlined spin />
+                <Text type="secondary">
+                  {turnStage === 'starting' ? 'Agent is starting…'
+                    : turnStage === 'analyzing' ? 'Agent is analyzing the evidence and context…'
+                    : turnStage === 'generating' ? 'Agent is generating the answer…'
+                    : 'Agent is saving the result…'}
+                </Text>
+              </div>
             ) : null}
 
             <div className="composer">
