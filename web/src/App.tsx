@@ -1098,33 +1098,15 @@ function AppInner() {
               },
               {
                 key: 'agent',
-                label: <span><ToolOutlined /> Agent</span>,
+                label: <span><ToolOutlined /> Skills & guidance</span>,
                 children: (
                   <div className="settings-page">
                     <div className="settings-page-header">
-                      <Title level={4}>Agent behavior</Title>
+                      <Title level={4}>Skills & guidance</Title>
                       <Paragraph type="secondary">
-                        Choose reusable capabilities and add investigation-specific guidance.
+                        Select reusable Skills and add investigation-specific guidance.
                       </Paragraph>
                     </div>
-
-                    <Card className="settings-card" title="Active Agent">
-                      <div className="agent-profile">
-                        <div className="agent-profile-title">
-                          <div>
-                            <Text strong>Lead Data Agent</Text>
-                            <div>
-                              <Text type="secondary">Evidence-backed data discovery and architecture analysis</Text>
-                            </div>
-                          </div>
-                          <Tag color="blue">Built-in</Tag>
-                        </div>
-                        <Paragraph type="secondary" className="agent-profile-description">
-                          The lead agent coordinates the investigation, reasons over verified evidence, uses the selected Skills,
-                          and produces evidence-linked claims. It is not a separate tool or knowledge source.
-                        </Paragraph>
-                      </div>
-                    </Card>
 
                     <Card className="settings-card" title="Skills">
                       <Flex justify="space-between" align="center" className="settings-card-heading">
@@ -1132,7 +1114,7 @@ function AppInner() {
                         <Tag>versioned</Tag>
                       </Flex>
                       <Paragraph type="secondary">
-                        Skills are reusable task modules. Each Skill can provide instructions, scripts and reference material to the Agent.
+                        Skills are independent, reusable task modules. Enable the ones this investigation should have available.
                       </Paragraph>
                       <Select
                         mode="multiple"
