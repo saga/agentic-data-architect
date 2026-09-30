@@ -91,6 +91,7 @@ interface InvestigationControl {
       args?: string[];
       url?: string;
       tools?: string[];
+      headers?: Record<string, string>;
     }>;
   };
   history: Array<{
@@ -232,6 +233,9 @@ function parseMcpJson(value: string): InvestigationControl['agent']['mcpServers'
       ...(Array.isArray(server.args) ? { args: server.args.filter((item): item is string => typeof item === 'string') } : {}),
       ...(typeof server.url === 'string' ? { url: server.url } : {}),
       ...(Array.isArray(server.tools) ? { tools: server.tools.filter((item): item is string => typeof item === 'string') } : {}),
+      ...(server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)
+        ? { headers: Object.fromEntries(Object.entries(server.headers).filter(([key, value]) => typeof key === 'string' && typeof value === 'string')) }
+        : {}),
     };
   });
 }
