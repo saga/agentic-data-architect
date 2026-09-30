@@ -15,6 +15,48 @@ V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
 
 ---
+## 当前交互与 Workspace
+
+V1.1 现在不是一次性 CLI pipeline，而是持续 Investigation session：
+
+```text
+npm run start
+   ↓
+持续 session
+   ↓
+用户补充目标 / 上下文 / 文档 / GitHub URL
+   ↓
+Agent 分析
+   ↓
+用户继续提问 / 补充 / 纠正方向
+   ↓
+继续分析
+```
+
+默认 workspace：
+
+```text
+.workspace/
+  shared/
+    index.json
+    confluence/
+    github/
+    leanix/
+    web/
+    document/
+  <session-name>/
+    context.json
+    transcript.md
+    discovery/
+    reports/
+    artifacts/
+```
+
+`.workspace/<session-name>/context.json` 是当前 Investigation 的主要状态入口。跨 session 可以复用的研究资料统一放在 `.workspace/shared/`，例如 Confluence 页面保存在 `.workspace/shared/confluence/`，并登记到 `.workspace/shared/index.json`。
+
+研究流程尽量由 SKILL 定义；确定性事实通过现有 TypeScript / JavaScript / Python 工具执行，不在 prompt 里硬编码一套会漂移的操作说明。
+
+---
 
 早期设计阶段的仓库很小，但当前 `main` 已经完成 V1.1 Current-State Discovery 可靠闭环。后续设计必须以当前实现为基线，而不是继续按最初的 skeleton 假设来设计。
 
