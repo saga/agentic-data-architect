@@ -29,7 +29,7 @@ import {
   loadWorkspaceContext,
   workspaceRoot,
 } from './investigation/workspace.js';
-import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
+import { investigationExists, newInvestigation, saveInvestigation, loadLatestSnapshot } from './investigation/store.js';
 import {
   closeConversationStore,
   recoverRunningConversationTurns,
@@ -180,6 +180,7 @@ app.post('/api/sessions', async (req, res) => {
   app.get('/api/sessions/:name', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
+    const snapshot = await loadLatestSnapshot<any>(name);
     const conversation = getConversationSummary(name);
     res.json({
       context,
@@ -188,6 +189,8 @@ app.post('/api/sessions', async (req, res) => {
       messages: listConversationMessages(name, 200),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
+      currentState: snapshot?.currentState ?? null,
+      semanticAssets: snapshot?.semanticAssets ?? [],
     });
   });
 
