@@ -16,7 +16,7 @@ V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 
 ---
 
-我看了 `saga/agentic-data-architect` 当前仓库。现在 `main` 基本还是一个空项目：只有 `README.md` 和 `.gitignore`，所以这次不需要围绕现有代码做妥协，可以直接把产品边界和核心模型定下来。
+早期设计阶段的仓库很小，但当前 `main` 已经完成 V1.1 Current-State Discovery 可靠闭环。后续设计必须以当前实现为基线，而不是继续按最初的 skeleton 假设来设计。
 
 我还针对 8 个方向做了资料检索，并重点核查了 AWS、EY、Databricks、dbt、Snowflake、OpenLineage、EDM Council/FIBO，以及投资管理领域的 Security Master、IBOR、point-in-time 数据实践。比较明显的一条主线是：
 
