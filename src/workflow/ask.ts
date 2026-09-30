@@ -96,7 +96,9 @@ export async function answerQuestion(
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
     ].filter(Boolean).join('\n\n'),
-    sessionId: inv.copilotConfigurationVersion === control.version ? inv.copilotSessionId : undefined,
+    ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId
+      ? { sessionId: inv.copilotSessionId }
+      : {}),
     onSessionId: (sessionId) => {
       if (sessionId !== inv.copilotSessionId) {
         inv.copilotSessionId = sessionId;
