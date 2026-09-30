@@ -51,6 +51,20 @@ export interface AskInput {
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
   onSessionId?: (sessionId: string) => void;
+  turnId?: string;
+}
+
+const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
+
+export async function abortCopilotTurn(turnId: string): Promise<boolean> {
+  const active = activeSessions.get(turnId);
+  if (!active) return false;
+  try {
+    await active.abort();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function askCopilot(input: AskInput): Promise<string> {
@@ -78,6 +92,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     : await c.createSession(sessionConfig);
 
   input.onSessionId?.(session.sessionId);
+  if (input.turnId) {
+    activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
+  }
   try {
     await session.rpc.skills.reload();
   } catch {
@@ -104,6 +121,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
     throw e;
   } finally {
+    if (input.turnId) activeSessions.delete(input.turnId);
     off();
     try {
       await session.disconnect();
