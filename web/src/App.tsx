@@ -640,7 +640,6 @@ function AppInner() {
                   </div>
                 </div>
               </div>
-              </div>
             )}
 
             {error ? (
