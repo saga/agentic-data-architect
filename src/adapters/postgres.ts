@@ -131,54 +131,62 @@ export class PostgresAdapter implements DatabaseAdapter {
   async profile(table: string, columns?: string[]): Promise<DataProfile> {
     const meta = await this.getTableMetadata(table);
     const { schema, name } = splitTable(table);
-    const from = `${ident(schema)}.${ident(name)}`;
-    const countRows = await this.q(`SELECT COUNT(*)::bigint AS c FROM ${from}`);
-    const rowCount = Number(countRows[0]?.['c'] ?? 0);
+    const from = ident(schema) + '.' + ident(name);
     const wanted = columns?.length ? new Set(columns) : null;
-    const profiles: ColumnProfile[] = [];
-    for (const col of meta.columns) {
-      if (wanted && !wanted.has(col.name)) continue;
+    const selected = meta.columns.filter((col) => !wanted || wanted.has(col.name));
+    const supportsMinMax = (type: string): boolean => {
+      const t = type.toLowerCase();
+      return [
+        'smallint', 'integer', 'bigint', 'numeric', 'decimal', 'real', 'double precision',
+        'date', 'timestamp without time zone', 'timestamp with time zone',
+        'time without time zone', 'time with time zone', 'character varying', 'character', 'text',
+      ].includes(t);
+    };
+    const aggregateParts = selected.flatMap((col, i) => {
       const c = ident(col.name);
-      // 三个轻聚合一次往返；min/max 对非可排序类型可能失败，失败就降级
-      const [agg] = await this.q(
-        `SELECT COUNT(*)::bigint AS n, COUNT(${c})::bigint AS nonnull, COUNT(DISTINCT ${c})::bigint AS distinct_n FROM ${from}`,
-      );
-      const n = Number(agg?.['n'] ?? 0);
-      const nonNull = Number(agg?.['nonnull'] ?? 0);
-      const nullCount = n - nonNull;
-      let min: string | undefined;
-      let max: string | undefined;
-      try {
-        const [mm] = await this.q(`SELECT MIN(${c})::text AS lo, MAX(${c})::text AS hi FROM ${from}`);
-        if (mm?.['lo'] != null) min = String(mm['lo']);
-        if (mm?.['hi'] != null) max = String(mm['hi']);
-      } catch {
-        /* 如 jsonb 等不可排序类型：不要 min/max */
+      const parts = [
+        'COUNT(' + c + ')::bigint AS "nn_' + i + '"',
+        'COUNT(DISTINCT ' + c + ')::bigint AS "d_' + i + '"',
+      ];
+      if (supportsMinMax(col.dataType)) {
+        parts.push('MIN(' + c + ')::text AS "lo_' + i + '"', 'MAX(' + c + ')::text AS "hi_' + i + '"');
       }
-      let sampleValues: unknown[] | undefined;
-      try {
-        const s = await this.q(`SELECT DISTINCT ${c} AS v FROM ${from} WHERE ${c} IS NOT NULL LIMIT 5`);
-        sampleValues = s.map((r) => r['v']);
-      } catch {
-        /* 采样失败不致命 */
+      return parts;
+    });
+    const aggregateSql = 'SELECT COUNT(*)::bigint AS "__row_count__"' +
+      (aggregateParts.length ? ', ' + aggregateParts.join(', ') : '') +
+      ' FROM ' + from;
+    const [agg] = await this.q(aggregateSql);
+    const rowCount = Number(agg?.['__row_count__'] ?? 0);
+    const sampleRows = await this.sample(table, 100);
+    const profiles: ColumnProfile[] = selected.map((col, i) => {
+      const nonNull = Number(agg?.['nn_' + i] ?? 0);
+      const distinctCount = Number(agg?.['d_' + i] ?? 0);
+      const samples: unknown[] = [];
+      for (const row of sampleRows) {
+        const value = row[col.name];
+        if (value == null || samples.some((v) => Object.is(v, value))) continue;
+        samples.push(value);
+        if (samples.length >= 5) break;
       }
-      profiles.push({
+      const lo = agg?.['lo_' + i];
+      const hi = agg?.['hi_' + i];
+      return {
         column: col.name,
         dataType: col.dataType,
         nullable: col.nullable,
-        rowCount: n,
-        nullCount,
-        nullRate: n === 0 ? 0 : nullCount / n,
-        distinctCount: Number(agg?.['distinct_n'] ?? 0),
-        distinctRate: n === 0 ? 0 : Number(agg?.['distinct_n'] ?? 0) / n,
-        ...(min !== undefined ? { min } : {}),
-        ...(max !== undefined ? { max } : {}),
-        ...(sampleValues ? { sampleValues } : {}),
-      });
-    }
+        rowCount,
+        nullCount: rowCount - nonNull,
+        nullRate: rowCount === 0 ? 0 : (rowCount - nonNull) / rowCount,
+        distinctCount,
+        distinctRate: rowCount === 0 ? 0 : distinctCount / rowCount,
+        ...(lo != null ? { min: String(lo) } : {}),
+        ...(hi != null ? { max: String(hi) } : {}),
+        ...(samples.length ? { sampleValues: samples } : {}),
+      };
+    });
     return { dataset: meta.qualifiedName, rowCount, columns: profiles, profiledAt: new Date().toISOString() };
   }
-
   async query(sql: string): Promise<QueryResult> {
     const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
