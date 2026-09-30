@@ -116,7 +116,7 @@ Web 层没有重新实现这一套逻辑。
 
 ## Skills
 
-Copilot SDK 负责加载 `skills/*/SKILL.md`，而不是在 TypeScript workflow 里手工拼接 Skill 文本。
+Copilot SDK 负责加载 `skills/*/SKILL.md`，而不是在 TypeScript workflow 里手工拼接 Skill 文本。当前由一个 `lead-data-agent` custom agent 预加载默认 Skill；Skill 集合可通过 `COPILOT_SKILLS` 调整。
 
 当前 Skill 分工：
 
@@ -203,6 +203,7 @@ npm run report -- demo
 | `TURN_TIMEOUT_MS` | 单轮等待上限 | `300000` |
 | `SQLGLOT_PYTHON` | SQLGlot Python 解释器 | `python3` |
 | `SKILLS_DIR` | Copilot SDK Skill 根目录 | `skills` |
+| `COPILOT_SKILLS` | Copilot Lead Agent 默认预加载 Skill，逗号分隔 | `investigation-session,financial-data-review` |
 
 ## 检查
 
