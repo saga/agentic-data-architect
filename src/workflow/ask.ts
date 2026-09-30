@@ -19,7 +19,6 @@ export async function answerQuestion(
   question: string,
   onDelta?: (delta: string) => void,
 ): Promise<AnswerSummary> {
-  const inv = await loadInvestigation(investigationName);
   await appendContextInput(investigationName, {
     kind: 'question',
     title: question,
@@ -28,6 +27,7 @@ export async function answerQuestion(
     important: true,
   });
   await appendTranscript(investigationName, 'user', question);
+  const inv = await loadInvestigation(investigationName);
 
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
