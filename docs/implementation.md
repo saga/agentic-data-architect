@@ -29,7 +29,7 @@
 - `src/analysis/context.ts` — 按问题检索证据（删除了 snapshot 截断）
 - `src/analysis/query.ts` — Targeted Query（plan → 校验 → 只读执行 → 证据）
 - `src/workflow/` — discover / ask / report，CLI 只剩参数解析
-- `tests/` + `examples/investment/golden/` + CI — 24 测试，golden lineage precision/recall=1
+- `tests/` + `examples/investment/golden/` + CI — 自动回归覆盖 lineage、evidence、findings、profiling、workspace、query safety、golden benchmark
 
 刻意没做的（以及原因）：
 
