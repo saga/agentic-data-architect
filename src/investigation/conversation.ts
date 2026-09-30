@@ -248,7 +248,7 @@ export function migrateLegacyConversationInputs(
 
   for (const input of legacyMessages) {
     saveConversationMessage({
-      id: input.id,
+      id: sessionName + ':' + input.id,
       sessionName,
       role: input.kind === 'assistant_message' ? 'assistant' : 'user',
       content: input.content ?? '',
