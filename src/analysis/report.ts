@@ -63,7 +63,19 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
       ? inv.findings.map((f) => `- [${f.severity}/${f.status}] ${f.type}: ${f.title} — ${f.description.slice(0, 200)}`)
       : ['(none — run discover to generate deterministic findings)']),
     ``,
-    `## 5. Data Quality`,
+    `## 5. Current-State Intelligence`,
+    ``,
+    ...(snapshot?.currentState
+      ? [
+        `- Dataset lineage coverage: ${snapshot.currentState.coverage.datasetLineageCoverage === null ? 'n/a' : (snapshot.currentState.coverage.datasetLineageCoverage * 100).toFixed(1) + '%'}`,
+        `- SQL parse failures: ${snapshot.currentState.coverage.sqlParseFailures}`,
+        `- Semantic assets: ${snapshot.currentState.coverage.semanticAssets}`,
+        `- Source-of-truth candidates: ${snapshot.currentState.sourceOfTruthCandidates.length}`,
+        `- Semantic candidates: ${snapshot.currentState.semanticCandidates.length}`,
+      ]
+      : ['(no Current-State Intelligence yet)']),
+    ``,
+    `## 6. Data Quality`,
     ``,
     ...((snapshot?.profiles.length ?? 0)
       ? (snapshot?.profiles ?? []).map((p) => `- ${p.dataset}: rows=${p.rowCount}`)
