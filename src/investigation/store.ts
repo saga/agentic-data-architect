@@ -1,3 +1,8 @@
+/**
+ * Investigation 持久化 Store。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -14,8 +19,10 @@ import {
 import { migrateLegacyConversationInputs } from './conversation.js';
 import { WorkspaceContextSchema } from './schemas.js';
 
+/** Investigation 是 WorkspaceContext 在业务层的别名，代表持久化的当前分析状态。 */
 export type Investigation = WorkspaceContext;
 
+/** 创建一个空的 Investigation 初始状态；不负责写盘。 */
 export function newInvestigation(name: string, userPrompt = ''): Investigation {
   return {
     schemaVersion: 3,
@@ -36,18 +43,22 @@ export function newInvestigation(name: string, userPrompt = ''): Investigation {
   };
 }
 
+/** 返回 Investigation 的工作目录。 */
 export function investigationRoot(name: string): string {
   return workspaceRoot(name);
 }
 
+/** 返回 Investigation context.json 路径。 */
 export function investigationFile(name: string): string {
   return contextFile(name);
 }
 
+/** 返回当前 Investigation 的报告目录。 */
 export function reportsDir(name: string): string {
   return path.join(investigationRoot(name), 'reports');
 }
 
+/** 在会话锁内把业务状态合并回最新 WorkspaceContext，再原子写入 context.json。 */
 export async function saveInvestigation(inv: Investigation): Promise<string> {
   return withWorkspaceContextLock(inv.name, async () => {
     await ensureWorkspace(inv.name, {
@@ -87,6 +98,7 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   });
 }
 
+/** 从当前 workspace 或旧版数据目录读取 Investigation，并执行必要的历史迁移。 */
 export async function loadInvestigation(name: string): Promise<Investigation> {
   try {
     const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<Investigation>;
@@ -121,6 +133,7 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
   throw new Error('Investigation 不存在：' + name);
 }
 
+/** 把旧版/不完整 context 转成当前 schemaVersion=3 的可信 Investigation。 */
 function normalizeInvestigation(name: string, raw: Partial<Investigation>): Investigation {
   return WorkspaceContextSchema.parse({
     schemaVersion: 3,
@@ -147,6 +160,7 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
   });
 }
 
+/** 判断当前或旧版存储中是否存在指定 Investigation。 */
 export async function investigationExists(name: string): Promise<boolean> {
   try {
     await fs.access(contextFile(name));
@@ -167,6 +181,7 @@ export async function investigationExists(name: string): Promise<boolean> {
   }
 }
 
+/** 原子保存一次 Discovery 快照，避免 Agent 读取到半写入 JSON。 */
 export async function saveDiscoverySnapshot(name: string, runId: string, snapshot: unknown): Promise<string> {
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
@@ -177,6 +192,7 @@ export async function saveDiscoverySnapshot(name: string, runId: string, snapsho
   return fp;
 }
 
+/** 按 run 文件名排序读取最近一次 Discovery 快照。 */
 export async function loadLatestSnapshot<T>(name: string): Promise<T | null> {
   let files: string[];
   try {
