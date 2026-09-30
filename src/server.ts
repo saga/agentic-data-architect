@@ -6,6 +6,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
+import {
+  AbortBodySchema,
+  CreateSessionBodySchema,
+  MessageBodySchema,
+  RequestValidationError,
+  UpdateConfigBodySchema,
+  parseRequest,
+} from './api/schemas.js';
+import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
 import { config } from './config.js';
@@ -29,8 +38,7 @@ import {
   appendAuditEvent,
   loadInvestigationControl,
   readAuditEvents,
-  updateInvestigationControl,
-  type InvestigationControl,
+  updateInvestigationControl
 } from './investigation/control.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -148,7 +156,8 @@ export function createApp(vite?: ViteDevServer) {
   });
 
   app.post('/api/sessions', async (req, res) => {
-    const context = await createSession(req.body?.name, req.body?.userPrompt);
+    const body = parseRequest(CreateSessionBodySchema, req.body);
+    const context = await createSession(body.name, body.userPrompt);
     res.status(201).json({ context });
   });
 
@@ -178,14 +187,10 @@ export function createApp(vite?: ViteDevServer) {
 
   app.put('/api/sessions/:name/config', async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
-    const body = req.body as Partial<InvestigationControl>;
-    if (!body.research || !body.agent) {
-      res.status(400).json({ error: '缺少研究范围或 Agent 配置，请重新打开配置并保存。' });
-      return;
-    }
+    const body = parseRequest(UpdateConfigBodySchema, req.body);
     const control = await updateInvestigationControl(name, {
-      research: body.research as InvestigationControl['research'],
-      agent: body.agent as InvestigationControl['agent'],
+      research: body.research,
+      agent: body.agent,
     });
     res.json({ control });
   });
@@ -268,7 +273,8 @@ export function createApp(vite?: ViteDevServer) {
     const indexFile = path.join(config.sharedDir, 'index.json');
     try {
       const raw = await fs.readFile(indexFile, 'utf8');
-      res.type('application/json').send(raw);
+      const index = SharedIndexSchema.parse(JSON.parse(raw));
+      res.json(index);
     } catch (error) {
       if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         res.json({ schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() });
@@ -280,14 +286,9 @@ export function createApp(vite?: ViteDevServer) {
 
   app.post('/api/sessions/:name/messages', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
-    if (!message) {
-      res.status(400).json({ error: '没有收到问题，请先输入要问的问题。' });
-      return;
-    }
+    const body = parseRequest(MessageBodySchema, req.body);
     await ensureWorkspace(name);
-    const result = await answerQuestion(name, message, undefined, turnId || undefined);
+    const result = await answerQuestion(name, body.message, undefined, body.turnId);
     res.json(result);
   });
 
@@ -353,11 +354,7 @@ export function createApp(vite?: ViteDevServer) {
 
   app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const turnId = typeof req.body?.turnId === 'string' ? req.body.turnId.trim() : '';
-    if (!turnId) {
-      res.status(400).json({ error: '请求编号缺失，请重新发送问题。' });
-      return;
-    }
+    const { turnId } = parseRequest(AbortBodySchema, req.body);
     const turn = getConversationTurn(turnId);
     if (!turn || turn.sessionName !== name) {
       res.status(404).json({ error: '找不到这次请求，请刷新页面后重试。' });
@@ -394,6 +391,10 @@ export function createApp(vite?: ViteDevServer) {
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     console.error(error);
     if (res.headersSent) return;
+    if (error instanceof RequestValidationError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
       res.status(413).json({ error: '文件太大，单个文件最多 50 MB。' });
       return;
