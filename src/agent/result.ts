@@ -48,7 +48,7 @@ export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedA
       claims: [],
       unknowns: ['模型没有返回合法 JSON，需要重问或收紧提示词'],
       followUpQuestions: [],
-      warnings: ['unparseable agent output: saved as raw text only, no claims'],
+      warnings: ['这次回答没有返回可解析的结构化结果，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
   }
@@ -65,7 +65,7 @@ export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedA
       droppedEvidenceRefs.push(id);
       return false;
     });
-    if (kept.length < ids.length) warnings.push(`claim 引用了不存在的 evidence，已剔除 ${ids.length - kept.length} 个`);
+    if (kept.length < ids.length) warnings.push(`回答引用了不存在的 Evidence，系统已删除 ${ids.length - kept.length} 个无效引用。`);
     claims.push({ claim: (r['claim'] as string).slice(0, 2000), status: calibrateStatus(kept.length, status), evidenceIds: kept });
   }
   const strings = (v: unknown): string[] =>
