@@ -14,6 +14,12 @@ import {
   type WorkspaceContext,
 } from './investigation/workspace.js';
 import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
+import {
+  closeConversationStore,
+  getConversationSummary,
+  listConversationMessages,
+  searchConversation,
+} from './investigation/conversation.js';
 import { stopClient } from './agent/copilot.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,17 +41,6 @@ function sessionKey(name: string): string {
   return safe;
 }
 
-function messagesFromContext(context: WorkspaceContext) {
-  return context.inputs
-    .filter((input) => input.kind === 'question' || input.kind === 'assistant_message')
-    .map((input) => ({
-      id: input.id,
-      role: input.kind === 'question' ? 'user' : 'assistant',
-      content: input.content ?? '',
-      capturedAt: input.capturedAt,
-    }));
-}
-
 async function listSessions(): Promise<SessionSummary[]> {
   await fs.mkdir(config.workspaceDir, { recursive: true });
   const entries = await fs.readdir(config.workspaceDir, { withFileTypes: true });
@@ -54,11 +49,12 @@ async function listSessions(): Promise<SessionSummary[]> {
     if (!entry.isDirectory() || entry.name === 'shared') continue;
     try {
       const context = await loadWorkspaceContext(entry.name);
+      const conversation = getConversationSummary(entry.name);
       result.push({
         key: entry.name,
         label: context.userPrompt?.trim().slice(0, 60) || entry.name,
         userPrompt: context.userPrompt ?? '',
-        updatedAt: context.updatedAt,
+        updatedAt: conversation.lastMessageAt ?? context.updatedAt,
       });
     } catch {
       // Ignore malformed/non-session directories in the UI list.
@@ -102,9 +98,25 @@ export function createApp(vite?: ViteDevServer) {
   app.get('/api/sessions/:name', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
+    const conversation = getConversationSummary(name);
     res.json({
       context,
-      messages: messagesFromContext(context),
+      messages: listConversationMessages(name, 200),
+      conversationCount: conversation.count,
+      conversationLastMessageAt: conversation.lastMessageAt ?? null,
+    });
+  });
+
+  app.get('/api/sessions/:name/messages', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 100;
+    const messages = query
+      ? searchConversation(name, query, { limit: Number.isFinite(limit) ? limit : 50 })
+      : listConversationMessages(name, Number.isFinite(limit) ? limit : 100);
+    res.json({
+      messages,
+      search: query || null,
     });
   });
 
@@ -198,6 +210,7 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     server.close();
     await vite?.close();
+    closeConversationStore();
     await stopClient();
   };
   process.once('SIGINT', shutdown);
