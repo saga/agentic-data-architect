@@ -44,6 +44,7 @@ export interface AskInput {
   sessionId?: string;
   workingDirectory?: string;
   model?: string;
+  onDelta?: (delta: string) => void;
 }
 
 export async function askCopilot(input: AskInput): Promise<string> {
@@ -61,7 +62,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   let content = '';
   const off = session.on('assistant.message_delta', (e) => {
-    if (e.data.deltaContent) content += e.data.deltaContent;
+    if (e.data.deltaContent) {
+      content += e.data.deltaContent;
+      input.onDelta?.(e.data.deltaContent);
+    }
   });
   try {
     const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
