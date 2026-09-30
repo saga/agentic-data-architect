@@ -81,5 +81,6 @@ describe('buildLineage emits evidence with provenance', () => {
     assert.equal(stmtEv?.lineStart, 1);
     assert.equal(stmtEv?.sourceHash, 'abc');
     assert.equal(stmtEv?.discoveryRunId, 'run-001');
+    assert.equal(g.columns[0]?.evidenceId, stmtEv?.id);
   });
 });
