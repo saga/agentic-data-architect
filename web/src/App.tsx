@@ -272,7 +272,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnStage, setTurnStage] = useState<'idle' | 'starting' | 'analyzing' | 'generating' | 'committing'>('idle');
+  const [turnStatus, setTurnStatus] = useState('Thinking…');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -448,7 +448,7 @@ function AppInner() {
 
     setValue('');
     setLoading(true);
-    setTurnStage('starting');
+    setTurnStatus('Thinking…');
     setError(undefined);
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
@@ -503,11 +503,18 @@ function AppInner() {
 
       await consumeSse(response, ({ event, data }) => {
         if (event === 'started') {
-          setTurnStage('analyzing');
+          setTurnStatus('Thinking…');
+          return;
+        }
+        if (event === 'status') {
+          const status = (data as { status?: unknown }).status;
+          if (typeof status === 'string' && status.trim()) {
+            setTurnStatus(status.trim());
+          }
           return;
         }
         if (event === 'delta') {
-          setTurnStage('generating');
+          setTurnStatus('Generating answer…');
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
             ? { ...currentAnswer, content: currentAnswer.content + delta }
@@ -524,7 +531,7 @@ function AppInner() {
 
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
-      setTurnStage('committing');
+      setTurnStatus('Saving results…');
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
@@ -541,7 +548,7 @@ function AppInner() {
       }
     } finally {
       setStreamingAnswer(undefined);
-      setTurnStage('idle');
+      setTurnStatus('Thinking…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
@@ -723,13 +730,7 @@ function AppInner() {
             </div>
             <Space>
               <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
-                {loading
-                  ? turnStage === 'starting' ? 'Starting agent…'
-                  : turnStage === 'analyzing' ? 'Analyzing…'
-                  : turnStage === 'generating' ? 'Generating answer…'
-                  : turnStage === 'committing' ? 'Saving results…'
-                  : 'Working…'
-                  : 'Ready'}
+                {loading ? turnStatus : 'Ready'}
               </Tag>
               {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
@@ -837,12 +838,7 @@ function AppInner() {
             {loading ? (
               <div className="agent-turn-status">
                 <LoadingOutlined spin />
-                <Text type="secondary">
-                  {turnStage === 'starting' ? 'Agent is starting…'
-                    : turnStage === 'analyzing' ? 'Agent is analyzing the evidence and context…'
-                    : turnStage === 'generating' ? 'Agent is generating the answer…'
-                    : 'Agent is saving the result…'}
-                </Text>
+                <Text type="secondary">{turnStatus}</Text>
               </div>
             ) : null}
 
