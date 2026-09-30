@@ -36,3 +36,10 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 
 换模型（GPT / Claude / Gemini）时直接重跑同一套 golden，对比上表即可，
 不需要肉眼判断“好像更聪明了”。
+
+## V1.1 可靠性回归
+
+- query safety：覆盖 CTE 写操作、字符串中的分号、锁定查询、SELECT INTO。
+- evidence traceability：覆盖 column lineage、profile table、profile column 都能进入 Agent context 并携带 evidence id。
+- workspace safety：覆盖 database URI 脱敏，避免密码/token 写入 context。
+- profiling performance：PostgreSQL / Snowflake 的 profile 已收敛为每表一次聚合 + 一次小样本，而不是每列多次全表查询。
