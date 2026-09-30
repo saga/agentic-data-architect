@@ -91,7 +91,6 @@ interface InvestigationControl {
       args?: string[];
       url?: string;
       tools?: string[];
-      headers?: Record<string, string>;
     }>;
   };
   history: Array<{
@@ -191,9 +190,6 @@ function parseMcpJson(value: string): InvestigationControl['agent']['mcpServers'
       ...(Array.isArray(server.args) ? { args: server.args.filter((item): item is string => typeof item === 'string') } : {}),
       ...(typeof server.url === 'string' ? { url: server.url } : {}),
       ...(Array.isArray(server.tools) ? { tools: server.tools.filter((item): item is string => typeof item === 'string') } : {}),
-      ...(server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)
-        ? { headers: Object.fromEntries(Object.entries(server.headers).filter(([key, value]) => typeof key === 'string' && typeof value === 'string')) }
-        : {}),
     };
   });
 }
@@ -229,10 +225,6 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [streamingAnswer, setStreamingAnswer] = useState('');
-  const turnIdRef = useRef<string>();
-  const turnSessionRef = useRef<string>();
-  const streamAbortRef = useRef<AbortController>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [error, setError] = useState<string>();
@@ -378,8 +370,6 @@ function AppInner() {
   const send = async (text?: string) => {
     const message = (text ?? value).trim();
     if (!message || loading) return;
-    const turnId = crypto.randomUUID();
-    turnIdRef.current = turnId;
 
     setValue('');
     setLoading(true);
@@ -397,7 +387,6 @@ function AppInner() {
         activeRef.current = key;
         navigateToSession(key);
       }
-      turnSessionRef.current = key;
 
       // Show the user's message immediately. The agent request can take several
       // seconds, so waiting for the server response before rendering it makes
@@ -415,43 +404,17 @@ function AppInner() {
         ],
       } : existing);
 
-      const controller = new AbortController();
-      streamAbortRef.current = controller;
-      const response = await fetch(`/api/sessions/${encodeURIComponent(key)}/messages/stream`, {
+      const result = await getJson<{
+        answer: string;
+        claimIds: string[];
+        warnings: string[];
+        unknowns: string[];
+      }>(`/api/sessions/${encodeURIComponent(key)}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ message, turnId }),
-        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
       });
-      if (!response.ok) throw new Error((await response.text()) || response.statusText);
-      if (!response.body) throw new Error('Streaming response is not available.');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let result: { answer: string; claimIds: string[]; warnings: string[]; unknowns: string[] } | undefined;
-      setStreamingAnswer('');
-      while (true) {
-        const { value: chunk, done } = await reader.read();
-        buffer += decoder.decode(chunk ?? new Uint8Array(), { stream: !done });
-        const frames = buffer.split('\n\n');
-        buffer = frames.pop() ?? '';
-        for (const frame of frames) {
-          const dataLine = frame.split('\n').find((line) => line.startsWith('data: '));
-          const eventLine = frame.split('\n').find((line) => line.startsWith('event: '));
-          if (!dataLine) continue;
-          const data = JSON.parse(dataLine.slice(6)) as any;
-          if (eventLine?.slice(7) === 'delta') {
-            setStreamingAnswer((currentAnswer) => currentAnswer + String(data.delta ?? ''));
-          } else if (eventLine?.slice(7) === 'completed') {
-            result = data;
-          } else if (eventLine?.slice(7) === 'error') {
-            throw new Error(String(data.error ?? 'Agent request failed'));
-          }
-        }
-        if (done) break;
-      }
-      if (!result) throw new Error('Agent stream ended without a completed response.');
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
@@ -463,10 +426,6 @@ function AppInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed');
     } finally {
-      streamAbortRef.current = undefined;
-      turnIdRef.current = undefined;
-      turnSessionRef.current = undefined;
-      setStreamingAnswer('');
       setLoading(false);
     }
   };
@@ -646,7 +605,7 @@ function AppInner() {
               </Text>
             </div>
             <Space>
-              <Tag className="workspace-status" bordered={false}>{loading ? (streamingAnswer ? 'Responding' : 'Thinking') : 'Ready'}</Tag>
+              <Tag className="workspace-status" bordered={false}>Ready</Tag>
               {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
@@ -664,11 +623,7 @@ function AppInner() {
                   assistant: { placement: 'start' },
                   user: { placement: 'end' },
                 }}
-                items={streamingAnswer ? [...bubbleItems, {
-                  key: 'streaming-assistant',
-                  role: 'assistant' as const,
-                  content: <ChatMarkdown content={streamingAnswer} />,
-                }] : bubbleItems}
+                items={bubbleItems}
                 className="bubble-list"
               />
             ) : (
@@ -768,17 +723,7 @@ function AppInner() {
                 loading={loading}
                 submitType="enter"
                 onSubmit={(message) => { void send(message); }}
-                onCancel={() => {
-                  const turnId = turnIdRef.current;
-                  if (turnId) {
-                    void fetch(`/api/sessions/${encodeURIComponent(activeRef.current ?? '')}/messages/abort`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ turnId }),
-                    }).catch(() => undefined);
-                  }
-                  streamAbortRef.current?.abort();
-                }}
+                onCancel={() => setLoading(false)}
                 placeholder="Ask about the data estate, lineage, sources, transformations, findings, or next investigation step"
                 prefix={
                   <Tooltip title="Upload files">
@@ -1053,3 +998,169 @@ function AppInner() {
                           }));
                         })}
                       />
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                key: 'agent',
+                label: <span><ToolOutlined /> Agent</span>,
+                children: (
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>Agent behavior</Title>
+                      <Paragraph type="secondary">
+                        Choose reusable capabilities and add investigation-specific guidance.
+                      </Paragraph>
+                    </div>
+
+                    <Card className="settings-card" title="Skills">
+                      <Flex justify="space-between" align="center" className="settings-card-heading">
+                        <Text strong>Available Skills</Text>
+                        <Tag>versioned</Tag>
+                      </Flex>
+                      <Paragraph type="secondary">Only selected Skills are available to this investigation's Lead Agent.</Paragraph>
+                      <Select
+                        mode="multiple"
+                        style={{ width: '100%' }}
+                        value={draft.agent.skills.map((item) => item.name)}
+                        options={skillOptions.map((skill) => ({
+                          label: skill.name,
+                          value: skill.name,
+                          title: skill.description,
+                        }))}
+                        onChange={(names) => updateDraft((next) => {
+                          next.agent.skills = names.map((name) => ({
+                            name,
+                            version: next.agent.skills.find((item) => item.name === name)?.version ?? 1,
+                          }));
+                        })}
+                      />
+                      <div className="selected-skill-list">
+                        {draft.agent.skills.map((skill) => (
+                          <div key={skill.name} className="selected-skill">
+                            <Text strong>{skill.name}</Text>
+                            <Tag>v{skill.version}</Tag>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <Card className="settings-card" title="Additional system prompt">
+                      <Flex justify="space-between" align="center" className="settings-card-heading">
+                        <Text strong>Investigation-specific guidance</Text>
+                        <Tag>v{draft.agent.systemPrompt.version}</Tag>
+                      </Flex>
+                      <Paragraph type="secondary">
+                        Add terminology, working style or investigation context. Built-in evidence and safety rules remain outside this field.
+                      </Paragraph>
+                      <Input.TextArea
+                        rows={11}
+                        value={draft.agent.systemPrompt.content}
+                        placeholder="Example: Treat proxy voting policy documents as primary business context when interpreting vote instructions."
+                        onChange={(event) => updateDraft((next) => { next.agent.systemPrompt.content = event.target.value; })}
+                      />
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                key: 'mcp',
+                label: <span><ToolOutlined /> MCP</span>,
+                children: (
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>MCP connections</Title>
+                      <Paragraph type="secondary">
+                        Add MCP servers used by this investigation. Configuration changes are versioned and audit logged.
+                      </Paragraph>
+                    </div>
+                    <Card className="settings-card" title="Servers">
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="Secrets are not stored in control.json"
+                        description="Keep tokens and credentials in the runtime environment or your MCP provider's secure configuration."
+                      />
+                      <Input.TextArea
+                        className="mcp-editor"
+                        rows={18}
+                        value={mcpDraft}
+                        onChange={(event) => setMcpDraft(event.target.value)}
+                        spellCheck={false}
+                      />
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                key: 'history',
+                label: <span><HistoryOutlined /> Version history</span>,
+                children: (
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>Version history</Title>
+                      <Paragraph type="secondary">
+                        Review the configuration versions that shaped this investigation.
+                      </Paragraph>
+                    </div>
+                    <div className="version-list">
+                      {[...draft.history].reverse().slice(0, 12).map((item) => (
+                        <Card key={item.version} size="small" className="version-card">
+                          <Flex justify="space-between" gap={12}>
+                            <div>
+                              <Text strong>Configuration v{item.version}</Text>
+                              <div><Text type="secondary">{item.reason}</Text></div>
+                            </div>
+                            <Text type="secondary">{formatTime(item.updatedAt)}</Text>
+                          </Flex>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        title="Investigation activity"
+        open={auditOpen}
+        width={760}
+        footer={null}
+        onCancel={() => setAuditOpen(false)}
+      >
+        <Flex vertical gap={12}>
+          {(current?.recentAudit ?? []).map((event) => (
+            <Card key={event.id} size="small">
+              <Flex justify="space-between" align="start" gap={16}>
+                <div>
+                  <Text strong>{event.summary}</Text>
+                  <div><Text type="secondary">{event.action}</Text></div>
+                  {event.configurationVersion ? <Tag className="audit-version">Config v{event.configurationVersion}</Tag> : null}
+                </div>
+                <Text type="secondary">{formatTime(event.timestamp)}</Text>
+              </Flex>
+            </Card>
+          ))}
+          {!current?.recentAudit.length ? <Empty description="No audit events yet." /> : null}
+          <Text type="secondary">
+            Structured audit records are stored in the session workspace as audit.jsonl.
+          </Text>
+        </Flex>
+      </Modal>
+    </Layout>
+  );
+}
+
+export function App() {
+  return (
+    <XProvider>
+      <AntApp>
+        <AppInner />
+      </AntApp>
+    </XProvider>
+  );
+}
