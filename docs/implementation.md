@@ -12,7 +12,7 @@ Browser
   → .workspace/<session>/context.json
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。 citeturn702320search0turn702320search1
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
