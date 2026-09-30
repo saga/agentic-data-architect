@@ -53,3 +53,56 @@
 ## V4：Controlled Write
 
 生成 SQL / dbt / Snowflake semantic view → PR → 人工批准 → 合并。写工具默认关闭，独立 Approval Gate。
+
+
+## V1.1 补充：Investigation Workspace 与企业研究来源
+
+当前 Investigation 的业务状态保存在 investigation.json；Agent 的长期工作目录单独放在 workspace/，避免把研究过程混进核心状态文件。
+
+~~~text
+workspace/
+  context.json
+  inputs/
+  research/
+    github/
+    leanix/
+    confluence/
+    web/
+  sources/
+    github/
+  findings/
+  artifacts/
+  notes/
+~~~
+
+### context.json
+
+context.json 是每次 Investigation 的第一入口：
+
+- userPrompt：用户最初要求
+- inputs：每个问题、发现、外部研究 query、重要决策的追加记录
+- importantInformation：已经确认、后续分析必须记住的重要事实
+- artifactPath：较长研究结果所在文件
+
+规则：不覆盖历史 input；长内容落盘，context.json 只保留索引和摘要；禁止写入密码、token、cookie 等凭据。
+
+### GitHub
+
+研究开始时让用户选择：
+
+- 直接 GitHub Tool：适合公司 GitHub Organization、目标明确、文件范围较小的检查。
+- Clone 到 workspace/sources/github/：适合大仓库、跨文件搜索、需要大量 rg/find/grep/git log 的分析。
+
+两种模式都必须把 query、repo、branch/commit、关键文件和重要发现写到 workspace/research/github/，并在 context.json 登记。
+
+### LeanIX
+
+使用 SAP LeanIX 官方 MCP Server 查询 Fact Sheets 和关系；不要自己实现 LeanIX REST connector。运行时发现真实 MCP tool schema，不猜工具名。LeanIX 返回的是 architecture evidence，和代码、运行数据、业务访谈冲突时必须分别记录。
+
+### Confluence
+
+使用 Atlassian 官方 Rovo MCP Server 查询 Confluence；不要用普通 Web Search 代替私有 Confluence 内容。保存 page id、space、title、更新时间、关键事实和冲突到 workspace/research/confluence/。
+
+### Copilot working directory
+
+Lead Data Agent 的 workingDirectory 指向当前 Investigation 的 workspace，而不是项目根目录。这样 Agent 产生的研究记录、源码副本、临时分析和重要发现都留在 Investigation 内。
