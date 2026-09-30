@@ -40,7 +40,7 @@ View                  metadata      semantic system
 
 ## Canonical Estate
 
-Estate 应该能表达 system/application、data store、dataset、column、job、job run、file、API、dashboard 和 report 之间的关系，而不只是 Dataset → Dataset。
+Estate 现在已经支持 system/application、data store、dataset、column、job、job run、file、API、dashboard 和 report 等类型；当前 SQL Discovery 会把 SQL 文件建成静态 Job 节点，并保留文件到 Job、Job 到数据集的关系。
 
 ## Coverage
 
