@@ -1,5 +1,5 @@
 import {
-  assertReadOnly,
+  boundedReadOnlyQuery,
   type ColumnInfo,
   type ColumnProfile,
   type DatabaseAdapter,
@@ -180,8 +180,7 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   async query(sql: string): Promise<QueryResult> {
-    assertReadOnly(sql);
-    const rows = await this.q(sql);
+    const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
     const truncated = rows.length >= 1000;
     return { columns, rows: rows.slice(0, 1000), rowCount: rows.length, truncated };
