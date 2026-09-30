@@ -20,7 +20,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 
 当前代码状态、下一步实现和边界。不重复架构理论。
 
-## 当前：V1.1
+## 当前：V1.2
 
 已经具备：
 
@@ -81,6 +81,11 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 4. Snowflake Semantic View discovery，并把定义转换成通用 SemanticAsset
 5. Source-of-Truth Candidates / Semantic Candidates
 6. graph-aware + semantic-aware question retrieval
+
+## V1.2
+
+1. Current-State Intelligence：coverage、source-of-truth candidates、semantic candidates
+2. Provider-neutral Semantic Context
 
 ## V2
 
