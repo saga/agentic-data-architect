@@ -15,6 +15,32 @@ V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
 
 ---
+## Skill / Core 边界
+
+当前架构明确把容易变化的业务知识从核心 workflow 中拿出来：
+
+~~~text
+Core Platform
+  ├─ Evidence / State
+  ├─ SQL Read-only Guard
+  ├─ Lineage / Profiling
+  ├─ Claim validation
+  └─ Copilot SDK integration
+          │
+          └── skillDirectories → skills/*/SKILL.md
+                                  ├─ investigation-session
+                                  ├─ financial-data-review
+                                  ├─ search-github
+                                  ├─ search-confluence
+                                  └─ search-leanix
+
+Skill
+  └─ scripts/   deterministic domain procedure
+~~~
+
+金融领域的 Position、Security、Price、Research 检查不再硬编码在 discovery workflow；由 `financial-data-review` Skill 按需驱动脚本执行。这样新增其它行业/业务领域时，不需要改核心 Agent workflow。
+
+平台安全边界仍然由代码负责：Skill 不能绕过 Evidence 校验、read-only SQL guard 或状态持久化规则。
 ## 当前交互与 Workspace
 
 V1.1 现在的主入口是 Web Investigation Workbench：
