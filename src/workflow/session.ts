@@ -9,8 +9,7 @@ import { investigationExists, loadInvestigation, newInvestigation, saveInvestiga
 import { runReport } from './report.js';
 
 function defaultSessionName(): string {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-  return 'session-' + stamp;
+  return 'default';
 }
 
 function copilotSessionId(name: string): string {
