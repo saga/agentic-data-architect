@@ -44,6 +44,8 @@ export interface AskInput {
   sessionId?: string;
   workingDirectory?: string;
   model?: string;
+  skills?: string[];
+  skillDirectories?: string[];
   onDelta?: (delta: string) => void;
 }
 
@@ -53,12 +55,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
     model: input.model ?? config.model,
     workingDirectory: input.workingDirectory ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
+    skillDirectories: input.skillDirectories ?? [config.skillsDir],
+    skills: input.skills ?? ['investigation-session'],
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
   const session = input.sessionId
     ? await resumeOrCreate(c, input.sessionId, sessionConfig)
     : await c.createSession(sessionConfig);
+
+  try {
+    await session.rpc.skills.reload();
+  } catch {
+    // Skill reload is best-effort; session creation still works on older runtimes.
+  }
 
   let content = '';
   const off = session.on('assistant.message_delta', (e) => {
