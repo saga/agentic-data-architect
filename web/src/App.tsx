@@ -646,7 +646,7 @@ function AppInner() {
               </Text>
             </div>
             <Space>
-              <Tag className="workspace-status" bordered={false}>Ready</Tag>
+              <Tag className="workspace-status" bordered={false}>{loading ? (streamingAnswer ? 'Responding' : 'Thinking') : 'Ready'}</Tag>
               {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
