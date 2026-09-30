@@ -231,6 +231,7 @@ function AppInner() {
   const [loading, setLoading] = useState(false);
   const [streamingAnswer, setStreamingAnswer] = useState('');
   const turnIdRef = useRef<string>();
+  const turnSessionRef = useRef<string>();
   const streamAbortRef = useRef<AbortController>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -396,6 +397,7 @@ function AppInner() {
         activeRef.current = key;
         navigateToSession(key);
       }
+      turnSessionRef.current = key;
 
       // Show the user's message immediately. The agent request can take several
       // seconds, so waiting for the server response before rendering it makes
@@ -463,6 +465,7 @@ function AppInner() {
     } finally {
       streamAbortRef.current = undefined;
       turnIdRef.current = undefined;
+      turnSessionRef.current = undefined;
       setStreamingAnswer('');
       setLoading(false);
     }
