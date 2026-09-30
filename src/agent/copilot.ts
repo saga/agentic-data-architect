@@ -13,9 +13,12 @@ export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
   if (starting) return starting;
   starting = (async () => {
-    const c = config.githubToken
-      ? new CopilotClient({ mode: 'empty', gitHubToken: config.githubToken, useLoggedInUser: false })
-      : new CopilotClient({ mode: 'copilot-cli', useLoggedInUser: true });
+    // This is a server application, so do not inherit Copilot CLI's ambient
+    // filesystem/tools. Explicit Skills and MCP are the only capabilities we add.
+    const c = new CopilotClient({
+      mode: 'empty',
+      ...(config.githubToken ? { gitHubToken: config.githubToken, useLoggedInUser: false } : { useLoggedInUser: true }),
+    });
     await c.start();
     client = c;
     starting = null;
@@ -59,6 +62,17 @@ export interface AskInput {
 }
 
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
+
+function statusFromIntent(intent: string): string {
+  const value = intent.toLowerCase();
+  if (value.includes('plan')) return 'Planning…';
+  if (value.includes('search') || value.includes('find')) return 'Searching…';
+  if (value.includes('inspect') || value.includes('read')) return 'Reviewing sources…';
+  if (value.includes('analy')) return 'Analyzing…';
+  if (value.includes('compare')) return 'Comparing findings…';
+  if (value.includes('review')) return 'Reviewing findings…';
+  return 'Working…';
+}
 
 async function listSkillNames(): Promise<string[]> {
   try {
@@ -144,7 +158,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   });
   const offIntent = session.on('assistant.intent', (e) => {
     const intent = typeof e.data.intent === 'string' ? e.data.intent.trim() : '';
-    if (intent) input.onStatus?.(intent);
+    if (intent) input.onStatus?.(statusFromIntent(intent));
   });
   const offReasoning = session.on('assistant.reasoning_delta', () => {
     input.onStatus?.('Thinking…');
