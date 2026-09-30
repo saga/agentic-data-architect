@@ -1,28 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   App as AntApp,
-  Badge,
   Button,
   Card,
   Divider,
-  Empty,
   Flex,
   Input,
   Layout,
   Modal,
+  Radio,
+  Select,
   Space,
   Tag,
+  Tabs,
+  Tooltip,
   Typography,
 } from 'antd';
+import type { UploadFile } from 'antd';
 import {
   CheckCircleOutlined,
+  FileSearchOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
+  GithubOutlined,
+  HistoryOutlined,
+  InfoCircleOutlined,
+  PaperClipOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SettingOutlined,
   SendOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import {
+  Attachments,
   Bubble,
   Conversations,
   Mermaid,
@@ -34,13 +46,67 @@ import { XMarkdown } from '@ant-design/x-markdown';
 import '@ant-design/x-markdown/themes/light.css';
 
 const { Sider, Header, Content } = Layout;
-const { Text, Title } = Typography;
+const { Text, Title, Paragraph } = Typography;
 
 interface SessionSummary {
   key: string;
   label: string;
   userPrompt: string;
   updatedAt: string;
+}
+
+interface WorkspaceInput {
+  id: string;
+  kind: string;
+  title: string;
+  artifactPath?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  sha256?: string;
+}
+
+interface InvestigationControl {
+  schemaVersion: number;
+  version: number;
+  updatedAt: string;
+  research: {
+    githubRepositories: string[];
+    githubSearchMode: 'only_selected' | 'selected_and_broad';
+    keywords: string[];
+    importantDocuments: Array<{ id: string; title: string; reference: string }>;
+  };
+  agent: {
+    systemPrompt: {
+      version: number;
+      content: string;
+    };
+    skills: Array<{ name: string; version: number }>;
+    mcpServers: Array<{
+      name: string;
+      version: number;
+      enabled: boolean;
+      type: 'local' | 'http';
+      command?: string;
+      args?: string[];
+      url?: string;
+      tools?: string[];
+    }>;
+  };
+  history: Array<{
+    version: number;
+    updatedAt: string;
+    reason: string;
+  }>;
+}
+
+interface AuditEvent {
+  id: string;
+  timestamp: string;
+  actor: 'user' | 'system';
+  action: string;
+  summary: string;
+  configurationVersion?: number;
+  details?: Record<string, unknown>;
 }
 
 interface SessionContext {
@@ -53,6 +119,7 @@ interface SessionContext {
   findings: Array<{ severity?: string; status?: string; title?: string }>;
   unknowns: string[];
   claims: unknown[];
+  inputs: WorkspaceInput[];
   updatedAt: string;
 }
 
@@ -65,7 +132,14 @@ interface Message {
 
 interface SessionData {
   context: SessionContext;
+  control: InvestigationControl;
+  recentAudit: AuditEvent[];
   messages: Message[];
+}
+
+interface SkillOption {
+  name: string;
+  description: string;
 }
 
 const markdownComponents = {
@@ -86,6 +160,39 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function cloneControl(control: InvestigationControl): InvestigationControl {
+  return JSON.parse(JSON.stringify(control)) as InvestigationControl;
+}
+
+function documentReferences(context?: SessionContext): string[] {
+  return (context?.inputs ?? [])
+    .filter((input) => input.kind === 'document' && input.artifactPath)
+    .map((input) => input.artifactPath as string);
+}
+
+function parseMcpJson(value: string): InvestigationControl['agent']['mcpServers'] {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) throw new Error('MCP configuration must be a JSON array.');
+
+  return parsed.map((item) => {
+    if (!item || typeof item !== 'object') throw new Error('Each MCP server must be an object.');
+    const server = item as Record<string, unknown>;
+    const name = String(server.name ?? '').trim();
+    const type = server.type === 'http' ? 'http' : 'local';
+    if (!name) throw new Error('Each MCP server needs a name.');
+    return {
+      name,
+      version: Number(server.version ?? 1) || 1,
+      enabled: server.enabled !== false,
+      type,
+      ...(typeof server.command === 'string' ? { command: server.command } : {}),
+      ...(Array.isArray(server.args) ? { args: server.args.filter((item): item is string => typeof item === 'string') } : {}),
+      ...(typeof server.url === 'string' ? { url: server.url } : {}),
+      ...(Array.isArray(server.tools) ? { tools: server.tools.filter((item): item is string => typeof item === 'string') } : {}),
+    };
+  });
+}
+
 function ChatMarkdown({ content }: { content: string }) {
   return (
     <XMarkdown
@@ -97,6 +204,7 @@ function ChatMarkdown({ content }: { content: string }) {
 }
 
 function AppInner() {
+  const { message: toast } = AntApp.useApp();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
   const [current, setCurrent] = useState<SessionData>();
@@ -105,6 +213,15 @@ function AppInner() {
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [error, setError] = useState<string>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('research');
+  const [draft, setDraft] = useState<InvestigationControl>();
+  const [mcpDraft, setMcpDraft] = useState('[]');
+  const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const [attachments, setAttachments] = useState<UploadFile[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
 
   const reloadSessions = async (selectLatest = true) => {
     const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
@@ -118,15 +235,44 @@ function AppInner() {
     setError(undefined);
     const result = await getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`);
     setCurrent(result);
+
+    const existing = result.context.inputs
+      .filter((input) => input.kind === 'document')
+      .map((input) => ({
+        uid: input.id,
+        name: input.title,
+        status: 'done' as const,
+        size: input.sizeBytes,
+        type: input.mimeType,
+      }));
+    setAttachments(existing);
+  };
+
+  const loadSkills = async () => {
+    try {
+      const result = await getJson<{ skills: SkillOption[] }>('/api/skills');
+      setSkillOptions(result.skills);
+    } catch {
+      // Skill discovery should not block the investigation UI.
+    }
   };
 
   useEffect(() => {
     reloadSessions().catch((e) => setError(e.message));
+    loadSkills().catch(() => undefined);
   }, []);
 
   useEffect(() => {
     if (active) loadSession(active).catch((e) => setError(e.message));
   }, [active]);
+
+  useEffect(() => {
+    if (settingsOpen && current?.control) {
+      const next = cloneControl(current.control);
+      setDraft(next);
+      setMcpDraft(JSON.stringify(next.agent.mcpServers, null, 2));
+    }
+  }, [settingsOpen, current?.control]);
 
   const bubbleItems = useMemo(
     () =>
@@ -204,10 +350,94 @@ function AppInner() {
       setNewSessionName('');
       await reloadSessions(false);
       setActive(created.context.name);
+      setTimeout(() => setSettingsOpen(true), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create session');
     }
   };
+
+  const updateDraft = (mutator: (next: InvestigationControl) => void) => {
+    setDraft((currentDraft) => {
+      if (!currentDraft) return currentDraft;
+      const next = cloneControl(currentDraft);
+      mutator(next);
+      return next;
+    });
+  };
+
+  const saveSettings = async () => {
+    if (!draft || !active) return;
+
+    try {
+      const mcpServers = parseMcpJson(mcpDraft);
+      const result = await getJson<{ control: InvestigationControl }>(
+        `/api/sessions/${encodeURIComponent(active)}/config`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            research: draft.research,
+            agent: { ...draft.agent, mcpServers },
+          }),
+        },
+      );
+
+      setCurrent((existing) => existing ? { ...existing, control: result.control } : existing);
+      setDraft(result.control);
+      setMcpDraft(JSON.stringify(result.control.agent.mcpServers, null, 2));
+      setSettingsOpen(false);
+      await loadSession(active);
+      toast.success(`Configuration saved as v${result.control.version}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Unable to save configuration');
+    }
+  };
+
+  const uploadFile = async (file: UploadFile) => {
+    const source = file.originFileObj;
+    if (!source || !active || uploadingFiles.has(file.uid)) return;
+
+    setUploadingFiles((currentSet) => new Set(currentSet).add(file.uid));
+    setAttachments((items) => items.map((item) => item.uid === file.uid ? { ...item, status: 'uploading' } : item));
+
+    try {
+      const form = new FormData();
+      form.append('file', source as Blob, file.name);
+      const result = await getJson<{ file: { id: string; name: string } }>(
+        `/api/sessions/${encodeURIComponent(active)}/files`,
+        { method: 'POST', body: form },
+      );
+      setAttachments((items) => items.map((item) => item.uid === file.uid
+        ? { ...item, uid: result.file.id, name: result.file.name, status: 'done' }
+        : item));
+      await loadSession(active);
+      toast.success(`Uploaded ${result.file.name}`);
+    } catch (e) {
+      setAttachments((items) => items.map((item) => item.uid === file.uid ? { ...item, status: 'error' } : item));
+      toast.error(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setUploadingFiles((currentSet) => {
+        const next = new Set(currentSet);
+        next.delete(file.uid);
+        return next;
+      });
+    }
+  };
+
+  const onAttachmentChange = ({ fileList }: { fileList: UploadFile[] }) => {
+    setAttachments(fileList);
+    for (const file of fileList) {
+      if (file.originFileObj && file.status !== 'done' && !uploadingFiles.has(file.uid)) {
+        void uploadFile(file);
+      }
+    }
+  };
+
+  const attachmentItems = current?.context.inputs
+    .filter((input) => input.kind === 'document')
+    .map((input) => (
+      <Tag key={input.id}>{input.title}</Tag>
+    )) ?? [];
 
   return (
     <Layout className="app-shell">
@@ -219,6 +449,7 @@ function AppInner() {
             <div><Text type="secondary">Evidence-first investigation</Text></div>
           </div>
         </div>
+
         <div className="sider-actions">
           <Button icon={<PlusOutlined />} type="primary" block onClick={() => setNewSessionOpen(true)}>
             New investigation
@@ -232,6 +463,15 @@ function AppInner() {
             Refresh
           </Button>
         </div>
+
+        <Alert
+          className="sider-tip"
+          type="info"
+          showIcon
+          icon={<InfoCircleOutlined />}
+          message="Each investigation has its own research scope, files and agent configuration."
+        />
+
         <Conversations
           activeKey={active}
           onActiveChange={(key) => setActive(key)}
@@ -246,7 +486,7 @@ function AppInner() {
       <Layout>
         <Header className="topbar">
           <Flex justify="space-between" align="center" style={{ width: '100%' }}>
-            <div>
+            <div className="topbar-title">
               <Title level={4} style={{ margin: 0 }}>
                 {current?.context.userPrompt || current?.context.name || 'New investigation'}
               </Title>
@@ -255,15 +495,15 @@ function AppInner() {
               </Text>
             </div>
             <Space>
-              {current?.context.evidence.length ? (
-                <Tag color="blue">Evidence {current.context.evidence.length}</Tag>
-              ) : null}
-              {current?.context.findings.length ? (
-                <Tag color="gold">Findings {current.context.findings.length}</Tag>
-              ) : null}
-              {current?.context.unknowns.length ? (
-                <Tag color="orange">Unknowns {current.context.unknowns.length}</Tag>
-              ) : null}
+              {current?.control ? <Tag>Config v{current.control.version}</Tag> : null}
+              {current?.context.evidence.length ? <Tag color="blue">Evidence {current.context.evidence.length}</Tag> : null}
+              {current?.context.findings.length ? <Tag color="gold">Findings {current.context.findings.length}</Tag> : null}
+              {current?.context.unknowns.length ? <Tag color="orange">Unknowns {current.context.unknowns.length}</Tag> : null}
+              <Tooltip title="Research and agent configuration">
+                <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
+                  Configure
+                </Button>
+              </Tooltip>
             </Space>
           </Flex>
         </Header>
@@ -295,40 +535,25 @@ function AppInner() {
                         <CheckCircleOutlined className="guide-icon" />
                         <div>
                           <Text strong>1. Describe the goal</Text>
-                          <div>
-                            <Text type="secondary">
-                              What decision or data question are you trying to answer?
-                            </Text>
-                          </div>
+                          <div><Text type="secondary">What decision or data question are you trying to answer?</Text></div>
                         </div>
                       </Flex>
                     </Card>
-
                     <Card size="small" className="guide-card">
                       <Flex align="flex-start" gap={12}>
                         <FolderOpenOutlined className="guide-icon" />
                         <div>
                           <Text strong>2. Give it some context</Text>
-                          <div>
-                            <Text type="secondary">
-                              Mention the system, datasets, SQL, documents, or source paths you already know.
-                              Missing information can be discovered during the investigation.
-                            </Text>
-                          </div>
+                          <div><Text type="secondary">Mention the system, datasets, SQL, documents, or source paths you already know. Missing information can be discovered during the investigation.</Text></div>
                         </div>
                       </Flex>
                     </Card>
-
                     <Card size="small" className="guide-card">
                       <Flex align="flex-start" gap={12}>
                         <FileTextOutlined className="guide-icon" />
                         <div>
                           <Text strong>3. Ask the first question</Text>
-                          <div>
-                            <Text type="secondary">
-                              The agent will inspect available evidence, identify gaps, and suggest the next investigation step.
-                            </Text>
-                          </div>
+                          <div><Text type="secondary">The agent will inspect available evidence, identify gaps, and suggest the next investigation step.</Text></div>
                         </div>
                       </Flex>
                     </Card>
@@ -342,13 +567,7 @@ function AppInner() {
                         'Map the lineage of portfolio market value.',
                         'What do we know about the current data model?',
                       ].map((prompt) => (
-                        <Button
-                          key={prompt}
-                          size="small"
-                          onClick={() => send(prompt)}
-                        >
-                          {prompt}
-                        </Button>
+                        <Button key={prompt} size="small" onClick={() => send(prompt)}>{prompt}</Button>
                       ))}
                     </Flex>
                   </div>
@@ -363,6 +582,12 @@ function AppInner() {
             ) : null}
 
             <div className="composer">
+              {attachmentItems.length ? (
+                <div className="composer-files">
+                  <Text type="secondary">Files in this investigation</Text>
+                  <Flex wrap gap={6}>{attachmentItems}</Flex>
+                </div>
+              ) : null}
               <Sender
                 value={value}
                 onChange={setValue}
@@ -370,6 +595,39 @@ function AppInner() {
                 onSubmit={send}
                 onCancel={() => setLoading(false)}
                 placeholder="Ask about the data estate, lineage, sources, transformations, findings, or next investigation step"
+                prefix={
+                  <Tooltip title="Upload files">
+                    <Button
+                      type="text"
+                      icon={<PaperClipOutlined />}
+                      onClick={() => setAttachmentsOpen((open) => !open)}
+                    />
+                  </Tooltip>
+                }
+                header={
+                  <Sender.Header
+                    title="Files"
+                    open={attachmentsOpen}
+                    onOpenChange={setAttachmentsOpen}
+                    forceRender
+                  >
+                    <Attachments
+                      beforeUpload={() => false}
+                      items={attachments}
+                      multiple
+                      onChange={onAttachmentChange}
+                      placeholder={(type) =>
+                        type === 'drop'
+                          ? { title: 'Drop files here' }
+                          : {
+                              icon: <FolderOpenOutlined />,
+                              title: 'Upload investigation files',
+                              description: 'Files are stored in this session workspace and indexed in context.json.',
+                            }
+                      }
+                    />
+                  </Sender.Header>
+                }
                 suffix={<SendOutlined />}
               />
             </div>
@@ -383,15 +641,43 @@ function AppInner() {
                 <Text type="secondary">SESSION</Text>
                 <Title level={5}>{current?.context.name || '—'}</Title>
               </div>
-              <Card size="small" title="Goal">
-                <Text>{current?.context.goal || 'Not set yet'}</Text>
+
+              <Alert
+                type="info"
+                showIcon
+                icon={<FileSearchOutlined />}
+                message="What this panel shows"
+                description="Current investigation state and the controls that shape what the agent can research and use."
+              />
+
+              <Card size="small" title="Research scope">
+                <Flex vertical gap={7}>
+                  <Text>
+                    GitHub: {current?.control?.research.githubRepositories.length
+                      ? current.control.research.githubSearchMode === 'only_selected'
+                        ? 'selected repos only'
+                        : 'selected repos + broader search'
+                      : 'not configured'}
+                  </Text>
+                  <Text>Keywords: {current?.control?.research.keywords.length ?? 0}</Text>
+                  <Text>Important docs: {current?.control?.research.importantDocuments.length ?? 0}</Text>
+                  <Button type="link" icon={<SettingOutlined />} onClick={() => { setSettingsTab('research'); setSettingsOpen(true); }}>
+                    Configure research
+                  </Button>
+                </Flex>
               </Card>
-              <Card size="small" title="Scope">
-                <Space wrap>
-                  {(current?.context.scope ?? []).map((item) => <Tag key={item}>{item}</Tag>)}
-                  {!current?.context.scope.length ? <Text type="secondary">No scope defined</Text> : null}
-                </Space>
+
+              <Card size="small" title="Agent controls">
+                <Flex vertical gap={7}>
+                  <Text>System prompt v{current?.control?.agent.systemPrompt.version ?? 1}</Text>
+                  <Text>Skills: {current?.control?.agent.skills.length ?? 0}</Text>
+                  <Text>MCP: {current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} enabled</Text>
+                  <Button type="link" icon={<ToolOutlined />} onClick={() => { setSettingsTab('agent'); setSettingsOpen(true); }}>
+                    Configure agent
+                  </Button>
+                </Flex>
               </Card>
+
               <Card size="small" title="Coverage">
                 <Flex vertical gap={6}>
                   <Text>Evidence: {current?.context.evidence.length ?? 0}</Text>
@@ -400,9 +686,28 @@ function AppInner() {
                   <Text>Unknowns: {current?.context.unknowns.length ?? 0}</Text>
                 </Flex>
               </Card>
-              <Text type="secondary">
-                Updated {current ? formatTime(current.context.updatedAt) : '—'}
-              </Text>
+
+              <Card
+                size="small"
+                title={
+                  <Flex justify="space-between" align="center">
+                    <span>Recent activity</span>
+                    <Button type="link" size="small" icon={<HistoryOutlined />} onClick={() => setAuditOpen(true)}>View all</Button>
+                  </Flex>
+                }
+              >
+                <Flex vertical gap={8}>
+                  {(current?.recentAudit ?? []).slice(0, 4).map((event) => (
+                    <div key={event.id} className="activity-item">
+                      <Text>{event.summary}</Text>
+                      <Text type="secondary">{formatTime(event.timestamp)}</Text>
+                    </div>
+                  ))}
+                  {!current?.recentAudit.length ? <Text type="secondary">No activity recorded yet.</Text> : null}
+                </Flex>
+              </Card>
+
+              <Text type="secondary">Updated {current ? formatTime(current.context.updatedAt) : '—'}</Text>
             </Flex>
           </aside>
         </Content>
@@ -422,6 +727,220 @@ function AppInner() {
           placeholder="portfolio-analytics"
           onPressEnter={createSession}
         />
+        <Alert
+          className="modal-tip"
+          type="info"
+          showIcon
+          message="After creation, you can configure repositories, research keywords, documents, Skills, MCP and additional system guidance."
+        />
+      </Modal>
+
+      <Modal
+        title={
+          <Flex align="center" gap={8}>
+            <SettingOutlined />
+            <span>Investigation configuration</span>
+            {draft ? <Tag>v{draft.version}</Tag> : null}
+          </Flex>
+        }
+        open={settingsOpen}
+        width={920}
+        onCancel={() => setSettingsOpen(false)}
+        onOk={saveSettings}
+        okText="Save configuration"
+        destroyOnClose
+      >
+        {draft ? (
+          <Tabs
+            activeKey={settingsTab}
+            onChange={setSettingsTab}
+            items={[
+              {
+                key: 'research',
+                label: <span><GithubOutlined /> Research</span>,
+                children: (
+                  <Flex vertical gap={18}>
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="Research constraints"
+                      description="These settings guide discovery and search. They are instructions, not evidence. The agent still needs to verify facts against sources."
+                    />
+                    <div>
+                      <Text strong>GitHub repositories</Text>
+                      <Paragraph type="secondary">Add one or more repository URLs. The search mode below controls whether the agent may broaden the search beyond them.</Paragraph>
+                      <Select
+                        mode="tags"
+                        style={{ width: '100%' }}
+                        tokenSeparators={[',']}
+                        value={draft.research.githubRepositories}
+                        placeholder="https://github.com/org/repo"
+                        onChange={(value) => updateDraft((next) => { next.research.githubRepositories = value; })}
+                      />
+                    </div>
+                    <div>
+                      <Text strong>GitHub search mode</Text>
+                      <Radio.Group
+                        value={draft.research.githubSearchMode}
+                        onChange={(event) => updateDraft((next) => { next.research.githubSearchMode = event.target.value; })}
+                        options={[
+                          { value: 'only_selected', label: 'Only these repositories' },
+                          { value: 'selected_and_broad', label: 'These first, then broader GitHub search' },
+                        ]}
+                      />
+                    </div>
+                    <div>
+                      <Text strong>Research keywords</Text>
+                      <Paragraph type="secondary">Terms the agent should actively look for across the configured sources.</Paragraph>
+                      <Select
+                        mode="tags"
+                        style={{ width: '100%' }}
+                        tokenSeparators={[',']}
+                        value={draft.research.keywords}
+                        placeholder="Position, Security Master, proxy voting..."
+                        onChange={(value) => updateDraft((next) => { next.research.keywords = value; })}
+                      />
+                    </div>
+                    <div>
+                      <Text strong>Important documents</Text>
+                      <Paragraph type="secondary">Uploaded files and URLs/paths that should receive priority during the investigation.</Paragraph>
+                      <Select
+                        mode="tags"
+                        style={{ width: '100%' }}
+                        tokenSeparators={[',']}
+                        value={draft.research.importantDocuments.map((item) => item.reference)}
+                        options={documentReferences(current).map((reference) => ({ label: reference, value: reference }))}
+                        placeholder="Select uploaded documents or type a document URL/path"
+                        onChange={(references) => updateDraft((next) => {
+                          next.research.importantDocuments = references.map((reference) => ({
+                            id: reference,
+                            title: reference.split('/').pop() || reference,
+                            reference,
+                          }));
+                        })}
+                      />
+                    </div>
+                  </Flex>
+                ),
+              },
+              {
+                key: 'agent',
+                label: <span><ToolOutlined /> Agent</span>,
+                children: (
+                  <Flex vertical gap={18}>
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Core safety rules are not editable here"
+                      description="The text below is additional system guidance appended to the built-in evidence/safety prompt. Changes create a new prompt version and are audit logged."
+                    />
+                    <div>
+                      <Flex justify="space-between" align="center">
+                        <Text strong>Skills</Text>
+                        <Tag>versioned</Tag>
+                      </Flex>
+                      <Paragraph type="secondary">Choose the Skills available to the Lead Agent for this investigation.</Paragraph>
+                      <Select
+                        mode="multiple"
+                        style={{ width: '100%' }}
+                        value={draft.agent.skills.map((item) => item.name)}
+                        options={skillOptions.map((skill) => ({
+                          label: skill.name,
+                          value: skill.name,
+                          title: skill.description,
+                        }))}
+                        onChange={(names) => updateDraft((next) => {
+                          next.agent.skills = names.map((name) => ({
+                            name,
+                            version: next.agent.skills.find((item) => item.name === name)?.version ?? 1,
+                          }));
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <Flex justify="space-between" align="center">
+                        <Text strong>Additional system prompt</Text>
+                        <Tag>v{draft.agent.systemPrompt.version}</Tag>
+                      </Flex>
+                      <Paragraph type="secondary">Use this for investigation-specific guidance, terminology or working style. Do not put security boundaries here.</Paragraph>
+                      <Input.TextArea
+                        rows={10}
+                        value={draft.agent.systemPrompt.content}
+                        placeholder="Example: Treat proxy voting policy documents as primary business context when interpreting vote instructions."
+                        onChange={(event) => updateDraft((next) => { next.agent.systemPrompt.content = event.target.value; })}
+                      />
+                    </div>
+                    <div>
+                      <Flex justify="space-between" align="center">
+                        <Text strong>MCP servers</Text>
+                        <Tag>configuration is versioned</Tag>
+                      </Flex>
+                      <Paragraph type="secondary">
+                        JSON array using Copilot SDK server settings. Secrets are intentionally not persisted here. Example: local server with command/args, or HTTP server with url.
+                      </Paragraph>
+                      <Input.TextArea
+                        rows={12}
+                        value={mcpDraft}
+                        onChange={(event) => setMcpDraft(event.target.value)}
+                        spellCheck={false}
+                      />
+                    </div>
+                  </Flex>
+                ),
+              },
+              {
+                key: 'history',
+                label: <span><HistoryOutlined /> Version history</span>,
+                children: (
+                  <Flex vertical gap={10}>
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="Configuration versions"
+                      description="Prompt, Skill and MCP changes receive explicit versions. The full configuration snapshot is retained for the latest 30 versions."
+                    />
+                    {[...draft.history].reverse().slice(0, 10).map((item) => (
+                      <Card key={item.version} size="small">
+                        <Flex justify="space-between">
+                          <Text strong>Configuration v{item.version}</Text>
+                          <Text type="secondary">{formatTime(item.updatedAt)}</Text>
+                        </Flex>
+                        <Text type="secondary">{item.reason}</Text>
+                      </Card>
+                    ))}
+                  </Flex>
+                ),
+              },
+            ]}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        title="Investigation activity"
+        open={auditOpen}
+        width={760}
+        footer={null}
+        onCancel={() => setAuditOpen(false)}
+      >
+        <Flex vertical gap={12}>
+          {(current?.recentAudit ?? []).map((event) => (
+            <Card key={event.id} size="small">
+              <Flex justify="space-between" align="start" gap={16}>
+                <div>
+                  <Text strong>{event.summary}</Text>
+                  <div><Text type="secondary">{event.action}</Text></div>
+                  {event.configurationVersion ? <Tag className="audit-version">Config v{event.configurationVersion}</Tag> : null}
+                </div>
+                <Text type="secondary">{formatTime(event.timestamp)}</Text>
+              </Flex>
+            </Card>
+          ))}
+          {!current?.recentAudit.length ? <Empty description="No audit events yet." /> : null}
+          <Text type="secondary">
+            Structured audit records are stored in the session workspace as audit.jsonl.
+          </Text>
+        </Flex>
       </Modal>
     </Layout>
   );
