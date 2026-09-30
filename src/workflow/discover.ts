@@ -42,6 +42,12 @@ export interface DiscoverSummary {
 }
 
 export async function runDiscovery(name: string, opts: DiscoverOptions): Promise<DiscoverSummary> {
+  // Validate before recording the run in workspace state; a rejected request
+  // should not leave a misleading discovery entry behind.
+  if (!opts.path && !opts.database) {
+    throw new Error('usage: discover <name> [--path ./dir] [--database postgres://...]（至少给一个来源）');
+  }
+
   const inv = await loadInvestigation(name);
   await appendContextInput(name, {
     kind: 'discovery',
@@ -50,9 +56,6 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     source: 'agentic-data-architect discover',
     important: true,
   });
-  if (!opts.path && !opts.database) {
-    throw new Error('usage: discover <name> [--path ./dir] [--database postgres://...]（至少给一个来源）');
-  }
   const startedAt = new Date().toISOString();
   const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
 
