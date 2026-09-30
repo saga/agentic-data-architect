@@ -790,7 +790,7 @@ function AppInner() {
 
               <Text type="secondary" className="panel-updated">Updated {current ? formatTime(current.context.updatedAt) : '—'}</Text>
             </aside>
-          </div>>
+          </div>
         </Content>
       </Layout>
 
