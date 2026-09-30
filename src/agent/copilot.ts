@@ -12,7 +12,7 @@ export async function getClient(): Promise<CopilotClient> {
   if (starting) return starting;
   starting = (async () => {
     const c = config.githubToken
-      ? new CopilotClient({ mode: 'empty', githubToken: config.githubToken, useLoggedInUser: false })
+      ? new CopilotClient({ mode: 'empty', gitHubToken: config.githubToken, useLoggedInUser: false })
       : new CopilotClient({ mode: 'copilot-cli', useLoggedInUser: true });
     await c.start();
     client = c;
@@ -50,7 +50,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
   const sessionConfig = {
     model: input.model ?? config.model,
-    workingDirectory: input.working ?? process.cwd(),
+    workingDirectory: input.workingDirectory ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
