@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
-import { SqlglotParser, type ColumnLineage, type ParsedStatement } from './sql-parser.js';
+import { SqlglotParser, splitStatements, type ColumnLineage, type ParsedStatement } from './sql-parser.js';
 
 /**
  * Lineage（AST 驱动，§十六）：L1 dataset + L2 column。
@@ -26,6 +26,7 @@ export interface LineageGraph {
   tables: string[];
   columns: ColumnLineage[];
   statements: ParsedStatement[];
+  parseFailures: { file: string; statementIndex: number; lineStart: number; lineEnd: number; error: string }[];
   evidence: EvidenceRef[];
 }
 
@@ -44,12 +45,39 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
   const tables = new Set<string>();
   const columns: ColumnLineage[] = [];
   const statements: ParsedStatement[] = [];
+  const parseFailures: { file: string; statementIndex: number; lineStart: number; lineEnd: number; error: string }[] = [];
   const evidence: EvidenceRef[] = [];
   const seenEdge = new Set<string>();
 
   for (const input of inputs) {
     const sql = await fs.readFile(input.path, 'utf-8');
+    const chunks = splitStatements(sql);
     const parsed = await parser.parseFile(input.path, sql, input.dialect);
+    const parsedIndexes = new Set(parsed.map((st) => st.statementIndex));
+    chunks.forEach((chunk, statementIndex) => {
+      if (parsedIndexes.has(statementIndex)) return;
+      const failure = {
+        file: input.path,
+        statementIndex,
+        lineStart: chunk.lineStart,
+        lineEnd: chunk.lineEnd,
+        error: 'SQL parser 没有返回这个语句的解析结果',
+      };
+      parseFailures.push(failure);
+      evidence.push({
+        id: nextId('ev'),
+        type: 'parse_failure',
+        investigationId: input.investigationId,
+        discoveryRunId: input.discoveryRunId,
+        source: input.path + ':' + chunk.lineStart + '-' + chunk.lineEnd,
+        file: input.path,
+        lineStart: chunk.lineStart,
+        lineEnd: chunk.lineEnd,
+        sourceHash: input.sha256,
+        value: { statementIndex, error: failure.error },
+        collectedAt: new Date().toISOString(),
+      });
+    });
     for (const st of parsed) {
       statements.push(st);
       const stmtEvidence: EvidenceRef = {
@@ -96,5 +124,5 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
       }
     }
   }
-  return { edges, tables: [...tables].sort(), columns, statements, evidence };
+  return { edges, tables: [...tables].sort(), columns, statements, parseFailures, evidence };
 }
