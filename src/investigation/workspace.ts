@@ -97,6 +97,27 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
   await fs.rename(temporary, file);
 }
 
+const contextWriteLocks = new Map<string, Promise<void>>();
+
+export async function withWorkspaceContextLock<T>(
+  name: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = contextWriteLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  contextWriteLocks.set(name, queued);
+
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (contextWriteLocks.get(name) === queued) contextWriteLocks.delete(name);
+  }
+}
+
 export function transcriptFile(name: string): string {
   return path.join(workspaceRoot(name), 'transcript.md');
 }
@@ -240,29 +261,32 @@ export async function appendContextInput(
   name: string,
   input: Omit<WorkspaceInput, 'id' | 'capturedAt'> & { id?: string; capturedAt?: string },
 ): Promise<WorkspaceInput> {
+  return withWorkspaceContextLock(name, async () => {
   const context = await loadWorkspaceContext(name);
-  const item: WorkspaceInput = {
-    id: input.id ?? 'input-' + String(context.inputs.length + 1).padStart(3, '0'),
-    capturedAt: input.capturedAt ?? new Date().toISOString(),
-    kind: input.kind,
-    title: input.title,
-    ...(input.content !== undefined ? { content: input.content } : {}),
-    ...(input.source !== undefined ? { source: input.source } : {}),
-    ...(input.uri !== undefined ? { uri: input.uri } : {}),
-    ...(input.artifactPath !== undefined ? { artifactPath: input.artifactPath } : {}),
-    ...(input.important !== undefined ? { important: input.important } : {}),
-    ...(input.mimeType !== undefined ? { mimeType: input.mimeType } : {}),
-    ...(input.sizeBytes !== undefined ? { sizeBytes: input.sizeBytes } : {}),
-    ...(input.sha256 !== undefined ? { sha256: input.sha256 } : {}),
-  };
-  context.inputs.push(item);
-  if (!context.userPrompt && input.kind === 'user_message' && input.content?.trim()) {
-    context.userPrompt = input.content.trim();
+    const item: WorkspaceInput = {
+      id: input.id ?? 'input-' + String(context.inputs.length + 1).padStart(3, '0'),
+      capturedAt: input.capturedAt ?? new Date().toISOString(),
+      kind: input.kind,
+      title: input.title,
+      ...(input.content !== undefined ? { content: input.content } : {}),
+      ...(input.source !== undefined ? { source: input.source } : {}),
+      ...(input.uri !== undefined ? { uri: input.uri } : {}),
+      ...(input.artifactPath !== undefined ? { artifactPath: input.artifactPath } : {}),
+      ...(input.important !== undefined ? { important: input.important } : {}),
+      ...(input.mimeType !== undefined ? { mimeType: input.mimeType } : {}),
+      ...(input.sizeBytes !== undefined ? { sizeBytes: input.sizeBytes } : {}),
+      ...(input.sha256 !== undefined ? { sha256: input.sha256 } : {}),
+    };
+    context.inputs.push(item);
+    if (!context.userPrompt && input.kind === 'user_message' && input.content?.trim()) {
+      context.userPrompt = input.content.trim();
+    }
+    context.updatedAt = new Date().toISOString();
+    await writeJsonAtomic(contextFile(name), context);
+    return item;
   }
-  context.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(contextFile(name), context);
-  return item;
-}
+  
+  });
 
 export async function addImportantInformation(name: string, information: string[]): Promise<void> {
   const context = await loadWorkspaceContext(name);
