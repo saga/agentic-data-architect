@@ -271,7 +271,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [streamingAnswer, setStreamingAnswer] = useState<string>();
+  const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [error, setError] = useState<string>();
@@ -412,12 +412,12 @@ function AppInner() {
           : undefined,
     }));
 
-    if (streamingAnswer !== undefined) {
+    if (streamingAnswer?.key === active) {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
-        content: streamingAnswer
-          ? <ChatMarkdown content={streamingAnswer} />
+        content: streamingAnswer.content
+          ? <ChatMarkdown content={streamingAnswer.content} />
           : <Text type="secondary">Thinking…</Text>,
         footer: <Text type="secondary">Live</Text>,
       });
@@ -445,8 +445,6 @@ function AppInner() {
     setValue('');
     setLoading(true);
     setError(undefined);
-    setStreamingAnswer('');
-
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
 
@@ -464,6 +462,7 @@ function AppInner() {
       }
 
       activeTurnRef.current = { key: key as string, turnId, controller };
+      setStreamingAnswer({ key: key as string, content: '' });
 
       setCurrent((existing) => existing ? {
         ...existing,
@@ -500,7 +499,9 @@ function AppInner() {
       await consumeSse(response, ({ event, data }) => {
         if (event === 'delta') {
           const delta = (data as { delta?: unknown }).delta;
-          if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => (currentAnswer ?? '') + delta);
+          if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
+            ? { ...currentAnswer, content: currentAnswer.content + delta }
+            : currentAnswer);
           return;
         }
         if (event === 'error') {
