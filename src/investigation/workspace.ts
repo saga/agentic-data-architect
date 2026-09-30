@@ -46,6 +46,7 @@ export interface WorkspaceContext {
   importantInformation: string[];
   inputs: WorkspaceInput[];
   copilotSessionId?: string;
+  copilotConfigurationVersion?: number;
   updatedAt: string;
 }
 
@@ -213,6 +214,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     importantInformation: raw.importantInformation ?? [],
     inputs: raw.inputs ?? [],
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
+    ...(typeof raw.copilotConfigurationVersion === 'number' ? { copilotConfigurationVersion: raw.copilotConfigurationVersion } : {}),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
 
