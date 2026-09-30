@@ -7,7 +7,7 @@ import { test } from 'node:test';
 const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentic-data-architect-'));
 process.env.DATA_DIR = dataDir;
 
-const { ensureWorkspace, contextFile, researchDir, appendContextInput, loadWorkspaceContext } =
+const { ensureWorkspace, contextFile, researchDir, appendContextInput, loadWorkspaceContext, redactSensitiveUri } =
   await import('../src/investigation/workspace.js');
 
 test('workspace creates context and research folders', async () => {
@@ -41,6 +41,13 @@ test('workspace appends inputs without overwriting earlier research context', as
   assert.equal(context.userPrompt, 'Modernize proxy voting');
   assert.equal(context.inputs.length, 2);
   assert.equal(context.inputs[1]?.artifactPath, 'research/github/001-search.md');
+});
+
+test('redactSensitiveUri never persists database credentials', () => {
+  const redacted = redactSensitiveUri('snowflake://user:secret@example.acct/DB/SCHEMA?warehouse=WH&role=ROLE&token=abc');
+  assert.equal(redacted.includes('secret'), false);
+  assert.equal(redacted.includes('abc'), false);
+  assert.ok(redacted.includes('REDACTED'));
 });
 
 test.after(async () => {
