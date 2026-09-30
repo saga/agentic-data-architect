@@ -1,4 +1,4 @@
-import { BuiltInTools, CopilotClient, ToolSet } from '@github/copilot-sdk';
+import { CopilotClient, ToolSet } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -13,8 +13,7 @@ const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
 // inheriting unrelated Copilot CLI capabilities while still allowing Skills,
 // read/search tools, deterministic Skill scripts, and configured MCP servers.
 const WORKBENCH_TOOLS = new ToolSet()
-  .addBuiltIn(BuiltInTools.Isolated)
-  .addBuiltIn(['grep', 'glob', 'view', 'bash'])
+  .addBuiltIn(['ask_user', 'task_complete', 'exit_plan_mode', 'skill', 'grep', 'glob', 'view', 'bash'])
   .addMcp('*');
 
 export async function getClient(): Promise<CopilotClient> {
