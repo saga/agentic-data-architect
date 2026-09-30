@@ -1108,12 +1108,32 @@ function AppInner() {
                       </Paragraph>
                     </div>
 
+                    <Card className="settings-card" title="Active Agent">
+                      <div className="agent-profile">
+                        <div className="agent-profile-title">
+                          <div>
+                            <Text strong>Lead Data Agent</Text>
+                            <div>
+                              <Text type="secondary">Evidence-backed data discovery and architecture analysis</Text>
+                            </div>
+                          </div>
+                          <Tag color="blue">Built-in</Tag>
+                        </div>
+                        <Paragraph type="secondary" className="agent-profile-description">
+                          The lead agent coordinates the investigation, reasons over verified evidence, uses the selected Skills,
+                          and produces evidence-linked claims. It is not a separate tool or knowledge source.
+                        </Paragraph>
+                      </div>
+                    </Card>
+
                     <Card className="settings-card" title="Skills">
                       <Flex justify="space-between" align="center" className="settings-card-heading">
-                        <Text strong>Available Skills</Text>
+                        <Text strong>Selected Skills</Text>
                         <Tag>versioned</Tag>
                       </Flex>
-                      <Paragraph type="secondary">Only selected Skills are available to this investigation's Lead Agent.</Paragraph>
+                      <Paragraph type="secondary">
+                        Skills are reusable task modules. Each Skill can provide instructions, scripts and reference material to the Agent.
+                      </Paragraph>
                       <Select
                         mode="multiple"
                         style={{ width: '100%' }}
@@ -1131,12 +1151,18 @@ function AppInner() {
                         })}
                       />
                       <div className="selected-skill-list">
-                        {draft.agent.skills.map((skill) => (
-                          <div key={skill.name} className="selected-skill">
-                            <Text strong>{skill.name}</Text>
-                            <Tag>v{skill.version}</Tag>
-                          </div>
-                        ))}
+                        {draft.agent.skills.map((skill) => {
+                          const option = skillOptions.find((item) => item.name === skill.name);
+                          return (
+                            <div key={skill.name} className="selected-skill">
+                              <div className="selected-skill-main">
+                                <Text strong>{skill.name}</Text>
+                                {option?.description ? <Text type="secondary">{option.description}</Text> : null}
+                              </div>
+                              <Tag>v{skill.version}</Tag>
+                            </div>
+                          );
+                        })}
                       </div>
                     </Card>
 
@@ -1149,7 +1175,7 @@ function AppInner() {
                         Add terminology, working style or investigation context. Built-in evidence and safety rules remain outside this field.
                       </Paragraph>
                       <Input.TextArea
-                        rows={11}
+                        autoSize={{ minRows: 8, maxRows: 18 }}
                         value={draft.agent.systemPrompt.content}
                         placeholder="Example: Treat proxy voting policy documents as primary business context when interpreting vote instructions."
                         onChange={(event) => updateDraft((next) => { next.agent.systemPrompt.content = event.target.value; })}
