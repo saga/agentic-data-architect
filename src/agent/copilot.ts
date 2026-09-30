@@ -1,8 +1,15 @@
+/**
+ * Copilot Agent 运行时封装。
+ *
+ * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、Skills/MCP/工具配置、流式事件和取消。
+ * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
+ */
 import { CopilotClient, ToolSet } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 
+// 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
@@ -16,6 +23,7 @@ const WORKBENCH_TOOLS = new ToolSet()
   .addBuiltIn(['ask_user', 'task_complete', 'exit_plan_mode', 'skill', 'grep', 'glob', 'view', 'bash'])
   .addMcp('*');
 
+/** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
   if (starting) return starting;
@@ -37,6 +45,7 @@ export async function getClient(): Promise<CopilotClient> {
   return starting;
 }
 
+/** 停止 CopilotClient 并清理共享运行时状态，供服务退出和测试 teardown 使用。 */
 export async function stopClient(): Promise<void> {
   starting = null;
   if (client) {
@@ -51,6 +60,7 @@ export async function stopClient(): Promise<void> {
 
 type CreateSessionConfig = Parameters<CopilotClient['createSession']>[0];
 
+/** 一次 Agent 执行所需的全部输入，以及流式输出、状态、Session 持久化和取消回调。 */
 export interface AskInput {
   prompt: string;
   systemPrompt: string;
@@ -68,8 +78,10 @@ export interface AskInput {
   shouldAbort?: () => boolean;
 }
 
+// turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
 
+/** 把 SDK intent 映射成简短的用户可见状态，不向前端暴露内部 reasoning 文本。 */
 function statusFromIntent(intent: string): string {
   const value = intent.toLowerCase();
   if (value.includes('plan')) return 'Planning…';
@@ -81,6 +93,7 @@ function statusFromIntent(intent: string): string {
   return 'Working…';
 }
 
+/** 扫描 Skills 目录并读取 Skill 名称；无效 Skill 目录直接忽略。 */
 async function listSkillNames(): Promise<string[]> {
   try {
     const entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
@@ -101,10 +114,12 @@ async function listSkillNames(): Promise<string[]> {
   }
 }
 
+/** 判断指定 turn 是否仍绑定运行中的 Copilot Session。 */
 export function hasActiveCopilotTurn(turnId: string): boolean {
   return activeSessions.has(turnId);
 }
 
+/** 请求终止指定 turn 对应的 Copilot Session；没有活动 Session 时返回 false。 */
 export async function abortCopilotTurn(turnId: string): Promise<boolean> {
   const active = activeSessions.get(turnId);
   if (!active) return false;
@@ -116,6 +131,7 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
   }
 }
 
+/** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/工具白名单并执行一次请求。 */
 export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
 
@@ -219,6 +235,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   }
 }
 
+/** 优先恢复已有 Copilot Session；确认 Session 不存在时才创建新的 Session。 */
 async function resumeOrCreate(
   c: CopilotClient,
   sessionId: string,
