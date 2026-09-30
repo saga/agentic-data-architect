@@ -1,3 +1,8 @@
+/**
+ * 数据库 Discovery 编排。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import { createAdapter } from '../adapters/postgres.js';
 import { SnowflakeAdapter } from '../adapters/snowflake.js';
 import { profileDataset } from '../analysis/profiling.js';
@@ -20,6 +25,7 @@ export interface DatabaseDiscoveryInput {
   maxProfileTables?: number;
 }
 
+/** 数据库 Discovery 输出，包括 Data Estate、profiles、Evidence 和未知项。 */
 export interface DatabaseDiscoveryResult {
   adapterType: string;
   estate: DataEstate;
@@ -28,11 +34,13 @@ export interface DatabaseDiscoveryResult {
   unknowns: string[];
 }
 
+/** 根据连接串选择 PostgreSQL 或 Snowflake 适配器。 */
 export function openAdapter(connectionString: string): DatabaseAdapter {
   if (/^snowflake:\/\//.test(connectionString)) return new SnowflakeAdapter(connectionString);
   return createAdapter(connectionString);
 }
 
+/** 执行数据库发现：先 metadata，再按需 profiling，并把无法确认的事项记录为 unknown。 */
 export async function discoverDatabase(input: DatabaseDiscoveryInput): Promise<DatabaseDiscoveryResult> {
   const adapter = openAdapter(input.connectionString);
   const estate = emptyEstate();
