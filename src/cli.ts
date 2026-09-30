@@ -1,9 +1,9 @@
+#!/usr/bin/env tsx
 /**
  * CLI 命令行入口。
  *
  * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
  */
-#!/usr/bin/env tsx
 import { stopClient } from './agent/copilot.js';
 import { investigationExists, newInvestigation, saveInvestigation } from './investigation/store.js';
 import { runDiscovery } from './workflow/discover.js';
