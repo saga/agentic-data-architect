@@ -12,7 +12,7 @@
 
 - `package.json`：增加 `start` / `dev`，默认进入 interactive session。
 - `src/cli.ts`：无命令、`start`、`dev` 都进入持续 session；旧 `init/discover/ask/report` 保留。
-- `src/workflow/session.ts`：新增 readline 循环；启动时逐步咨询；每轮允许补充、提问和纠正；提供 `/report`、`/context`、`/exit`。
+- `src/workflow/session.ts`：新增 readline 循环；启动时逐步咨询；每轮允许补充、提问和纠正；提供 `/report`、`/context`、`/exit`；不指定名称时使用可恢复的 `default` session。
 - `src/agent/copilot.ts`：支持为同一 investigation 固定 sessionId，使退出重启后可以恢复 Copilot session。
 - `src/config.ts`：当前 workspace 默认改为 `.workspace`；`.data` 仅保留 legacy migration。
 - `src/investigation/workspace.ts`：session 根目录收敛为 `.workspace/<name>`；新增 `shared/index.json`、shared artifact registration 和 transcript。
