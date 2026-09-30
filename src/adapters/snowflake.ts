@@ -1,3 +1,8 @@
+/**
+ * Snowflake 数据库适配器。
+ *
+ * 实现 DatabaseAdapter 的只读能力，面向企业数据发现和 profiling，并隔离 Snowflake SDK 细节。
+ */
 import {
   boundedReadOnlyQuery,
   type ColumnInfo,
@@ -25,6 +30,7 @@ type SfConn = {
   destroy: (cb: (err: Error | undefined) => void) => void;
 };
 
+/** 延迟加载 Snowflake SDK；不做数据库发现时不要求驱动已经加载。 */
 async function loadDriver(): Promise<{
   createConnection: (opts: Record<string, string>) => { connect: (cb: (err: Error | undefined) => void) => void } & SfConn;
 }> {
@@ -37,6 +43,7 @@ async function loadDriver(): Promise<{
   }
 }
 
+/** 把 snowflake:// 连接串拆成 SDK 所需的 account、用户、数据库、Schema、warehouse 和 role。 */
 function parseUrl(conn: string): Record<string, string> {
   const u = new URL(conn);
   if (u.protocol !== 'snowflake:') throw new Error('非法 snowflake 连接串');
@@ -52,6 +59,7 @@ function parseUrl(conn: string): Record<string, string> {
   };
 }
 
+/** 校验并转义 Snowflake 标识符，禁止任意字符串直接进入 SQL。 */
 function ident(name: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name)) {
     throw new Error(`非法 Snowflake 标识符：${name}`);
@@ -59,6 +67,7 @@ function ident(name: string): string {
   return '"' + name.replace(/"/g, '""') + '"';
 }
 
+/** 将数据库表名拆成 database/schema/table 三段并校验格式。 */
 function splitTable(table: string): { database?: string; schema: string; name: string } {
   const parts = table.split('.').map((p) => p.replace(/^"|"$/g, ''));
   if (parts.length > 3 || parts.length < 1 || parts.some((p) => !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(p))) {
@@ -70,18 +79,22 @@ function splitTable(table: string): { database?: string; schema: string; name: s
   return { ...(database ? { database } : {}), schema, name };
 }
 
+/** 根据拆分后的结构重新生成安全的全限定表名。 */
 function qualifiedTable(table: string): string {
   const parts = splitTable(table);
   return [parts.database, parts.schema, parts.name].filter((part): part is string => Boolean(part)).map(ident).join('.');
 }
 
+/** Snowflake 只读适配器，实现统一 DatabaseAdapter 契约。 */
 export class SnowflakeAdapter implements DatabaseAdapter {
   readonly type = 'snowflake';
   private conn: SfConn | null = null;
 
-  constructor(private readonly connectionString: string) {}
+  /** 保存 Snowflake 连接串，实际连接在 connect() 中建立。 */
+constructor(private readonly connectionString: string) {}
 
-  async connect(): Promise<void> {
+  /** 创建 Snowflake SDK 连接并等待连接完成。 */
+async connect(): Promise<void> {
     const sdk = await loadDriver();
     const connection = sdk.createConnection(parseUrl(this.connectionString));
     await new Promise<void>((resolve, reject) => {
@@ -90,14 +103,16 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     this.conn = connection;
   }
 
-  async close(): Promise<void> {
+  /** 销毁现有 Snowflake 连接并清空引用。 */
+async close(): Promise<void> {
     if (!this.conn) return;
     const c = this.conn;
     this.conn = null;
     await new Promise<void>((resolve) => c.destroy(() => resolve()));
   }
 
-  private q(text: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+  /** 将 Snowflake callback 风格 execute 转换成 Promise，并统一返回 rows。 */
+private q(text: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
     if (!this.conn) throw new Error('未连接：先调用 connect()');
     const conn = this.conn;
     return new Promise((resolve, reject) => {
@@ -105,12 +120,14 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     });
   }
 
-  async listDatabases(): Promise<DatabaseInfo[]> {
+  /** 查询当前账号可访问的数据库。 */
+async listDatabases(): Promise<DatabaseInfo[]> {
     const rows = await this.q(`SHOW DATABASES`);
     return rows.map((r) => ({ name: String(r['name'] ?? r['NAME']) }));
   }
 
-  async listSchemas(database?: string): Promise<SchemaInfo[]> {
+  /** 查询指定数据库下可访问的 Schema。 */
+async listSchemas(database?: string): Promise<SchemaInfo[]> {
     const scope = database ? `${ident(database)}.` : '';
     const rows = await this.q(
       `SELECT SCHEMA_NAME AS name FROM ${scope}INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME NOT IN ('INFORMATION_SCHEMA') ORDER BY 1`,
@@ -118,7 +135,8 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     return rows.map((r) => ({ name: String(r['NAME'] ?? r['name']), ...(database ? { database } : {}) }));
   }
 
-  async listTables(database?: string, schema = 'PUBLIC'): Promise<TableInfo[]> {
+  /** 查询指定 Schema 下的基础表。 */
+async listTables(database?: string, schema = 'PUBLIC'): Promise<TableInfo[]> {
     const scope = database ? `${ident(database)}.` : '';
     const rows = await this.q(
       `SELECT TABLE_SCHEMA AS s, TABLE_NAME AS n FROM ${scope}INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA = ? ORDER BY 1,2`,
@@ -136,7 +154,8 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     });
   }
 
-  async getTableMetadata(table: string): Promise<TableMetadata> {
+  /** 查询表的列结构并转换成统一 TableMetadata。 */
+async getTableMetadata(table: string): Promise<TableMetadata> {
     const parts = splitTable(table);
     const name = parts.name;
     const schema = parts.schema;
@@ -156,12 +175,14 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     return { ...(database ? { database } : {}), schema, name, qualifiedName, columns };
   }
 
-  async sample(table: string, limit: number): Promise<Record<string, unknown>[]> {
+  /** 对指定表执行受限采样，避免把大量原始数据拉到 Agent。 */
+async sample(table: string, limit: number): Promise<Record<string, unknown>[]> {
     const n = Math.min(Math.max(Math.floor(limit), 1), 1000);
     return this.q(`SELECT * FROM ${qualifiedTable(table)} LIMIT ${n}`);
   }
 
-  async profile(table: string, columns?: string[]): Promise<DataProfile> {
+  /** 聚合计算行数、空值率、distinct 比率、min/max，并收集少量样本值。 */
+async profile(table: string, columns?: string[]): Promise<DataProfile> {
     const meta = await this.getTableMetadata(table);
     const from = qualifiedTable(table);
     const wanted = columns?.length ? new Set(columns.map((x) => x.toUpperCase())) : null;
@@ -219,7 +240,8 @@ export class SnowflakeAdapter implements DatabaseAdapter {
     });
     return { dataset: meta.qualifiedName, rowCount, columns: profiles, profiledAt: new Date().toISOString() };
   }
-  async query(sql: string): Promise<QueryResult> {
+  /** 执行只读定向 SQL，并统一把结果控制在最多 1000 行。 */
+async query(sql: string): Promise<QueryResult> {
     const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
     return { columns, rows: rows.slice(0, 1000), rowCount: rows.length, truncated: rows.length >= 1000 };
