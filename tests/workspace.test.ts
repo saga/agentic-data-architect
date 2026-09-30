@@ -49,6 +49,17 @@ test('workspace appends inputs without overwriting earlier context', async () =>
   assert.equal(context.inputs[1]?.artifactPath, 'shared/github/001-search.md');
 });
 
+test('first interactive user message becomes the session userPrompt', async () => {
+  await ensureWorkspace('first-prompt');
+  await appendContextInput('first-prompt', {
+    kind: 'user_message',
+    title: 'Goal',
+    content: 'Analyze portfolio position lineage',
+  });
+  const context = await loadWorkspaceContext('first-prompt');
+  assert.equal(context.userPrompt, 'Analyze portfolio position lineage');
+});
+
 test('shared index records reusable documents', async () => {
   await addSharedDocument(
     'confluence',
