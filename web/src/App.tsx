@@ -362,6 +362,7 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
+    setStreamingAnswer(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -423,7 +424,7 @@ function AppInner() {
       });
     }
     return items;
-  }, [current?.messages, streamingAnswer]);
+  }, [active, current?.messages, streamingAnswer]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
