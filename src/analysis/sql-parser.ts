@@ -33,6 +33,8 @@ export interface ColumnLineage {
   targetColumn: string;
   expression?: string;
   statementId: string;
+  /** 对应 SQL statement evidence，便于列级结论回指原始 SQL。 */
+  evidenceId?: string;
 }
 
 export interface ParsedStatement {
@@ -43,7 +45,7 @@ export interface ParsedStatement {
   lineEnd: number;
   target?: string;
   sources: string[];
-  columns: Omit<ColumnLineage, 'statementId' | 'targetDataset'>[];
+  columns: Omit<ColumnLineage, 'statementId' | 'targetDataset' | 'evidenceId'>[];
   dialect?: string;
 }
 
