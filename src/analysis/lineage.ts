@@ -52,16 +52,25 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
   for (const input of inputs) {
     const sql = await fs.readFile(input.path, 'utf-8');
     const chunks = splitStatements(sql);
-    const parsed = await parser.parseFile(input.path, sql, input.dialect);
+    const detailed = parser.parseFileDetailed
+      ? await parser.parseFileDetailed(input.path, sql, input.dialect)
+      : {
+          statements: await parser.parseFile(input.path, sql, input.dialect),
+          failures: [],
+        };
+    const parsed = detailed.statements;
+    const detailedFailures = detailed.failures || [];
+    const failureByIndex = new Map(detailedFailures.map((failure) => [failure.statementIndex, failure]));
     const parsedIndexes = new Set(parsed.map((st) => st.statementIndex));
     chunks.forEach((chunk, statementIndex) => {
       if (parsedIndexes.has(statementIndex)) return;
+      const parserFailure = failureByIndex.get(statementIndex);
       const failure = {
         file: input.path,
         statementIndex,
         lineStart: chunk.lineStart,
         lineEnd: chunk.lineEnd,
-        error: 'SQL parser 没有返回这个语句的解析结果',
+        error: parserFailure?.error || 'SQL parser 没有返回这个语句的解析结果',
       };
       parseFailures.push(failure);
       evidence.push({
