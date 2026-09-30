@@ -817,6 +817,7 @@ function AppInner() {
       </Modal>
 
       <Modal
+        className="settings-modal"
         title={
           <Flex align="center" gap={8}>
             <SettingOutlined />
@@ -825,31 +826,36 @@ function AppInner() {
           </Flex>
         }
         open={settingsOpen}
-        width={920}
+        width={1000}
+        centered
         onCancel={() => setSettingsOpen(false)}
         onOk={saveSettings}
-        okText="Save configuration"
+        okText="Save changes"
         destroyOnClose
       >
         {draft ? (
           <Tabs
+            tabPosition="left"
             activeKey={settingsTab}
             onChange={setSettingsTab}
+            className="settings-tabs"
             items={[
               {
                 key: 'research',
-                label: <span><GithubOutlined /> Research</span>,
+                label: <span><GithubOutlined /> Research scope</span>,
                 children: (
-                  <Flex vertical gap={18}>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="Research constraints"
-                      description="These settings guide discovery and search. They are instructions, not evidence. The agent still needs to verify facts against sources."
-                    />
-                    <div>
-                      <Text strong>GitHub repositories</Text>
-                      <Paragraph type="secondary">Add one or more repository URLs. The search mode below controls whether the agent may broaden the search beyond them.</Paragraph>
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>Research scope</Title>
+                      <Paragraph type="secondary">
+                        Define where the investigation should look and which sources deserve priority.
+                      </Paragraph>
+                    </div>
+
+                    <Card className="settings-card" title="GitHub sources">
+                      <Paragraph type="secondary">
+                        Add repositories that matter to this investigation. Search can stay within them or broaden when necessary.
+                      </Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
@@ -858,21 +864,21 @@ function AppInner() {
                         placeholder="https://github.com/org/repo"
                         onChange={(value) => updateDraft((next) => { next.research.githubRepositories = value; })}
                       />
-                    </div>
-                    <div>
-                      <Text strong>GitHub search mode</Text>
+                      <div className="field-label">Search scope</div>
                       <Radio.Group
                         value={draft.research.githubSearchMode}
                         onChange={(event) => updateDraft((next) => { next.research.githubSearchMode = event.target.value; })}
+                        optionType="button"
+                        buttonStyle="solid"
                         options={[
-                          { value: 'only_selected', label: 'Only these repositories' },
-                          { value: 'selected_and_broad', label: 'These first, then broader GitHub search' },
+                          { value: 'only_selected', label: 'Selected repositories only' },
+                          { value: 'selected_and_broad', label: 'Selected first, then broader search' },
                         ]}
                       />
-                    </div>
-                    <div>
-                      <Text strong>Research keywords</Text>
-                      <Paragraph type="secondary">Terms the agent should actively look for across the configured sources.</Paragraph>
+                    </Card>
+
+                    <Card className="settings-card" title="Research keywords">
+                      <Paragraph type="secondary">Important business or technical terms the agent should actively look for.</Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
@@ -881,17 +887,17 @@ function AppInner() {
                         placeholder="Position, Security Master, proxy voting..."
                         onChange={(value) => updateDraft((next) => { next.research.keywords = value; })}
                       />
-                    </div>
-                    <div>
-                      <Text strong>Important documents</Text>
-                      <Paragraph type="secondary">Uploaded files and URLs/paths that should receive priority during the investigation.</Paragraph>
+                    </Card>
+
+                    <Card className="settings-card" title="Important documents">
+                      <Paragraph type="secondary">Documents that should receive priority when interpreting the investigation.</Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
                         value={draft.research.importantDocuments.map((item) => item.reference)}
-                        options={documentReferences(current?.context ? current.context : undefined).map((reference) => ({ label: reference, value: reference }))}
-                        placeholder="Select uploaded documents or type a document URL/path"
+                        options={documentReferences(current?.context).map((reference) => ({ label: reference, value: reference }))}
+                        placeholder="Choose an uploaded file or type a URL/path"
                         onChange={(references) => updateDraft((next) => {
                           next.research.importantDocuments = references.map((reference) => ({
                             id: reference,
@@ -900,27 +906,28 @@ function AppInner() {
                           }));
                         })}
                       />
-                    </div>
-                  </Flex>
+                    </Card>
+                  </div>
                 ),
               },
               {
                 key: 'agent',
                 label: <span><ToolOutlined /> Agent</span>,
                 children: (
-                  <Flex vertical gap={18}>
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message="Core safety rules are not editable here"
-                      description="The text below is additional system guidance appended to the built-in evidence/safety prompt. Changes create a new prompt version and are audit logged."
-                    />
-                    <div>
-                      <Flex justify="space-between" align="center">
-                        <Text strong>Skills</Text>
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>Agent behavior</Title>
+                      <Paragraph type="secondary">
+                        Choose reusable capabilities and add investigation-specific guidance.
+                      </Paragraph>
+                    </div>
+
+                    <Card className="settings-card" title="Skills">
+                      <Flex justify="space-between" align="center" className="settings-card-heading">
+                        <Text strong>Available Skills</Text>
                         <Tag>versioned</Tag>
                       </Flex>
-                      <Paragraph type="secondary">Choose the Skills available to the Lead Agent for this investigation.</Paragraph>
+                      <Paragraph type="secondary">Only selected Skills are available to this investigation's Lead Agent.</Paragraph>
                       <Select
                         mode="multiple"
                         style={{ width: '100%' }}
@@ -937,59 +944,88 @@ function AppInner() {
                           }));
                         })}
                       />
-                    </div>
-                    <div>
-                      <Flex justify="space-between" align="center">
-                        <Text strong>Additional system prompt</Text>
+                      <div className="selected-skill-list">
+                        {draft.agent.skills.map((skill) => (
+                          <div key={skill.name} className="selected-skill">
+                            <Text strong>{skill.name}</Text>
+                            <Tag>v{skill.version}</Tag>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <Card className="settings-card" title="Additional system prompt">
+                      <Flex justify="space-between" align="center" className="settings-card-heading">
+                        <Text strong>Investigation-specific guidance</Text>
                         <Tag>v{draft.agent.systemPrompt.version}</Tag>
                       </Flex>
-                      <Paragraph type="secondary">Use this for investigation-specific guidance, terminology or working style. Do not put security boundaries here.</Paragraph>
+                      <Paragraph type="secondary">
+                        Add terminology, working style or investigation context. Built-in evidence and safety rules remain outside this field.
+                      </Paragraph>
                       <Input.TextArea
-                        rows={10}
+                        rows={11}
                         value={draft.agent.systemPrompt.content}
                         placeholder="Example: Treat proxy voting policy documents as primary business context when interpreting vote instructions."
                         onChange={(event) => updateDraft((next) => { next.agent.systemPrompt.content = event.target.value; })}
                       />
-                    </div>
-                    <div>
-                      <Flex justify="space-between" align="center">
-                        <Text strong>MCP servers</Text>
-                        <Tag>configuration is versioned</Tag>
-                      </Flex>
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                key: 'mcp',
+                label: <span><ToolOutlined /> MCP</span>,
+                children: (
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>MCP connections</Title>
                       <Paragraph type="secondary">
-                        JSON array using Copilot SDK server settings. Secrets are intentionally not persisted here. Example: local server with command/args, or HTTP server with url.
+                        Add MCP servers used by this investigation. Configuration changes are versioned and audit logged.
                       </Paragraph>
+                    </div>
+                    <Card className="settings-card" title="Servers">
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="Secrets are not stored in control.json"
+                        description="Keep tokens and credentials in the runtime environment or your MCP provider's secure configuration."
+                      />
                       <Input.TextArea
-                        rows={12}
+                        className="mcp-editor"
+                        rows={18}
                         value={mcpDraft}
                         onChange={(event) => setMcpDraft(event.target.value)}
                         spellCheck={false}
                       />
-                    </div>
-                  </Flex>
+                    </Card>
+                  </div>
                 ),
               },
               {
                 key: 'history',
                 label: <span><HistoryOutlined /> Version history</span>,
                 children: (
-                  <Flex vertical gap={10}>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="Configuration versions"
-                      description="Prompt, Skill and MCP changes receive explicit versions. The full configuration snapshot is retained for the latest 30 versions."
-                    />
-                    {[...draft.history].reverse().slice(0, 10).map((item) => (
-                      <Card key={item.version} size="small">
-                        <Flex justify="space-between">
-                          <Text strong>Configuration v{item.version}</Text>
-                          <Text type="secondary">{formatTime(item.updatedAt)}</Text>
-                        </Flex>
-                        <Text type="secondary">{item.reason}</Text>
-                      </Card>
-                    ))}
-                  </Flex>
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>Version history</Title>
+                      <Paragraph type="secondary">
+                        Review the configuration versions that shaped this investigation.
+                      </Paragraph>
+                    </div>
+                    <div className="version-list">
+                      {[...draft.history].reverse().slice(0, 12).map((item) => (
+                        <Card key={item.version} size="small" className="version-card">
+                          <Flex justify="space-between" gap={12}>
+                            <div>
+                              <Text strong>Configuration v{item.version}</Text>
+                              <div><Text type="secondary">{item.reason}</Text></div>
+                            </div>
+                            <Text type="secondary">{formatTime(item.updatedAt)}</Text>
+                          </Flex>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 ),
               },
             ]}
