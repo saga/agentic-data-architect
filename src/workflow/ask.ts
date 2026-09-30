@@ -158,11 +158,13 @@ export async function answerQuestion(
 
   const answer = parsed.answer || raw.slice(0, 2000);
   await saveInvestigation(inv);
+  if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
   saveConversationMessage({
     sessionName: investigationName,
     role: 'assistant',
     content: answer,
   });
+  if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
   const result: AnswerSummary = {
     answer,
