@@ -1,3 +1,5 @@
+# Changelog
+
 ## 2026-09-30 — 依赖审计与最终收口
 
 - `package-lock.json` 顶层版本与 `package.json` 从 0.3.1/0.3.2 不一致，已同步为 0.3.2。
@@ -23,8 +25,6 @@
 最新 main 的 GitHub Actions CI 已通过 typecheck + test。
 
 ---
-# Changelog
-
 ## 2026-09-30 — V1.1 全仓审查与可靠性修正
 
 ### 为什么改
