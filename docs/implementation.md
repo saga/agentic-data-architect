@@ -103,3 +103,8 @@ skills/financial-data-review/
   SKILL.md
   scripts/review.mjs
 ~~~
+
+
+### Schema 验证
+
+项目使用 Zod 4 作为运行时 Schema 层。持久化 JSON、HTTP 请求体、环境变量和 Agent 结构化输出都在进入业务逻辑前经过 Schema 校验；TypeScript 类型由 Zod Schema 推导，避免手写 interface 与验证逻辑长期漂移。
