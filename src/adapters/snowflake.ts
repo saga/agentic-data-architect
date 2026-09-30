@@ -72,7 +72,7 @@ function splitTable(table: string): { database?: string; schema: string; name: s
 
 function qualifiedTable(table: string): string {
   const parts = splitTable(table);
-  return [parts.database, parts.schema, parts.name].filter(Boolean).map(ident).join('.');
+  return [parts.database, parts.schema, parts.name].filter((part): part is string => Boolean(part)).map(ident).join('.');
 }
 
 export class SnowflakeAdapter implements DatabaseAdapter {
