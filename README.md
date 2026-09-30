@@ -89,3 +89,37 @@ scripts/sqlglot_parser.py SQLGlot 桥（stdin/stdout JSON）
 tests/                    单测 + tests/evaluation/golden.test.ts
 examples/investment/golden/ golden 数据集 + 期望结果
 ```
+
+
+## Investigation Workspace
+
+每个 Investigation 都有独立的工作目录：
+
+~~~text
+.data/investigations/<name>/
+  investigation.json
+  discovery/
+  reports/
+  workspace/
+    context.json
+    inputs/
+    research/
+      github/
+      leanix/
+      confluence/
+      web/
+    sources/
+      github/
+    findings/
+    artifacts/
+    notes/
+~~~
+
+workspace/context.json 是整个研究过程的上下文入口，记录最初用户 prompt、每次 input、重要信息以及对应研究文档。外部研究不能只留在聊天记录里。
+
+GitHub 代码研究支持两种方式，由用户在研究开始时选择：
+
+1. 直接使用 GitHub Tool，通过 GitHub URL / repository API 读取和分析。
+2. Clone 到 workspace/sources/github/，再使用本地 find / grep / rg / git 做深入分析。
+
+LeanIX 架构事实使用 SAP LeanIX 官方 MCP；Confluence 内部文档使用 Atlassian 官方 Rovo MCP。研究记录和重要发现分别保存到 workspace/research/ 和 workspace/findings/。
