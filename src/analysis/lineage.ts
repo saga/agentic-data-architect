@@ -1,3 +1,8 @@
+/**
+ * SQL AST 驱动的 lineage 构建。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import fs from 'node:fs/promises';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 import { SqlglotParser, type ColumnLineage, type ParsedStatement } from './sql-parser.js';
@@ -15,6 +20,7 @@ export interface DatasetEdge {
   evidenceId: string;
 }
 
+/** 一次 SQL lineage 分析的完整结果，包括表、列、statement 和 Evidence。 */
 export interface LineageGraph {
   edges: DatasetEdge[];
   tables: string[];
@@ -23,6 +29,7 @@ export interface LineageGraph {
   evidence: EvidenceRef[];
 }
 
+/** 构建 lineage 所需的输入文件及其源指纹。 */
 export interface LineageInput {
   path: string;
   sha256: string;
@@ -31,6 +38,7 @@ export interface LineageInput {
   dialect?: string;
 }
 
+/** 批量解析 SQL 文件，生成 dataset/column lineage，并为每个结论创建可追溯 Evidence。 */
 export async function buildLineage(inputs: LineageInput[], parser = new SqlglotParser()): Promise<LineageGraph> {
   const edges: DatasetEdge[] = [];
   const tables = new Set<string>();
