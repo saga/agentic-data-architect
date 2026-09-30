@@ -1,3 +1,8 @@
+---
+name: investigation-session
+description: Continuous human-agent data investigation: clarify goals, preserve multi-turn context, separate evidence from inference, and drive the investigation toward useful next questions and outputs.
+---
+
 # Investigation Session
 
 持续的人机协作 Data Investigation，不是一次性问答。
