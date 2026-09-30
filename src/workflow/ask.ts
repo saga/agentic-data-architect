@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { askCopilot } from '../agent/copilot.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
@@ -15,11 +13,6 @@ export interface AnswerSummary {
   claimIds: string[];
   warnings: string[];
   unknowns: string[];
-}
-
-async function loadInvestigationSkill(): Promise<string> {
-  const file = path.resolve(process.cwd(), 'skills/investigation-session/SKILL.md');
-  return fs.readFile(file, 'utf8');
 }
 
 export async function answerQuestion(
