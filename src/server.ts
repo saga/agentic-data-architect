@@ -310,8 +310,8 @@ export function createApp(vite?: ViteDevServer) {
     let finished = false;
     const send = (event: string, data: unknown) => {
       if (finished || res.writableEnded) return;
-      res.write(`event: ${event}\\n`);
-      res.write(`data: ${JSON.stringify(data)}\\n\\n`);
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
     send('started', { turnId });
