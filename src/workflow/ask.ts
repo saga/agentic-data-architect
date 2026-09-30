@@ -36,6 +36,7 @@ export async function answerQuestion(
   question: string,
   onDelta?: (delta: string) => void,
   turnId?: string,
+  onStatus?: (status: string) => void,
 ): Promise<AnswerSummary> {
   if (!turnId) turnId = nextId('turn');
 
@@ -144,6 +145,7 @@ export async function answerQuestion(
     skills: control.agent.skills.map((item) => item.name),
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
+    ...(onStatus ? { onStatus } : {}),
     turnId,
     shouldAbort: () => abortRequestedTurns.has(turnId),
   });
