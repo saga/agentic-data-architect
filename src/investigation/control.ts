@@ -21,6 +21,8 @@ export interface McpServerSetting {
   args?: string[];
   url?: string;
   tools?: string[];
+  /** HTTP headers may reference environment variables as ${NAME}; secret values are never needed in control.json. */
+  headers?: Record<string, string>;
 }
 
 export interface InvestigationControl {
@@ -89,6 +91,9 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
       ...(Array.isArray(item.args) ? { args: item.args.filter((arg): arg is string => typeof arg === 'string') } : {}),
       ...(typeof item.url === 'string' && item.url.trim() ? { url: item.url.trim() } : {}),
       ...(Array.isArray(item.tools) ? { tools: item.tools.filter((tool): tool is string => typeof tool === 'string') } : {}),
+      ...(item.headers && typeof item.headers === 'object' && !Array.isArray(item.headers)
+        ? { headers: Object.fromEntries(Object.entries(item.headers).filter(([key, value]) => typeof key === 'string' && typeof value === 'string')) }
+        : {}),
     }))
     .filter((item) => item.name);
 }
@@ -143,6 +148,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
         ...item,
         ...(item.args ? { args: [...item.args] } : {}),
         ...(item.tools ? { tools: [...item.tools] } : {}),
+        ...(item.headers ? { headers: { ...item.headers } } : {}),
       })),
     },
   };
@@ -386,22 +392,31 @@ export function buildResearchConfigPrompt(control: InvestigationControl): string
   return lines.join('\n');
 }
 
+function resolveEnvReferences(value: string): string {
+  return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => process.env[name] ?? '');
+}
+
 export function toCopilotMcpServers(control: InvestigationControl): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const server of control.agent.mcpServers) {
     if (!server.enabled) continue;
+    const headers = server.headers
+      ? Object.fromEntries(Object.entries(server.headers).map(([key, value]) => [key, resolveEnvReferences(value)]))
+      : undefined;
     if (server.type === 'http' && server.url) {
       result[server.name] = {
         type: 'http',
-        url: server.url,
+        url: resolveEnvReferences(server.url),
         tools: server.tools?.length ? server.tools : ['*'],
+        ...(headers ? { headers } : {}),
       };
     } else if (server.type === 'local' && server.command) {
       result[server.name] = {
         type: 'local',
-        command: server.command,
-        args: server.args ?? [],
+        command: resolveEnvReferences(server.command),
+        args: (server.args ?? []).map(resolveEnvReferences),
         tools: server.tools?.length ? server.tools : ['*'],
+        ...(headers ? { headers } : {}),
       };
     }
   }
