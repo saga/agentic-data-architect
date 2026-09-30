@@ -56,6 +56,10 @@ export interface AskInput {
 
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
 
+export function hasActiveCopilotTurn(turnId: string): boolean {
+  return activeSessions.has(turnId);
+}
+
 export async function abortCopilotTurn(turnId: string): Promise<boolean> {
   const active = activeSessions.get(turnId);
   if (!active) return false;
