@@ -1,3 +1,8 @@
+/**
+ * Investigation Control、版本和审计。
+ *
+ * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -13,6 +18,7 @@ import {
   type McpServerSetting,
 } from './schemas.js';
 
+/** 返回当前 Investigation 的 control.json 路径。 */
 function controlFile(name: string): string {
   return path.join(workspaceRoot(name), 'control.json');
 }
@@ -20,6 +26,7 @@ function controlFile(name: string): string {
 const controlUpdateLocks = new Map<string, Promise<void>>();
 const controlInitLocks = new Map<string, Promise<void>>();
 
+/** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
   const previous = controlUpdateLocks.get(name) ?? Promise.resolve();
   let release!: () => void;
@@ -35,15 +42,18 @@ async function withControlUpdateLock<T>(name: string, operation: () => Promise<T
   }
 }
 
+/** 返回当前 Investigation 的审计日志路径。 */
 function auditFile(name: string): string {
   return path.join(workspaceRoot(name), 'audit.jsonl');
 }
 
+/** 清理字符串数组：去空格、去空值、去重复，为配置保存提供稳定输入。 */
 function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))];
 }
 
+/** 将历史/外部传入的 MCP 配置归一化成内部结构，再交给 Zod 做最终验证。 */
 function normalizeMcpServers(value: unknown): McpServerSetting[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -102,6 +112,7 @@ async function skillSourceHash(name: string): Promise<string | undefined> {
   }
 }
 
+/** 创建一个新 Investigation 的默认配置，默认 Skill 来自环境配置。 */
 function defaultControl(): Omit<InvestigationControl, 'history'> {
   const now = new Date().toISOString();
   return {
@@ -125,6 +136,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
   };
 }
 
+/** 复制当前配置到 history 快照，避免后续对象修改影响历史记录。 */
 function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, 'history'> {
   return {
     schemaVersion: control.schemaVersion,
@@ -149,6 +161,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
   };
 }
 
+/** 读取旧 control.json 后补默认值、清理历史格式，并通过 Zod 得到可信 Control。 */
 function normalizeControl(raw: Partial<InvestigationControl>): InvestigationControl {
   const defaults = defaultControl();
   const research = raw.research ?? defaults.research;
@@ -200,6 +213,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
   });
 }
 
+/** 读取 Control；首次访问时负责创建 v1 默认配置，并用初始化锁避免并发重复创建。 */
 export async function loadInvestigationControl(name: string): Promise<InvestigationControl> {
   try {
     return normalizeControl(JSON.parse(await fs.readFile(controlFile(name), 'utf8')) as Partial<InvestigationControl>);
@@ -251,6 +265,7 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
   }
 }
 
+/** 串行更新 Research/Agent 配置、递增版本、记录 Skill/MCP 版本变化并写审计。 */
 export async function updateInvestigationControl(
   name: string,
   next: Pick<InvestigationControl, 'research' | 'agent'>,
@@ -356,6 +371,7 @@ async function updateInvestigationControlImpl(
   return control;
 }
 
+/** 向 audit.jsonl 追加一条经过 Schema 校验的审计事件。 */
 export async function appendAuditEvent(
   name: string,
   event: Omit<AuditEvent, 'id' | 'timestamp'>,
@@ -369,6 +385,7 @@ export async function appendAuditEvent(
   return full;
 }
 
+/** 读取最近的审计事件；损坏或不符合当前 Schema 的行会被忽略。 */
 export async function readAuditEvents(name: string, limit = 50): Promise<AuditEvent[]> {
   try {
     const text = await fs.readFile(auditFile(name), 'utf8');
@@ -382,6 +399,7 @@ export async function readAuditEvents(name: string, limit = 50): Promise<AuditEv
   }
 }
 
+/** 把用户配置转换成模型可读的任务约束 Prompt，并明确它不是 Evidence。 */
 export function buildResearchConfigPrompt(control: InvestigationControl): string {
   const lines = [
     '## Investigation configuration',
@@ -424,10 +442,12 @@ export function buildResearchConfigPrompt(control: InvestigationControl): string
   return lines.join('\n');
 }
 
+/** 解析 MCP URL/header/command 中的 ${ENV_NAME} 引用，但不把原始敏感变量写回配置。 */
 function resolveEnvReferences(value: string): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => process.env[name] ?? '');
 }
 
+/** 将内部 MCP 配置转换成 Copilot SDK 需要的结构，并保留 HTTP headers。 */
 export function toCopilotMcpServers(control: InvestigationControl): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const server of control.agent.mcpServers) {
