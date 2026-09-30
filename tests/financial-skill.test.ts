@@ -92,6 +92,8 @@ test('financial review skill script produces deterministic review artifact', asy
     assert.equal(artifact.status, 'ok');
     assert.ok(artifact.observations.some((item) => item.type === 'multiple_sources_of_truth'));
     assert.ok(artifact.observations.some((item) => item.type === 'temporal_risk'));
+    assert.ok(artifact.observations.some((item) => item.type === 'identifier_fragmentation'));
+
     assert.ok(artifact.questions.length > 0);
   } finally {
     await rm(root, { recursive: true, force: true });
