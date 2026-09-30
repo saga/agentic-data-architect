@@ -1,5 +1,22 @@
 # Implementation Roadmap
 
+## 当前交互层：Web Workbench
+
+主入口已经从 readline session 改为 Web UI：
+
+```text
+Browser
+  → Express 5
+  → Investigation API
+  → existing workflow / Evidence / Copilot
+  → .workspace/<session>/context.json
+```
+
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。 citeturn702320search0turn702320search1
+
+Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
+
+
 当前代码状态、下一步实现和边界。不重复架构理论。
 
 ## 当前：V1.1
