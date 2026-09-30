@@ -16,7 +16,8 @@ export interface QueryPlan {
 /** 校验：只读 + 单条 + 必须提到目标 dataset。 */
 export function validateQueryPlan(plan: QueryPlan): void {
   assertReadOnly(plan.sql);
-  if (!plan.sql.toLowerCase().includes(plan.dataset.toLowerCase().split('.').pop() as string)) {
+  const table = (plan.dataset.split('.').pop() ?? '').replace(/^"|"$/g, '');
+  if (!table || !new RegExp('(?<![A-Za-z0-9_$])' + table.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\  if (!plan.sql.toLowerCase().includes(plan.dataset.toLowerCase().split('.').pop() as string)) {') + '(?![A-Za-z0-9_$])', 'i').test(plan.sql)) {
     throw new Error(`查询没有引用目标表 ${plan.dataset}，拒绝执行：${plan.sql.slice(0, 120)}`);
   }
 }
