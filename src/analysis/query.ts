@@ -1,3 +1,8 @@
+/**
+ * Targeted Query 的安全执行入口。
+ *
+ * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ */
 import { assertReadOnly, type DatabaseAdapter } from '../adapters/database.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 
@@ -24,6 +29,7 @@ export function validateQueryPlan(plan: QueryPlan): void {
   }
 }
 
+/** 执行已经通过安全校验的查询，并把结果包装成可追溯 Evidence。 */
 export async function runQueryPlan(
   adapter: DatabaseAdapter,
   plan: QueryPlan,
