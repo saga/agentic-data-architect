@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
 const venvDir = path.join(root, '.venv');
 const requirements = path.join(root, 'requirements-dev.txt');
+const configuredPython = process.env['SQLGLOT_PYTHON'];
 const python = process.env['PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3');
 const venvPython = process.platform === 'win32'
   ? path.join(venvDir, 'Scripts', 'python.exe')
@@ -18,6 +19,21 @@ function run(command, args) {
     stdio: 'inherit',
     env: process.env,
   });
+}
+
+if (configuredPython) {
+  try {
+    execFileSync(configuredPython, ['-c', 'import sqlglot'], {
+      cwd: root,
+      stdio: 'ignore',
+      env: process.env,
+    });
+    console.log(`SQLGlot test interpreter: ${configuredPython}`);
+    process.exit(0);
+  } catch {
+    console.error(`SQLGLOT_PYTHON does not have sqlglot installed: ${configuredPython}`);
+    process.exit(1);
+  }
 }
 
 function hasSqlglot() {
