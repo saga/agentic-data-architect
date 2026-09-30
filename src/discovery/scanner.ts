@@ -50,6 +50,7 @@ async function walk(dir: string, out: SourceFile[]): Promise<void> {
       if (!SKIP_DIRS.has(e.name)) await walk(path.join(dir, e.name), out);
       continue;
     }
+    if (e.isSymbolicLink()) continue;
     const fp = path.join(dir, e.name);
     const ext = path.extname(e.name).toLowerCase();
     const [stat, raw] = await Promise.all([fs.stat(fp), fs.readFile(fp)]);
