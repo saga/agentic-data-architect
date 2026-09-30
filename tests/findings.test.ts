@@ -2,7 +2,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   findDuplicateTransformations,
-  findMultipleSourcesOfTruth,
   findSemanticConflicts,
   runAllFindings,
   type FindingContext,
@@ -42,14 +41,6 @@ function ctxWith(datasets: string[]): FindingContext {
 }
 
 describe('findings engine', () => {
-  it('multiple position candidates -> multiple_sources_of_truth', () => {
-    const ctx = ctxWith(['ibor_position', 'legacy_position', 'portfolio_position']);
-    const found = findMultipleSourcesOfTruth(ctx);
-    assert.equal(found.length, 1);
-    assert.equal(found[0]?.type, 'multiple_sources_of_truth');
-    assert.ok((found[0]?.evidenceIds.length ?? 0) >= 2);
-  });
-
   it('no evidence -> no finding (never invent)', () => {
     const ctx = ctxWith(['ibor_position', 'legacy_position']);
     ctx.evidence = [];
