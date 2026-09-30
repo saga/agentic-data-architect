@@ -1,4 +1,4 @@
-# 当前实现状态（V1.1）
+# 当前实现状态（V1.2）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -8,9 +8,11 @@ Skill-driven financial review、结构化 Agent 结果（含状态校正）、�
 V1.1 优先完成（本节是对照清单，做完即勾）：
 1. Evidence provenance ✓ 2. SQL AST / column lineage ✓ 3. Estate Graph ✓
 4. 只读 database adapter ✓ 5. targeted profiling ✓ 6. findings/conflicts ✓
-7. 结构化 Agent 结果 ✓ 8. evaluation ✓
+7. 结构化 Agent 结果 ✓ 8. evaluation ✓  9. Current-State Intelligence ✓
 
-V2 做 Semantic / Source-to-Target / Target Architecture。
+V1.2 增加 Current-State Intelligence：canonical asset types、parse coverage、source-of-truth candidates、semantic candidates，以及 provider-neutral Semantic Context。
+
+V2 做完整 Business Semantics / Source-to-Target / Target Architecture。
 V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
