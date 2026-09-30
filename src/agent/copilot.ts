@@ -1,17 +1,6 @@
 import { CopilotClient } from '@github/copilot-sdk';
 import { config } from '../config.js';
 
-/**
- * Copilot SDK 最小封装：优先复用本机 `copilot` CLI 登录状态。
- *
- * 参考 team-member-copilot-agent/server/copilot.ts 的两条纪律（这里只保留结论）：
- *  1. resume 失败 ≠ session 不存在，只有明确 not-found 才降级 create。
- *  2. sendAndWait 超时 ≠ 取消，超时后必须 abort，否则引擎还在后台跑。
- *
- * V1 刻意不做：tool 授权、capability 适配、multi-turn 锁、MCP。
- * 上下文以纯文本形式拼进 prompt（只读），不给模型任何写工具。
- */
-
 let client: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
@@ -23,7 +12,7 @@ export async function getClient(): Promise<CopilotClient> {
   if (starting) return starting;
   starting = (async () => {
     const c = config.githubToken
-      ? new CopilotClient({ mode: 'empty', gitHubToken: config.githubToken, useLoggedInUser: false })
+      ? new CopilotClient({ mode: 'empty', githubToken: config.githubToken, useLoggedInUser: false })
       : new CopilotClient({ mode: 'copilot-cli', useLoggedInUser: true });
     await c.start();
     client = c;
@@ -51,7 +40,7 @@ export async function stopClient(): Promise<void> {
 export interface AskInput {
   prompt: string;
   systemPrompt: string;
-  /** 不传 = 每次新建 session（V1 默认无状态）；传 = 复用长期 session */
+  /** When provided, the same resumable Copilot session is reused across turns/processes. */
   sessionId?: string;
   workingDirectory?: string;
   model?: string;
@@ -61,8 +50,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
   const sessionConfig = {
     model: input.model ?? config.model,
-    workingDirectory: input.workingDirectory ?? process.cwd(),
+    workingDirectory: input.working ?? process.cwd(),
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
   const session = input.sessionId
@@ -81,7 +71,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       try {
         await session.abort();
       } catch {
-        /* abort 失败也只能抛原始超时 */
+        /* ignore */
       }
     }
     throw e;
@@ -106,13 +96,12 @@ async function resumeOrCreate(
     if (e instanceof Error && SESSION_NOT_FOUND.test(e.message)) {
       return c.createSession(sessionConfig);
     }
-    // 存在性不明时再问一次权威来源，查不到才认为是新建
     try {
       if ((await c.getSessionMetadata(sessionId)) === undefined) {
         return c.createSession(sessionConfig);
       }
     } catch {
-      /* 连元数据都查不了：保留原始错误，不伪装成新会话 */
+      /* preserve the original resume error */
     }
     throw e;
   }
