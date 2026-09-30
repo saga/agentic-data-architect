@@ -1,5 +1,5 @@
 import {
-  assertReadOnly,
+  boundedReadOnlyQuery,
   type ColumnInfo,
   type ColumnProfile,
   type DatabaseAdapter,
@@ -52,6 +52,29 @@ function parseUrl(conn: string): Record<string, string> {
   };
 }
 
+function ident(name: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name)) {
+    throw new Error(`非法 Snowflake 标识符：${name}`);
+  }
+  return '"' + name.replace(/"/g, '""') + '"';
+}
+
+function splitTable(table: string): { database?: string; schema: string; name: string } {
+  const parts = table.split('.').map((p) => p.replace(/^"|"$/g, ''));
+  if (parts.length > 3 || parts.length < 1 || parts.some((p) => !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(p))) {
+    throw new Error(`非法表名（只允许 [db.][schema.]table）：${table}`);
+  }
+  const name = parts.pop() as string;
+  const schema = parts.pop() ?? 'PUBLIC';
+  const database = parts.pop();
+  return { ...(database ? { database } : {}), schema, name };
+}
+
+function qualifiedTable(table: string): string {
+  const parts = splitTable(table);
+  return [parts.database, parts.schema, parts.name].filter(Boolean).map(ident).join('.');
+}
+
 export class SnowflakeAdapter implements DatabaseAdapter {
   readonly type = 'snowflake';
   private conn: SfConn | null = null;
@@ -88,14 +111,15 @@ export class SnowflakeAdapter implements DatabaseAdapter {
   }
 
   async listSchemas(database?: string): Promise<SchemaInfo[]> {
+    const scope = database ? `${ident(database)}.` : '';
     const rows = await this.q(
-      `SELECT SCHEMA_NAME AS name FROM ${database ? `${database}.` : ''}INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME NOT IN ('INFORMATION_SCHEMA') ORDER BY 1`,
+      `SELECT SCHEMA_NAME AS name FROM ${scope}INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME NOT IN ('INFORMATION_SCHEMA') ORDER BY 1`,
     );
     return rows.map((r) => ({ name: String(r['NAME'] ?? r['name']), ...(database ? { database } : {}) }));
   }
 
   async listTables(database?: string, schema = 'PUBLIC'): Promise<TableInfo[]> {
-    const scope = database ? `${database}.` : '';
+    const scope = database ? `${ident(database)}.` : '';
     const rows = await this.q(
       `SELECT TABLE_SCHEMA AS s, TABLE_NAME AS n FROM ${scope}INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA = ? ORDER BY 1,2`,
       [schema.toUpperCase()],
@@ -113,11 +137,11 @@ export class SnowflakeAdapter implements DatabaseAdapter {
   }
 
   async getTableMetadata(table: string): Promise<TableMetadata> {
-    const parts = table.split('.');
-    const name = parts.pop() as string;
-    const schema = parts.pop() ?? 'PUBLIC';
-    const database = parts.pop();
-    const scope = database ? `${database}.` : '';
+    const parts = splitTable(table);
+    const name = parts.name;
+    const schema = parts.schema;
+    const database = parts.database;
+    const scope = database ? `${ident(database)}.` : '';
     const rows = await this.q(
       `SELECT COLUMN_NAME AS n, DATA_TYPE AS t, IS_NULLABLE AS nu FROM ${scope}INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`,
       [schema.toUpperCase(), name.toUpperCase()],
@@ -128,18 +152,19 @@ export class SnowflakeAdapter implements DatabaseAdapter {
       nullable: String(r['NU'] ?? r['nu']) !== 'NO',
     }));
     if (columns.length === 0) throw new Error(`表不存在或无权访问：${table}`);
-    const qualifiedName = `${database ? `${database}.` : ''}${schema}.${name}`;
+    const qualifiedName = [database, schema, name].filter(Boolean).join('.');
     return { ...(database ? { database } : {}), schema, name, qualifiedName, columns };
   }
 
   async sample(table: string, limit: number): Promise<Record<string, unknown>[]> {
     const n = Math.min(Math.max(Math.floor(limit), 1), 1000);
-    return this.q(`SELECT * FROM ${table} LIMIT ${n}`);
+    return this.q(`SELECT * FROM ${qualifiedTable(table)} LIMIT ${n}`);
   }
 
   async profile(table: string, columns?: string[]): Promise<DataProfile> {
     const meta = await this.getTableMetadata(table);
-    const [c] = await this.q(`SELECT COUNT(*) AS C FROM ${table}`);
+    const from = qualifiedTable(table);
+    const [c] = await this.q(`SELECT COUNT(*) AS C FROM ${from}`);
     const rowCount = Number(c?.['C'] ?? 0);
     const wanted = columns?.length ? new Set(columns.map((x) => x.toUpperCase())) : null;
     const profiles: ColumnProfile[] = [];
@@ -147,14 +172,14 @@ export class SnowflakeAdapter implements DatabaseAdapter {
       if (wanted && !wanted.has(col.name.toUpperCase())) continue;
       const id = `"${col.name.replace(/"/g, '""')}"`;
       const [agg] = await this.q(
-        `SELECT COUNT(*) AS N, COUNT(${id}) AS NN, COUNT(DISTINCT ${id}) AS D FROM ${table}`,
+        `SELECT COUNT(*) AS N, COUNT(${id}) AS NN, COUNT(DISTINCT ${id}) AS D FROM ${from}`,
       );
       const n = Number(agg?.['N'] ?? 0);
       const nonNull = Number(agg?.['NN'] ?? 0);
       let min: string | undefined;
       let max: string | undefined;
       try {
-        const [mm] = await this.q(`SELECT MIN(${id})::STRING AS LO, MAX(${id})::STRING AS HI FROM ${table}`);
+        const [mm] = await this.q(`SELECT MIN(${id})::STRING AS LO, MAX(${id})::STRING AS HI FROM ${from}`);
         if (mm?.['LO'] != null) min = String(mm['LO']);
         if (mm?.['HI'] != null) max = String(mm['HI']);
       } catch {
@@ -177,8 +202,7 @@ export class SnowflakeAdapter implements DatabaseAdapter {
   }
 
   async query(sql: string): Promise<QueryResult> {
-    assertReadOnly(sql);
-    const rows = await this.q(sql);
+    const rows = await this.q(boundedReadOnlyQuery(sql));
     const columns = rows.length > 0 ? Object.keys(rows[0] as object) : [];
     return { columns, rows: rows.slice(0, 1000), rowCount: rows.length, truncated: rows.length >= 1000 };
   }
