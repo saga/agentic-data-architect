@@ -15,7 +15,7 @@ export type AgentClaimDraft = z.infer<typeof AgentClaimDraftSchema>;
 
 export const AgentAnswerSchema = z.object({
   answer: z.string().max(8000).catch(''),
-  claims: z.array(AgentClaimDraftSchema.catch(null))
+  claims: z.array(AgentClaimDraftSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
   unknowns: z.array(z.string().max(500)).catch([]),
