@@ -20,13 +20,24 @@ body {
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
+  user-select: auto;
+}
+
+.app-shell.is-resizing,
+.app-shell.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .session-sider {
-  height: 100vh;
+  height: 100vh !important;
+  min-width: 220px !important;
+  max-width: 380px !important;
   overflow: hidden;
-  border-right: 1px solid #f0f0f0;
+  border-right: 0;
+  background: #fff !important;
   padding: 16px 12px;
+  flex: 0 0 auto !important;
 }
 
 .brand {
@@ -41,6 +52,7 @@ body {
   height: 34px;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   border-radius: 9px;
   background: #1677ff;
   color: #fff;
@@ -54,15 +66,51 @@ body {
   margin-bottom: 12px;
 }
 
+.sider-tip {
+  margin: 0 4px 12px;
+}
+
 .conversations {
-  height: calc(100vh - 138px);
+  height: calc(100vh - 170px);
   overflow: auto;
 }
 
+.resize-handle {
+  position: relative;
+  z-index: 20;
+  flex: 0 0 6px;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: #f0f0f0;
+  transition: background-color 120ms ease, width 120ms ease;
+}
+
+.resize-handle:hover::after,
+.app-shell.is-resizing .resize-handle::after {
+  left: 1px;
+  width: 3px;
+  background: #1677ff;
+}
+
+.resize-handle-right {
+  order: 0;
+}
+
 .topbar {
-  flex: 0 0 64px;
-  height: 64px;
-  line-height: 64px;
+  flex: 0 0 64px !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  line-height: normal !important;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
@@ -71,8 +119,20 @@ body {
   overflow: hidden;
 }
 
+.topbar-title {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar-title .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-layout {
   display: flex;
+  min-width: 0;
   min-height: 0;
   height: calc(100vh - 64px);
   overflow: hidden;
@@ -81,7 +141,8 @@ body {
 
 .chat-main {
   min-width: 0;
-  flex: 1;
+  min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
 }
@@ -92,59 +153,6 @@ body {
   overflow: auto;
   padding: 24px 28px;
 }
-
-.welcome {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-}
-
-.message-markdown {
-  max-width: min(860px, 70vw);
-}
-
-.composer {
-  padding: 12px 24px 18px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.content-divider {
-  height: auto;
-  margin: 0;
-}
-
-.context-panel {
-  width: 320px;
-  overflow: auto;
-  padding: 18px;
-  background: #fafafa;
-}
-
-.error-card {
-  margin: 0 24px 8px;
-}
-
-@media (max-width: 900px) {
-  .context-panel,
-  .content-divider {
-    display: none;
-  }
-
-  .session-sider {
-    width: 230px !important;
-    min-width: 230px !important;
-  }
-
-  .bubble-list {
-    padding: 16px;
-  }
-
-  .composer {
-    padding: 10px 12px 14px;
-  }
-}
-
 
 .welcome {
   flex: 1;
@@ -179,25 +187,314 @@ body {
   gap: 8px;
 }
 
+.message-markdown {
+  max-width: min(860px, 70vw);
+}
 
-.sider-tip { margin: 0 4px 12px; }
+.composer {
+  padding: 12px 24px 18px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+}
 
-.topbar-title { min-width: 0; overflow: hidden; }
+.composer-files {
+  display: grid;
+  gap: 6px;
+  padding: 0 2px 8px;
+}
 
-.topbar-title .ant-typography { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-divider {
+  height: auto;
+  margin: 0;
+}
 
-.composer-files { display: grid; gap: 6px; padding: 0 2px 8px; }
+.right-panel-shell {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 280px;
+  max-width: 460px;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+  border-left: 0;
+}
 
-.activity-item { display: grid; gap: 2px; padding-bottom: 7px; border-bottom: 1px solid #f0f0f0; }
+.context-panel {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 18px 16px 24px;
+  background: #fafafa;
+}
 
-.activity-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 14px;
+}
 
-.modal-tip { margin-top: 14px; }
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
 
-.audit-version { margin-top: 6px; margin-inline-start: 0; }
+.context-tip {
+  margin-bottom: 14px;
+}
 
-.settings-modal .ant-modal-body { max-height: 70vh; overflow: auto; }
+.panel-section {
+  padding: 15px 2px;
+  border-top: 1px solid #e8e8e8;
+}
 
-.ant-tabs-content { min-height: 0; }
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
 
-@media (max-width: 1100px) { .context-panel { width: 300px; } .topbar .ant-space { gap: 6px !important; } }
+.section-heading > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.section-subtitle {
+  font-size: 12px;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+}
+
+.status-line > .ant-typography:last-child {
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coverage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.coverage-grid > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.coverage-grid span {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.coverage-grid .ant-typography {
+  font-size: 12px;
+}
+
+.activity-list {
+  display: grid;
+  gap: 9px;
+}
+
+.activity-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.activity-item .ant-typography {
+  max-width: 100%;
+}
+
+.panel-updated {
+  display: block;
+  padding: 12px 2px 0;
+  font-size: 12px;
+}
+
+.error-card {
+  margin: 0 24px 8px;
+}
+
+.modal-tip {
+  margin-top: 14px;
+}
+
+.settings-modal .ant-modal-content {
+  overflow: hidden;
+}
+
+.settings-modal .ant-modal-body {
+  max-height: min(72vh, 720px);
+  overflow: hidden;
+  padding: 0 0 12px;
+}
+
+.settings-tabs {
+  min-height: 560px;
+}
+
+.settings-tabs > .ant-tabs-nav {
+  width: 190px;
+  flex: 0 0 190px;
+  padding: 18px 0 18px 18px;
+  margin: 0;
+  border-right: 1px solid #f0f0f0;
+}
+
+.settings-tabs > .ant-tabs-content-holder {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-tabs .ant-tabs-content {
+  height: 100%;
+}
+
+.settings-tabs .ant-tabs-tabpane {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-page {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 26px 30px 18px;
+}
+
+.settings-page-header {
+  margin-bottom: 20px;
+}
+
+.settings-page-header .ant-typography {
+  margin-bottom: 5px;
+}
+
+.settings-card {
+  margin-bottom: 14px;
+}
+
+.settings-card:last-child {
+  margin-bottom: 0;
+}
+
+.settings-card-heading {
+  margin-bottom: 8px;
+}
+
+.field-label {
+  margin: 18px 0 9px;
+  font-weight: 600;
+}
+
+.selected-skill-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.selected-skill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 7px;
+  background: #fafafa;
+}
+
+.mcp-editor {
+  margin-top: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.version-list {
+  display: grid;
+  gap: 9px;
+}
+
+.version-card {
+  margin: 0;
+}
+
+.audit-version {
+  margin-top: 6px;
+  margin-inline-start: 0;
+}
+
+@media (max-width: 900px) {
+  .right-panel-shell,
+  .content-divider,
+  .resize-handle-right {
+    display: none;
+  }
+
+  .session-sider {
+    width: 230px !important;
+    min-width: 230px !important;
+  }
+
+  .bubble-list {
+    padding: 16px;
+  }
+
+  .composer {
+    padding: 10px 12px 14px;
+  }
+
+  .topbar {
+    padding: 0 12px;
+  }
+
+  .topbar .ant-space > .ant-tag {
+    display: none;
+  }
+
+  .settings-tabs > .ant-tabs-nav {
+    width: 150px;
+    flex-basis: 150px;
+  }
+
+  .settings-page {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 680px) {
+  .session-sider {
+    display: none;
+  }
+
+  .resize-handle-left {
+    display: none;
+  }
+
+  .settings-modal .ant-modal {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px);
+  }
+
+  .settings-tabs > .ant-tabs-nav {
+    display: none;
+  }
+}
