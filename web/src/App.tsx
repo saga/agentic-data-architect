@@ -143,7 +143,7 @@ interface SessionData {
   currentState?: {
     coverage: {
       datasets: number;
-      datasetLineageCoverage: number | null;
+      dataset血缘Coverage: number | null;
       sqlParseFailures: number;
       semanticAssets: number;
       profiledDatasets: number;
@@ -160,7 +160,7 @@ interface SkillOption {
   description: string;
 }
 
-interface ModernizationGap {
+interface 现代化差距 {
   id: string;
   kind: string;
   title: string;
@@ -171,7 +171,7 @@ interface ModernizationGap {
   recommendation: string;
 }
 
-interface ModernizationPlan {
+interface 现代化Plan {
   id: string;
   title: string;
   status: string;
@@ -184,7 +184,7 @@ interface ModernizationPlan {
     semanticAssets: number;
     findings: number;
   };
-  gaps: ModernizationGap[];
+  gaps: 现代化差距[];
   analysisCases: Array<{
     title: string;
     question: string;
@@ -201,7 +201,7 @@ interface ModernizationPlan {
     name: string;
     objective: string;
     outputs: string[];
-    blockedByGapIds: string[];
+    blockedBy差距Ids: string[];
   }>;
   mappings: Array<{
     id: string;
@@ -365,9 +365,9 @@ function AppInner() {
   const [mcpDraft, setMcpDraft] = useState('[]');
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [auditOpen, setAuditOpen] = useState(false);
-  const [modernizationOpen, setModernizationOpen] = useState(false);
-  const [modernizationLoading, setModernizationLoading] = useState(false);
-  const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
+  const [modernizationOpen, set现代化Open] = useState(false);
+  const [modernizationLoading, set现代化Loading] = useState(false);
+  const [modernizationPlan, set现代化Plan] = useState<现代化Plan>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -425,18 +425,18 @@ function AppInner() {
     setAttachments(existing);
   };
 
-  const loadModernization = async (key: string) => {
-    setModernizationLoading(true);
+  const load现代化 = async (key: string) => {
+    set现代化Loading(true);
     try {
-      const result = await getJson<{ plan: ModernizationPlan }>(
+      const result = await getJson<{ plan: 现代化Plan }>(
         `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
       );
-      setModernizationPlan(result.plan);
-      setModernizationOpen(true);
+      set现代化Plan(result.plan);
+      set现代化Open(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法生成现代化计划');
     } finally {
-      setModernizationLoading(false);
+      set现代化Loading(false);
     }
   };
 
@@ -462,7 +462,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
-    setModernizationPlan(undefined);
+    set现代化Plan(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -808,7 +808,7 @@ function AppInner() {
       <div
         className="resize-handle resize-handle-left"
         role="separator"
-        aria-label="Resize session sidebar"
+        aria-label="调整会话栏宽度"
         onMouseDown={(event) => {
           event.preventDefault();
           setResizing('left');
@@ -910,7 +910,7 @@ function AppInner() {
                       {[
                         'Legacy 平台中的 Position 最终来自哪里？',
                         '梳理 Portfolio Market Value 的完整数据血缘。',
-                        '目前已经确认了哪些 Current-State 数据模型？',
+                        '目前已经确认了哪些 当前现状 数据模型？',
                       ].map((prompt) => (
                         <Button key={prompt} className="quick-chip" size="small" onClick={() => send(prompt)}>
                           {prompt}
@@ -960,7 +960,7 @@ function AppInner() {
                 }
                 header={
                   <Sender.Header
-                    title="Files"
+                    title="文件"
                     open={attachmentsOpen}
                     onOpenChange={setAttachmentsOpen}
                     forceRender
@@ -1001,7 +1001,7 @@ function AppInner() {
             <div
               className="resize-handle resize-handle-right"
               role="separator"
-              aria-label="Resize investigation sidebar"
+              aria-label="调整工作区栏宽度"
               onMouseDown={(event) => {
                 event.preventDefault();
                 setResizing('right');
@@ -1010,7 +1010,7 @@ function AppInner() {
             <aside className="context-panel">
               <div className="panel-header">
                 <div>
-                  <Text className="eyebrow">INVESTIGATION</Text>
+                  <Text className="eyebrow">调查</Text>
                   <Title level={5} style={{ margin: '3px 0 0' }}>{current?.context.name || '—'}</Title>
                 </div>
                 <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
@@ -1058,25 +1058,25 @@ function AppInner() {
                 <div className="section-heading">
                   <div>
                     <Text strong>现代化工作</Text>
-                    <Text type="secondary" className="section-subtitle">Data Analyst + Data Architect 工作产物</Text>
+                    <Text type="secondary" className="section-subtitle">数据分析师 + 数据架构师工作产物</Text>
                   </div>
                 </div>
                 <Flex vertical gap={9}>
                   <Text type="secondary">
-                    从当前发现生成分析 Case、Gap、目标架构、Source-to-Target 映射、迁移阶段和验证计划。
+                    从当前发现生成分析 Case、差距、目标架构、源到目标映射、迁移阶段和验证计划。
                   </Text>
                   <Button
                     type="primary"
                     ghost
                     loading={modernizationLoading}
                     disabled={!active}
-                    onClick={() => active && void loadModernization(active)}
+                    onClick={() => active && void load现代化(active)}
                   >
                     {modernizationPlan ? '打开现代化计划' : '生成现代化计划'}
                   </Button>
                   {modernizationPlan ? (
                     <Flex gap={6} wrap>
-                      <Tag>{modernizationPlan.gaps.length} 个 Gap</Tag>
+                      <Tag>{modernizationPlan.gaps.length} 个 差距</Tag>
                       <Tag>{modernizationPlan.mappings.length} 条映射</Tag>
                       <Tag>{modernizationPlan.validationPlan.checks.length} 项验证</Tag>
                     </Flex>
@@ -1096,8 +1096,8 @@ function AppInner() {
                   <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">发现问题</Text></div>
                   <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">未知项</Text></div>
                   <div>
-                    <span>{current?.currentState?.coverage.datasetLineageCoverage == null ? '—' : `${(current.currentState.coverage.datasetLineageCoverage * 100).toFixed(0)}%`}</span>
-                    <Text type="secondary">Lineage 覆盖</Text>
+                    <span>{current?.currentState?.coverage.dataset血缘Coverage == null ? '—' : `${(current.currentState.coverage.dataset血缘Coverage * 100).toFixed(0)}%`}</span>
+                    <Text type="secondary">血缘 覆盖</Text>
                   </div>
                   <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">语义资产</Text></div>
                   <div><span>{current?.currentState?.coverage.sqlParseFailures ?? 0}</span><Text type="secondary">SQL 解析失败</Text></div>
@@ -1127,7 +1127,7 @@ function AppInner() {
                   </Flex>
                 ) : (
                   <Text type="secondary">
-                    当前还没有现代化 Gap。先完成 Discovery，再生成现代化计划。
+                    当前还没有现代化 差距。先完成 Discovery，再生成现代化计划。
                   </Text>
                 )}
               </section>
@@ -1157,20 +1157,20 @@ function AppInner() {
       </Layout>
 
       <Modal
-        title="Modernization plan"
+        title="现代化工作计划"
         open={modernizationOpen}
         width={980}
         centered
-        onCancel={() => setModernizationOpen(false)}
+        onCancel={() => set现代化Open(false)}
         footer={[
-          <Button key="close" onClick={() => setModernizationOpen(false)}>关闭</Button>,
+          <Button key="close" onClick={() => set现代化Open(false)}>关闭</Button>,
           <Button
             key="refresh"
             type="primary"
             loading={modernizationLoading}
-            onClick={() => active && void loadModernization(active)}
+            onClick={() => active && void load现代化(active)}
           >
-            Rebuild from latest Current-State
+            从最新现状重新生成
           </Button>,
         ]}
       >
@@ -1187,13 +1187,13 @@ function AppInner() {
               <Divider style={{ margin: '12px 0' }} />
               <div className="coverage-grid compact">
                 <div><span>{modernizationPlan.currentState.datasets}</span><Text type="secondary">数据集</Text></div>
-                <div><span>{modernizationPlan.currentState.lineageCoverage === null ? '—' : `${(modernizationPlan.currentState.lineageCoverage * 100).toFixed(0)}%`}</span><Text type="secondary">Lineage</Text></div>
+                <div><span>{modernizationPlan.currentState.lineageCoverage === null ? '—' : `${(modernizationPlan.currentState.lineageCoverage * 100).toFixed(0)}%`}</span><Text type="secondary">血缘</Text></div>
                 <div><span>{modernizationPlan.currentState.parseFailures}</span><Text type="secondary">SQL 解析失败</Text></div>
                 <div><span>{modernizationPlan.currentState.semanticAssets}</span><Text type="secondary">语义资产</Text></div>
               </div>
             </Card>
 
-            <Card size="small" title={`Gap (${modernizationPlan.gaps.length})`}>
+            <Card size="small" title={`差距 (${modernizationPlan.gaps.length})`}>
               {modernizationPlan.gaps.length ? (
                 <Flex vertical gap={10}>
                   {modernizationPlan.gaps.map((gap) => (
@@ -1210,7 +1210,7 @@ function AppInner() {
                   ))}
                 </Flex>
               ) : (
-                <Empty description="当前现状没有发现确定性的 Gap。" />
+                <Empty description="当前现状没有发现确定性的 差距。" />
               )}
             </Card>
 
@@ -1235,15 +1235,15 @@ function AppInner() {
                   <div key={stage.id}>
                     <Text strong>{index + 1}. {stage.name}</Text>
                     <div><Text type="secondary">{stage.objective}</Text></div>
-                    {stage.blockedByGapIds.length ? (
-                      <Text type="danger">阻塞：{stage.blockedByGapIds.join(', ')}</Text>
+                    {stage.blockedBy差距Ids.length ? (
+                      <Text type="danger">阻塞：{stage.blockedBy差距Ids.join(', ')}</Text>
                     ) : null}
                   </div>
                 ))}
               </Flex>
             </Card>
 
-            <Card size="small" title={`Source-to-Target 映射（${modernizationPlan.mappings.length}）`}>
+            <Card size="small" title={`源到目标映射（${modernizationPlan.mappings.length}）`}>
               <Flex vertical gap={8}>
                 {modernizationPlan.mappings.length ? (
                   modernizationPlan.mappings.slice(0, 20).map((mapping) => (
@@ -1307,7 +1307,7 @@ function AppInner() {
           autoFocus
           value={newSessionName}
           onChange={(event) => setNewSessionName(event.target.value)}
-          placeholder="portfolio-analytics"
+          placeholder="例如：portfolio-modernization"
           onPressEnter={createSession}
         />
         <Alert
@@ -1386,7 +1386,7 @@ function AppInner() {
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
                         value={draft.research.keywords}
-                        placeholder="Position, Security Master, proxy voting..."
+                        placeholder="Position、Security Master、Proxy Voting..."
                         onChange={(value) => updateDraft((next) => { next.research.keywords = value; })}
                       />
                     </Card>
@@ -1424,7 +1424,7 @@ function AppInner() {
                       </Paragraph>
                     </div>
 
-                    <Card className="settings-card" title="Skills">
+                    <Card className="settings-card" title="技能">
                       <Flex justify="space-between" align="center" className="settings-card-heading">
                         <Text strong>已启用技能</Text>
                         <Tag>有版本管理</Tag>
@@ -1475,7 +1475,7 @@ function AppInner() {
                       <Input.TextArea
                         autoSize={{ minRows: 8, maxRows: 18 }}
                         value={draft.agent.systemPrompt.content}
-                        placeholder="Example: Treat proxy voting policy documents as primary business context when interpreting vote instructions."
+                        placeholder="例如：解释投票指令时，把代理投票政策文档作为主要业务依据。"
                         onChange={(event) => updateDraft((next) => { next.agent.systemPrompt.content = event.target.value; })}
                       />
                     </Card>
