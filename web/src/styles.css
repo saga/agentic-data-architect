@@ -244,29 +244,6 @@ body {
   margin-bottom: 14px;
 }
 
-.panel-section {
-  padding: 15px 2px;
-  border-top: 1px solid #e8e8e8;
-}
-
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.section-heading > div:first-child {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.section-subtitle {
-  font-size: 12px;
-}
-
 .error-card {
   margin: 0 24px 8px;
 }
@@ -681,15 +658,6 @@ body {
   gap: 12px;
 }
 
-.modernization-modal .ant-card {
-  border-color: rgba(5, 5, 5, 0.07);
-  border-radius: 10px;
-}
-
-.modernization-modal .ant-card + .ant-card {
-  margin-top: 10px;
-}
-
 /* 右侧栏和改造计划都用统一的正文大小；数字不再放大成“仪表盘”效果。 */
 .context-panel {
   font-size: 13px;
@@ -698,10 +666,6 @@ body {
 .context-panel .ant-typography,
 .context-panel .ant-tag,
 .context-panel .ant-btn {
-  font-size: 13px;
-}
-
-.context-panel .section-heading > div:first-child .ant-typography {
   font-size: 13px;
 }
 
@@ -745,11 +709,6 @@ body {
 .plain-plan-next {
   display: grid;
   gap: 2px;
-}
-
-.modernization-modal .ant-card {
-  border-color: rgba(5, 5, 5, 0.07);
-  border-radius: 10px;
 }
 
 .modernization-modal .ant-card-head-title {
