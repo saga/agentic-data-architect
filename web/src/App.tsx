@@ -160,7 +160,7 @@ interface SkillOption {
   description: string;
 }
 
-interface 现代化差距 {
+interface ModernizationGap {
   id: string;
   kind: string;
   title: string;
@@ -184,7 +184,7 @@ interface ModernizationPlan {
     semanticAssets: number;
     findings: number;
   };
-  gaps: 现代化差距[];
+  gaps: ModernizationGap[];
   analysisCases: Array<{
     title: string;
     question: string;
@@ -438,7 +438,7 @@ function AppInner() {
       setModernizationPlan(result.plan);
       setModernizationOpen(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '无法生成现代化计划');
+      setError(e instanceof Error ? e.message : '无法生成改造计划');
     } finally {
       setModernizationLoading(false);
     }
@@ -837,7 +837,7 @@ function AppInner() {
               {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">发现问题 {current.context.findings.length}</Tag> : null}
-              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">未知项 {current.context.unknowns.length}</Tag> : null}
+              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">待查内容 {current.context.unknowns.length}</Tag> : null}
 
             </Space>
           </Flex>
