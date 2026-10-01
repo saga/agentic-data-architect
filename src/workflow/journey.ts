@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import type { WorkflowId } from '../investigation/schemas.js';
+import { parseSkillManifest } from '../skills/catalog.js';
 
 export type JourneyNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
@@ -220,6 +221,13 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
 export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<JourneyDefinition> {
   const skillPath = path.join(config.skillsDir, workflowId, 'SKILL.md');
   const markdown = await fs.readFile(skillPath, 'utf8');
+  const manifest = parseSkillManifest(markdown, skillPath);
+  if (manifest.name !== workflowId) {
+    throw new Error('Workflow ' + workflowId + ' 对应 Skill 名称不一致：' + manifest.name);
+  }
+  if (manifest.metadata.kind !== 'workflow') {
+    throw new Error('Skill ' + workflowId + ' 的 kind=' + manifest.metadata.kind + '，不能作为 Workflow 加载。');
+  }
   const result = parseJourneyMarkdown(markdown);
   if (!result.definition || result.issues.length) {
     throw new Error(
