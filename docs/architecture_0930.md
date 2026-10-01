@@ -1,4 +1,4 @@
-# 当前实现状态（V1.2）
+# 当前实现状态（V1.3）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -12,8 +12,9 @@ V1.1 优先完成（本节是对照清单，做完即勾）：
 
 V1.2 增加 Current-State Intelligence：canonical asset types、parse coverage、source-of-truth candidates、semantic candidates，以及 provider-neutral Semantic Context。
 
-V2 做完整 Business Semantics / Source-to-Target / Target Architecture。
-V3 做 Migration Waves / Dual Run / Reconciliation / Cutover。
+V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization Workbench：增加 Analysis Case、Target Architecture、Source-to-Target Mapping、Architecture Decision、Gap Analysis 和 Modernization Plan。它们先作为轻量、可验证的工作产物存在，不引入重量级 workflow engine。
+
+后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
