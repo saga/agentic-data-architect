@@ -98,3 +98,65 @@ test('journey state uses facts rather than agent self-report', () => {
   assert.equal(state.stages.find((stage) => stage.id === 'estate')?.status, 'current');
   assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
+
+
+test('parses the financial AI-native architecture workflow', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow financial-ai-native-architecture',
+    'start -> intake',
+    '',
+    '## @task intake',
+    'title: 明确业务目标',
+    'completeWhen: goal',
+    '- success -> requirements',
+    '- needs-input -> intake',
+    '',
+    '## @task requirements',
+    'title: 明确业务需求',
+    '- success -> data',
+    '- needs-input -> intake',
+    '',
+    '## @task data',
+    'title: 查数据',
+    '- success -> domain-model',
+    '- needs-input -> requirements',
+    '',
+    '## @task domain-model',
+    'title: 定义金融业务模型',
+    '- success -> architecture',
+    '',
+    '## @task architecture',
+    'title: 设计数据架构',
+    '- success -> semantic',
+    '- retry -> data',
+    '',
+    '## @task semantic',
+    'title: 设计业务语义',
+    '- success -> agent',
+    '',
+    '## @task agent',
+    'title: 设计 Agent',
+    '- success -> controls',
+    '',
+    '## @task controls',
+    'title: 设计安全和运行控制',
+    '- success -> evaluation',
+    '',
+    '## @task evaluation',
+    'title: 设计验证和评估',
+    '- success -> roadmap',
+    '',
+    '## @task roadmap',
+    'title: 形成实施路线',
+    '- success -> done',
+    '',
+    '## @end done',
+    'visible: false',
+  ].join('\\n'));
+
+  assert.equal(result.issues.length, 0);
+  assert.ok(result.definition);
+  assert.equal(result.definition?.id, 'financial-ai-native-architecture');
+  assert.equal(result.definition?.start, 'intake');
+  assert.equal(result.definition?.nodes.length, 10);
+});
