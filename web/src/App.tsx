@@ -559,6 +559,7 @@ function AppInner() {
       );
       setAssessmentPlan(result.plan);
       setJourney(result.plan.journey);
+      setModernizationOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法生成架构评估');
     } finally {
