@@ -1,6 +1,8 @@
 ---
 name: investigation-session
 description: Continuous human-agent data investigation: clarify goals, preserve multi-turn context, separate evidence from inference, and drive the investigation toward useful next questions and outputs.
+metadata:
+  kind: capability
 ---
 
 # Investigation Session
