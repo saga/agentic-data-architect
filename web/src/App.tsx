@@ -1215,7 +1215,23 @@ function AppInner() {
                 <div className="right-section-heading">
                   <Text strong>现在卡在哪里</Text>
                 </div>
-                {current?.context.workflow === 'financial-ai-native-architecture' ? (
+                {current?.context.workflow === 'data-architecture-assessment' ? (
+                  <div className="right-blocked-card">
+                    <Text strong>先把现状和主要问题查清楚</Text>
+                    <Text type="secondary">
+                      先看数据资产、数据流、模型、来源、治理和现有技术，再给出问题清单、建议和实施顺序。
+                    </Text>
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={loading}
+                      disabled={!active || loading}
+                      onClick={() => void send('先按“数据架构评估”路线开始。请先明确这次评估的范围、目标和交付物，再检查当前架构、数据流、数据模型、治理、安全、质量和主要技术风险。不要直接给结论，先把证据和未知项查清楚。')}
+                    >
+                      开始评估
+                    </Button>
+                  </div>
+                ) : current?.context.workflow === 'financial-ai-native-architecture' ? (
                   <div className="right-blocked-card">
                     <Text strong>先把方案目标说清楚</Text>
                     <Text type="secondary">
@@ -1315,14 +1331,22 @@ function AppInner() {
                           size="small"
                           loading={modernizationLoading}
                           onClick={() => {
-                            if (modernizationPlan) {
+                            if (current?.context.workflow === 'data-architecture-assessment') {
+                              if (assessmentPlan) {
+                                setModernizationOpen(true);
+                              } else if (active) {
+                                void loadAssessment(active);
+                              }
+                            } else if (modernizationPlan) {
                               setModernizationOpen(true);
                             } else if (active) {
                               void loadModernization(active);
                             }
                           }}
                         >
-                          {modernizationPlan ? '看完整方案' : '生成完整方案'}
+                          {current?.context.workflow === 'data-architecture-assessment'
+                            ? (assessmentPlan ? '看评估结果' : '生成评估结果')
+                            : (modernizationPlan ? '看完整方案' : '生成完整方案')}
                         </Button>
                       </div>
                     );
@@ -1336,14 +1360,54 @@ function AppInner() {
 
                   <Modal
         className="modernization-modal"
-        title="完整改造方案"
+        title={current?.context.workflow === 'data-architecture-assessment' ? '架构评估结果' : '完整改造方案'}
         open={modernizationOpen}
         width={760}
         centered
         onCancel={() => setModernizationOpen(false)}
         footer={<Button onClick={() => setModernizationOpen(false)}>关闭</Button>}
       >
-        {modernizationPlan && current?.currentState ? (
+        {current?.context.workflow === 'data-architecture-assessment' && assessmentPlan ? (
+          <div className="plain-plan">
+            <Text type="secondary">
+              这是基于当前调查证据整理出的评估草案。问题、建议和实施顺序仍需要负责人确认。
+            </Text>
+            <Card size="small" title="评估范围">
+              <div className="plain-summary">
+                <span>{assessmentPlan.goal || '尚未明确目标'}</span>
+                <span>数据集：<strong>{assessmentPlan.currentState.datasets}</strong></span>
+                <span>数据来路：<strong>{assessmentPlan.currentState.lineageCoverage == null ? '未统计' : Math.round(assessmentPlan.currentState.lineageCoverage * 100) + '%'}</strong></span>
+                <span>发现问题：<strong>{assessmentPlan.currentState.findings}</strong></span>
+              </div>
+            </Card>
+            <Card size="small" title="主要问题">
+              <div className="plan-stage-list">
+                {assessmentPlan.findings.slice(0, 12).map((finding) => (
+                  <div key={finding.id} className="plan-stage">
+                    <Text strong>{finding.title}</Text>
+                    <Text type="secondary">{finding.description}</Text>
+                    <Text type="secondary">建议：{finding.recommendation}</Text>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card size="small" title="建议">
+              <div className="plain-summary">
+                {assessmentPlan.recommendations.map((item) => <span key={item}>{item}</span>)}
+              </div>
+            </Card>
+            <Card size="small" title="实施顺序">
+              <div className="plan-stage-list">
+                {assessmentPlan.roadmap.map((item, index) => (
+                  <div key={item.id} className="plan-stage">
+                    <Text strong>{index + 1}. {item.title}</Text>
+                    <Text type="secondary">{item.objective}</Text>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        ) : modernizationPlan && current?.currentState ? (
           <div className="plain-plan">
             <Text type="secondary">
               这里是详细方案。右侧已经显示当前卡点和直接操作，这里只看完整步骤和方案内容。
