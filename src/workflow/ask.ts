@@ -38,6 +38,8 @@ export interface AnswerSummary {
   claimIds: string[];
   warnings: string[];
   unknowns: string[];
+  /** 回答后的下一步问题；前端用它生成主动引导输入卡片。 */
+  followUpQuestions: string[];
 }
 
 /** 完整执行一轮 Investigation 问答：抢占 turn → 固定 Control → 构造证据上下文 → 执行 Agent → 解析答案 → 原子提交结果。 */
@@ -204,6 +206,7 @@ activeAfterExecution.phase = 'committing';
     claimIds: claims.map((c) => `${c.id}[${c.status}]`),
     warnings: parsed.warnings,
     unknowns: parsed.unknowns,
+    followUpQuestions: parsed.followUpQuestions,
   };
   // durable turn 最后才标记 completed，保证数据库状态代表已经真正写完结果。
 finishConversationTurn(turnId, 'completed', JSON.stringify(result));
