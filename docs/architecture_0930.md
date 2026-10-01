@@ -30,7 +30,7 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 3. **Data Architecture Assessment**
    - 适用于评估已有数据架构：查清当前情况、主要问题、改进建议和实施顺序。
 
-两条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
+三条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
 
 ~~~text
 Legacy Modernization
@@ -64,7 +64,7 @@ Data Architecture Assessment
     → 排出实施顺序
 ~~~
 
-两条 Workflow 都只固定“大阶段”。Agent 在阶段内部自由调查、使用工具和反复验证。
+三条 Workflow 都只固定“大阶段”。Agent 在阶段内部自由调查、使用工具和反复验证。
 
 Financial AI-Native Architecture 的 Skill 重点覆盖：
 
@@ -76,6 +76,30 @@ Financial AI-Native Architecture 的 Skill 重点覆盖：
 - point-in-time research、Evidence 和 deterministic validation
 
 不要把三条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
+
+## Data Architecture Assessment Workflow
+
+Data Architecture Assessment 用于回答“现在这套数据架构怎么样、哪里有问题、先改什么”，不直接替代迁移方案，也不等于从零设计目标平台。
+
+路线定义在：
+
+```text
+skills/data-architecture-assessment/SKILL.md
+```
+
+当前路线：
+
+```text
+明确评估目标
+  → 查清当前架构
+  → 找出主要问题
+  → 给出改进建议
+  → 排出实施顺序
+```
+
+运行时位于 `src/workflow/assessment.ts`。它复用已有 Current-State、Finding、Gap Analysis 和 Evidence，不重新做一套 discovery engine；生成的评估结果保存为 `reports/architecture-assessment.json`。
+
+右侧工作区使用同一个 Journey runtime 展示 Assessment 路线；评估结果里展示当前范围、主要问题、建议和实施顺序。
 
 ## Legacy Modernization Workflow
 
@@ -117,6 +141,7 @@ Core Platform
   ├─ SQL Read-only Guard
   ├─ Lineage / Profiling
   ├─ Claim validation
+  ├─ Curated Architecture Knowledge
   └─ Copilot SDK integration
           │
           └── skillDirectories → skills/*/SKILL.md
