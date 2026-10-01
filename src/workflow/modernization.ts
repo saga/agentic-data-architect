@@ -416,7 +416,36 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
 export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
-    return ModernizationPlanSchema.parse(raw);
+    const plan = ModernizationPlanSchema.parse(raw);
+    const inv = await loadInvestigation(name);
+    const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+    const current = snapshot?.currentState ?? null;
+    const gaps = buildModernizationGaps({
+      currentState: current,
+      estate: snapshot?.estate,
+      findings: inv.findings,
+    });
+    const journey = buildJourneyState(await loadModernizationJourney(), {
+      goal: inv.goal || inv.userPrompt,
+      currentState: current ? {
+        datasets: current.coverage.datasets,
+        lineageCoverage: current.coverage.datasetLineageCoverage,
+        semanticAssets: current.coverage.semanticAssets,
+        parseFailures: current.coverage.sqlParseFailures,
+      } : null,
+      unknowns: inv.unknowns,
+      highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+      targetComponentCount: plan.targetArchitecture.status === 'draft'
+        ? 0
+        : plan.targetArchitecture.components.length,
+      mappingCount: plan.mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length,
+      blockingValidationReady: plan.validationPlan.checks.filter(
+        (check) => check.blocking && ['ready', 'passed'].includes(check.status),
+      ).length,
+      blockingValidationTotal: plan.validationPlan.checks.filter((check) => check.blocking).length,
+    });
+
+    return { ...plan, journey };
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
