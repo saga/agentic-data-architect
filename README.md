@@ -4,19 +4,21 @@
 
 它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
 
-核心不是“聊天”，而是：
+核心不是“聊天”，而是一条有状态的 Legacy Modernization Journey：
 
 ~~~text
-Legacy Project
-  → Discovery
-  → Current-State Intelligence
-  → Analyst Investigation
-  → Business / Semantic Context
-  → Target Architecture
-  → Source-to-Target Mapping
-  → Gap Analysis
-  → Migration / Validation
+接到任务
+  → 看清旧系统
+  → 找到数据真相
+  → 查关键问题
+  → 定下现状
+  → 设计新方案
+  → 新旧对应
+  → 验证结果
+  → 切换
 ~~~
+
+Agent 在每一关负责调查和推理；Workflow 决定当前在哪一关、什么时候可以进入下一关，以及发现新问题后回到哪里。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、GitHub、Confluence、Web Search 等由工具执行。
 
 ## 总体架构
 
@@ -63,7 +65,7 @@ sequenceDiagram
 
     User->>UI: 创建项目 / 提出问题
     UI->>WF: 开始 Investigation
-    WF->>Disc: 扫描代码、数据库、ETL、文档
+    WF->>Disc: 按 Journey 当前关卡执行发现
     Disc->>Meta: 生成资产、Job、Dataset、Column
     Disc->>Ev: 保存证据与 provenance
     Disc->>Meta: 生成 lineage / profiling / coverage
@@ -74,7 +76,7 @@ sequenceDiagram
     Agent->>Meta: 检索资产和上下游
     Agent->>Ev: 检索证据
     Agent->>Sem: 使用已有 semantic / business context
-    Agent-->>UI: 事实、推断、未知项、下一步
+    Agent-->>UI: 事实、未知项、当前关卡、下一步
 
     User->>Review: 确认或修正业务含义
     Review-->>WF: 人工确认
@@ -105,6 +107,36 @@ http://127.0.0.1:3000
 
 ~~~bash
 npm run dev
+~~~
+
+## Modernization Journey
+
+路线定义在：
+
+~~~text
+skills/legacy-modernization/SKILL.md
+~~~
+
+它使用轻量 Markdown Workflow：
+
+~~~text
+@flow
+@task
+@gate
+@end
+@stop
+~~~
+
+主路线不是一个死板的流程图。发现新的 lineage、业务定义或数据质量问题时，可以回到前面的调查关卡；只有 Current-State、Mapping、Validation 等确定性状态满足条件，Journey 才会推进。
+
+Workflow 和 Skill 分工如下：
+
+~~~text
+Workflow → 现在做什么、什么时候能过、失败回哪里
+Skill    → 这一关具体怎么查
+Tool     → 真正执行 SQL / profiling / lineage / search
+Agent    → 理解证据、选择调查动作、解释结果
+Human    → 确认业务定义、范围和例外
 ~~~
 
 ## Modernization Work Products
@@ -164,9 +196,10 @@ skills/
   search-github/
   search-confluence/
   search-leanix/
+  legacy-modernization/
 ~~~
 
-安全、Evidence 校验、只读查询、Lineage、Profiling 和状态持久化仍由代码负责。
+legacy-modernization 同时承载 Modernization Journey 的路线定义。安全、Evidence 校验、只读查询、Lineage、Profiling 和状态持久化仍由代码负责。
 
 ## 进一步说明
 
