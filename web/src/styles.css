@@ -747,18 +747,12 @@ body {
   color: rgba(0, 0, 0, 0.45);
 }
 
-.right-summary,
 .right-section,
 .right-next {
   padding: 15px 2px;
   border-bottom: 1px solid #e8e8e8;
 }
 
-.right-summary {
-  padding-top: 17px;
-}
-
-.right-label,
 .right-section-heading {
   display: block;
   margin-bottom: 7px;
@@ -770,13 +764,13 @@ body {
   font-size: 13px;
 }
 
-.right-goal {
-  margin: 0 !important;
-  font-size: 14px !important;
-  line-height: 1.6;
-  color: rgba(0, 0, 0, 0.82);
+.right-section,
+.right-next {
+  padding: 15px 2px;
+  border-bottom: 1px solid #e8e8e8;
 }
 
+.right-section-heading {
 .right-facts {
   display: flex;
   flex-wrap: wrap;
@@ -822,4 +816,9 @@ body {
 .right-next-content .ant-btn {
   width: fit-content;
   margin-top: 3px;
+}
+
+.topbar-label {
+  font-size: 14px;
+  line-height: 1.5;
 }
