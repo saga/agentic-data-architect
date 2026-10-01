@@ -4,6 +4,7 @@ import {
   App as AntApp,
   Button,
   Card,
+  ConfigProvider,
   Divider,
   Empty,
   Flex,
@@ -45,6 +46,7 @@ import {
   XProvider,
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
+import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
 const { Sider, Header, Content } = Layout;
@@ -72,10 +74,10 @@ interface InvestigationControl {
   version: number;
   updatedAt: string;
   research: {
-    githubRepositories: string[];
+    github仓库: string[];
     githubSearchMode: 'only_selected' | 'selected_and_broad';
     keywords: string[];
-    importantDocuments: Array<{ id: string; title: string; reference: string }>;
+    important文档: Array<{ id: string; title: string; reference: string }>;
   };
   agent: {
     systemPrompt: {
@@ -83,7 +85,7 @@ interface InvestigationControl {
       content: string;
     };
     skills: Array<{ name: string; version: number }>;
-    mcpServers: Array<{
+    mcp服务器: Array<{
       name: string;
       version: number;
       enabled: boolean;
@@ -138,6 +140,19 @@ interface SessionData {
   control: InvestigationControl;
   recentAudit: AuditEvent[];
   messages: Message[];
+  currentState?: {
+    coverage: {
+      datasets: number;
+      datasetLineageCoverage: number | null;
+      sqlParseFailures: number;
+      semanticAssets: number;
+      profiled数据集: number;
+    };
+    sourceOfTruthCandidates: unknown[];
+    semanticCandidates: unknown[];
+    highValueAssets: string[];
+  } | null;
+  semanticAssets?: unknown[];
 }
 
 interface SkillOption {
@@ -170,9 +185,15 @@ interface ModernizationPlan {
     findings: number;
   };
   gaps: ModernizationGap[];
+  analysisCases: Array<{
+    title: string;
+    question: string;
+    steps: Array<{ title: string; status: string; action: string }>;
+    conclusion?: string;
+  }>;
   targetArchitecture: {
     principles: string[];
-    components: Array<{ id: string; name: string; type: string; description: string }>;
+    components: Array<{ id: string; name: string; type: string; description: string; sourceAssets?: string[] }>;
     openQuestions: string[];
   };
   migrationStages: Array<{
@@ -182,6 +203,28 @@ interface ModernizationPlan {
     outputs: string[];
     blockedByGapIds: string[];
   }>;
+  mappings: Array<{
+    id: string;
+    title: string;
+    sourceAsset: string;
+    targetAsset: string;
+    transformation?: string;
+    businessRule?: string;
+    validationRule?: string;
+    status: string;
+  }>;
+  validationPlan: {
+    checks: Array<{
+      id: string;
+      type: string;
+      name: string;
+      description: string;
+      status: string;
+      blocking: boolean;
+    }>;
+    cutoverCriteria: string[];
+    rollbackCriteria: string[];
+  };
 }
 
 const markdownComponents = {
@@ -216,7 +259,7 @@ async function consumeSse(
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('Streaming response is not available.');
+  if (!reader) throw new Error('当前环境不支持流式响应。');
 
   const decoder = new TextDecoder();
   let buffer = '';
@@ -254,16 +297,16 @@ function documentReferences(context?: SessionContext): string[] {
     .map((input) => input.artifactPath as string);
 }
 
-function parseMcpJson(value: string): InvestigationControl['agent']['mcpServers'] {
+function parseMcpJson(value: string): InvestigationControl['agent']['mcp服务器'] {
   const parsed = JSON.parse(value) as unknown;
-  if (!Array.isArray(parsed)) throw new Error('MCP configuration must be a JSON array.');
+  if (!Array.isArray(parsed)) throw new Error('MCP 配置必须是 JSON 数组。');
 
   return parsed.map((item) => {
-    if (!item || typeof item !== 'object') throw new Error('Each MCP server must be an object.');
+    if (!item || typeof item !== 'object') throw new Error('每个 MCP Server 都必须是对象。');
     const server = item as Record<string, unknown>;
     const name = String(server.name ?? '').trim();
     const type = server.type === 'http' ? 'http' : 'local';
-    if (!name) throw new Error('Each MCP server needs a name.');
+    if (!name) throw new Error('每个 MCP Server 都必须有名称。');
     return {
       name,
       version: Number(server.version ?? 1) || 1,
@@ -311,7 +354,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnStatus, setTurnStatus] = useState('Thinking…');
+  const [turnStatus, setTurnStatus] = useState('思考中…');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -386,12 +429,12 @@ function AppInner() {
     setModernizationLoading(true);
     try {
       const result = await getJson<{ plan: ModernizationPlan }>(
-        `/api/sessions/${encodeURIComponent(key)}/modernization`,
+        `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
       );
       setModernizationPlan(result.plan);
       setModernizationOpen(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to build modernization plan');
+      setError(e instanceof Error ? e.message : '无法生成现代化计划');
     } finally {
       setModernizationLoading(false);
     }
@@ -432,7 +475,7 @@ function AppInner() {
     if (settingsOpen && current?.control) {
       const next = cloneControl(current.control);
       setDraft(next);
-      setMcpDraft(JSON.stringify(next.agent.mcpServers, null, 2));
+      setMcpDraft(JSON.stringify(next.agent.mcp服务器, null, 2));
     }
   }, [settingsOpen, current?.control]);
 
@@ -477,7 +520,7 @@ function AppInner() {
         role: 'assistant',
         content: currentStreamingAnswer.content
           ? <ChatMarkdown content={currentStreamingAnswer.content} />
-          : <Text type="secondary">Thinking…</Text>,
+          : <Text type="secondary">思考中…</Text>,
         footer: undefined,
       });
     }
@@ -503,7 +546,7 @@ function AppInner() {
 
     setValue('');
     setLoading(true);
-    setTurnStatus('Thinking…');
+    setTurnStatus('思考中…');
     setError(undefined);
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
@@ -558,7 +601,7 @@ function AppInner() {
 
       await consumeSse(response, ({ event, data }) => {
         if (event === 'started') {
-          setTurnStatus('Thinking…');
+          setTurnStatus('思考中…');
           return;
         }
         if (event === 'status') {
@@ -569,7 +612,7 @@ function AppInner() {
           return;
         }
         if (event === 'delta') {
-          setTurnStatus('Generating answer…');
+          setTurnStatus('正在生成答案…');
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
             ? { ...currentAnswer, content: currentAnswer.content + delta }
@@ -577,7 +620,7 @@ function AppInner() {
           return;
         }
         if (event === 'error') {
-          throw new Error(String((data as { error?: unknown }).error ?? 'Request failed'));
+          throw new Error(String((data as { error?: unknown }).error ?? '请求失败'));
         }
         if (event === 'completed') {
           result = data as typeof result;
@@ -586,7 +629,7 @@ function AppInner() {
 
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
-      setTurnStatus('Saving results…');
+      setTurnStatus('正在保存结果…');
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
@@ -597,13 +640,13 @@ function AppInner() {
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        setError('Turn stopped.');
+        setError('本轮执行已停止。');
       } else {
-        setError(e instanceof Error ? e.message : 'Request failed');
+        setError(e instanceof Error ? e.message : '请求失败');
       }
     } finally {
       setStreamingAnswer(undefined);
-      setTurnStatus('Thinking…');
+      setTurnStatus('思考中…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
@@ -624,7 +667,7 @@ function AppInner() {
       navigateToSession(created.context.name);
       setTimeout(() => setSettingsOpen(true), 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to create session');
+      setError(e instanceof Error ? e.message : '无法创建调查');
     }
   };
 
@@ -641,7 +684,7 @@ function AppInner() {
     if (!draft || !active) return;
 
     try {
-      const mcpServers = parseMcpJson(mcpDraft);
+      const mcp服务器 = parseMcpJson(mcpDraft);
       const result = await getJson<{ control: InvestigationControl }>(
         `/api/sessions/${encodeURIComponent(active)}/config`,
         {
@@ -649,17 +692,17 @@ function AppInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             research: draft.research,
-            agent: { ...draft.agent, mcpServers },
+            agent: { ...draft.agent, mcp服务器 },
           }),
         },
       );
 
       setCurrent((existing) => existing ? { ...existing, control: result.control } : existing);
       setDraft(result.control);
-      setMcpDraft(JSON.stringify(result.control.agent.mcpServers, null, 2));
+      setMcpDraft(JSON.stringify(result.control.agent.mcp服务器, null, 2));
       setSettingsOpen(false);
       await loadSession(active);
-      toast.success(`Configuration saved as v${result.control.version}`);
+      toast.success(`配置已保存为 v${result.control.version}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Unable to save configuration');
     }
@@ -683,7 +726,7 @@ function AppInner() {
         ? { ...item, uid: result.file.id, name: result.file.name, status: 'done' }
         : item));
       await loadSession(active);
-      toast.success(`Uploaded ${result.file.name}`);
+      toast.success(`已上传 ${result.file.name}`);
     } catch (e) {
       setAttachments((items) => items.map((item) => item.uid === file.uid ? { ...item, status: 'error' } : item));
       toast.error(e instanceof Error ? e.message : 'Upload failed');
@@ -717,14 +760,14 @@ function AppInner() {
         <div className="brand">
           <div className="brand-mark">DA</div>
           <div>
-            <Text strong>Agentic Data Architect</Text>
-            <div><Text type="secondary">Evidence-first investigation</Text></div>
+            <Text strong>现代化数据工作台</Text>
+            <div><Text type="secondary">基于证据的调查</Text></div>
           </div>
         </div>
 
         <div className="sider-actions">
           <Button icon={<PlusOutlined />} type="primary" block onClick={() => setNewSessionOpen(true)}>
-            New investigation
+            新建调查
           </Button>
           <Button
             icon={<ReloadOutlined />}
@@ -732,7 +775,7 @@ function AppInner() {
             block
             onClick={() => reloadSessions(false).catch((e) => setError(e.message))}
           >
-            Refresh
+            刷新
           </Button>
         </div>
 
@@ -743,8 +786,8 @@ function AppInner() {
             showIcon
             closable
             icon={<InfoCircleOutlined />}
-            message="Each investigation has its own research scope, files and agent configuration."
-            onClose={() => {
+            message="每个调查都有独立的研究范围、文件和 Agent 配置。"
+            on关闭={() => {
               setShowLeftTip(false);
               try { localStorage.setItem('ada.tip.left', 'dismissed'); } catch {}
             }}
@@ -777,7 +820,7 @@ function AppInner() {
           <Flex justify="space-between" align="center" style={{ width: '100%' }}>
             <div className="topbar-title">
               <Title level={4} style={{ margin: 0 }}>
-                {current?.context.userPrompt || current?.context.name || 'New investigation'}
+                {current?.context.userPrompt || current?.context.name || '新建调查'}
               </Title>
               <Text type="secondary">
                 {current?.context.name || 'Start with the question you need to answer'}
@@ -785,12 +828,12 @@ function AppInner() {
             </div>
             <Space>
               <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
-                {loading ? turnStatus : 'Ready'}
+                {loading ? turnStatus : '就绪'}
               </Tag>
-              {current?.control ? <Tag bordered={false}>Config v{current.control.version}</Tag> : null}
-              {current?.context.evidence.length ? <Tag bordered={false} color="blue">Evidence {current.context.evidence.length}</Tag> : null}
-              {current?.context.findings.length ? <Tag bordered={false} color="gold">Findings {current.context.findings.length}</Tag> : null}
-              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">Unknowns {current.context.unknowns.length}</Tag> : null}
+              {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
+              {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
+              {current?.context.findings.length ? <Tag bordered={false} color="gold">发现问题 {current.context.findings.length}</Tag> : null}
+              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">未知项 {current.context.unknowns.length}</Tag> : null}
 
             </Space>
           </Flex>
@@ -813,36 +856,36 @@ function AppInner() {
                   <div className="welcome-brand">
                     <div className="welcome-orb">DA</div>
                     <div>
-                      <Text strong>Evidence-first data investigation</Text>
-                      <div><Text type="secondary">Discover the estate, trace lineage, verify facts, then decide what to investigate next.</Text></div>
+                      <Text strong>基于证据的数据调查</Text>
+                      <div><Text type="secondary">先还原数据资产与血缘，再验证事实，最后决定下一步分析什么。</Text></div>
                     </div>
                   </div>
 
                   <Welcome
                     variant="borderless"
                     icon={<FileTextOutlined />}
-                    title="What are we investigating?"
-                    description="Start with a goal or a question. Add context, files or research sources whenever you have them."
+                    title="我们要解决什么问题？"
+                    description="从目标或问题开始；可以随时补充上下文、文件或研究资料。"
                   />
 
                   <div className="starter-grid">
                     {[
                       {
                         icon: <CheckCircleOutlined />,
-                        title: 'Define the goal',
-                        description: 'What business or data decision are you trying to make?',
+                        title: '定义目标',
+                        description: '你要解决什么业务或数据问题？',
                         prompt: 'Help me define the investigation goal and the key questions we should answer.',
                       },
                       {
                         icon: <FileSearchOutlined />,
-                        title: 'Trace a data flow',
-                        description: 'Find sources, transformations and lineage for an important dataset.',
+                        title: '追踪数据流',
+                        description: '找到关键数据集的来源、转换和上下游关系。',
                         prompt: 'Trace the lineage of the most important data flow in this investigation.',
                       },
                       {
                         icon: <GithubOutlined />,
-                        title: 'Research the domain',
-                        description: 'Compare repositories, documents and existing implementation patterns.',
+                        title: '研究业务领域',
+                        description: '检索仓库、文档和已有实现，确认可以验证的事实。',
                         prompt: 'Research the relevant domain patterns and summarize what we can verify.',
                       },
                     ].map((item) => (
@@ -862,12 +905,12 @@ function AppInner() {
                   </div>
 
                   <div className="quick-start">
-                    <Text className="quick-start-label" type="secondary">Quick start</Text>
+                    <Text className="quick-start-label" type="secondary">快速开始</Text>
                     <Flex wrap gap={8}>
                       {[
-                        'Where does Position come from in the legacy platform?',
-                        'Map the lineage of portfolio market value.',
-                        'What do we know about the current data model?',
+                        'Legacy 平台中的 Position 最终来自哪里？',
+                        '梳理 Portfolio Market Value 的完整数据血缘。',
+                        '目前已经确认了哪些 Current-State 数据模型？',
                       ].map((prompt) => (
                         <Button key={prompt} className="quick-chip" size="small" onClick={() => send(prompt)}>
                           {prompt}
@@ -878,7 +921,7 @@ function AppInner() {
 
                   <div className="welcome-footnote">
                     <PaperClipOutlined />
-                    <Text type="secondary">Upload files, configure GitHub sources, Skills and MCP as the investigation evolves.</Text>
+                    <Text type="secondary">可以上传文件，并在调查过程中配置 GitHub、技能和 MCP。</Text>
                   </div>
                 </div>
               </div>
@@ -893,7 +936,7 @@ function AppInner() {
             <div className="composer">
               {attachmentItems.length ? (
                 <div className="composer-files">
-                  <Text type="secondary">Files in this investigation</Text>
+                  <Text type="secondary">本次调查中的文件</Text>
                   <Flex wrap gap={6}>{attachmentItems}</Flex>
                 </div>
               ) : null}
@@ -905,9 +948,9 @@ function AppInner() {
                 submitType="enter"
                 onSubmit={(message) => { void send(message); }}
                 onCancel={cancelActiveTurn}
-                placeholder="Ask about the data estate, lineage, sources, transformations, findings, or next investigation step"
+                placeholder="可以询问数据资产、血缘、来源、转换、发现的问题或下一步分析"
                 prefix={
-                  <Tooltip title="Upload files">
+                  <Tooltip title="上传文件">
                     <Button
                       type="text"
                       icon={<PaperClipOutlined />}
@@ -929,11 +972,11 @@ function AppInner() {
                       onChange={onAttachmentChange}
                       placeholder={(type) =>
                         type === 'drop'
-                          ? { title: 'Drop files here' }
+                          ? { title: '把文件拖到这里' }
                           : {
                               icon: <FolderOpenOutlined />,
-                              title: 'Upload investigation files',
-                              description: 'Files are stored in this session workspace and indexed in context.json.',
+                              title: '上传调查文件',
+                              description: '文件会保存到当前调查工作区，并登记到 context.json。',
                             }
                       }
                     />
@@ -978,49 +1021,49 @@ function AppInner() {
               <section className="panel-section">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Goal</Text>
-                    <Text type="secondary" className="section-subtitle">What this investigation is trying to answer</Text>
+                    <Text strong>目标</Text>
+                    <Text type="secondary" className="section-subtitle">这次调查要回答什么</Text>
                   </div>
                 </div>
                 <Paragraph
                   ellipsis={{ rows: 5, tooltip: current?.context.goal || current?.context.userPrompt }}
                   style={{ marginBottom: 0 }}
                 >
-                  {current?.context.goal || current?.context.userPrompt || 'No goal defined yet.'}
+                  {current?.context.goal || current?.context.userPrompt || '还没有定义目标。'}
                 </Paragraph>
               </section>
 
               <section className="panel-section">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Sources</Text>
-                    <Text type="secondary" className="section-subtitle">Available context for the agent</Text>
+                    <Text strong>资料来源</Text>
+                    <Text type="secondary" className="section-subtitle">Agent 当前可用的上下文</Text>
                   </div>
                 </div>
                 <div className="status-line">
-                  <Text type="secondary">Documents</Text>
+                  <Text type="secondary">文档</Text>
                   <Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text>
                 </div>
                 <div className="status-line">
-                  <Text type="secondary">Repositories</Text>
-                  <Text>{current?.control?.research.githubRepositories.length ?? 0}</Text>
+                  <Text type="secondary">仓库</Text>
+                  <Text>{current?.control?.research.github仓库.length ?? 0}</Text>
                 </div>
                 <div className="status-line">
-                  <Text type="secondary">Keywords</Text>
+                  <Text type="secondary">关键词</Text>
                   <Text>{current?.control?.research.keywords.length ?? 0}</Text>
                 </div>
               </section>
 
-              <section className="panel-section">
+              <section className="panel-section modern-panel-card">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Modernization</Text>
-                    <Text type="secondary" className="section-subtitle">Analyst + Architect work products</Text>
+                    <Text strong>现代化工作</Text>
+                    <Text type="secondary" className="section-subtitle">Data Analyst + Data Architect 工作产物</Text>
                   </div>
                 </div>
-                <Flex vertical gap={8}>
+                <Flex vertical gap={9}>
                   <Text type="secondary">
-                    Generate a draft package with analysis case, gaps, target architecture, migration stages and reviewable evidence.
+                    从当前发现生成分析 Case、Gap、目标架构、Source-to-Target 映射、迁移阶段和验证计划。
                   </Text>
                   <Button
                     type="primary"
@@ -1029,40 +1072,84 @@ function AppInner() {
                     disabled={!active}
                     onClick={() => active && void loadModernization(active)}
                   >
-                    {modernizationPlan ? 'Open modernization plan' : 'Build modernization plan'}
+                    {modernizationPlan ? '打开现代化计划' : '生成现代化计划'}
                   </Button>
                   {modernizationPlan ? (
                     <Flex gap={6} wrap>
-                      <Tag>{modernizationPlan.gaps.length} gaps</Tag>
-                      <Tag>{modernizationPlan.targetArchitecture.components.length} target components</Tag>
-                      <Tag>{modernizationPlan.migrationStages.length} stages</Tag>
+                      <Tag>{modernizationPlan.gaps.length} 个 Gap</Tag>
+                      <Tag>{modernizationPlan.mappings.length} 条映射</Tag>
+                      <Tag>{modernizationPlan.validationPlan.checks.length} 项验证</Tag>
                     </Flex>
                   ) : null}
                 </Flex>
               </section>
 
-              <section className="panel-section">
+              <section className="panel-section modern-panel-card">
                 <div className="section-heading">
                   <div>
-                    <Text strong>Current state</Text>
-                    <Text type="secondary" className="section-subtitle">Evidence-backed progress</Text>
+                    <Text strong>当前状态</Text>
+                    <Text type="secondary" className="section-subtitle">已经知道什么，还缺什么</Text>
                   </div>
                 </div>
                 <div className="coverage-grid compact">
-                  <div><span>{current?.context.evidence.length ?? 0}</span><Text type="secondary">Evidence</Text></div>
-                  <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">Findings</Text></div>
-                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">Unknowns</Text></div>
+                  <div><span>{current?.currentState?.coverage.datasets ?? 0}</span><Text type="secondary">数据集</Text></div>
+                  <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">发现问题</Text></div>
+                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">未知项</Text></div>
+                  <div>
+                    <span>{current?.currentState?.coverage.datasetLineageCoverage == null ? '—' : `${(current.currentState.coverage.datasetLineageCoverage * 100).toFixed(0)}%`}</span>
+                    <Text type="secondary">Lineage 覆盖</Text>
+                  </div>
+                  <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">语义资产</Text></div>
+                  <div><span>{current?.currentState?.coverage.sqlParseFailures ?? 0}</span><Text type="secondary">SQL 解析失败</Text></div>
                 </div>
               </section>
 
+              <section className="panel-section modern-panel-card">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>下一步要解决</Text>
+                    <Text type="secondary" className="section-subtitle">优先处理会阻塞目标设计的问题</Text>
+                  </div>
+                </div>
+                {modernizationPlan?.gaps.length ? (
+                  <Flex vertical gap={8}>
+                    {modernizationPlan.gaps.slice(0, 5).map((gap) => (
+                      <div key={gap.id} className="modern-gap-row">
+                        <Flex justify="space-between" gap={8}>
+                          <Text strong>{gap.title}</Text>
+                          <Tag color={gap.severity === 'high' ? 'red' : gap.severity === 'medium' ? 'orange' : undefined}>
+                            {gap.severity === 'high' ? '高' : gap.severity === 'medium' ? '中' : '低'}
+                          </Tag>
+                        </Flex>
+                        <Text type="secondary">{gap.recommendation}</Text>
+                      </div>
+                    ))}
+                  </Flex>
+                ) : (
+                  <Text type="secondary">
+                    当前还没有现代化 Gap。先完成 Discovery，再生成现代化计划。
+                  </Text>
+                )}
+              </section>
+
+              <section className="panel-section modern-panel-card">
+                <div className="section-heading">
+                  <div>
+                    <Text strong>资料与能力</Text>
+                    <Text type="secondary" className="section-subtitle">Agent 当前能够使用的上下文</Text>
+                  </div>
+                </div>
+                <div className="status-line"><Text type="secondary">文档</Text><Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">GitHub 仓库</Text><Text>{current?.control?.research.github仓库.length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">关键词</Text><Text>{current?.control?.research.keywords.length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">技能</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcp服务器.filter((item) => item.enabled).length ?? 0}</Text></div>
+              </section>
+
               <Text type="secondary" className="panel-updated">
-                Config v{current?.control?.version ?? 1}
+                配置 v{current?.control?.version ?? 1}
                 {' · '}
-                {current?.control?.agent.skills.length ?? 0} Skills
-                {' · '}
-                {current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0} MCP
-                {' · Updated '}
-                {current ? formatTime(current.context.updatedAt) : '—'}
+                最近更新 {current ? formatTime(current.context.updatedAt) : '—'}
               </Text>
             </aside>
           </div>
@@ -1076,7 +1163,7 @@ function AppInner() {
         centered
         onCancel={() => setModernizationOpen(false)}
         footer={[
-          <Button key="close" onClick={() => setModernizationOpen(false)}>Close</Button>,
+          <Button key="close" onClick={() => setModernizationOpen(false)}>关闭</Button>,
           <Button
             key="refresh"
             type="primary"
@@ -1093,20 +1180,20 @@ function AppInner() {
               <Flex justify="space-between" align="center" gap={16}>
                 <div>
                   <Title level={4} style={{ margin: 0 }}>{modernizationPlan.title}</Title>
-                  <Text type="secondary">{modernizationPlan.goal || 'No modernization goal defined yet.'}</Text>
+                  <Text type="secondary">{modernizationPlan.goal || '还没有定义现代化目标。'}</Text>
                 </div>
                 <Tag color="blue">{modernizationPlan.status}</Tag>
               </Flex>
               <Divider style={{ margin: '12px 0' }} />
               <div className="coverage-grid compact">
-                <div><span>{modernizationPlan.currentState.datasets}</span><Text type="secondary">Datasets</Text></div>
+                <div><span>{modernizationPlan.currentState.datasets}</span><Text type="secondary">数据集</Text></div>
                 <div><span>{modernizationPlan.currentState.lineageCoverage === null ? '—' : `${(modernizationPlan.currentState.lineageCoverage * 100).toFixed(0)}%`}</span><Text type="secondary">Lineage</Text></div>
-                <div><span>{modernizationPlan.currentState.parseFailures}</span><Text type="secondary">Parse failures</Text></div>
-                <div><span>{modernizationPlan.currentState.semanticAssets}</span><Text type="secondary">Semantic assets</Text></div>
+                <div><span>{modernizationPlan.currentState.parseFailures}</span><Text type="secondary">SQL 解析失败</Text></div>
+                <div><span>{modernizationPlan.currentState.semanticAssets}</span><Text type="secondary">语义资产</Text></div>
               </div>
             </Card>
 
-            <Card size="small" title={`Gaps (${modernizationPlan.gaps.length})`}>
+            <Card size="small" title={`Gap (${modernizationPlan.gaps.length})`}>
               {modernizationPlan.gaps.length ? (
                 <Flex vertical gap={10}>
                   {modernizationPlan.gaps.map((gap) => (
@@ -1123,11 +1210,11 @@ function AppInner() {
                   ))}
                 </Flex>
               ) : (
-                <Empty description="No deterministic gaps found from the current snapshot." />
+                <Empty description="当前现状没有发现确定性的 Gap。" />
               )}
             </Card>
 
-            <Card size="small" title="Target architecture draft">
+            <Card size="small" title="目标架构草案">
               <Flex vertical gap={8}>
                 {modernizationPlan.targetArchitecture.principles.map((principle) => (
                   <Text key={principle}>• {principle}</Text>
@@ -1142,27 +1229,75 @@ function AppInner() {
               </Flex>
             </Card>
 
-            <Card size="small" title="Migration stages">
+            <Card size="small" title="迁移阶段">
               <Flex vertical gap={8}>
                 {modernizationPlan.migrationStages.map((stage, index) => (
                   <div key={stage.id}>
                     <Text strong>{index + 1}. {stage.name}</Text>
                     <div><Text type="secondary">{stage.objective}</Text></div>
                     {stage.blockedByGapIds.length ? (
-                      <Text type="danger">Blocked by: {stage.blockedByGapIds.join(', ')}</Text>
+                      <Text type="danger">阻塞：{stage.blockedByGapIds.join(', ')}</Text>
                     ) : null}
                   </div>
                 ))}
               </Flex>
             </Card>
+
+            <Card size="small" title={`Source-to-Target 映射（${modernizationPlan.mappings.length}）`}>
+              <Flex vertical gap={8}>
+                {modernizationPlan.mappings.length ? (
+                  modernizationPlan.mappings.slice(0, 20).map((mapping) => (
+                    <div key={mapping.id} className="mapping-card">
+                      <Flex justify="space-between" gap={10}>
+                        <div><Text strong>{mapping.sourceAsset}</Text><Text type="secondary"> → </Text><Text strong>{mapping.targetAsset}</Text></div>
+                        <Tag>{mapping.status === 'proposed' ? '待审核' : mapping.status}</Tag>
+                      </Flex>
+                      {mapping.transformation ? <div><Text type="secondary">转换：</Text>{mapping.transformation}</div> : null}
+                      {mapping.businessRule ? <div><Text type="secondary">业务规则：</Text>{mapping.businessRule}</div> : null}
+                      {mapping.validationRule ? <div><Text type="secondary">验证：</Text>{mapping.validationRule}</div> : null}
+                    </div>
+                  ))
+                ) : (
+                  <Empty description="当前没有候选映射。" />
+                )}
+              </Flex>
+            </Card>
+
+            <Card size="small" title="验证计划">
+              <Flex vertical gap={9}>
+                {modernizationPlan.validationPlan.checks.map((check) => (
+                  <div key={check.id} className="validation-row">
+                    <div>
+                      <Text strong>{check.name}</Text>
+                      <div><Text type="secondary">{check.description}</Text></div>
+                    </div>
+                    <Space>
+                      {check.blocking ? <Tag color="red">阻塞项</Tag> : <Tag>非阻塞</Tag>}
+                      <Tag color={check.status === 'blocked' ? 'orange' : check.status === 'ready' ? 'green' : undefined}>
+                        {check.status === 'blocked' ? '待解决' : check.status === 'ready' ? '可执行' : '计划中'}
+                      </Tag>
+                    </Space>
+                  </div>
+                ))}
+              </Flex>
+              <Divider />
+              <Text strong>切换条件</Text>
+              <Flex vertical gap={5} style={{ marginTop: 6 }}>
+                {modernizationPlan.validationPlan.cutoverCriteria.map((item) => <Text key={item}>• {item}</Text>)}
+              </Flex>
+              <Text strong style={{ display: 'block', marginTop: 10 }}>回退条件</Text>
+              <Flex vertical gap={5} style={{ marginTop: 6 }}>
+                {modernizationPlan.validationPlan.rollbackCriteria.map((item) => <Text key={item}>• {item}</Text>)}
+              </Flex>
+            </Card>
           </div>
         ) : (
-          <Empty description="No modernization plan loaded." />
+          <Empty description="还没有加载现代化计划。" />
         )}
       </Modal>
 
       <Modal
-        title="New investigation"
+        title="新建调查"
         open={newSessionOpen}
         onCancel={() => setNewSessionOpen(false)}
         onOk={createSession}
@@ -1179,7 +1314,7 @@ function AppInner() {
           className="modal-tip"
           type="info"
           showIcon
-          message="After creation, you can configure repositories, research keywords, documents, Skills, MCP and additional system guidance."
+          message="创建后可以继续配置仓库、研究关键词、文档、技能、MCP 和额外指导。"
         />
       </Modal>
 
@@ -1188,7 +1323,7 @@ function AppInner() {
         title={
           <Flex align="center" gap={8}>
             <SettingOutlined />
-            <span>Investigation configuration</span>
+            <span>调查配置</span>
             {draft ? <Tag>v{draft.version}</Tag> : null}
           </Flex>
         }
@@ -1197,8 +1332,8 @@ function AppInner() {
         centered
         onCancel={() => setSettingsOpen(false)}
         onOk={saveSettings}
-        okText="Save changes"
-        destroyOnClose
+        okText="保存修改"
+        destroyOn关闭
       >
         {draft ? (
           <Tabs
@@ -1209,43 +1344,43 @@ function AppInner() {
             items={[
               {
                 key: 'research',
-                label: <span><GithubOutlined /> Research scope</span>,
+                label: <span><GithubOutlined /> 研究范围</span>,
                 children: (
                   <div className="settings-page">
                     <div className="settings-page-header">
-                      <Title level={4}>Research scope</Title>
+                      <Title level={4}>研究范围</Title>
                       <Paragraph type="secondary">
-                        Define where the investigation should look and which sources deserve priority.
+                        定义调查范围，以及哪些资料应该优先使用。
                       </Paragraph>
                     </div>
 
-                    <Card className="settings-card" title="GitHub sources">
+                    <Card className="settings-card" title="GitHub 仓库">
                       <Paragraph type="secondary">
-                        Add repositories that matter to this investigation. Search can stay within them or broaden when necessary.
+                        添加与调查相关的仓库；可以只搜索这些仓库，也可以在必要时扩大范围。
                       </Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
-                        value={draft.research.githubRepositories}
+                        value={draft.research.github仓库}
                         placeholder="https://github.com/org/repo"
-                        onChange={(value) => updateDraft((next) => { next.research.githubRepositories = value; })}
+                        onChange={(value) => updateDraft((next) => { next.research.github仓库 = value; })}
                       />
-                      <div className="field-label">Search scope</div>
+                      <div className="field-label">搜索范围</div>
                       <Radio.Group
                         value={draft.research.githubSearchMode}
                         onChange={(event) => updateDraft((next) => { next.research.githubSearchMode = event.target.value; })}
                         optionType="button"
                         buttonStyle="solid"
                         options={[
-                          { value: 'only_selected', label: 'Selected repositories only' },
-                          { value: 'selected_and_broad', label: 'Selected first, then broader search' },
+                          { value: 'only_selected', label: '仅搜索已选仓库' },
+                          { value: 'selected_and_broad', label: '先搜索已选仓库，再扩大范围' },
                         ]}
                       />
                     </Card>
 
-                    <Card className="settings-card" title="Research keywords">
-                      <Paragraph type="secondary">Important business or technical terms the agent should actively look for.</Paragraph>
+                    <Card className="settings-card" title="研究关键词">
+                      <Paragraph type="secondary">希望 Agent 主动关注的重要业务或技术术语。</Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
@@ -1256,17 +1391,17 @@ function AppInner() {
                       />
                     </Card>
 
-                    <Card className="settings-card" title="Important documents">
-                      <Paragraph type="secondary">Documents that should receive priority when interpreting the investigation.</Paragraph>
+                    <Card className="settings-card" title="重要文档">
+                      <Paragraph type="secondary">文档 that should receive priority when interpreting the investigation.</Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
-                        value={draft.research.importantDocuments.map((item) => item.reference)}
+                        value={draft.research.important文档.map((item) => item.reference)}
                         options={documentReferences(current?.context).map((reference) => ({ label: reference, value: reference }))}
-                        placeholder="Choose an uploaded file or type a URL/path"
+                        placeholder="选择已上传文件，或输入 URL / 路径"
                         onChange={(references) => updateDraft((next) => {
-                          next.research.importantDocuments = references.map((reference) => ({
+                          next.research.important文档 = references.map((reference) => ({
                             id: reference,
                             title: reference.split('/').pop() || reference,
                             reference,
@@ -1279,23 +1414,23 @@ function AppInner() {
               },
               {
                 key: 'agent',
-                label: <span><ToolOutlined /> Skills & guidance</span>,
+                label: <span><ToolOutlined /> 技能与指导</span>,
                 children: (
                   <div className="settings-page">
                     <div className="settings-page-header">
-                      <Title level={4}>Skills & guidance</Title>
+                      <Title level={4}>技能与指导</Title>
                       <Paragraph type="secondary">
-                        Select reusable Skills and add investigation-specific guidance.
+                        选择可复用技能，并补充本次调查特有的指导信息。
                       </Paragraph>
                     </div>
 
                     <Card className="settings-card" title="Skills">
                       <Flex justify="space-between" align="center" className="settings-card-heading">
-                        <Text strong>Selected Skills</Text>
-                        <Tag>versioned</Tag>
+                        <Text strong>已启用技能</Text>
+                        <Tag>有版本管理</Tag>
                       </Flex>
                       <Paragraph type="secondary">
-                        Skills are independent, reusable task modules. Enable the ones this investigation should have available.
+                        技能是独立、可复用的任务模块；选择本次调查需要使用的技能。
                       </Paragraph>
                       <Select
                         mode="multiple"
@@ -1329,13 +1464,13 @@ function AppInner() {
                       </div>
                     </Card>
 
-                    <Card className="settings-card" title="Additional system prompt">
+                    <Card className="settings-card" title="额外指导">
                       <Flex justify="space-between" align="center" className="settings-card-heading">
-                        <Text strong>Investigation-specific guidance</Text>
+                        <Text strong>本次调查指导</Text>
                         <Tag>v{draft.agent.systemPrompt.version}</Tag>
                       </Flex>
                       <Paragraph type="secondary">
-                        Add terminology, working style or investigation context. Built-in evidence and safety rules remain outside this field.
+                        可以补充术语、工作方式和调查背景；内置的 Evidence 与安全规则不在这里修改。
                       </Paragraph>
                       <Input.TextArea
                         autoSize={{ minRows: 8, maxRows: 18 }}
@@ -1353,17 +1488,17 @@ function AppInner() {
                 children: (
                   <div className="settings-page">
                     <div className="settings-page-header">
-                      <Title level={4}>MCP connections</Title>
+                      <Title level={4}>MCP 连接</Title>
                       <Paragraph type="secondary">
-                        Add MCP servers used by this investigation. Configuration changes are versioned and audit logged.
+                        Add MCP servers used by this investigation. Configuration changes are 有版本管理 and audit logged.
                       </Paragraph>
                     </div>
-                    <Card className="settings-card" title="Servers">
+                    <Card className="settings-card" title="服务器">
                       <Alert
                         type="warning"
                         showIcon
-                        message="Secrets are not stored in control.json"
-                        description="Keep tokens and credentials in the runtime environment or your MCP provider's secure configuration."
+                        message="密钥不会保存到 control.json"
+                        description="请把 Token 和凭证保存在运行环境或 MCP Provider 的安全配置中。"
                       />
                       <Input.TextArea
                         className="mcp-editor"
@@ -1378,13 +1513,13 @@ function AppInner() {
               },
               {
                 key: 'history',
-                label: <span><HistoryOutlined /> Version history</span>,
+                label: <span><HistoryOutlined /> 版本历史</span>,
                 children: (
                   <div className="settings-page">
                     <div className="settings-page-header">
-                      <Title level={4}>Version history</Title>
+                      <Title level={4}>版本历史</Title>
                       <Paragraph type="secondary">
-                        Review the configuration versions that shaped this investigation.
+                        查看影响本次调查的历史配置版本。
                       </Paragraph>
                     </div>
                     <div className="version-list">
@@ -1392,7 +1527,7 @@ function AppInner() {
                         <Card key={item.version} size="small" className="version-card">
                           <Flex justify="space-between" gap={12}>
                             <div>
-                              <Text strong>Configuration v{item.version}</Text>
+                              <Text strong>配置 v{item.version}</Text>
                               <div><Text type="secondary">{item.reason}</Text></div>
                             </div>
                             <Text type="secondary">{formatTime(item.updatedAt)}</Text>
@@ -1409,7 +1544,7 @@ function AppInner() {
       </Modal>
 
       <Modal
-        title="Investigation activity"
+        title="调查活动"
         open={auditOpen}
         width={760}
         footer={null}
@@ -1422,15 +1557,15 @@ function AppInner() {
                 <div>
                   <Text strong>{event.summary}</Text>
                   <div><Text type="secondary">{event.action}</Text></div>
-                  {event.configurationVersion ? <Tag className="audit-version">Config v{event.configurationVersion}</Tag> : null}
+                  {event.configurationVersion ? <Tag className="audit-version">配置 v{event.configurationVersion}</Tag> : null}
                 </div>
                 <Text type="secondary">{formatTime(event.timestamp)}</Text>
               </Flex>
             </Card>
           ))}
-          {!current?.recentAudit.length ? <Empty description="No audit events yet." /> : null}
+          {!current?.recentAudit.length ? <Empty description="暂无审计记录。" /> : null}
           <Text type="secondary">
-            Structured audit records are stored in the session workspace as audit.jsonl.
+            结构化审计记录保存在当前调查工作区的 audit.jsonl。
           </Text>
         </Flex>
       </Modal>
@@ -1440,10 +1575,12 @@ function AppInner() {
 
 export function App() {
   return (
-    <XProvider>
+    <ConfigProvider locale={zhCN}>
+      <XProvider>
       <AntApp>
         <AppInner />
       </AntApp>
-    </XProvider>
+      </XProvider>
+    </ConfigProvider>
   );
 }
