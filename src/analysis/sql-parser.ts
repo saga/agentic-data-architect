@@ -59,8 +59,23 @@ export interface ParsedStatement {
 }
 
 /** SQL parser 抽象契约，业务层不依赖 sqlglot 的具体实现。 */
+export interface ParseFailure {
+  statementIndex: number;
+  error: string;
+}
+
+/**
+ * SQL parser 抽象契约。
+ *
+ * parseFile 保持向后兼容；parseFileDetailed 额外暴露“哪些 statement 解析失败”，
+ * 让 Current-State Discovery 不再静默吞掉坏 SQL。实现可以不提供 detailed 结果，业务层会回退。
+ */
 export interface SqlParser {
   parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStatement[]>;
+  parseFileDetailed?(file: string, sql: string, dialect?: string): Promise<{
+    statements: ParsedStatement[];
+    failures: ParseFailure[];
+  }>;
 }
 
 /** 决定使用哪个 Python 解释器，优先项目配置和本地 .venv。 */
@@ -161,6 +176,57 @@ interface BridgeStatement {
 
 /** 基于 Python sqlglot bridge 的 SqlParser 实现，把 AST 结果转换为本项目统一结构。 */
 export class SqlglotParser implements SqlParser {
+
+  /** 解析整个 SQL 文件，并保留每个无法解析 statement 的错误。 */
+  async parseFileDetailed(
+    file: string,
+    sql: string,
+    dialect?: string,
+  ): Promise<{ statements: ParsedStatement[]; failures: ParseFailure[] }> {
+    const chunks = splitStatements(sql);
+    if (chunks.length === 0) return { statements: [], failures: [] };
+    const payload = JSON.stringify({
+      batch: chunks.map((c) => ({ sql: c.sql, ...(dialect ? { dialect } : {}) })),
+    });
+    let stdout: string;
+    try {
+      stdout = await execBridge(resolvePython(), bridgeScript(), payload);
+    } catch (e) {
+      throw new Error(
+        `SQL parser bridge failed (python=${resolvePython()}). ` +
+          `Need sqlglot on that interpreter: pip install sqlglot. Cause: ${e instanceof Error ? e.message : e}`,
+      );
+    }
+    const parsed = JSON.parse(stdout) as { results?: { statements: BridgeStatement[]; error: string | null }[] };
+    if (!parsed.results) throw new Error(`SQL parser bridge bad output: ${stdout.slice(0, 200)}`);
+
+    const statements: ParsedStatement[] = [];
+    const failures: ParseFailure[] = [];
+    parsed.results.forEach((r, i) => {
+      if (r.error || !r.statements) {
+        failures.push({
+          statementIndex: i,
+          error: r.error || 'SQL parser 没有返回这个语句的解析结果',
+        });
+        return;
+      }
+      r.statements.forEach((s, j) => {
+        statements.push({
+          id: `${file}#${i}${r.statements.length > 1 ? `.${j}` : ''}`,
+          file,
+          statementIndex: i,
+          lineStart: chunks[i]?.lineStart ?? 1,
+          lineEnd: chunks[i]?.lineEnd ?? 1,
+          ...(s.target ? { target: s.target } : {}),
+          sources: s.sources,
+          columns: s.columns,
+          ...(dialect ? { dialect } : {}),
+        });
+      });
+    });
+    return { statements, failures };
+  }
+
   /** 解析一个 SQL 文件，单条解析失败时跳过该 statement，避免污染整份文件。 */
 async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStatement[]> {
     const chunks = splitStatements(sql);
