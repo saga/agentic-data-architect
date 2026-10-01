@@ -9,6 +9,7 @@ import { investigationExists, newInvestigation, saveInvestigation } from './inve
 import { runDiscovery } from './workflow/discover.js';
 import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
+import { buildModernizationPlan } from './workflow/modernization.js';
 
 /** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
@@ -56,6 +57,16 @@ async function cmdAsk(args: string[]): Promise<void> {
   for (const w of r.warnings) console.log('warning: ' + w);
 }
 
+/** CLI modernize 命令：把 Discovery 结果组织成可继续编辑/审核的 modernization work package。 */
+async function cmdModernize(args: string[]): Promise<void> {
+  const [name] = args;
+  if (!name) throw new Error('usage: modernize <name>');
+  if (!(await investigationExists(name))) throw new Error('session 不存在：' + name);
+  const result = await buildModernizationPlan(name);
+  console.log(JSON.stringify(result.plan, null, 2));
+  console.error('written: ' + result.path);
+}
+
 /** CLI report 命令：生成当前 Investigation 报告并打印，同时写入报告文件。 */
 async function cmdReport(args: string[]): Promise<void> {
   const [name] = args;
@@ -69,11 +80,12 @@ async function cmdReport(args: string[]): Promise<void> {
 async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
   try {
-    if (!cmd) { console.log('usage: npm run start | init | discover | ask | report'); return; }
+    if (!cmd) { console.log('usage: npm run start | init | discover | ask | report | modernize'); return; }
     if (cmd === 'init') await cmdInit(args);
     else if (cmd === 'discover') await cmdDiscover(args);
     else if (cmd === 'ask') await cmdAsk(args);
     else if (cmd === 'report') await cmdReport(args);
+    else if (cmd === 'modernize') await cmdModernize(args);
     else {
       console.log('usage: npm run start | init | discover | ask | report');
       process.exitCode = 2;
