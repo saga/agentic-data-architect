@@ -55,6 +55,8 @@ GET  /api/sessions/:name/messages?q=...
 POST /api/sessions/:name/messages
 POST /api/sessions/:name/messages/stream
 POST /api/sessions/:name/messages/abort
+GET  /api/sessions/:name/journey
+GET  /api/sessions/:name/modernization
 GET  /api/sessions/:name/report
 GET  /api/sessions/:name/audit
 GET  /api/shared
@@ -67,6 +69,7 @@ POST /api/sessions/:name/files
 核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state 和 turn 生命周期。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
+Legacy Modernization Journey 也以 Markdown Skill 定义路线；Workflow 负责顺序和 Gate，Skill 负责每一关的调查方法。
 
 ## CLI
 
@@ -91,7 +94,7 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
 | SQLGLOT_PYTHON | SQLGlot Python 解释器 | python3 |
 | SKILLS_DIR | Skill 根目录 | skills |
-| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review |
+| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization |
 
 ## 检查
 
@@ -99,6 +102,7 @@ CLI 和 Web 共用同一个 Investigation workspace。
 npm run typecheck
 npm test
 npm run build
+npm run flow:lint
 ~~~
 
 ## 相关文档
