@@ -25,7 +25,7 @@ test('parses modernization markdown workflow and validates routes', () => {
     '',
     '## @end done',
     'visible: false',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
@@ -49,7 +49,7 @@ test('rejects routes pointing to a missing node', () => {
     '',
     '## @end done',
     'visible: false',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.ok(result.issues.some((issue) => issue.includes('missing')));
 });
@@ -77,7 +77,7 @@ test('journey state uses facts rather than agent self-report', () => {
     'title: 设计新方案',
     'objective: 形成草案',
     'completeWhen: target',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.ok(result.definition);
 
