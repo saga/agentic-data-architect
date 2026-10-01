@@ -1,6 +1,8 @@
 ---
 name: search-github
 description: Research GitHub repositories, source code, issues, pull requests, implementation details, and historical behavior.
+metadata:
+  kind: capability
 ---
 
 # Search GitHub
