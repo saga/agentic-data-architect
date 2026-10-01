@@ -439,6 +439,7 @@ function AppInner() {
   const [modernizationOpen, setModernizationOpen] = useState(false);
   const [modernizationLoading, setModernizationLoading] = useState(false);
   const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
+  const [journey, setJourney] = useState<ModernizationPlan['journey']>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -479,15 +480,18 @@ function AppInner() {
       setCurrent(undefined);
       setValue('');
       setNextGuidance(undefined);
+      setJourney(undefined);
       setAttachmentsOpen(false);
     }
-    const [result, modernization] = await Promise.all([
+    const [result, modernization, journeyResult] = await Promise.all([
       getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
       getJson<{ plan: ModernizationPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/modernization`),
+      getJson<{ journey: ModernizationPlan['journey'] }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
     setModernizationPlan(modernization.plan ?? undefined);
+    setJourney(journeyResult.journey ?? modernization.plan?.journey);
 
     const existing = result.context.inputs
       .filter((input) => input.kind === 'document')
@@ -508,6 +512,7 @@ function AppInner() {
         `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
       );
       setModernizationPlan(result.plan);
+      setJourney(result.plan.journey);
       setModernizationOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法生成改造计划');
@@ -563,6 +568,7 @@ function AppInner() {
     setStreamingAnswer(undefined);
     setNextGuidance(undefined);
     setModernizationPlan(undefined);
+    setJourney(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -1108,20 +1114,20 @@ function AppInner() {
                 </Tooltip>
               </div>
 
-              {modernizationPlan?.journey?.stages.length ? (
+              {journey?.stages.length ? (
                 <section className="right-section right-journey">
                   <div className="right-section-heading">
                     <Text strong>路线</Text>
                   </div>
                   <div className="journey-map">
-                    {modernizationPlan.journey.stages.map((stage, index) => (
+                    {journey.stages.map((stage, index) => (
                       <div
                         key={stage.id}
                         className={"journey-map-item journey-map-item-" + stage.status}
                       >
                         <div className="journey-map-rail" aria-hidden="true">
                           <span className="journey-map-dot" />
-                          {index < modernizationPlan.journey!.stages.length - 1 ? (
+                          {index < journey.stages.length - 1 ? (
                             <span className="journey-map-line" />
                           ) : null}
                         </div>
@@ -1259,7 +1265,7 @@ function AppInner() {
 
             <Card size="small" title="路线图">
               <div className="plan-stage-list">
-                {modernizationPlan.journey?.stages.map((stage, index) => (
+                {(journey?.stages ?? modernizationPlan.journey?.stages ?? []).map((stage, index) => (
                   <div key={stage.id} className="plan-stage">
                     <Flex justify="space-between" gap={8}>
                       <Text strong>{index + 1}. {stage.title}</Text>
