@@ -22,7 +22,7 @@ import {
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
-import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
+import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
 import { config } from './config.js';
 import {
   appendContextInput,
@@ -282,6 +282,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       messages,
       search: query || null,
     });
+  });
+
+  app.get('/api/sessions/:name/journey', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const journey = await loadModernizationJourneyState(name);
+    res.json({ journey });
   });
 
   app.get('/api/sessions/:name/modernization', async (req, res) => {
