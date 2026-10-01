@@ -23,11 +23,12 @@ import { WorkspaceContextSchema } from './schemas.js';
 export type Investigation = WorkspaceContext;
 
 /** 创建一个空的 Investigation 初始状态；不负责写盘。 */
-export function newInvestigation(name: string, userPrompt = ''): Investigation {
+export function newInvestigation(name: string, userPrompt = '', workflow: Investigation['workflow'] = 'legacy-modernization'): Investigation {
   return {
     schemaVersion: 3,
     name,
     userPrompt,
+    workflow,
     goal: '',
     scope: [],
     systems: [],
@@ -63,6 +64,7 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   return withWorkspaceContextLock(inv.name, async () => {
     await ensureWorkspace(inv.name, {
       userPrompt: inv.userPrompt,
+      workflow: inv.workflow,
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
