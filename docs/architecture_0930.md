@@ -1805,6 +1805,27 @@ Agent 不是“聊天几轮以后记住上下文”。
 
 ---
 
+# Skill 类型与 Workflow 边界
+
+Skill 统一用 SKILL.md 打包，但运行语义只保留两类：
+
+```text
+capability
+  一个明确能力，Agent 自己决定什么时候调用、怎么和其它能力组合。
+  例如：search-confluence、search-github、financial-data-review。
+
+workflow
+  一条有明确阶段、顺序、Gate 和完成条件的工作路线。
+  例如：legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
+```
+
+类型写在 frontmatter 的 metadata.kind。复杂程度不是分类标准；只有需要 Journey 约束阶段、顺序和完成条件时，才使用 workflow。
+
+- src/skills/catalog.ts：统一解析并用 Zod 校验 Skill manifest。
+- src/workflow/journey.ts：只允许 kind: workflow 的 Skill 进入 Journey。
+- src/workflow/lint.ts：所有 Skill 都必须有合法 kind，capability 不得定义 @flow。
+- Copilot SDK：二者仍按普通 Skill 目录加载，不再额外做一套 Skill runtime。
+
 # 二十九、Agent 与 Skill 的边界
 
 当前实现不是 multi-agent swarm，也没有单独的 `lead-data-agent` custom agent。
