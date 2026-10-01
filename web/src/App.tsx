@@ -74,10 +74,10 @@ interface InvestigationControl {
   version: number;
   updatedAt: string;
   research: {
-    github仓库: string[];
+    githubRepositories: string[];
     githubSearchMode: 'only_selected' | 'selected_and_broad';
     keywords: string[];
-    important文档: Array<{ id: string; title: string; reference: string }>;
+    importantDocuments: Array<{ id: string; title: string; reference: string }>;
   };
   agent: {
     systemPrompt: {
@@ -85,7 +85,7 @@ interface InvestigationControl {
       content: string;
     };
     skills: Array<{ name: string; version: number }>;
-    mcp服务器: Array<{
+    mcpServers: Array<{
       name: string;
       version: number;
       enabled: boolean;
@@ -297,7 +297,7 @@ function documentReferences(context?: SessionContext): string[] {
     .map((input) => input.artifactPath as string);
 }
 
-function parseMcpJson(value: string): InvestigationControl['agent']['mcp服务器'] {
+function parseMcpJson(value: string): InvestigationControl['agent']['mcpServers'] {
   const parsed = JSON.parse(value) as unknown;
   if (!Array.isArray(parsed)) throw new Error('MCP 配置必须是 JSON 数组。');
 
@@ -475,7 +475,7 @@ function AppInner() {
     if (settingsOpen && current?.control) {
       const next = cloneControl(current.control);
       setDraft(next);
-      setMcpDraft(JSON.stringify(next.agent.mcp服务器, null, 2));
+      setMcpDraft(JSON.stringify(next.agent.mcpServers, null, 2));
     }
   }, [settingsOpen, current?.control]);
 
@@ -684,7 +684,7 @@ function AppInner() {
     if (!draft || !active) return;
 
     try {
-      const mcp服务器 = parseMcpJson(mcpDraft);
+      const mcpServers = parseMcpJson(mcpDraft);
       const result = await getJson<{ control: InvestigationControl }>(
         `/api/sessions/${encodeURIComponent(active)}/config`,
         {
@@ -692,14 +692,14 @@ function AppInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             research: draft.research,
-            agent: { ...draft.agent, mcp服务器 },
+            agent: { ...draft.agent, mcpServers },
           }),
         },
       );
 
       setCurrent((existing) => existing ? { ...existing, control: result.control } : existing);
       setDraft(result.control);
-      setMcpDraft(JSON.stringify(result.control.agent.mcp服务器, null, 2));
+      setMcpDraft(JSON.stringify(result.control.agent.mcpServers, null, 2));
       setSettingsOpen(false);
       await loadSession(active);
       toast.success(`配置已保存为 v${result.control.version}`);
@@ -787,7 +787,7 @@ function AppInner() {
             closable
             icon={<InfoCircleOutlined />}
             message="每个调查都有独立的研究范围、文件和 Agent 配置。"
-            on关闭={() => {
+            onClose={() => {
               setShowLeftTip(false);
               try { localStorage.setItem('ada.tip.left', 'dismissed'); } catch {}
             }}
@@ -1046,7 +1046,7 @@ function AppInner() {
                 </div>
                 <div className="status-line">
                   <Text type="secondary">仓库</Text>
-                  <Text>{current?.control?.research.github仓库.length ?? 0}</Text>
+                  <Text>{current?.control?.research.githubRepositories.length ?? 0}</Text>
                 </div>
                 <div className="status-line">
                   <Text type="secondary">关键词</Text>
@@ -1140,10 +1140,10 @@ function AppInner() {
                   </div>
                 </div>
                 <div className="status-line"><Text type="secondary">文档</Text><Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">GitHub 仓库</Text><Text>{current?.control?.research.github仓库.length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">GitHub 仓库</Text><Text>{current?.control?.research.githubRepositories.length ?? 0}</Text></div>
                 <div className="status-line"><Text type="secondary">关键词</Text><Text>{current?.control?.research.keywords.length ?? 0}</Text></div>
                 <div className="status-line"><Text type="secondary">技能</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcp服务器.filter((item) => item.enabled).length ?? 0}</Text></div>
+                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0}</Text></div>
               </section>
 
               <Text type="secondary" className="panel-updated">
@@ -1362,9 +1362,9 @@ function AppInner() {
                         mode="tags"
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
-                        value={draft.research.github仓库}
+                        value={draft.research.githubRepositories}
                         placeholder="https://github.com/org/repo"
-                        onChange={(value) => updateDraft((next) => { next.research.github仓库 = value; })}
+                        onChange={(value) => updateDraft((next) => { next.research.githubRepositories = value; })}
                       />
                       <div className="field-label">搜索范围</div>
                       <Radio.Group
@@ -1397,11 +1397,11 @@ function AppInner() {
                         mode="tags"
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
-                        value={draft.research.important文档.map((item) => item.reference)}
+                        value={draft.research.importantDocuments.map((item) => item.reference)}
                         options={documentReferences(current?.context).map((reference) => ({ label: reference, value: reference }))}
                         placeholder="选择已上传文件，或输入 URL / 路径"
                         onChange={(references) => updateDraft((next) => {
-                          next.research.important文档 = references.map((reference) => ({
+                          next.research.importantDocuments = references.map((reference) => ({
                             id: reference,
                             title: reference.split('/').pop() || reference,
                             reference,
