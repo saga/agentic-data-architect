@@ -35,7 +35,7 @@ function targetKey(name: string): string {
 
 /** 为首版 modernization package 生成可审阅的 dataset-level mapping 建议。 */
 function buildInitialMappings(
-  current: DiscoverySnapshot['currentState'],
+  current: DiscoverySnapshot['currentState'] | null,
   evidenceIds: string[],
 ): SourceToTargetMapping[] {
   if (!current) return [];
