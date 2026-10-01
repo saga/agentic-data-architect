@@ -1,6 +1,8 @@
 ---
 name: working-directory
 description: Workspace conventions for investigation state, shared research artifacts, evidence, reports, and generated files.
+metadata:
+  kind: capability
 ---
 
 # Workspace 约定
