@@ -59,7 +59,6 @@ function buildInitialMappings(
       id: productId('mapping'),
       type: 'source_to_target',
       title: `候选映射：${source || 'legacy asset'} → ${key}`,
-      status: 'draft',
       version: 1,
       createdAt: timestamp,
       updatedAt: timestamp,
