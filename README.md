@@ -247,22 +247,42 @@ Snowflake Semantic View 可以由 Snowflake adapter 发现；Data Product、Cata
 
 ## Skills
 
-主 Agent 使用 Copilot SDK default agent。领域方法通过 Skill 提供：
+Skill 仍然统一以一个 SKILL.md 目录作为打包单位，但运行语义只分两类：
 
 ~~~text
-skills/
-  investigation-session/
-  financial-data-review/
-  search-github/
-  search-confluence/
-  search-leanix/
-  legacy-modernization/
-  financial-ai-native-architecture/
-  data-architecture-assessment/
+capability
+  一个明确能力，Agent 自己决定什么时候用、怎么和其它能力组合。
+  例如：search-confluence、search-github、financial-data-review。
+
+workflow
+  一条有明确阶段、顺序、Gate 和完成条件的工作路线。
+  例如：legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
 ~~~
 
-legacy-modernization 和 data-architecture-assessment 都通过 Markdown Workflow 定义自己的路线；通用 Journey runtime 负责解析和根据确定性事实显示进度。安全、Evidence 校验、只读查询、Lineage、Profiling 和状态持久化仍由代码负责。
+每个 Skill 的 frontmatter 都要声明 metadata.kind：
 
+~~~yaml
+metadata:
+  kind: capability
+~~~
+
+或：
+
+~~~yaml
+metadata:
+  kind: workflow
+~~~
+
+复杂程度不是分类标准。一个 capability 即使内部有多个查询或脚本，只要 Agent 仍然可以自由组合，就保持 capability；只有需要 Workflow / Journey 约束阶段、顺序和完成条件时，才是 workflow。
+
+代码层面，src/skills/catalog.ts 统一解析和校验 Skill manifest；src/workflow/journey.ts 只接受 kind: workflow 的 Skill；flow:lint 同时检查 Skill metadata 和 Markdown Workflow。
+
+当前 Skill：
+
+~~~text
+capability: investigation-session / financial-data-review / search-github / search-confluence / search-leanix / working-directory
+workflow: legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
+~~~
 ## 进一步说明
 
 详细运行、API、Workspace、Skill、CLI、环境变量和实现资料见：
@@ -274,11 +294,6 @@ V1.2 Current-State Intelligence 的数据模型和设计见：
 [docs/current-state-intelligence.md](docs/current-state-intelligence.md)
 
 
-## 三条工作路线
-
-- **改造已有系统**：Current-State → 数据真相 → 设计目标 → mapping → validation → cutover。
-- **从零设计金融 AI / 数据架构**：业务目标 → 数据 → 金融业务模型 → 数据架构 → 语义 → Agent → 控制 → 评估 → roadmap。
-- **评估现有数据架构**：评估目标 → Current-State → 问题 → 改进建议 → 实施顺序。
 
 ## 架构知识
 
