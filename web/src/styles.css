@@ -799,13 +799,6 @@ body {
   font-size: 13px;
 }
 
-.right-section,
-.right-next {
-  padding: 15px 2px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.right-section-heading {
 .right-facts {
   display: flex;
   flex-wrap: wrap;
@@ -856,4 +849,36 @@ body {
 .topbar-label {
   font-size: 14px;
   line-height: 1.5;
+}
+
+.action-card {
+  border-color: rgba(22, 119, 255, 0.18);
+  background: #f8fbff;
+}
+
+.action-card .ant-card-head-title {
+  font-size: 14px;
+}
+
+.action-card-text {
+  margin-bottom: 12px !important;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.gap-action {
+  width: fit-content;
+  margin-top: 5px;
+}
+
+.plain-plan-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.plain-plan-empty .ant-typography {
+  font-size: 13px;
 }
