@@ -19,7 +19,56 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
 ---
-## Legacy Modernization Journey（当前实现）
+## Data Architect 工作路线
+
+当前有两条明确的 Data Architect 工作路线：
+
+1. **Legacy Modernization**
+   - 适用于已有系统改造、replatform、迁移和切换。
+2. **Financial AI-Native Architecture**
+   - 适用于从零设计金融服务 AI / 数据平台，例如 Portfolio Research Agent。
+
+两条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
+
+~~~text
+Legacy Modernization
+  接到任务
+    → 看清旧系统
+    → 找到数据真相
+    → 查关键问题
+    → 定下现状
+    → 设计新方案
+    → 新旧对应
+    → 验证
+    → 切换
+
+Financial AI-Native Architecture
+  明确业务目标
+    → 明确业务需求
+    → 查数据
+    → 定义金融业务模型
+    → 设计数据架构
+    → 设计业务语义
+    → 设计 Agent
+    → 设计安全和运行控制
+    → 设计验证和评估
+    → 形成实施路线
+~~~
+
+两条 Workflow 都只固定“大阶段”。Agent 在阶段内部自由调查、使用工具和反复验证。
+
+Financial AI-Native Architecture 的 Skill 重点覆盖：
+
+- Portfolio Research / Investment Analytics 业务范围
+- Security / Position / Price / FX / Corporate Action / Benchmark 等金融数据
+- Snowflake 数据层和 Semantic View
+- LangChain / DeepAgents / Skills / Tools
+- LangSmith tracing / evaluation
+- point-in-time research、Evidence 和 deterministic validation
+
+不要把两条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
+
+## Legacy Modernization Workflow
 
 Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由一个 Markdown Workflow 定义固定的工作路线：
 
@@ -45,7 +94,7 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 - Agent：根据当前证据决定具体调查动作，并解释结果。
 - 人：确认业务定义、范围和不能自动判断的例外。
 
-Journey 状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
+Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
 
 右侧工作区展示当前路线的紧凑地图；完整路线和详细方案仍在“完整改造方案”中查看。发现新的 lineage / semantic / data-quality 问题时，Journey 可以回到调查关卡，而不是继续向后推进。
 
