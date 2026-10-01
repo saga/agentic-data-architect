@@ -840,3 +840,89 @@ body {
 .modernization-modal .ant-card + .ant-card {
   margin-top: 10px;
 }
+
+/* 右侧栏和改造计划都用统一的正文大小；数字不再放大成“仪表盘”效果。 */
+.context-panel {
+  font-size: 13px;
+}
+
+.context-panel .ant-typography,
+.context-panel .ant-tag,
+.context-panel .ant-btn {
+  font-size: 13px;
+}
+
+.context-panel .section-heading > div:first-child .ant-typography {
+  font-size: 13px;
+}
+
+.coverage-grid.compact > div {
+  padding: 8px 9px;
+}
+
+.coverage-grid.compact span,
+.modern-metrics span {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px !important;
+  font-weight: 600;
+}
+
+.plain-plan {
+  display: grid;
+  gap: 12px;
+}
+
+.plain-plan-intro {
+  padding: 2px 2px 6px;
+}
+
+.plain-summary {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plain-summary strong {
+  font-weight: 600;
+}
+
+.plain-plan-item {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.plain-plan-item .ant-typography,
+.plain-plan-next .ant-typography,
+.plain-plan-note {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plain-plan-next {
+  display: grid;
+  gap: 2px;
+}
+
+.modernization-modal .ant-card {
+  border-color: rgba(5, 5, 5, 0.07);
+  border-radius: 10px;
+}
+
+.modernization-modal .ant-card-head-title {
+  font-size: 14px;
+}
+
+.modernization-modal .ant-card-body {
+  font-size: 13px;
+}
+
+.modernization-modal .ant-modal-title {
+  font-size: 16px;
+}
