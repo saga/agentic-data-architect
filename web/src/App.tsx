@@ -145,6 +145,45 @@ interface SkillOption {
   description: string;
 }
 
+interface ModernizationGap {
+  id: string;
+  kind: string;
+  title: string;
+  description: string;
+  severity: string;
+  affectedAssets: string[];
+  evidenceIds: string[];
+  recommendation: string;
+}
+
+interface ModernizationPlan {
+  id: string;
+  title: string;
+  status: string;
+  goal: string;
+  scope: string[];
+  currentState: {
+    datasets: number;
+    lineageCoverage: number | null;
+    parseFailures: number;
+    semanticAssets: number;
+    findings: number;
+  };
+  gaps: ModernizationGap[];
+  targetArchitecture: {
+    principles: string[];
+    components: Array<{ id: string; name: string; type: string; description: string }>;
+    openQuestions: string[];
+  };
+  migrationStages: Array<{
+    id: string;
+    name: string;
+    objective: string;
+    outputs: string[];
+    blockedByGapIds: string[];
+  }>;
+}
+
 const markdownComponents = {
   mermaid: Mermaid as React.ComponentType<any>,
 };
@@ -283,6 +322,9 @@ function AppInner() {
   const [mcpDraft, setMcpDraft] = useState('[]');
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [modernizationOpen, setModernizationOpen] = useState(false);
+  const [modernizationLoading, setModernizationLoading] = useState(false);
+  const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -340,6 +382,21 @@ function AppInner() {
     setAttachments(existing);
   };
 
+  const loadModernization = async (key: string) => {
+    setModernizationLoading(true);
+    try {
+      const result = await getJson<{ plan: ModernizationPlan }>(
+        `/api/sessions/${encodeURIComponent(key)}/modernization`,
+      );
+      setModernizationPlan(result.plan);
+      setModernizationOpen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to build modernization plan');
+    } finally {
+      setModernizationLoading(false);
+    }
+  };
+
   const loadSkills = async () => {
     try {
       const result = await getJson<{ skills: SkillOption[] }>('/api/skills');
@@ -362,6 +419,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
+    setModernizationPlan(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -956,6 +1014,36 @@ function AppInner() {
               <section className="panel-section">
                 <div className="section-heading">
                   <div>
+                    <Text strong>Modernization</Text>
+                    <Text type="secondary" className="section-subtitle">Analyst + Architect work products</Text>
+                  </div>
+                </div>
+                <Flex vertical gap={8}>
+                  <Text type="secondary">
+                    Generate a draft package with analysis case, gaps, target architecture, migration stages and reviewable evidence.
+                  </Text>
+                  <Button
+                    type="primary"
+                    ghost
+                    loading={modernizationLoading}
+                    disabled={!active}
+                    onClick={() => active && void loadModernization(active)}
+                  >
+                    {modernizationPlan ? 'Open modernization plan' : 'Build modernization plan'}
+                  </Button>
+                  {modernizationPlan ? (
+                    <Flex gap={6} wrap>
+                      <Tag>{modernizationPlan.gaps.length} gaps</Tag>
+                      <Tag>{modernizationPlan.targetArchitecture.components.length} target components</Tag>
+                      <Tag>{modernizationPlan.migrationStages.length} stages</Tag>
+                    </Flex>
+                  ) : null}
+                </Flex>
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
+                  <div>
                     <Text strong>Current state</Text>
                     <Text type="secondary" className="section-subtitle">Evidence-backed progress</Text>
                   </div>
@@ -980,6 +1068,98 @@ function AppInner() {
           </div>
         </Content>
       </Layout>
+
+      <Modal
+        title="Modernization plan"
+        open={modernizationOpen}
+        width={980}
+        centered
+        onCancel={() => setModernizationOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setModernizationOpen(false)}>Close</Button>,
+          <Button
+            key="refresh"
+            type="primary"
+            loading={modernizationLoading}
+            onClick={() => active && void loadModernization(active)}
+          >
+            Rebuild from latest Current-State
+          </Button>,
+        ]}
+      >
+        {modernizationPlan ? (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <Card size="small">
+              <Flex justify="space-between" align="center" gap={16}>
+                <div>
+                  <Title level={4} style={{ margin: 0 }}>{modernizationPlan.title}</Title>
+                  <Text type="secondary">{modernizationPlan.goal || 'No modernization goal defined yet.'}</Text>
+                </div>
+                <Tag color="blue">{modernizationPlan.status}</Tag>
+              </Flex>
+              <Divider style={{ margin: '12px 0' }} />
+              <div className="coverage-grid compact">
+                <div><span>{modernizationPlan.currentState.datasets}</span><Text type="secondary">Datasets</Text></div>
+                <div><span>{modernizationPlan.currentState.lineageCoverage === null ? '—' : `${(modernizationPlan.currentState.lineageCoverage * 100).toFixed(0)}%`}</span><Text type="secondary">Lineage</Text></div>
+                <div><span>{modernizationPlan.currentState.parseFailures}</span><Text type="secondary">Parse failures</Text></div>
+                <div><span>{modernizationPlan.currentState.semanticAssets}</span><Text type="secondary">Semantic assets</Text></div>
+              </div>
+            </Card>
+
+            <Card size="small" title={`Gaps (${modernizationPlan.gaps.length})`}>
+              {modernizationPlan.gaps.length ? (
+                <Flex vertical gap={10}>
+                  {modernizationPlan.gaps.map((gap) => (
+                    <div key={gap.id}>
+                      <Flex justify="space-between" gap={12}>
+                        <Text strong>{gap.title}</Text>
+                        <Tag color={gap.severity === 'high' ? 'red' : gap.severity === 'medium' ? 'orange' : undefined}>
+                          {gap.severity}
+                        </Tag>
+                      </Flex>
+                      <Paragraph type="secondary" style={{ margin: '4px 0' }}>{gap.description}</Paragraph>
+                      <Text>{gap.recommendation}</Text>
+                    </div>
+                  ))}
+                </Flex>
+              ) : (
+                <Empty description="No deterministic gaps found from the current snapshot." />
+              )}
+            </Card>
+
+            <Card size="small" title="Target architecture draft">
+              <Flex vertical gap={8}>
+                {modernizationPlan.targetArchitecture.principles.map((principle) => (
+                  <Text key={principle}>• {principle}</Text>
+                ))}
+                <Divider style={{ margin: '6px 0' }} />
+                {modernizationPlan.targetArchitecture.components.map((component) => (
+                  <div key={component.id}>
+                    <Text strong>{component.name}</Text>
+                    <div><Text type="secondary">{component.description}</Text></div>
+                  </div>
+                ))}
+              </Flex>
+            </Card>
+
+            <Card size="small" title="Migration stages">
+              <Flex vertical gap={8}>
+                {modernizationPlan.migrationStages.map((stage, index) => (
+                  <div key={stage.id}>
+                    <Text strong>{index + 1}. {stage.name}</Text>
+                    <div><Text type="secondary">{stage.objective}</Text></div>
+                    {stage.blockedByGapIds.length ? (
+                      <Text type="danger">Blocked by: {stage.blockedByGapIds.join(', ')}</Text>
+                    ) : null}
+                  </div>
+                ))}
+              </Flex>
+            </Card>
+          </div>
+        ) : (
+          <Empty description="No modernization plan loaded." />
+        )}
+      </Modal>
 
       <Modal
         title="New investigation"
