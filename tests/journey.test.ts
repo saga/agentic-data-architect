@@ -158,5 +158,5 @@ test('parses the financial AI-native architecture workflow', () => {
   assert.ok(result.definition);
   assert.equal(result.definition?.id, 'financial-ai-native-architecture');
   assert.equal(result.definition?.start, 'intake');
-  assert.equal(result.definition?.nodes.length, 10);
+  assert.equal(result.definition?.nodes.length, 11);
 });
