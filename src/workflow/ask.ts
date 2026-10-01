@@ -154,6 +154,7 @@ const raw = await askCopilot({
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
+      'Session workflow: ' + inv.workflow + '. When this workflow has a matching Skill, follow its Markdown Workflow for the high-level work stages; within a stage, use agent judgment and tools.',
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
     ].filter(Boolean).join('\n\n'),
