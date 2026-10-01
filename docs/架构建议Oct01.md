@@ -925,7 +925,25 @@ One main Agent
        └── Validation Skill
 ```
 
-Agent 根据当前 workflow phase 使用不同 Skill。
+Skill 都统一用 SKILL.md 打包；frontmatter 用 metadata.kind 区分执行语义。
+capability 由 Agent 自由组合，workflow 才由 Journey 约束大阶段、顺序和完成条件。
+
+当前实现对应：
+
+```text
+capability
+  search-confluence
+  search-github
+  search-leanix
+  financial-data-review
+  investigation-session
+  working-directory
+
+workflow
+  legacy-modernization
+  financial-ai-native-architecture
+  data-architecture-assessment
+```
 
 这样比 swarm 简单，而且和你现在 Copilot SDK + Skill 的实现天然兼容。
 
