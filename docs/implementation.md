@@ -217,6 +217,31 @@ npm run flow:lint
 
 运行时通过 `src/knowledge/catalog.ts` 按 workflow 和当前问题做轻量确定性检索，再把少量结果作为“方法参考”注入 Agent。知识不能成为当前 Investigation 的 Evidence。
 
+## Skill 类型
+
+Skill 统一以 skills/<name>/SKILL.md 打包，但运行语义只有两类：
+
+- capability：明确的一项能力，Agent 自己决定什么时候用、如何和其它能力组合。例如 search-confluence、search-github、financial-data-review。
+- workflow：完整的工作路线，存在固定的大阶段、顺序、Gate 和完成条件。例如 legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
+
+类型写在 Skill frontmatter 的 metadata.kind，而不是再创建另一套 Skill 目录格式。
+
+~~~yaml
+metadata:
+  kind: capability
+~~~
+
+或：
+
+~~~yaml
+metadata:
+  kind: workflow
+~~~
+
+复杂度不是分类条件。一个 capability 内部可以有多个查询或脚本；只要 Agent 仍然可以自由组合，就不需要升级成 workflow。也不要增加 task 之类的第三种类型。
+
+当前代码由 src/skills/catalog.ts 统一解析 manifest。Journey 只接受 kind: workflow；普通 capability 不得定义 @flow。
+
 ## Skill 边界
 
 核心代码负责安全和一致性：Evidence 校验、Claim 状态校正、SQL read-only、workspace/state persistence、lineage/profile 等确定性基础能力不交给模型。
