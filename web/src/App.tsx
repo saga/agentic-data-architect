@@ -110,7 +110,7 @@ interface AuditEvent {
   details?: Record<string, unknown>;
 }
 
-type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture';
+type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
 
 interface SessionContext {
   name: string;
@@ -177,6 +177,43 @@ interface JourneyStage {
   status: 'completed' | 'current' | 'locked' | 'future';
   nodeType: 'task' | 'gate' | 'review' | 'end' | 'stop';
   unlocked: boolean;
+}
+
+interface ArchitectureAssessmentPlan {
+  id: string;
+  title: string;
+  status: string;
+  goal: string;
+  scope: string[];
+  currentState: {
+    datasets: number;
+    lineageCoverage: number | null;
+    semanticAssets: number;
+    findings: number;
+    unknowns: number;
+  };
+  findings: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    description: string;
+    recommendation: string;
+    evidenceIds: string[];
+  }>;
+  recommendations: string[];
+  roadmap: Array<{
+    id: string;
+    title: string;
+    objective: string;
+    findingIds: string[];
+  }>;
+  journey?: {
+    workflowId: string;
+    currentNodeId: string;
+    completedNodeIds: string[];
+    unlockedNodeIds: string[];
+    stages: JourneyStage[];
+  };
 }
 
 interface ModernizationPlan {
@@ -443,6 +480,7 @@ function AppInner() {
   const [modernizationOpen, setModernizationOpen] = useState(false);
   const [modernizationLoading, setModernizationLoading] = useState(false);
   const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
+  const [assessmentPlan, setAssessmentPlan] = useState<ArchitectureAssessmentPlan>();
   const [journey, setJourney] = useState<ModernizationPlan['journey']>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
@@ -484,18 +522,22 @@ function AppInner() {
       setCurrent(undefined);
       setValue('');
       setNextGuidance(undefined);
+      setModernizationPlan(undefined);
+      setAssessmentPlan(undefined);
       setJourney(undefined);
       setAttachmentsOpen(false);
     }
-    const [result, modernization, journeyResult] = await Promise.all([
+    const [result, modernization, assessment, journeyResult] = await Promise.all([
       getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
       getJson<{ plan: ModernizationPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/modernization`),
+      getJson<{ plan: ArchitectureAssessmentPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/assessment`),
       getJson<{ journey: ModernizationPlan['journey'] }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
     setModernizationPlan(modernization.plan ?? undefined);
-    setJourney(journeyResult.journey ?? modernization.plan?.journey);
+    setAssessmentPlan(assessment.plan ?? undefined);
+    setJourney(journeyResult.journey ?? modernization.plan?.journey ?? assessment.plan?.journey);
 
     const existing = result.context.inputs
       .filter((input) => input.kind === 'document')
@@ -507,6 +549,21 @@ function AppInner() {
         type: input.mimeType,
       }));
     setAttachments(existing);
+  };
+
+  const loadAssessment = async (key: string) => {
+    setModernizationLoading(true);
+    try {
+      const result = await getJson<{ plan: ArchitectureAssessmentPlan }>(
+        `/api/sessions/${encodeURIComponent(key)}/assessment?rebuild=true`,
+      );
+      setAssessmentPlan(result.plan);
+      setJourney(result.plan.journey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法生成架构评估');
+    } finally {
+      setModernizationLoading(false);
+    }
   };
 
   const loadModernization = async (key: string) => {
@@ -572,6 +629,7 @@ function AppInner() {
     setStreamingAnswer(undefined);
     setNextGuidance(undefined);
     setModernizationPlan(undefined);
+    setAssessmentPlan(undefined);
     setJourney(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
@@ -1119,7 +1177,7 @@ function AppInner() {
                 </Tooltip>
               </div>
 
-              {current?.context.workflow === 'legacy-modernization' && journey?.stages.length ? (
+              {journey?.stages.length ? (
                 <section className="right-section right-journey">
                   <div className="right-section-heading">
                     <Text strong>路线</Text>
@@ -1235,7 +1293,7 @@ function AppInner() {
                 )}
               </section>
 
-              {current?.context.workflow === 'legacy-modernization' && current?.currentState ? (
+              {(current?.context.workflow === 'legacy-modernization' || current?.context.workflow === 'data-architecture-assessment') && current?.currentState ? (
                 <section className="right-next">
                   <div className="right-section-heading">
                     <Text strong>下一步</Text>
@@ -1377,6 +1435,7 @@ function AppInner() {
           <Space direction="vertical" size={8}>
             <Radio value="legacy-modernization">改造已有系统</Radio>
             <Radio value="financial-ai-native-architecture">从零设计金融 AI / 数据架构</Radio>
+            <Radio value="data-architecture-assessment">评估现有数据架构</Radio>
           </Space>
         </Radio.Group>
         <Divider />
