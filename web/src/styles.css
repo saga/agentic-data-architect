@@ -851,19 +851,18 @@ body {
   line-height: 1.5;
 }
 
-.action-card {
-  border-color: rgba(22, 119, 255, 0.18);
+.right-blocked-card {
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px;
+  border: 1px solid rgba(22, 119, 255, 0.18);
+  border-radius: 9px;
   background: #f8fbff;
 }
 
-.action-card .ant-card-head-title {
-  font-size: 14px;
-}
-
-.action-card-text {
-  margin-bottom: 12px !important;
+.right-blocked-card .ant-typography {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .gap-action {
@@ -882,3 +881,31 @@ body {
 .plain-plan-empty .ant-typography {
   font-size: 13px;
 }
+
+.plan-stage-list {
+  display: grid;
+  gap: 9px;
+}
+
+.plan-stage {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.plan-stage .ant-typography {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plan-open-questions {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
