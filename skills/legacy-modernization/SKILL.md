@@ -43,14 +43,6 @@ description: >
 
 start -> intake
 
-## @task start
-
-title: 开始
-visible: false
-objective: 找到本次调查的第一个工作单元。
-
-- success -> intake
-
 ## @task intake
 
 title: 接到任务
