@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
-import { SqlglotParser, splitStatements, type ColumnLineage, type ParsedStatement } from './sql-parser.js';
+import { SqlglotParser, splitStatements, type ColumnLineage, type ParsedStatement, type ParseFailure } from './sql-parser.js';
 
 /**
  * Lineage（AST 驱动，§十六）：L1 dataset + L2 column。
@@ -52,16 +52,18 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
   for (const input of inputs) {
     const sql = await fs.readFile(input.path, 'utf-8');
     const chunks = splitStatements(sql);
-    const detailed = parser.parseFileDetailed
+    const detailed: { statements: ParsedStatement[]; failures: ParseFailure[] } = parser.parseFileDetailed
       ? await parser.parseFileDetailed(input.path, sql, input.dialect)
       : {
           statements: await parser.parseFile(input.path, sql, input.dialect),
           failures: [],
         };
     const parsed = detailed.statements;
-    const detailedFailures = detailed.failures || [];
-    const failureByIndex = new Map(detailedFailures.map((failure) => [failure.statementIndex, failure]));
-    const parsedIndexes = new Set(parsed.map((st) => st.statementIndex));
+    const detailedFailures = detailed.failures;
+    const failureByIndex = new Map<number, ParseFailure>(
+      detailedFailures.map((failure: ParseFailure) => [failure.statementIndex, failure]),
+    );
+    const parsedIndexes = new Set<number>(parsed.map((st: ParsedStatement) => st.statementIndex));
     chunks.forEach((chunk, statementIndex) => {
       if (parsedIndexes.has(statementIndex)) return;
       const parserFailure = failureByIndex.get(statementIndex);
@@ -70,7 +72,7 @@ export async function buildLineage(inputs: LineageInput[], parser = new SqlglotP
         statementIndex,
         lineStart: chunk.lineStart,
         lineEnd: chunk.lineEnd,
-        error: parserFailure?.error || 'SQL parser 没有返回这个语句的解析结果',
+        error: parserFailure?.error ?? 'SQL parser 没有返回这个语句的解析结果',
       };
       parseFailures.push(failure);
       evidence.push({
