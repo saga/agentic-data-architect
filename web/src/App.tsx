@@ -143,7 +143,7 @@ interface SessionData {
   currentState?: {
     coverage: {
       datasets: number;
-      dataset血缘Coverage: number | null;
+      datasetLineageCoverage: number | null;
       sqlParseFailures: number;
       semanticAssets: number;
       profiledDatasets: number;
@@ -201,7 +201,7 @@ interface 现代化Plan {
     name: string;
     objective: string;
     outputs: string[];
-    blockedBy差距Ids: string[];
+    blockedByGapIds: string[];
   }>;
   mappings: Array<{
     id: string;
@@ -365,9 +365,9 @@ function AppInner() {
   const [mcpDraft, setMcpDraft] = useState('[]');
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [auditOpen, setAuditOpen] = useState(false);
-  const [modernizationOpen, set现代化Open] = useState(false);
-  const [modernizationLoading, set现代化Loading] = useState(false);
-  const [modernizationPlan, set现代化Plan] = useState<现代化Plan>();
+  const [modernizationOpen, setModernizationOpen] = useState(false);
+  const [modernizationLoading, setModernizationLoading] = useState(false);
+  const [modernizationPlan, setModernizationPlan] = useState<现代化Plan>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -425,18 +425,18 @@ function AppInner() {
     setAttachments(existing);
   };
 
-  const load现代化 = async (key: string) => {
-    set现代化Loading(true);
+  const loadModernization = async (key: string) => {
+    setModernizationLoading(true);
     try {
       const result = await getJson<{ plan: 现代化Plan }>(
         `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
       );
-      set现代化Plan(result.plan);
-      set现代化Open(true);
+      setModernizationPlan(result.plan);
+      setModernizationOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法生成现代化计划');
     } finally {
-      set现代化Loading(false);
+      setModernizationLoading(false);
     }
   };
 
@@ -462,7 +462,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
-    set现代化Plan(undefined);
+    setModernizationPlan(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -1070,7 +1070,7 @@ function AppInner() {
                     ghost
                     loading={modernizationLoading}
                     disabled={!active}
-                    onClick={() => active && void load现代化(active)}
+                    onClick={() => active && void loadModernization(active)}
                   >
                     {modernizationPlan ? '打开现代化计划' : '生成现代化计划'}
                   </Button>
@@ -1096,7 +1096,7 @@ function AppInner() {
                   <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">发现问题</Text></div>
                   <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">未知项</Text></div>
                   <div>
-                    <span>{current?.currentState?.coverage.dataset血缘Coverage == null ? '—' : `${(current.currentState.coverage.dataset血缘Coverage * 100).toFixed(0)}%`}</span>
+                    <span>{current?.currentState?.coverage.datasetLineageCoverage == null ? '—' : `${(current.currentState.coverage.datasetLineageCoverage * 100).toFixed(0)}%`}</span>
                     <Text type="secondary">血缘 覆盖</Text>
                   </div>
                   <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">语义资产</Text></div>
@@ -1161,14 +1161,14 @@ function AppInner() {
         open={modernizationOpen}
         width={980}
         centered
-        onCancel={() => set现代化Open(false)}
+        onCancel={() => setModernizationOpen(false)}
         footer={[
-          <Button key="close" onClick={() => set现代化Open(false)}>关闭</Button>,
+          <Button key="close" onClick={() => setModernizationOpen(false)}>关闭</Button>,
           <Button
             key="refresh"
             type="primary"
             loading={modernizationLoading}
-            onClick={() => active && void load现代化(active)}
+            onClick={() => active && void loadModernization(active)}
           >
             从最新现状重新生成
           </Button>,
@@ -1235,8 +1235,8 @@ function AppInner() {
                   <div key={stage.id}>
                     <Text strong>{index + 1}. {stage.name}</Text>
                     <div><Text type="secondary">{stage.objective}</Text></div>
-                    {stage.blockedBy差距Ids.length ? (
-                      <Text type="danger">阻塞：{stage.blockedBy差距Ids.join(', ')}</Text>
+                    {stage.blockedByGapIds.length ? (
+                      <Text type="danger">阻塞：{stage.blockedByGapIds.join(', ')}</Text>
                     ) : null}
                   </div>
                 ))}
