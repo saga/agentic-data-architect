@@ -96,5 +96,5 @@ test('journey state uses facts rather than agent self-report', () => {
   assert.deepEqual(state.completedNodeIds, ['intake']);
   assert.equal(state.currentNodeId, 'estate');
   assert.equal(state.stages.find((stage) => stage.id === 'estate')?.status, 'current');
-  assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'locked');
+  assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
