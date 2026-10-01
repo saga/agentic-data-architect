@@ -77,12 +77,13 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 
 ### Data Architect Workflow
 
-当前工作台支持两条固定的大阶段路线：
+当前工作台支持三条固定的大阶段路线：
 
 - Legacy Modernization：已有系统改造、replatform、迁移和切换。
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
+- Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
 
-两条路线都放在 Skill 的 Markdown Workflow 中。Session 创建时保存所选路线；Agent 会在本轮使用对应 Skill，路线只限制高层阶段，阶段内部仍由 Agent 自主调查和调用工具。
+三条路线都放在 Skill 的 Markdown Workflow 中。Session 创建时保存所选路线；Agent 会在本轮使用对应 Skill，路线只限制高层阶段，阶段内部仍由 Agent 自主调查和调用工具。
 
 金融 AI-native 路线：
 
@@ -101,7 +102,9 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 
 
 
-当前已经从 Current-State Discovery 进入完整 modernization 工作包，并增加了一条有状态的 Modernization Journey。
+当前已经从 Current-State Discovery 进入完整 modernization 工作包，并支持三条高层工作路线。Legacy Modernization 与 Data Architecture Assessment 共用同一个 Journey runtime。
+
+Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量评估结果，复用 Current-State、Findings、Gap Analysis 和 Evidence；结果写入当前 Investigation 的 `reports/architecture-assessment.json`。
 
 ### Modernization Journey
 
@@ -143,7 +146,7 @@ skills/legacy-modernization/SKILL.md
 - Agent：根据证据选择调查动作并解释结果。
 - Human：确认业务定义、范围和例外。
 
-Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；完整 Modernization Plan 仍通过 `GET /api/sessions/:name/modernization` 提供。
+Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；Legacy Modernization 的完整方案通过 `GET /api/sessions/:name/modernization` 提供，Data Architecture Assessment 的评估结果通过 `GET /api/sessions/:name/assessment` 提供。
 
 Markdown Workflow 的基本检查可以运行：
 
@@ -196,7 +199,7 @@ npm run flow:lint
 
 这些对象通过 `modernization-plan.json` 持久化，UI 和 Agent 都可以继续基于它工作。自动生成结果一律视为 draft / proposed，不把模型推理当成最终业务事实。
 
-## V1.4：下一步
+## 当前未完成的主要工作
 
 - 把 Journey 的每个关卡接到真正的 deterministic action / reconciliation engine
 - 支持 Journey 分支、返工和人工确认状态持久化
@@ -208,6 +211,12 @@ npm run flow:lint
 - 根据已批准 mapping 生成 migration wave 建议
 
 暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具。
+## Architecture Knowledge
+
+`knowledge/` 保存跨 Investigation 可复用的 Data Architect 经验。每条知识记录来源、资料时间、最近复核时间、来源可信度和知识可信度，并区分 stable / contextual / time-sensitive。
+
+运行时通过 `src/knowledge/catalog.ts` 按 workflow 和当前问题做轻量确定性检索，再把少量结果作为“方法参考”注入 Agent。知识不能成为当前 Investigation 的 Evidence。
+
 ## Skill 边界
 
 核心代码负责安全和一致性：Evidence 校验、Claim 状态校正、SQL read-only、workspace/state persistence、lineage/profile 等确定性基础能力不交给模型。
