@@ -1,8 +1,8 @@
 /**
- * Legacy Modernization 主工作流。
+ * 把已经查到的系统信息整理成一份“接下来怎么改”的计划。
  *
- * 这不是另一个 Agent framework；它只是把已有 Discovery / Current-State 结果
- * 组织成 Data Analyst + Data Architect 可以继续编辑、审核和交付的工作包。
+ * 这段代码不替人做最终决定，只负责先把现状、问题、建议和检查方法整理出来，
+ * 让分析师和架构师可以继续修改、确认和使用。
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -33,7 +33,7 @@ function targetKey(name: string): string {
   return last.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
-/** 为首版 modernization package 生成可审阅的 dataset-level mapping 建议。 */
+/** 先把旧数据和新数据大致对应起来，给后面人工确认打个底。 */
 function buildInitialMappings(
   current: DiscoverySnapshot['currentState'] | null,
   evidenceIds: string[],
@@ -75,7 +75,7 @@ function buildInitialMappings(
   });
 }
 
-/** 生成首版 Validation Plan，把迁移前必须回答的问题显式化。 */
+/** 把真正迁移前要检查的事情列出来，避免到了最后才发现没法验证。 */
 function buildValidationPlan(
   current: DiscoverySnapshot['currentState'] | null,
   mappings: SourceToTargetMapping[],
@@ -177,7 +177,7 @@ function buildValidationPlan(
   };
 }
 
-/** 生成最小的 Analyst Case，让后续 UI/Agent 有一个明确的分析载体。 */
+/** 给分析师留一个明确的问题和两步起始动作，后面可以继续补充。 */
 function buildInitialAnalysisCase(goal: string, scope: string[], evidenceIds: string[]): AnalysisCase {
   const timestamp = now();
   return {
@@ -213,7 +213,7 @@ function buildInitialAnalysisCase(goal: string, scope: string[], evidenceIds: st
   };
 }
 
-/** 先提供一个厂商无关的 target blueprint，明确它仍是 draft，不冒充最终架构。 */
+/** 先给一个不绑死具体产品的方案草稿；它只是起点，必须经过人工确认。 */
 function buildTargetArchitecture(
   goal: string,
   gaps: ReturnType<typeof buildModernizationGaps>,
@@ -303,7 +303,7 @@ function buildTargetArchitecture(
   };
 }
 
-/** 建立默认 ADR 容器；真正的设计决定由 Agent + Human Review 填充。 */
+/** 先留一个设计决定的位置，真正的决定还要看资料并由人确认。 */
 function buildInitialDecisions(): ArchitectureDecision[] {
   const timestamp = now();
   return [{
@@ -331,7 +331,7 @@ function buildInitialDecisions(): ArchitectureDecision[] {
   }];
 }
 
-/** 生成并持久化 modernization plan，供 UI、CLI 和后续 Agent 继续编辑。 */
+/** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
@@ -391,7 +391,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   return { plan, path: fp };
 }
 
-/** 读取已经生成的 modernization plan；不存在时返回 null。 */
+/** 读取已经保存的改造计划；还没有生成时就返回空。 */
 export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
