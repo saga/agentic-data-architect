@@ -1,6 +1,6 @@
 # README Reference
 
-README 只保留项目定位、总体架构和主流程；本文件保存开发和运行时需要查阅的细节。
+README 只保留项目定位、总体架构和主要工作路线；本文件保存开发和运行时需要查阅的细节。
 
 ## Web UI
 
@@ -69,7 +69,7 @@ POST /api/sessions/:name/files
 核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state 和 turn 生命周期。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
-Legacy Modernization Journey 也以 Markdown Skill 定义路线；Workflow 负责顺序和 Gate，Skill 负责每一关的调查方法。
+两条 Data Architect Workflow 都以 Markdown Skill 定义。Workflow 负责大阶段、顺序和 Gate；Skill 负责这一阶段具体怎么做。当前两条路线分别是 legacy-modernization 和 financial-ai-native-architecture。
 
 ## CLI
 
@@ -94,7 +94,7 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
 | SQLGLOT_PYTHON | SQLGlot Python 解释器 | python3 |
 | SKILLS_DIR | Skill 根目录 | skills |
-| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization |
+| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture |
 
 ## 检查
 
