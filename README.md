@@ -1,6 +1,8 @@
 # agentic-data-architect
 
-用 AI Agent 协助 Data Analyst / Data Architect 理解老系统、还原当前数据架构，并为后续数据现代化提供可验证的基础。
+面向 **Data Analyst + Data Architect 的 Legacy Modernization / Replatform AI 工作台**。
+
+它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
 
 核心不是“聊天”，而是：
 
@@ -8,10 +10,12 @@
 Legacy Project
   → Discovery
   → Current-State Intelligence
+  → Analyst Investigation
   → Business / Semantic Context
   → Target Architecture
   → Source-to-Target Mapping
-  → Validation
+  → Gap Analysis
+  → Migration / Validation
 ~~~
 
 ## 总体架构
@@ -102,6 +106,20 @@ http://127.0.0.1:3000
 ~~~bash
 npm run dev
 ~~~
+
+## Modernization Work Products
+
+工作台的核心交付物不是聊天记录，而是：
+
+~~~text
+Analysis Case
+Target Architecture
+Source-to-Target Mapping
+Architecture Decision
+Modernization Plan
+~~~
+
+Agent 可以协助生成和修改这些对象；重要结论继续通过 Evidence / Claim / Human Review 固化。
 
 ## Current-State Intelligence
 
