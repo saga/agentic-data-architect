@@ -779,3 +779,64 @@ body {
     max-width: 100%;
   }
 }
+
+/* 现代化工作区右侧栏：信息按“项目 → 现代化 → 现状 → 下一步 → 资料”分组，避免和聊天内容混在一起。 */
+.modern-panel-card {
+  margin: 8px 0;
+  padding: 14px !important;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.modern-panel-card .section-heading {
+  margin-bottom: 10px;
+}
+
+.modern-gap-row {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.modern-panel-card .ant-steps {
+  margin-bottom: 12px;
+}
+
+.modernization-modal .ant-modal-body {
+  max-height: min(76vh, 760px);
+  overflow-y: auto;
+}
+
+.mapping-card,
+.validation-row,
+.analysis-step {
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.mapping-card {
+  display: grid;
+  gap: 5px;
+}
+
+.validation-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modernization-modal .ant-card {
+  border-color: rgba(5, 5, 5, 0.07);
+  border-radius: 10px;
+}
+
+.modernization-modal .ant-card + .ant-card {
+  margin-top: 10px;
+}
