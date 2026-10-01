@@ -1157,7 +1157,23 @@ function AppInner() {
                 <div className="right-section-heading">
                   <Text strong>现在卡在哪里</Text>
                 </div>
-                {!current?.currentState ? (
+                {current?.context.workflow === 'financial-ai-native-architecture' ? (
+                  <div className="right-blocked-card">
+                    <Text strong>先把方案目标说清楚</Text>
+                    <Text type="secondary">
+                      先明确用户、业务问题、范围和最终交付物，再决定数据、Semantic View 和 Agent 怎么设计。
+                    </Text>
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={loading}
+                      disabled={!active || loading}
+                      onClick={() => void send('先按“金融 AI / 数据架构”路线开始。请先明确用户、业务目标、范围、关键使用场景和最终交付物，再决定数据和 Agent 方案。')}
+                    >
+                      开始设计
+                    </Button>
+                  </div>
+                ) : !current?.currentState ? (
                   <div className="right-blocked-card">
                     <Text strong>还没查清现有系统</Text>
                     <Text type="secondary">
@@ -1219,7 +1235,7 @@ function AppInner() {
                 )}
               </section>
 
-              {current?.currentState ? (
+              {current?.context.workflow === 'legacy-modernization' && current?.currentState ? (
                 <section className="right-next">
                   <div className="right-section-heading">
                     <Text strong>下一步</Text>
