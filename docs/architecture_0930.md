@@ -21,12 +21,14 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 ---
 ## Data Architect 工作路线
 
-当前有两条明确的 Data Architect 工作路线：
+当前有三条明确的 Data Architect 工作路线：
 
 1. **Legacy Modernization**
    - 适用于已有系统改造、replatform、迁移和切换。
 2. **Financial AI-Native Architecture**
    - 适用于从零设计金融服务 AI / 数据平台，例如 Portfolio Research Agent。
+3. **Data Architecture Assessment**
+   - 适用于评估已有数据架构：查清当前情况、主要问题、改进建议和实施顺序。
 
 两条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
 
@@ -53,6 +55,13 @@ Financial AI-Native Architecture
     → 设计安全和运行控制
     → 设计验证和评估
     → 形成实施路线
+
+Data Architecture Assessment
+  明确评估目标
+    → 查清当前架构
+    → 找出主要问题
+    → 给出改进建议
+    → 排出实施顺序
 ~~~
 
 两条 Workflow 都只固定“大阶段”。Agent 在阶段内部自由调查、使用工具和反复验证。
@@ -66,7 +75,7 @@ Financial AI-Native Architecture 的 Skill 重点覆盖：
 - LangSmith tracing / evaluation
 - point-in-time research、Evidence 和 deterministic validation
 
-不要把两条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
+不要把三条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
 
 ## Legacy Modernization Workflow
 
@@ -2495,3 +2504,22 @@ LeanIX 的登记状态仍然只是一个 Evidence Source。若与代码、运行
 - context.json 保留索引和重要信息
 
 这样 Agent 才能在多轮、多天的 Investigation 中继续工作，而不是每次重新研究一遍。
+
+
+## 可复用架构知识
+
+项目增加了一个独立的 `knowledge/` 层，用来保存从外部资料整理出来的 Data Architect 实践经验。
+
+它和 Evidence 的边界很重要：
+
+```text
+knowledge/                       .workspace/<session>/
+通用方法和经验                    当前项目真正查到的事实
+来源、时间、可信度                 Evidence / Finding / 用户确认
+用于决定“下一步怎么查”             用于证明“当前系统是什么”
+不能证明当前项目事实               是当前项目结论的依据
+```
+
+知识条目记录 `publishedAt`、`reviewedAt`、`sourceConfidence`、`knowledgeConfidence` 和 `timeSensitivity`，并带有 inputs / outputs / checks / cautions。Agent 每轮按 workflow 和问题用轻量确定性检索挑选少量知识；知识只进入方法参考区，不进入 Evidence。
+
+第一批知识覆盖：业务目标、Current-State、Target/Transition、数据模型与业务语义、集成方式、治理/质量/lineage、Architecture Review、Data Product，以及金融场景的 lineage 和 source authority。
