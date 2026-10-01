@@ -171,7 +171,7 @@ interface 现代化差距 {
   recommendation: string;
 }
 
-interface 现代化Plan {
+interface ModernizationPlan {
   id: string;
   title: string;
   status: string;
@@ -367,7 +367,7 @@ function AppInner() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [modernizationOpen, setModernizationOpen] = useState(false);
   const [modernizationLoading, setModernizationLoading] = useState(false);
-  const [modernizationPlan, setModernizationPlan] = useState<现代化Plan>();
+  const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -428,7 +428,7 @@ function AppInner() {
   const loadModernization = async (key: string) => {
     setModernizationLoading(true);
     try {
-      const result = await getJson<{ plan: 现代化Plan }>(
+      const result = await getJson<{ plan: ModernizationPlan }>(
         `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
       );
       setModernizationPlan(result.plan);
