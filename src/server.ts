@@ -287,8 +287,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
   app.get('/api/sessions/:name/modernization', async (req, res) => {
     const name = sessionKey(req.params.name);
     const rebuild = req.query.rebuild === 'true';
-    const existing = rebuild ? null : await loadModernizationPlan(name);
-    const result = existing ? { plan: existing, path: null } : await buildModernizationPlan(name);
+    const existing = await loadModernizationPlan(name);
+    if (existing && !rebuild) {
+      res.json({ plan: existing, path: null });
+      return;
+    }
+    if (!existing && !rebuild) {
+      res.json({ plan: null, path: null });
+      return;
+    }
+    const result = await buildModernizationPlan(name);
     res.json(result);
   });
 
