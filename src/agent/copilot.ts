@@ -89,13 +89,13 @@ const activeSessions = new Map<string, { sessionId: string; abort: () => Promise
 /** 把 SDK intent 映射成简短的用户可见状态，不向前端暴露内部 reasoning 文本。 */
 function statusFromIntent(intent: string): string {
   const value = intent.toLowerCase();
-  if (value.includes('plan')) return 'Planning…';
-  if (value.includes('search') || value.includes('find')) return 'Searching…';
-  if (value.includes('inspect') || value.includes('read')) return 'Reviewing sources…';
-  if (value.includes('analy')) return 'Analyzing…';
-  if (value.includes('compare')) return 'Comparing findings…';
-  if (value.includes('review')) return 'Reviewing findings…';
-  return 'Working…';
+  if (value.includes('plan')) return '助手正在整理分析步骤，请稍候…';
+  if (value.includes('search') || value.includes('find')) return '助手正在查找相关资料，请稍候…';
+  if (value.includes('inspect') || value.includes('read')) return '助手正在查看相关资料，请稍候…';
+  if (value.includes('analy')) return '助手正在分析已找到的信息，请稍候…';
+  if (value.includes('compare')) return '助手正在比较已有结果，请稍候…';
+  if (value.includes('review')) return '助手正在检查分析结果，请稍候…';
+  return '助手正在处理你的问题，请稍候…';
 }
 
 /** 扫描 Skills 目录并读取 Skill 名称；无效 Skill 目录直接忽略。 */
@@ -190,11 +190,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (intent) input.onStatus?.(statusFromIntent(intent));
   });
   const offReasoning = session.on('assistant.reasoning_delta', () => {
-    input.onStatus?.('Thinking…');
+    input.onStatus?.('助手正在分析你的问题，请稍候…');
   });
   const offToolStart = session.on('tool.execution_start', (e) => {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
-    input.onStatus?.(toolName ? `Running ${toolName}…` : 'Running a tool…');
+    input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
   });
   const offToolComplete = session.on('tool.execution_complete', () => {
     input.onStatus?.('Thinking…');
@@ -202,10 +202,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // These events are UI status signals, not model chain-of-thought. Keep them
   // operational so the browser never receives hidden reasoning text.
   const offPermission = session.on('permission.requested', () => {
-    input.onStatus?.('Waiting for approval…');
+    input.onStatus?.('这一步需要你的确认，请在提示出现后继续操作。');
   });
   const offCompaction = session.on('session.compaction_start', () => {
-    input.onStatus?.('Summarizing context…');
+    input.onStatus?.('助手正在整理前面的对话内容，请稍候…');
   });
   try {
     if (input.shouldAbort?.()) {
