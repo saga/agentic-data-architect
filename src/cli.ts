@@ -10,18 +10,28 @@ import { runDiscovery } from './workflow/discover.js';
 import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
 import { buildModernizationPlan } from './workflow/modernization.js';
+import type { WorkflowId } from './investigation/schemas.js';
 
 /** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
-  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2]');
+  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow legacy-modernization|financial-ai-native-architecture]');
   let userPrompt = '';
-  const inv = newInvestigation(name, userPrompt);
+  let workflow: WorkflowId = 'legacy-modernization';
+  const inv = newInvestigation(name, userPrompt, workflow);
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--prompt') { userPrompt = rest[++i] ?? ''; inv.userPrompt = userPrompt; }
     if (rest[i] === '--goal') inv.goal = rest[++i] ?? '';
     if (rest[i] === '--scope') inv.scope = (rest[++i] ?? '').split(',').filter(Boolean);
     if (rest[i] === '--system') inv.systems = (rest[++i] ?? '').split(',').filter(Boolean);
+    if (rest[i] === '--workflow') {
+      const value = rest[++i] as WorkflowId;
+      if (value !== 'legacy-modernization' && value !== 'financial-ai-native-architecture') {
+        throw new Error('workflow 只能是 legacy-modernization 或 financial-ai-native-architecture');
+      }
+      workflow = value;
+      inv.workflow = value;
+    }
   }
   console.log('session created: ' + await saveInvestigation(inv));
 }
