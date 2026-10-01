@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.3",
   "type": "module",
-  "description": "Evidence-backed Data Modernization Workbench (V1: Current-State Discovery). See docs/architecture_0930.md",
+  "description": "Evidence-backed Data Architecture Workbench. See docs/architecture_0930.md",
   "scripts": {
     "start": "tsx src/server.ts",
     "dev": "tsx src/server.ts",
