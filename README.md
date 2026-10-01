@@ -1,10 +1,10 @@
 # agentic-data-architect
 
-面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前包含 Legacy Modernization 和从零建设金融 AI / 数据架构两类固定工作路线。
+面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前包含三类固定工作路线：改造已有系统、从零设计金融 AI / 数据架构、评估现有数据架构。
 
 它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
 
-核心不是“聊天”，而是一条有状态的 Legacy Modernization Journey：
+核心不是“聊天”，而是围绕三类工作路线推进调查、评估和设计；其中已有系统改造路线带有有状态的 Journey：
 
 ~~~text
 接到任务
@@ -119,9 +119,12 @@ npm run dev
 
 从零设计金融 AI / 数据架构
   → Financial AI-Native Architecture Workflow
+
+评估现有数据架构
+  → Data Architecture Assessment Workflow
 ~~~
 
-两条路线都只固定 Data Architect 的大阶段。每一关里面怎么调查、调用哪些工具、是否回到前一关，由 Agent 根据证据决定。
+三条路线都只固定 Data Architect 的大阶段。每一关里面怎么调查、调用哪些工具、是否回到前一关，由 Agent 根据证据决定。
 
 从零建设金融 Portfolio Research Agent 的路线定义在：
 
@@ -145,6 +148,26 @@ skills/financial-ai-native-architecture/SKILL.md
 ~~~
 
 该路线直接覆盖 LangChain / DeepAgents、LangSmith、Snowflake Semantic View、金融数据模型和 Portfolio Research 场景。
+
+## Data Architecture Assessment Workflow
+
+路线定义在：
+
+~~~text
+skills/data-architecture-assessment/SKILL.md
+~~~
+
+典型路线：
+
+~~~text
+明确评估目标
+  → 查清当前架构
+  → 找出主要问题
+  → 给出改进建议
+  → 排出实施顺序
+~~~
+
+评估结果保存到当前 Investigation 的 `reports/architecture-assessment.json`。问题和建议必须回到当前 Investigation 的 Evidence；通用架构经验只作为方法参考。
 
 ## Legacy Modernization Workflow
 
@@ -234,9 +257,11 @@ skills/
   search-confluence/
   search-leanix/
   legacy-modernization/
+  financial-ai-native-architecture/
+  data-architecture-assessment/
 ~~~
 
-legacy-modernization 同时承载 Modernization Journey 的路线定义。安全、Evidence 校验、只读查询、Lineage、Profiling 和状态持久化仍由代码负责。
+legacy-modernization 和 data-architecture-assessment 都通过 Markdown Workflow 定义自己的路线；通用 Journey runtime 负责解析和根据确定性事实显示进度。安全、Evidence 校验、只读查询、Lineage、Profiling 和状态持久化仍由代码负责。
 
 ## 进一步说明
 
