@@ -21,6 +21,230 @@ description: 从零设计金融服务 AI-native 数据与 Agent 架构，适用�
 
 已有 legacy 系统迁移、replatform、验证和切换时，使用 legacy-modernization。
 
+
+这个 Skill 包含一条固定的 Data Architect 工作路线。路线只固定“大阶段”；每一关里面怎么查、查哪些资料、是否回到前一关，由 Agent 根据证据决定。
+
+## Workflow
+
+## @flow financial-ai-native-architecture
+
+start -> intake
+
+## @task intake
+
+title: 明确业务目标
+objective: 明确用户、业务目标、范围和最终交付物。
+completeWhen: goal
+tools: read,url
+
+先回答：
+
+- 谁使用。
+- 解决什么问题。
+- 范围是什么。
+- 最终需要交付答案、数据集、Data Product、Dashboard、Agent tool 还是完整平台。
+- 成功标准是什么。
+
+- success -> requirements
+- needs-input -> intake
+
+## @task requirements
+
+title: 明确业务需求
+objective: 把用户真正要解决的问题和关键使用场景说清楚。
+tools: read,url
+
+重点确认：
+
+- Portfolio Research、Exposure、Performance、Attribution、Risk、Security Research 中具体是哪类工作。
+- 实时、日终、历史回放还是 point-in-time research。
+- 哪些判断必须有证据。
+- 哪些结果必须人工确认。
+
+发现业务范围不清时回到 intake。
+
+- success -> data
+- needs-input -> intake
+
+## @task data
+
+title: 查数据
+objective: 找到需要的数据、来源、质量、时效和历史版本。
+tools: read,url
+
+优先检查：
+
+- Portfolio / Position / Security / Price / FX / Transaction / Benchmark / Research 等真实来源。
+- identifier mapping。
+- 数据质量、freshness、coverage。
+- valuation date 和 point-in-time。
+- 哪些数据可以作为可信来源。
+
+不要因为找到一个表就假设它是 source of truth。
+
+- success -> domain-model
+- needs-input -> requirements
+- retry -> data
+
+## @task domain-model
+
+title: 定义金融业务模型
+objective: 把业务对象、关系、时间语义和关键业务规则说清楚。
+tools: read,url
+
+根据真实业务范围决定是否需要：
+
+Portfolio、Account、Security、Issuer、Position、Transaction、Order / Trade、Price、FX、Corporate Action、Benchmark / Index、Fundamental、Estimate、Research、Performance、Risk / Exposure。
+
+重点检查：
+
+- Security identifier。
+- Position 的确切含义。
+- Price 与 Corporate Action 的时间关系。
+- Benchmark 的历史版本。
+- Research / Fundamental 是否要求 point-in-time。
+
+发现业务定义冲突时回到 data 或 requirements，不要猜。
+
+- success -> architecture
+- needs-input -> data
+- retry -> data
+
+## @task architecture
+
+title: 设计数据架构
+objective: 确定数据如何进入 Snowflake、如何组织、如何提供给分析和 Agent。
+tools: read,url
+
+至少说明：
+
+- sources。
+- raw / historical data。
+- domain data。
+- analytics / data products。
+- data flows。
+- quality / lineage / ownership。
+- 哪些数据需要权限隔离。
+
+不要把 Bronze / Silver / Gold 当成业务架构本身。
+
+- success -> semantic
+- needs-input -> domain-model
+- retry -> data
+
+## @task semantic
+
+title: 设计业务语义
+objective: 把指标、实体、维度和时间口径变成可供 Agent 使用的 Semantic View 定义。
+tools: read,url
+
+至少说明：
+
+- 实体。
+- 指标和计算方式。
+- 维度。
+- 时间语义。
+- 底层真实表和字段。
+- 已确认定义与候选定义。
+
+Semantic View 是业务语义入口，不等于完整 ontology。
+
+发现指标定义不清时回到 domain-model 或 data。
+
+- success -> agent
+- needs-input -> domain-model
+- retry -> semantic
+
+## @task agent
+
+title: 设计 Agent
+objective: 确定 DeepAgents、Skills、Tools 和人工确认点如何协同完成 Portfolio Research 等工作。
+tools: read,url
+
+默认一个通用 Agent + Skills + Tools。
+
+典型能力：
+
+- DeepAgents planning / workspace。
+- Snowflake / SQL。
+- Research Search。
+- Portfolio analytics。
+- Evidence / validation。
+- Skill 按需加载。
+
+不要因为 Data Analyst、Data Architect、Research 就马上拆多个 Agent。
+
+- success -> controls
+- needs-input -> semantic
+- retry -> requirements
+
+## @task controls
+
+title: 设计安全和运行控制
+objective: 明确数据访问、工具权限、Evidence、审计和高风险操作的控制边界。
+tools: read,url
+
+至少说明：
+
+- 谁可以访问什么数据。
+- Agent 是否只读。
+- 哪些动作必须人工确认。
+- 哪些判断必须有 Evidence。
+- LangSmith tracing 如何用于运行观察。
+- 什么内容另外保存为业务审计记录。
+
+不要把 LangSmith trace 本身当成监管审计证据。
+
+- success -> evaluation
+- needs-input -> agent
+- retry -> data
+
+## @task evaluation
+
+title: 设计验证和评估
+objective: 证明 Agent 的答案、数据、业务口径和工具使用是可靠的。
+tools: read,url
+
+至少覆盖：
+
+- 代表性的 Portfolio Research 问题。
+- Semantic View 定义正确性。
+- SQL / 数据结果正确性。
+- point-in-time 正确性。
+- Evidence 覆盖。
+- Tool selection。
+- Regression evaluation。
+- LangSmith tracing / evaluation。
+
+发现验证标准不足时回到 semantic 或 agent。
+
+- success -> roadmap
+- needs-input -> controls
+- retry -> agent
+
+## @task roadmap
+
+title: 形成实施路线
+objective: 把方案拆成可以逐步建设的阶段，并明确风险、依赖和待确认事项。
+tools: read,url
+
+输出：
+
+- 第一阶段先建设什么。
+- 哪些数据和语义必须先准备。
+- 哪些 Agent 能力随后加入。
+- 哪些问题现在还不能确定。
+- 每阶段如何验证。
+
+- success -> done
+- needs-input -> architecture
+
+## @end done
+
+title: 方案完成
+visible: false
+objective: 已形成可以继续审核和实施的 Data Architecture 方案。
+
 ## 核心原则
 
 1. **先定义业务问题，再选技术。**
@@ -29,8 +253,8 @@ description: 从零设计金融服务 AI-native 数据与 Agent 架构，适用�
 2. **一个通用 Agent 优先。**
    不因为 Data Analyst、Data Architect、Research 等职责不同就马上拆多个 Agent。优先使用一个通用 Agent + Skills + Tools。
 
-3. **新建设任务默认不使用固定 Workflow。**
-   Agent 可以自己决定先查资料、查数据、澄清问题还是画方案。只有以后发现某个流程真的稳定、重复、必须按顺序执行，才把它升级成 Markdown Workflow。
+3. **Workflow 固定大阶段，不固定每一步具体怎么做。**
+   Agent 可以在每一关内自由调查、调用工具、反复验证，并按照 route 回到前面的关卡。
 
 4. **确定性工作交给代码。**
    SQL 校验、只读限制、权限判断、数据质量、reconciliation、结果 schema 和 Evidence 引用不要靠模型“记住”。
@@ -40,7 +264,7 @@ description: 从零设计金融服务 AI-native 数据与 Agent 架构，适用�
 
 ## 推荐的设计工作
 
-下面是检查清单，不是强制 Workflow。根据任务跳过不需要的部分。
+下面的内容是各关的工作方法。Workflow 固定阶段，Agent 在每一关内决定具体调查顺序。
 
 ### 1. 业务范围
 
