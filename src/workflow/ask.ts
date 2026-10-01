@@ -18,6 +18,7 @@ import {
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
+import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -135,6 +136,13 @@ const priorConversation = searchConversation(investigationName, question, {
     : '';
   const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
 
+  // 通用知识用于“怎么做”的参考，不得冒充当前 Investigation 的事实证据。
+  const knowledge = await searchArchitectureKnowledge(
+    [inv.workflow, inv.goal, question].filter(Boolean).join('\n'),
+    { workflow: inv.workflow, limit: 6 },
+  );
+  const knowledgeText = renderArchitectureKnowledge(knowledge);
+
   // Evidence ownership 边界：模型只能引用当前 Investigation 已存在的 Evidence ID。
 const existingIds = new Set(inv.evidence.map((e) => e.id));
   // Prompt 在本次 turn 内固定；之后用户修改配置只影响下一轮，避免 TOCTOU。
@@ -155,6 +163,7 @@ const raw = await askCopilot({
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
       'Session workflow: ' + inv.workflow + '. When this workflow has a matching Skill, follow its Markdown Workflow for the high-level work stages; within a stage, use agent judgment and tools.',
+      knowledgeText,
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
     ].filter(Boolean).join('\n\n'),
