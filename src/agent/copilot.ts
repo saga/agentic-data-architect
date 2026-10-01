@@ -28,10 +28,15 @@ export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
   if (starting) return starting;
   starting = (async () => {
-    // This is a server application, so do not inherit Copilot CLI's ambient
-    // filesystem/tools. Explicit Skills and MCP are the only capabilities we add.
+    // empty 模式不会再默认把 Copilot 状态写到用户家目录。
+    // 所有 Investigation 共用这个运行时目录，具体 Session 再由 SDK 按 sessionId 分目录保存。
+    // 这样既满足 SDK 的显式持久化要求，也不会让不同 Investigation 共用同一份 Session 状态。
+    const copilotBaseDirectory = path.join(config.workspaceDir, 'copilot');
+    await fs.mkdir(copilotBaseDirectory, { recursive: true });
+
     const c = new CopilotClient({
       mode: 'empty',
+      baseDirectory: copilotBaseDirectory,
       ...(config.githubToken ? { gitHubToken: config.githubToken, useLoggedInUser: false } : { useLoggedInUser: true }),
     });
     await c.start();
