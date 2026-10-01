@@ -1061,13 +1061,13 @@ function AppInner() {
               <section className="panel-section modern-panel-card">
                 <div className="section-heading">
                   <div>
-                    <Text strong>现代化工作</Text>
-                    <Text type="secondary" className="section-subtitle">数据分析师 + 数据架构师工作产物</Text>
+                    <Text strong>改造计划</Text>
+                    <Text type="secondary" className="section-subtitle">帮你看清现在的情况，再决定下一步做什么</Text>
                   </div>
                 </div>
                 <Flex vertical gap={9}>
                   <Text type="secondary">
-                    从当前发现生成分析 Case、差距、目标架构、源到目标映射、迁移阶段和验证计划。
+                    这里不讲一堆技术名词，只告诉你：现在知道什么、先解决什么、下一步做什么。
                   </Text>
                   <Button
                     type="primary"
@@ -1076,23 +1076,17 @@ function AppInner() {
                     disabled={!active}
                     onClick={() => active && void loadModernization(active)}
                   >
-                    {modernizationPlan ? '打开现代化计划' : '生成现代化计划'}
+                    {modernizationPlan ? '看下一步' : '生成改造计划'}
                   </Button>
-                  {modernizationPlan ? (
-                    <Flex gap={6} wrap>
-                      <Tag>{modernizationPlan.gaps.length} 个 差距</Tag>
-                      <Tag>{modernizationPlan.mappings.length} 条映射</Tag>
-                      <Tag>{modernizationPlan.validationPlan.checks.length} 项验证</Tag>
-                    </Flex>
-                  ) : null}
+
                 </Flex>
               </section>
 
               <section className="panel-section modern-panel-card">
                 <div className="section-heading">
                   <div>
-                    <Text strong>当前状态</Text>
-                    <Text type="secondary" className="section-subtitle">已经知道什么，还缺什么</Text>
+                    <Text strong>现在知道什么</Text>
+                    <Text type="secondary" className="section-subtitle">哪些已经查清，哪些还不知道</Text>
                   </div>
                 </div>
                 <div className="coverage-grid compact">
@@ -1131,7 +1125,7 @@ function AppInner() {
                   </Flex>
                 ) : (
                   <Text type="secondary">
-                    当前还没有现代化 差距。先完成 Discovery，再生成现代化计划。
+                    目前还没有整理出下一步要处理的问题。先把现有系统查清楚。
                   </Text>
                 )}
               </section>
@@ -1161,9 +1155,10 @@ function AppInner() {
       </Layout>
 
       <Modal
-        title="现代化工作计划"
+        className="modernization-modal"
+        title="改造计划"
         open={modernizationOpen}
-        width={980}
+        width={760}
         centered
         onCancel={() => setModernizationOpen(false)}
         footer={[
@@ -1174,132 +1169,81 @@ function AppInner() {
             loading={modernizationLoading}
             onClick={() => active && void loadModernization(active)}
           >
-            从最新现状重新生成
+            重新看看现在的情况
           </Button>,
         ]}
       >
         {modernizationPlan ? (
-          <div style={{ display: 'grid', gap: 16 }}>
-            <Card size="small">
-              <Flex justify="space-between" align="center" gap={16}>
-                <div>
-                  <Title level={4} style={{ margin: 0 }}>{modernizationPlan.title}</Title>
-                  <Text type="secondary">{modernizationPlan.goal || '还没有定义现代化目标。'}</Text>
-                </div>
-                <Tag color="blue">{modernizationPlan.status}</Tag>
-              </Flex>
-              <Divider style={{ margin: '12px 0' }} />
-              <div className="coverage-grid compact">
-                <div><span>{modernizationPlan.currentState.datasets}</span><Text type="secondary">数据集</Text></div>
-                <div><span>{modernizationPlan.currentState.lineageCoverage === null ? '—' : `${(modernizationPlan.currentState.lineageCoverage * 100).toFixed(0)}%`}</span><Text type="secondary">血缘</Text></div>
-                <div><span>{modernizationPlan.currentState.parseFailures}</span><Text type="secondary">SQL 解析失败</Text></div>
-                <div><span>{modernizationPlan.currentState.semanticAssets}</span><Text type="secondary">语义资产</Text></div>
+          <div className="plain-plan">
+            <div className="plain-plan-intro">
+              <Title level={4} style={{ marginBottom: 4 }}>{modernizationPlan.title}</Title>
+              <Text type="secondary">
+                {modernizationPlan.goal || '这次要把现有的数据系统查清楚，再决定怎么改。'}
+              </Text>
+            </div>
+
+            <Card size="small" title="现在知道什么">
+              <div className="plain-summary">
+                <span>已经找到 <strong>{modernizationPlan.currentState.datasets}</strong> 个数据集</span>
+                <span>发现了 <strong>{modernizationPlan.currentState.findings}</strong> 个问题</span>
+                <span>还有 <strong>{modernizationPlan.currentState.parseFailures}</strong> 个 SQL 没有看懂</span>
+                <span>
+                  血缘覆盖
+                  <strong>
+                    {modernizationPlan.currentState.lineageCoverage === null ? '还不知道' : ` ${Math.round(modernizationPlan.currentState.lineageCoverage * 100)}%`}
+                  </strong>
+                </span>
+                <span>找到 <strong>{modernizationPlan.currentState.semanticAssets}</strong> 条业务定义或指标信息</span>
               </div>
             </Card>
 
-            <Card size="small" title={`差距 (${modernizationPlan.gaps.length})`}>
+            <Card size="small" title="先解决什么">
               {modernizationPlan.gaps.length ? (
                 <Flex vertical gap={10}>
-                  {modernizationPlan.gaps.map((gap) => (
-                    <div key={gap.id}>
-                      <Flex justify="space-between" gap={12}>
-                        <Text strong>{gap.title}</Text>
+                  {modernizationPlan.gaps.slice(0, 4).map((gap, index) => (
+                    <div key={gap.id} className="plain-plan-item">
+                      <Flex justify="space-between" align="start" gap={10}>
+                        <Text strong>{index + 1}. {gap.title}</Text>
                         <Tag color={gap.severity === 'high' ? 'red' : gap.severity === 'medium' ? 'orange' : undefined}>
-                          {gap.severity}
+                          {gap.severity === 'high' ? '先处理' : gap.severity === 'medium' ? '需要确认' : '可以后做'}
                         </Tag>
                       </Flex>
-                      <Paragraph type="secondary" style={{ margin: '4px 0' }}>{gap.description}</Paragraph>
-                      <Text>{gap.recommendation}</Text>
+                      <Text type="secondary">{gap.recommendation}</Text>
                     </div>
                   ))}
                 </Flex>
               ) : (
-                <Empty description="当前现状没有发现确定性的 差距。" />
+                <Text>目前没有发现明显的阻塞问题，可以开始讨论怎么改。</Text>
               )}
             </Card>
 
-            <Card size="small" title="目标架构草案">
-              <Flex vertical gap={8}>
-                {modernizationPlan.targetArchitecture.principles.map((principle) => (
-                  <Text key={principle}>• {principle}</Text>
-                ))}
-                <Divider style={{ margin: '6px 0' }} />
-                {modernizationPlan.targetArchitecture.components.map((component) => (
-                  <div key={component.id}>
-                    <Text strong>{component.name}</Text>
-                    <div><Text type="secondary">{component.description}</Text></div>
-                  </div>
-                ))}
-              </Flex>
-            </Card>
-
-            <Card size="small" title="迁移阶段">
-              <Flex vertical gap={8}>
-                {modernizationPlan.migrationStages.map((stage, index) => (
-                  <div key={stage.id}>
-                    <Text strong>{index + 1}. {stage.name}</Text>
-                    <div><Text type="secondary">{stage.objective}</Text></div>
-                    {stage.blockedByGapIds.length ? (
-                      <Text type="danger">阻塞：{stage.blockedByGapIds.join(', ')}</Text>
+            <Card size="small" title="下一步怎么做">
+              {(() => {
+                const nextStage = modernizationPlan.migrationStages.find((stage) => stage.blockedByGapIds.length === 0)
+                  ?? modernizationPlan.migrationStages[0];
+                if (!nextStage) {
+                  return <Text>暂时没有下一步建议。</Text>;
+                }
+                return (
+                  <div className="plain-plan-next">
+                    <Text strong>{nextStage.name}</Text>
+                    <Paragraph style={{ margin: "4px 0 8px" }}>{nextStage.objective}</Paragraph>
+                    {nextStage.outputs.length ? (
+                      <Text type="secondary">这一步会产出：{nextStage.outputs.join("、")}</Text>
                     ) : null}
                   </div>
-                ))}
-              </Flex>
+                );
+              })()}
             </Card>
 
-            <Card size="small" title={`源到目标映射（${modernizationPlan.mappings.length}）`}>
-              <Flex vertical gap={8}>
-                {modernizationPlan.mappings.length ? (
-                  modernizationPlan.mappings.slice(0, 20).map((mapping) => (
-                    <div key={mapping.id} className="mapping-card">
-                      <Flex justify="space-between" gap={10}>
-                        <div><Text strong>{mapping.sourceAsset}</Text><Text type="secondary"> → </Text><Text strong>{mapping.targetAsset}</Text></div>
-                        <Tag>{mapping.status === 'proposed' ? '待审核' : mapping.status}</Tag>
-                      </Flex>
-                      {mapping.transformation ? <div><Text type="secondary">转换：</Text>{mapping.transformation}</div> : null}
-                      {mapping.businessRule ? <div><Text type="secondary">业务规则：</Text>{mapping.businessRule}</div> : null}
-                      {mapping.validationRule ? <div><Text type="secondary">验证：</Text>{mapping.validationRule}</div> : null}
-                    </div>
-                  ))
-                ) : (
-                  <Empty description="当前没有候选映射。" />
-                )}
-              </Flex>
-            </Card>
-
-            <Card size="small" title="验证计划">
-              <Flex vertical gap={9}>
-                {modernizationPlan.validationPlan.checks.map((check) => (
-                  <div key={check.id} className="validation-row">
-                    <div>
-                      <Text strong>{check.name}</Text>
-                      <div><Text type="secondary">{check.description}</Text></div>
-                    </div>
-                    <Space>
-                      {check.blocking ? <Tag color="red">阻塞项</Tag> : <Tag>非阻塞</Tag>}
-                      <Tag color={check.status === 'blocked' ? 'orange' : check.status === 'ready' ? 'green' : undefined}>
-                        {check.status === 'blocked' ? '待解决' : check.status === 'ready' ? '可执行' : '计划中'}
-                      </Tag>
-                    </Space>
-                  </div>
-                ))}
-              </Flex>
-              <Divider />
-              <Text strong>切换条件</Text>
-              <Flex vertical gap={5} style={{ marginTop: 6 }}>
-                {modernizationPlan.validationPlan.cutoverCriteria.map((item) => <Text key={item}>• {item}</Text>)}
-              </Flex>
-              <Text strong style={{ display: 'block', marginTop: 10 }}>回退条件</Text>
-              <Flex vertical gap={5} style={{ marginTop: 6 }}>
-                {modernizationPlan.validationPlan.rollbackCriteria.map((item) => <Text key={item}>• {item}</Text>)}
-              </Flex>
-            </Card>
+            <Text type="secondary" className="plain-plan-note">
+              这里的内容是系统根据已经查到的资料整理出来的草案，不是最终决定。确认后再进入下一步。
+            </Text>
           </div>
         ) : (
-          <Empty description="还没有加载现代化计划。" />
+          <Empty description="还没有生成改造计划。先完成一次调查。" />
         )}
       </Modal>
-
       <Modal
         title="新建调查"
         open={newSessionOpen}
