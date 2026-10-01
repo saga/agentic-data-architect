@@ -22,6 +22,7 @@ import {
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
+import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import { config } from './config.js';
 import {
   appendContextInput,
@@ -281,6 +282,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       messages,
       search: query || null,
     });
+  });
+
+  app.get('/api/sessions/:name/modernization', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const existing = await loadModernizationPlan(name);
+    const result = existing ? { plan: existing, path: null } : await buildModernizationPlan(name);
+    res.json(result);
   });
 
   app.get('/api/sessions/:name/report', async (req, res) => {
