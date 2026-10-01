@@ -134,7 +134,7 @@ async function listSessions(): Promise<SessionSummary[]> {
 }
 
 /** 创建新的 Investigation、默认 Control 和初始审计事件；已存在时直接返回。 */
-async function createSession(name?: string, userPrompt?: string) {
+async function createSession(name?: string, userPrompt?: string, workflow?: 'legacy-modernization' | 'financial-ai-native-architecture') {
   const key = sessionKey(
     name?.trim() ||
       'session-' +
@@ -143,7 +143,7 @@ async function createSession(name?: string, userPrompt?: string) {
   if (await investigationExists(key)) {
     return loadWorkspaceContext(key);
   }
-  const investigation = newInvestigation(key, userPrompt?.trim() ?? '');
+  const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? 'legacy-modernization');
   await saveInvestigation(investigation);
   await loadInvestigationControl(key);
   await appendAuditEvent(key, {
@@ -174,7 +174,7 @@ app.get('/api/sessions', async (_req, res) => {
   // 创建 Session API：body 先经 Zod，再进入业务层。
 app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(CreateSessionBodySchema, req.body);
-    const context = await createSession(body.name, body.userPrompt);
+    const context = await createSession(body.name, body.userPrompt, body.workflow);
     res.status(201).json({ context });
   });
 
