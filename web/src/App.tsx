@@ -588,9 +588,9 @@ function AppInner() {
       -1,
     );
     const items = messages.map((message, index) => {
-      const showGuidance = message.role === 'assistant'
-        && index === lastAssistantIndex
-        && nextGuidance?.questions.length;
+      const guidance = message.role === 'assistant' && index === lastAssistantIndex
+        ? nextGuidance
+        : undefined;
 
       return {
         key: message.id,
@@ -599,16 +599,16 @@ function AppInner() {
           message.role === 'assistant' ? (
             <div className="assistant-message-content">
               <ChatMarkdown content={message.content} />
-              {showGuidance ? (
+              {guidance?.questions.length ? (
                 <FollowUpCard
-                  questions={nextGuidance.questions}
-                  value={nextGuidance.value}
+                  questions={guidance.questions}
+                  value={guidance.value}
                   loading={loading}
                   onChange={(value) => setNextGuidance((currentGuidance) => currentGuidance
                     ? { ...currentGuidance, value }
                     : currentGuidance)}
                   onSubmit={() => {
-                    const nextValue = nextGuidance.value.trim();
+                    const nextValue = guidance.value.trim();
                     if (nextValue) void send(nextValue);
                   }}
                 />
