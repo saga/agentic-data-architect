@@ -10,6 +10,7 @@ import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema } fro
 export const WorkflowIdSchema = z.enum([
   'legacy-modernization',
   'financial-ai-native-architecture',
+  'data-architecture-assessment',
 ]);
 export type WorkflowId = z.infer<typeof WorkflowIdSchema>;
 
