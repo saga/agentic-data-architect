@@ -6,6 +6,13 @@
 import * as z from 'zod';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema } from '../evidence/types.js';
 
+/** 当前 Session 使用的固定工作路线；普通聊天不需要专门流程时仍可沿用默认的 Legacy Modernization。 */
+export const WorkflowIdSchema = z.enum([
+  'legacy-modernization',
+  'financial-ai-native-architecture',
+]);
+export type WorkflowId = z.infer<typeof WorkflowIdSchema>;
+
 /** Workspace 输入事件的来源类型；用于区分用户、Agent、Discovery 和外部文档。 */
 export const WorkspaceInputKindSchema = z.enum([
   'user_prompt', 'user_message', 'assistant_message', 'question',
@@ -33,6 +40,7 @@ export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
   name: z.string().min(1),
   userPrompt: z.string(),
+  workflow: WorkflowIdSchema.default('legacy-modernization'),
   goal: z.string(),
   scope: z.array(z.string()),
   systems: z.array(z.string()),
@@ -53,6 +61,7 @@ export type WorkspaceContext = z.infer<typeof WorkspaceContextSchema>;
 /** 创建新 Workspace 时允许传入的初始化字段 Schema。 */
 export const WorkspaceSeedSchema = z.object({
   userPrompt: z.string().optional(),
+  workflow: WorkflowIdSchema.optional(),
   goal: z.string().optional(),
   scope: z.array(z.string()).optional(),
   systems: z.array(z.string()).optional(),
