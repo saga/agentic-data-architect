@@ -1220,9 +1220,9 @@ function AppInner() {
                     <Text strong>下一步</Text>
                   </div>
                   {(() => {
-                    const nextStage = modernizationPlan?.migrationStages.find(
-                      (stage) => stage.blockedByGapIds.length === 0,
-                    ) ?? modernizationPlan?.migrationStages[0];
+                    const nextStage = journey?.stages.find(
+                      (stage) => stage.status === 'current',
+                    ) ?? journey?.stages.find((stage) => stage.status === 'future');
 
                     if (!nextStage) {
                       return <Text type="secondary">先完成当前检查，再决定下一步。</Text>;
@@ -1230,7 +1230,7 @@ function AppInner() {
 
                     return (
                       <div className="right-next-content">
-                        <Text strong>{nextStage.name}</Text>
+                        <Text strong>{nextStage.title}</Text>
                         <Text type="secondary">{nextStage.objective}</Text>
                         <Button
                           size="small"
