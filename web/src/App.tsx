@@ -110,8 +110,11 @@ interface AuditEvent {
   details?: Record<string, unknown>;
 }
 
+type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture';
+
 interface SessionContext {
   name: string;
+  workflow: WorkflowId;
   userPrompt: string;
   goal: string;
   scope: string[];
@@ -429,6 +432,7 @@ function AppInner() {
   const [nextGuidance, setNextGuidance] = useState<{ questions: string[]; value: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
+  const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId>('legacy-modernization');
   const [error, setError] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('research');
@@ -804,10 +808,11 @@ function AppInner() {
       const created = await getJson<{ context: SessionContext }>('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, workflow: newSessionWorkflow }),
       });
       setNewSessionOpen(false);
       setNewSessionName('');
+      setNewSessionWorkflow('legacy-modernization');
       await reloadSessions(false);
       navigateToSession(created.context.name);
       setTimeout(() => setSettingsOpen(true), 0);
@@ -1114,7 +1119,7 @@ function AppInner() {
                 </Tooltip>
               </div>
 
-              {journey?.stages.length ? (
+              {current?.context.workflow === 'legacy-modernization' && journey?.stages.length ? (
                 <section className="right-section right-journey">
                   <div className="right-section-heading">
                     <Text strong>路线</Text>
@@ -1341,24 +1346,36 @@ function AppInner() {
         )}
       </Modal>
       <Modal
-        title="新建调查"
+        title="新建工作"
+
         open={newSessionOpen}
         onCancel={() => setNewSessionOpen(false)}
         onOk={createSession}
         okButtonProps={{ disabled: !newSessionName.trim() }}
       >
+        <Radio.Group
+          value={newSessionWorkflow}
+          onChange={(event) => setNewSessionWorkflow(event.target.value as WorkflowId)}
+          className="new-workflow-choice"
+        >
+          <Space direction="vertical" size={8}>
+            <Radio value="legacy-modernization">改造已有系统</Radio>
+            <Radio value="financial-ai-native-architecture">从零设计金融 AI / 数据架构</Radio>
+          </Space>
+        </Radio.Group>
+        <Divider />
         <Input
           autoFocus
           value={newSessionName}
           onChange={(event) => setNewSessionName(event.target.value)}
-          placeholder="例如：portfolio-modernization"
+          placeholder="例如：portfolio-research-agent"
           onPressEnter={createSession}
         />
         <Alert
           className="modal-tip"
           type="info"
           showIcon
-          message="创建后可以继续配置仓库、研究关键词、文档、技能、MCP 和额外指导。"
+          message="路线只决定工作的大阶段；每一阶段里，助手仍会自己调查、分析和调用工具。"
         />
       </Modal>
 
