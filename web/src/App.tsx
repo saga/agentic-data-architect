@@ -350,7 +350,7 @@ function AppInner() {
   const [current, setCurrent] = useState<SessionData>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnStatus, setTurnStatus] = useState('思考中…');
+  const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -543,7 +543,7 @@ function AppInner() {
         role: 'assistant',
         content: currentStreamingAnswer.content
           ? <ChatMarkdown content={currentStreamingAnswer.content} />
-          : <Text type="secondary">思考中…</Text>,
+          : <Text type="secondary">助手正在处理你的问题，请稍候…</Text>,
         footer: undefined,
       });
     }
@@ -569,7 +569,7 @@ function AppInner() {
 
     setValue('');
     setLoading(true);
-    setTurnStatus('思考中…');
+    setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
@@ -635,7 +635,7 @@ function AppInner() {
           return;
         }
         if (event === 'delta') {
-          setTurnStatus('正在生成答案…');
+          setTurnStatus('助手正在整理答案，请稍候…');
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
             ? { ...currentAnswer, content: currentAnswer.content + delta }
@@ -652,7 +652,7 @@ function AppInner() {
 
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
-      setTurnStatus('正在保存结果…');
+      setTurnStatus('正在保存这次分析结果，请稍候…');
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
@@ -846,7 +846,7 @@ function AppInner() {
             </div>
             <Space>
               <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
-                {loading ? turnStatus : '就绪'}
+                {loading ? turnStatus : '可以继续提问'}
               </Tag>
               {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
