@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildJourneyState,
   parseJourneyMarkdown,
+  loadWorkflowJourney,
   type JourneyFacts,
 } from '../src/workflow/journey.js';
 
@@ -159,4 +160,15 @@ test('parses the financial AI-native architecture workflow', () => {
   assert.equal(result.definition?.id, 'financial-ai-native-architecture');
   assert.equal(result.definition?.start, 'intake');
   assert.equal(result.definition?.nodes.length, 11);
+});
+
+
+test('loads the architecture assessment markdown workflow', async () => {
+  const definition = await loadWorkflowJourney('data-architecture-assessment');
+  assert.equal(definition.id, 'data-architecture-assessment');
+  assert.equal(definition.start, 'intake');
+  assert.deepEqual(
+    definition.nodes.map((node) => node.id),
+    ['intake', 'current-state', 'findings', 'recommendation', 'roadmap', 'done'],
+  );
 });
