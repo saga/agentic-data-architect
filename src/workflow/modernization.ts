@@ -18,6 +18,7 @@ import {
 } from '../model/modernization.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
+import { buildJourneyState, loadModernizationJourney } from './journey.js';
 
 function productId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
@@ -352,6 +353,25 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   const decisions = buildInitialDecisions();
   const mappings = buildInitialMappings(current, evidenceIds);
   const validationPlan = buildValidationPlan(current, mappings, gaps, evidenceIds, inv.scope);
+  const journeyDefinition = await loadModernizationJourney();
+  const journey = buildJourneyState(journeyDefinition, {
+    goal: inv.goal || inv.userPrompt,
+    currentState: current ? {
+      datasets: current.coverage.datasets,
+      lineageCoverage: current.coverage.datasetLineageCoverage,
+      semanticAssets: current.coverage.semanticAssets,
+      parseFailures: current.coverage.sqlParseFailures,
+    } : null,
+    unknowns: inv.unknowns,
+    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+    // target/mapping 的 draft/proposed 产物不能算“通关”；否则刚生成计划，地图就会跳过真正的工作。
+    targetComponentCount: targetArchitecture.status === 'draft' ? 0 : targetArchitecture.components.length,
+    mappingCount: mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length,
+    blockingValidationReady: validationPlan.checks.filter(
+      (check) => check.blocking && ['ready', 'passed'].includes(check.status),
+    ).length,
+    blockingValidationTotal: validationPlan.checks.filter((check) => check.blocking).length,
+  });
   const plan: ModernizationPlan = ModernizationPlanSchema.parse({
     id: productId('modernization'),
     title: inv.goal || '老系统改造计划',
@@ -381,6 +401,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     mappings,
     decisions,
     validationPlan,
+    journey,
     evidenceIds,
   });
 
