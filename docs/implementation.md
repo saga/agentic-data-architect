@@ -75,6 +75,32 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 
 ## V1.3：Legacy Modernization Workbench
 
+### Data Architect Workflow
+
+当前工作台支持两条固定的大阶段路线：
+
+- Legacy Modernization：已有系统改造、replatform、迁移和切换。
+- Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
+
+两条路线都放在 Skill 的 Markdown Workflow 中。Session 创建时保存所选路线；Agent 会在本轮使用对应 Skill，路线只限制高层阶段，阶段内部仍由 Agent 自主调查和调用工具。
+
+金融 AI-native 路线：
+
+```text
+明确业务目标
+  → 明确业务需求
+  → 查数据
+  → 定义金融业务模型
+  → 设计数据架构
+  → 设计业务语义
+  → 设计 Agent
+  → 设计安全和运行控制
+  → 设计验证和评估
+  → 形成实施路线
+```
+
+
+
 当前已经从 Current-State Discovery 进入完整 modernization 工作包，并增加了一条有状态的 Modernization Journey。
 
 ### Modernization Journey
