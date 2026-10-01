@@ -329,6 +329,64 @@ function ChatMarkdown({ content }: { content: string }) {
   );
 }
 
+function FollowUpCard(props: {
+  questions: string[];
+  value: string;
+  loading: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const primaryQuestion = props.questions[0];
+  const suggestions = props.questions.slice(1, 3);
+
+  return (
+    <Card size="small" className="agent-guidance-card">
+      <Flex vertical gap={8}>
+        <Text strong className="agent-guidance-title">下一步</Text>
+        <Text type="secondary" className="agent-guidance-question">{primaryQuestion}</Text>
+        <Input.TextArea
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+          onPressEnter={(event) => {
+            if (!event.shiftKey) {
+              event.preventDefault();
+              props.onSubmit();
+            }
+          }}
+          autoSize={{ minRows: 2, maxRows: 5 }}
+          placeholder="把需要补充的信息写在这里，例如代码库地址、目录、文件名或业务定义。"
+          disabled={props.loading}
+        />
+        <Flex justify="space-between" align="center" gap={8} wrap>
+          <Space size={4} wrap>
+            {suggestions.map((question) => (
+              <Button
+                key={question}
+                type="link"
+                size="small"
+                className="agent-guidance-suggestion"
+                onClick={() => props.onChange(question)}
+                disabled={props.loading}
+              >
+                {question}
+              </Button>
+            ))}
+          </Space>
+          <Button
+            type="primary"
+            size="small"
+            icon={<SendOutlined />}
+            onClick={props.onSubmit}
+            disabled={!props.value.trim() || props.loading}
+          >
+            继续
+          </Button>
+        </Flex>
+      </Flex>
+    </Card>
+  );
+}
+
 function AppInner() {
   const routeSession = () => {
     const match = window.location.pathname.match(/^\/investigations\/([^/]+)\/?$/);
@@ -352,6 +410,7 @@ function AppInner() {
   const [loading, setLoading] = useState(false);
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
+  const [nextGuidance, setNextGuidance] = useState<{ questions: string[]; value: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [error, setError] = useState<string>();
@@ -403,6 +462,7 @@ function AppInner() {
     if (clearFirst) {
       setCurrent(undefined);
       setValue('');
+      setNextGuidance(undefined);
       setAttachmentsOpen(false);
     }
     const [result, modernization] = await Promise.all([
@@ -485,6 +545,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
+    setNextGuidance(undefined);
     setModernizationPlan(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
@@ -568,6 +629,7 @@ function AppInner() {
     if (!message || loading) return;
 
     setValue('');
+    setNextGuidance(undefined);
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
