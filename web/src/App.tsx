@@ -1234,9 +1234,16 @@ function AppInner() {
                         <Text type="secondary">{nextStage.objective}</Text>
                         <Button
                           size="small"
-                          onClick={() => setModernizationOpen(true)}
+                          loading={modernizationLoading}
+                          onClick={() => {
+                            if (modernizationPlan) {
+                              setModernizationOpen(true);
+                            } else if (active) {
+                              void loadModernization(active);
+                            }
+                          }}
                         >
-                          看完整方案
+                          {modernizationPlan ? '看完整方案' : '生成完整方案'}
                         </Button>
                       </div>
                     );
