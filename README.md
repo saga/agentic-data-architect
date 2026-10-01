@@ -247,3 +247,14 @@ legacy-modernization 同时承载 Modernization Journey 的路线定义。安全
 V1.2 Current-State Intelligence 的数据模型和设计见：
 
 [docs/current-state-intelligence.md](docs/current-state-intelligence.md)
+
+
+## 三条工作路线
+
+- **改造已有系统**：Current-State → 数据真相 → 设计目标 → mapping → validation → cutover。
+- **从零设计金融 AI / 数据架构**：业务目标 → 数据 → 金融业务模型 → 数据架构 → 语义 → Agent → 控制 → 评估 → roadmap。
+- **评估现有数据架构**：评估目标 → Current-State → 问题 → 改进建议 → 实施顺序。
+
+## 架构知识
+
+项目内的 `knowledge/` 保存可复用的 Data Architect 实践经验，并标明来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不替代当前 Investigation 的 Evidence。
