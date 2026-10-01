@@ -409,9 +409,13 @@ function AppInner() {
       setValue('');
       setAttachmentsOpen(false);
     }
-    const result = await getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`);
+    const [result, modernization] = await Promise.all([
+      getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
+      getJson<{ plan: ModernizationPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/modernization`),
+    ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
+    setModernizationPlan(modernization.plan ?? undefined);
 
     const existing = result.context.inputs
       .filter((input) => input.kind === 'document')
@@ -1386,7 +1390,7 @@ function AppInner() {
                         style={{ width: '100%' }}
                         tokenSeparators={[',']}
                         value={draft.research.keywords}
-                        placeholder="Position、Security Master、Proxy Voting..."
+                        placeholder="例如：持仓、证券主数据、代理投票..."
                         onChange={(value) => updateDraft((next) => { next.research.keywords = value; })}
                       />
                     </Card>
@@ -1498,7 +1502,7 @@ function AppInner() {
                         type="warning"
                         showIcon
                         message="密钥不会保存到 control.json"
-                        description="请把 Token 和凭证保存在运行环境或 MCP Provider 的安全配置中。"
+                        description="请把访问令牌和凭证保存在运行环境或 MCP 服务的安全配置中。"
                       />
                       <Input.TextArea
                         className="mcp-editor"
