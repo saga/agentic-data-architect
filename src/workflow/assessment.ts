@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { loadInvestigation, loadLatestSnapshot, reportsDir, writeJsonAtomic } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
