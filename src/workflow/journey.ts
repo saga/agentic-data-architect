@@ -120,7 +120,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     const heading = headingPattern.exec(raw);
     if (heading) {
       commitNode();
-      const kind = heading[1] as JourneyNodeType;
+      const kind = heading[1];
       const id = heading[2];
       if (kind === 'flow') {
         if (flowId) issues.push('第 ' + lineNumber + ' 行重复定义 @flow ' + id);
@@ -128,7 +128,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       } else {
         current = {
           id,
-          type: kind,
+          type: kind as JourneyNodeType,
           title: id,
           attrs: {},
           routes: [],
