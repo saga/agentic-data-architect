@@ -267,63 +267,6 @@ body {
   font-size: 12px;
 }
 
-.status-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 5px 0;
-}
-
-.status-line > .ant-typography:last-child {
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.coverage-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.coverage-grid > div {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.coverage-grid span {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 19px;
-  font-weight: 600;
-}
-
-.coverage-grid .ant-typography {
-  font-size: 12px;
-}
-
-.coverage-grid.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.coverage-grid.compact > div {
-  padding: 9px 8px;
-}
-
-.coverage-grid.compact span {
-  font-size: 18px;
-}
-
-.panel-updated {
-  display: block;
-  padding: 12px 2px 0;
-  font-size: 12px;
-}
-
 .error-card {
   margin: 0 24px 8px;
 }
@@ -691,11 +634,6 @@ body {
   border-top-color: rgba(5, 5, 5, 0.065);
 }
 
-.coverage-grid > div {
-  border-color: rgba(5, 5, 5, 0.07);
-  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.025);
-}
-
 .settings-modal .ant-modal-content {
   border-radius: 16px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
@@ -717,31 +655,6 @@ body {
 }
 
 /* 现代化工作区右侧栏：信息按“项目 → 现代化 → 现状 → 下一步 → 资料”分组，避免和聊天内容混在一起。 */
-.modern-panel-card {
-  margin: 8px 0;
-  padding: 14px !important;
-  border: 1px solid rgba(5, 5, 5, 0.06);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.modern-panel-card .section-heading {
-  margin-bottom: 10px;
-}
-
-.modern-gap-row {
-  display: grid;
-  gap: 4px;
-  padding: 9px 10px;
-  border: 1px solid rgba(5, 5, 5, 0.06);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.modern-panel-card .ant-steps {
-  margin-bottom: 12px;
-}
-
 .modernization-modal .ant-modal-body {
   max-height: min(76vh, 760px);
   overflow-y: auto;
@@ -790,18 +703,6 @@ body {
 
 .context-panel .section-heading > div:first-child .ant-typography {
   font-size: 13px;
-}
-
-.coverage-grid.compact > div {
-  padding: 8px 9px;
-}
-
-.coverage-grid.compact span,
-.modern-metrics span {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 14px !important;
-  font-weight: 600;
 }
 
 .plain-plan {
@@ -861,4 +762,105 @@ body {
 
 .modernization-modal .ant-modal-title {
   font-size: 16px;
+}
+
+/* 右栏只放当前工作真正需要的信息；完整配置、审计和详细计划都放到弹窗。 */
+.context-panel {
+  padding: 16px 14px 20px;
+  background: #fafafa;
+  font-size: 13px;
+}
+
+.panel-header {
+  padding: 2px 2px 14px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.panel-header .ant-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.eyebrow {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.right-summary,
+.right-section,
+.right-next {
+  padding: 15px 2px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.right-summary {
+  padding-top: 17px;
+}
+
+.right-label,
+.right-section-heading {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.right-section-heading .ant-typography {
+  font-size: 13px;
+}
+
+.right-goal {
+  margin: 0 !important;
+  font-size: 14px !important;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.82);
+}
+
+.right-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.58);
+}
+
+.right-issues {
+  display: grid;
+  gap: 8px;
+}
+
+.right-issue {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border-left: 2px solid #d9d9d9;
+  background: #fff;
+}
+
+.right-issue .ant-typography {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.right-next {
+  border-bottom: 0;
+}
+
+.right-next-content {
+  display: grid;
+  gap: 6px;
+}
+
+.right-next-content .ant-typography {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.right-next-content .ant-btn {
+  width: fit-content;
+  margin-top: 3px;
 }
