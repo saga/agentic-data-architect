@@ -73,37 +73,61 @@ Skill 是平级、可复用、按 Investigation 配置的能力模块。Research
 
 不要把会变化的命令、tool schema 或研究流程再复制成大量 prompt 文本。
 
-## V1.2
+## V1.3：Legacy Modernization Workbench
 
-1. Canonical Estate 扩展到 application / data store / job / job run / API / dashboard 等资产类型
-2. SQL parse failure / discovery coverage
-3. provider-neutral Semantic Context
-4. Snowflake Semantic View discovery，并把定义转换成通用 SemanticAsset
-5. Source-of-Truth Candidates / Semantic Candidates
-6. graph-aware + semantic-aware question retrieval
+当前已经从 Current-State Discovery 进入完整 modernization 工作包：
 
-## V1.2
+1. **Current-State Intelligence**
+   - metadata / dataset / column
+   - SQL / ETL lineage
+   - profiling
+   - parse coverage
+   - source-of-truth candidates
+   - semantic context
+2. **Analyst Investigation**
+   - Analysis Case
+   - hypotheses / analysis steps
+   - Findings / Evidence / Unknowns
+3. **Target Architecture**
+   - provider-neutral target blueprint
+   - domain data
+   - transformation
+   - semantic layer
+   - serving / governance
+4. **Source-to-Target Mapping**
+   - dataset-level mapping skeleton
+   - transformation / business rule / validation rule
+   - mapping remains `proposed` until reviewed
+5. **Gap Analysis**
+   - discovery / lineage / semantic / quality / architecture / migration gaps
+6. **Validation Plan**
+   - coverage
+   - lineage
+   - semantic
+   - mapping
+   - reconciliation
+   - quality
+   - cutover / rollback
+7. **Migration Stages**
+   - baseline
+   - business semantics
+   - target architecture
+   - mapping
+   - validation
+   - migration waves / cutover
 
-1. Current-State Intelligence：coverage、source-of-truth candidates、semantic candidates
-2. Provider-neutral Semantic Context
+这些对象通过 `modernization-plan.json` 持久化，UI 和 Agent 都可以继续基于它工作。自动生成结果一律视为 draft / proposed，不把模型推理当成最终业务事实。
 
-## V2
+## V1.4：下一步
 
-1. BusinessConcept / SemanticMapping
-2. Source-to-Target Mapping
-3. Target Architecture
+- 把 Analysis Case 接到真正的 read-only query / reconciliation engine
+- 支持列级 Source-to-Target Mapping
+- 支持人工 review / approve / reject，并保留 review history
+- 增加 Target Schema / Data Model 编辑与版本化
+- 将 Validation Plan 变成可执行的 deterministic checks
+- 根据已批准 mapping 生成 migration wave 建议
 
-## V3
-
-1. Migration Waves
-2. Reconciliation / Validation
-3. Cutover / Rollback
-
-## V4
-
-Controlled Write / PR / Deployment。
-
-暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具或大量数据库 adapter。
+暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具。
 ## Skill 边界
 
 核心代码负责安全和一致性：Evidence 校验、Claim 状态校正、SQL read-only、workspace/state persistence、lineage/profile 等确定性基础能力不交给模型。
