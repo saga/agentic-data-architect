@@ -96,6 +96,29 @@ export const ArchitectureDecisionSchema = WorkProductBaseSchema.extend({
 export type ArchitectureDecision = z.infer<typeof ArchitectureDecisionSchema>;
 
 /** modernization 中一个待解决的结构性 Gap。 */
+/** 单条迁移/验证检查，明确检查什么、当前状态和是否阻塞。 */
+export const ValidationCheckSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['coverage', 'lineage', 'semantic', 'mapping', 'reconciliation', 'quality', 'cutover']),
+  name: z.string().min(1),
+  description: z.string().min(1),
+  status: z.enum(['planned', 'ready', 'passed', 'failed', 'blocked']),
+  blocking: z.boolean(),
+  evidenceIds: z.array(z.string()),
+}).strict();
+export type ValidationCheck = z.infer<typeof ValidationCheckSchema>;
+
+/** Modernization 的独立 Validation Plan，供 Analyst / Architect 在迁移前审核。 */
+export const ValidationPlanSchema = WorkProductBaseSchema.extend({
+  type: z.literal('modernization_plan'),
+  scope: z.array(z.string()),
+  checks: z.array(ValidationCheckSchema),
+  cutoverCriteria: z.array(z.string()),
+  rollbackCriteria: z.array(z.string()),
+}).strict();
+export type ValidationPlan = z.infer<typeof ValidationPlanSchema>;
+
+/** modernization 中一个待解决的结构性 Gap。 */
 export const ModernizationGapSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['discovery', 'lineage', 'semantic', 'data_quality', 'architecture', 'mapping', 'migration']),
@@ -136,6 +159,7 @@ export const ModernizationPlanSchema = z.object({
   }).strict()),
   mappings: z.array(SourceToTargetMappingSchema),
   decisions: z.array(ArchitectureDecisionSchema),
+  validationPlan: ValidationPlanSchema,
   evidenceIds: z.array(z.string()),
 }).strict();
 export type ModernizationPlan = z.infer<typeof ModernizationPlanSchema>;
