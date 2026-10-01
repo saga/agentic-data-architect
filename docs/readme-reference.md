@@ -50,6 +50,7 @@ shared/ 保存跨 session 可以复用的研究资料。
 
 - `legacy-modernization`
 - `financial-ai-native-architecture`
+- `data-architecture-assessment`
 
 Session 会把选择保存到 context.json；当前没有额外的 Workflow Registry。
 
@@ -66,6 +67,7 @@ POST /api/sessions/:name/messages/stream
 POST /api/sessions/:name/messages/abort
 GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/modernization
+GET  /api/sessions/:name/assessment
 GET  /api/sessions/:name/report
 GET  /api/sessions/:name/audit
 GET  /api/shared
@@ -78,7 +80,8 @@ POST /api/sessions/:name/files
 核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state 和 turn 生命周期。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
-两条 Data Architect Workflow 都以 Markdown Skill 定义。Workflow 负责大阶段、顺序和 Gate；Skill 负责这一阶段具体怎么做。当前两条路线分别是 legacy-modernization 和 financial-ai-native-architecture。
+`knowledge/` 负责可跨 Investigation 复用的架构经验；每条知识记录来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不能替代当前 Investigation 的 Evidence。
+三条 Data Architect Workflow 都以 Markdown Skill 定义。Workflow 负责大阶段、顺序和 Gate；Skill 负责这一阶段具体怎么做。当前三条路线分别是 legacy-modernization、financial-ai-native-architecture 和 data-architecture-assessment。
 
 ## CLI
 
@@ -103,7 +106,8 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
 | SQLGLOT_PYTHON | SQLGlot Python 解释器 | python3 |
 | SKILLS_DIR | Skill 根目录 | skills |
-| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture |
+| KNOWLEDGE_DIR | 可复用架构知识根目录 | knowledge |
+| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture,data-architecture-assessment |
 
 ## 检查
 
