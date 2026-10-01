@@ -13,10 +13,10 @@
     "report": "tsx src/cli.ts report",
     "modernize": "tsx src/cli.ts modernize",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
-    "test": "npm run flow:lint && npm run test:python && tsx --test \"tests/**/*.test.ts\","
+    "test": "npm run flow:lint && npm run test:python && tsx --test \"tests/**/*.test.ts\"",
     "build": "vite build && tsc",
     "test:python": "node scripts/ensure-python-deps.mjs",
-    "flow:lint": "tsx src/workflow/lint.ts skills/legacy-modernization/SKILL.md"
+    "flow:lint": "tsx src/workflow/lint.ts"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
