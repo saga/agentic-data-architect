@@ -19,6 +19,36 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
 ---
+## Legacy Modernization Journey（当前实现）
+
+Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由一个 Markdown Workflow 定义固定的工作路线：
+
+```text
+接到任务
+  → 看清旧系统
+  → 找到数据真相
+  → 查关键问题
+  → 定下现状
+  → 设计新方案
+  → 新旧对应
+  → 验证结果
+  → 切换
+```
+
+Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `@flow / @task / @gate / @end` 语法。参考 copilot-server-agent 的 Skill Flow，但本项目目前只实现路线解析、route 校验和确定性 Journey 状态计算，不引入完整的审批/命令执行引擎。
+
+边界：
+
+- Workflow：决定现在做什么、什么时候能进入下一关、失败后回哪里。
+- Skill：说明这一关具体怎么调查。
+- Tool：执行 SQL、profiling、lineage、GitHub、Confluence、Web Search 等动作。
+- Agent：根据当前证据决定具体调查动作，并解释结果。
+- 人：确认业务定义、范围和不能自动判断的例外。
+
+Journey 状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
+
+右侧工作区展示当前路线的紧凑地图；完整路线和详细方案仍在“完整改造方案”中查看。发现新的 lineage / semantic / data-quality 问题时，Journey 可以回到调查关卡，而不是继续向后推进。
+
 ## Skill / Core / Agent 边界
 
 当前架构明确把容易变化的业务知识从核心 workflow 中拿出来：
