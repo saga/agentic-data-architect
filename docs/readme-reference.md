@@ -75,13 +75,33 @@ GET  /api/skills
 POST /api/sessions/:name/files
 ~~~
 
+## Skill 类型
+
+统一使用 SKILL.md 打包，但 frontmatter 必须声明 metadata.kind：
+
+~~~yaml
+metadata:
+  kind: capability
+~~~
+
+或：
+
+~~~yaml
+metadata:
+  kind: workflow
+~~~
+
+capability 是 Agent 可以自由组合的能力；workflow 是由 Journey 约束阶段、顺序、Gate 和完成条件的完整工作路线。当前 workflow 是 legacy-modernization、financial-ai-native-architecture、data-architecture-assessment；search-confluence、search-github、search-leanix、financial-data-review 等都是 capability。
+
+task 不是第三种 Skill 类型。复杂程度也不是分类标准。
+
 ## Agent / Skill 边界
 
 核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state 和 turn 生命周期。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
 `knowledge/` 负责可跨 Investigation 复用的架构经验；每条知识记录来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不能替代当前 Investigation 的 Evidence。
-三条 Data Architect Workflow 都以 Markdown Skill 定义。Workflow 负责大阶段、顺序和 Gate；Skill 负责这一阶段具体怎么做。当前三条路线分别是 legacy-modernization、financial-ai-native-architecture 和 data-architecture-assessment。
+三条 Data Architect Workflow 都以 kind: workflow 的 Markdown Skill 定义。Workflow 负责大阶段、顺序和 Gate；kind: capability 的 Skill 提供可自由组合的具体能力。当前三条路线分别是 legacy-modernization、financial-ai-native-architecture 和 data-architecture-assessment。
 
 ## CLI
 
