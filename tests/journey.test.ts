@@ -152,7 +152,7 @@ test('parses the financial AI-native architecture workflow', () => {
     '',
     '## @end done',
     'visible: false',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
