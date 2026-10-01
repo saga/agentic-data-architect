@@ -6,6 +6,23 @@
  * 和最终的 Modernization Plan。它们都保留 Evidence 引用，但不把 Evidence 嵌进来。
  */
 import * as z from 'zod';
+import type { JourneyState } from '../workflow/journey.js';
+
+export const JourneyStateSchema = z.object({
+  workflowId: z.string().min(1),
+  currentNodeId: z.string().min(1),
+  completedNodeIds: z.array(z.string()),
+  unlockedNodeIds: z.array(z.string()),
+  stages: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    objective: z.string().min(1),
+    status: z.enum(['completed', 'current', 'locked', 'future']),
+    nodeType: z.enum(['task', 'gate', 'review', 'end', 'stop']),
+    unlocked: z.boolean(),
+  }).strict()),
+}).strict();
+
 
 export const WorkProductStatusSchema = z.enum(['draft', 'in_review', 'approved', 'rejected']);
 export type WorkProductStatus = z.infer<typeof WorkProductStatusSchema>;
@@ -160,6 +177,8 @@ export const ModernizationPlanSchema = z.object({
   mappings: z.array(SourceToTargetMappingSchema),
   decisions: z.array(ArchitectureDecisionSchema),
   validationPlan: ValidationPlanSchema,
+  /** 根据 Markdown Workflow 计算出的当前关卡；旧版本计划可暂时没有这一项。 */
+  journey: JourneyStateSchema.optional(),
   evidenceIds: z.array(z.string()),
 }).strict();
 export type ModernizationPlan = z.infer<typeof ModernizationPlanSchema>;
