@@ -216,17 +216,22 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   return { issues };
 }
 
-/** 从 skills/legacy-modernization/SKILL.md 加载主路线。 */
-export async function loadModernizationJourney(): Promise<JourneyDefinition> {
-  const skillPath = path.join(config.skillsDir, 'legacy-modernization', 'SKILL.md');
+/** 根据 Session workflow 加载对应的 Markdown 路线。 */
+export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<JourneyDefinition> {
+  const skillPath = path.join(config.skillsDir, workflowId, 'SKILL.md');
   const markdown = await fs.readFile(skillPath, 'utf8');
   const result = parseJourneyMarkdown(markdown);
   if (!result.definition || result.issues.length) {
     throw new Error(
-      'Legacy Modernization workflow 定义无效：\n' + result.issues.join('\n'),
+      `Workflow ${workflowId} 定义无效：\n` + result.issues.join('\n'),
     );
   }
   return result.definition;
+}
+
+/** 保留旧调用入口，避免 Legacy Modernization 代码一次性大改。 */
+export async function loadModernizationJourney(): Promise<JourneyDefinition> {
+  return loadWorkflowJourney('legacy-modernization');
 }
 
 function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
