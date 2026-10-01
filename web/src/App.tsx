@@ -146,7 +146,7 @@ interface SessionData {
       datasetLineageCoverage: number | null;
       sqlParseFailures: number;
       semanticAssets: number;
-      profiled数据集: number;
+      profiledDatasets: number;
     };
     sourceOfTruthCandidates: unknown[];
     semanticCandidates: unknown[];
@@ -1333,7 +1333,7 @@ function AppInner() {
         onCancel={() => setSettingsOpen(false)}
         onOk={saveSettings}
         okText="保存修改"
-        destroyOn关闭
+        destroyOnClose
       >
         {draft ? (
           <Tabs
