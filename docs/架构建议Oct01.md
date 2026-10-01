@@ -1281,7 +1281,29 @@ Source-of-truth      42%
 
 ---
 
-# 24. Findings Engine 需要从“小问题检查器”升级到 Architecture Assessment
+# 24. Architecture Assessment 已经落地
+
+当前代码已经增加了独立的 `data-architecture-assessment` 工作路线：
+
+```text
+明确评估目标
+  → 查清当前架构
+  → 找出主要问题
+  → 给出改进建议
+  → 排出实施顺序
+```
+
+实现位于：
+
+- `skills/data-architecture-assessment/SKILL.md`
+- `src/workflow/assessment.ts`
+- `GET /api/sessions/:name/assessment`
+
+当前实现复用已有 Current-State、Findings、Gap Analysis 和 Evidence，不再需要另起一套大型 Assessment Engine。
+
+下面原来的 “以后至少增加” 列表，现在应理解为 **Findings 能力的后续扩展**，而不是 Architecture Assessment Workflow 尚未实现。
+
+## Findings Engine 后续仍需要扩展
 
 目前主要：
 
