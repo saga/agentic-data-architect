@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { loadModernizationPlan } from '../workflow/modernization.js';
 import type { DiscoverySnapshot } from '../workflow/discover.js';
 
 /**
@@ -15,6 +16,7 @@ import type { DiscoverySnapshot } from '../workflow/discover.js';
 export async function buildReport(name: string): Promise<{ markdown: string; path: string }> {
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const modernization = await loadModernizationPlan(name);
   const lineage = snapshot?.lineage ?? null;
   const estate = snapshot?.estate ?? null;
 
@@ -91,7 +93,19 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
       ? inv.claims.map((c) => `### [${c.status}] ${c.claim.split('\n')[0]?.slice(0, 160)}` + `\n evidence: ${c.evidenceIds.join(', ') || '(none → treat as unknown)'}`)
       : ['(none yet — run ask)']),
     ``,
-    `## 9. Coverage / Gaps`,
+    `## 9. Modernization Work Plan`,
+    ``,
+    ...(modernization
+      ? [
+        `- Status: ${modernization.status}, version: ${modernization.version}`,
+        `- Gaps: ${modernization.gaps.length}, mappings: ${modernization.mappings.length}`,
+        `- Validation checks: ${modernization.validationPlan.checks.length}`,
+        `- Migration stages: ${modernization.migrationStages.map((stage) => stage.name).join(' → ')}`,
+        `- Target components: ${modernization.targetArchitecture.components.map((component) => component.name).join(', ')}`,
+      ]
+      : ['(no modernization plan yet — use the Modernization Workbench to generate one)']),
+    ``,
+    `## 10. Coverage / Gaps`,
     ``,
     `- SQL parse coverage: ${sqlCoverage}`,
     `- Lineage coverage: ${lineageCoverage}`,
