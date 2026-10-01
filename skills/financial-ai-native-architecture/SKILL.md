@@ -7,7 +7,7 @@ description: 从零设计金融服务 AI-native 数据与 Agent 架构，适用�
 
 这个 Skill 用于从零设计一个新的金融服务数据与 AI Agent 方案。
 
-它不是 Legacy Modernization Workflow，也不是固定审批流程。用户给出目标后，Agent 根据已有资料和未知项决定下一步调查或设计动作。
+它有一条固定的 Data Architect 工作路线，但只固定大阶段；每一关里面怎么查、查哪些资料、是否回到前一关，由 Agent 根据证据决定。
 
 ## 什么时候使用
 
