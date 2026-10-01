@@ -15,7 +15,7 @@ import type { WorkflowId } from './investigation/schemas.js';
 /** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
-  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow legacy-modernization|financial-ai-native-architecture]');
+  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow legacy-modernization|financial-ai-native-architecture|data-architecture-assessment]');
   let userPrompt = '';
   let workflow: WorkflowId = 'legacy-modernization';
   const inv = newInvestigation(name, userPrompt, workflow);
