@@ -44,6 +44,15 @@ conversations.db 保存 user / assistant / system 消息，并使用 SQLite FTS5
 
 shared/ 保存跨 session 可以复用的研究资料。
 
+## 工作路线
+
+新建工作可以选择：
+
+- `legacy-modernization`
+- `financial-ai-native-architecture`
+
+Session 会把选择保存到 context.json；当前没有额外的 Workflow Registry。
+
 ## API
 
 ~~~text
