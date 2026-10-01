@@ -29,6 +29,7 @@ import {
   loadArchitectureAssessmentJourneyState,
 } from './workflow/assessment.js';
 import { config } from './config.js';
+import { listSkillManifests } from './skills/catalog.js';
 import {
   appendContextInput,
   ensureWorkspace,
@@ -76,29 +77,6 @@ const upload = multer({
 function safeUploadName(name: string): string {
   const base = path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 160);
   return base || 'uploaded-file';
-}
-
-/** 从 skills 目录读取每个 Skill 的 name/description，供 Settings UI 展示。 */
-async function listSkills(): Promise<Array<{ name: string; description: string }>> {
-  let entries;
-  try {
-    entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  const result: Array<{ name: string; description: string }> = [];
-  for (const entry of entries.filter((item) => item.isDirectory())) {
-    try {
-      const text = await fs.readFile(path.join(config.skillsDir, entry.name, 'SKILL.md'), 'utf8');
-      const name = /^name:\s*(.+)$/m.exec(text)?.[1]?.trim() || entry.name;
-      const description = /^description:\s*(.+)$/m.exec(text)?.[1]?.trim() || '';
-      result.push({ name, description });
-    } catch {
-      // Ignore directories without SKILL.md.
-    }
-  }
-  return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** 兼容 Express 路由参数可能为 string|string[] 的情况，统一取第一个值。 */
@@ -205,7 +183,7 @@ app.post('/api/sessions', async (req, res) => {
   });
 
   app.get('/api/skills', async (_req, res) => {
-    res.json({ skills: await listSkills() });
+    res.json({ skills: await listSkillManifests() });
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
