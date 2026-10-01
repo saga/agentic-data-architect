@@ -8,6 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import type { WorkflowId } from '../investigation/schemas.js';
 
 export type JourneyNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
@@ -42,6 +43,10 @@ export interface ParsedJourney {
 
 export interface JourneyFacts {
   goal: string;
+  /** Architecture Assessment 使用的确定性计数；Legacy 路线不需要填。 */
+  findingCount?: number;
+  recommendationCount?: number;
+  roadmapItemCount?: number;
   currentState: {
     datasets: number;
     lineageCoverage: number | null;
@@ -266,6 +271,18 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
 
     case 'cutover':
       return conditionPassed('validation', facts);
+
+    case 'assessment-current-state':
+      return Boolean(facts.currentState);
+
+    case 'assessment-findings':
+      return (facts.findingCount ?? 0) > 0 || Boolean(facts.currentState);
+
+    case 'assessment-recommendation':
+      return (facts.recommendationCount ?? 0) > 0;
+
+    case 'assessment-roadmap':
+      return (facts.roadmapItemCount ?? 0) > 0;
 
     default:
       return false;
