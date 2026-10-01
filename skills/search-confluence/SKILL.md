@@ -1,6 +1,8 @@
 ---
 name: search-confluence
 description: Research internal Confluence architecture, ADRs, business documentation, runbooks, processes, and constraints.
+metadata:
+  kind: capability
 ---
 
 # Search Confluence
