@@ -624,7 +624,7 @@ function AppInner() {
 
       await consumeSse(response, ({ event, data }) => {
         if (event === 'started') {
-          setTurnStatus('思考中…');
+          setTurnStatus('助手正在处理你的问题，请稍候…');
           return;
         }
         if (event === 'status') {
