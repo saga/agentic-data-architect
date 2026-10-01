@@ -4,12 +4,13 @@
  * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
  */
 import * as z from 'zod';
-import { ControlAgentSchema, ControlResearchSchema } from '../investigation/schemas.js';
+import { ControlAgentSchema, ControlResearchSchema, WorkflowIdSchema } from '../investigation/schemas.js';
 
 /** 创建 Investigation Session 的 HTTP 请求体 Schema。 */
 export const CreateSessionBodySchema = z.object({
   name: z.string().trim().min(1).optional(),
   userPrompt: z.string().trim().optional(),
+  workflow: WorkflowIdSchema.optional(),
 }).strict();
 
 /** 保存 Investigation research / Agent 配置的 HTTP 请求体 Schema。 */
