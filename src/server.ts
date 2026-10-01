@@ -286,6 +286,11 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   app.get('/api/sessions/:name/journey', async (req, res) => {
     const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (context.workflow !== 'legacy-modernization') {
+      res.json({ journey: null });
+      return;
+    }
     const journey = await loadModernizationJourneyState(name);
     res.json({ journey });
   });
