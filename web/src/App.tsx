@@ -729,7 +729,7 @@ function AppInner() {
       toast.success(`已上传 ${result.file.name}`);
     } catch (e) {
       setAttachments((items) => items.map((item) => item.uid === file.uid ? { ...item, status: 'error' } : item));
-      toast.error(e instanceof Error ? e.message : 'Upload failed');
+      toast.error(e instanceof Error ? e.message : '上传失败');
     } finally {
       setUploadingFiles((currentSet) => {
         const next = new Set(currentSet);
@@ -927,7 +927,7 @@ function AppInner() {
                           : {
                               icon: <FolderOpenOutlined />,
                               title: '上传调查文件',
-                              description: '文件会保存到当前调查工作区，并登记到 context.json。',
+                              description: '文件会保存在当前调查里，后面可以继续使用。',
                             }
                       }
                     />
