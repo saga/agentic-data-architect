@@ -6,8 +6,6 @@
  * 和最终的 Modernization Plan。它们都保留 Evidence 引用，但不把 Evidence 嵌进来。
  */
 import * as z from 'zod';
-import type { JourneyState } from '../workflow/journey.js';
-
 export const JourneyStateSchema = z.object({
   workflowId: z.string().min(1),
   currentNodeId: z.string().min(1),
