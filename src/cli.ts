@@ -26,8 +26,8 @@ async function cmdInit(args: string[]): Promise<void> {
     if (rest[i] === '--system') inv.systems = (rest[++i] ?? '').split(',').filter(Boolean);
     if (rest[i] === '--workflow') {
       const value = rest[++i] as WorkflowId;
-      if (value !== 'legacy-modernization' && value !== 'financial-ai-native-architecture') {
-        throw new Error('workflow 只能是 legacy-modernization 或 financial-ai-native-architecture');
+      if (!['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'].includes(value)) {
+        throw new Error('workflow 只能是 legacy-modernization、financial-ai-native-architecture 或 data-architecture-assessment');
       }
       workflow = value;
       inv.workflow = value;
