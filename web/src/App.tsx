@@ -572,7 +572,7 @@ function AppInner() {
         messages: [
           ...existing.messages,
           {
-            id: `local-user-${turnId}`,
+            id: `${turnId}:user`,
             role: 'user',
             content: message,
             capturedAt: new Date().toISOString(),
@@ -819,12 +819,7 @@ function AppInner() {
         <Header className="topbar">
           <Flex justify="space-between" align="center" style={{ width: '100%' }}>
             <div className="topbar-title">
-              <Title level={4} style={{ margin: 0 }}>
-                {current?.context.userPrompt || current?.context.name || '新建调查'}
-              </Title>
-              <Text type="secondary">
-                {current?.context.name || '直接输入你想查清楚的问题'}
-              </Text>
+              <Text strong className="topbar-label">调查工作区</Text>
             </div>
             <Space>
               <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
@@ -961,10 +956,8 @@ function AppInner() {
             <aside className="context-panel">
               <div className="panel-header">
                 <div>
-                  <Text className="eyebrow">当前工作</Text>
-                  <Title level={5} style={{ margin: '3px 0 0' }}>
-                    {current?.context.name || '新调查'}
-                  </Title>
+                  <Text className="eyebrow">工作进展</Text>
+                  <Text strong>当前情况与下一步</Text>
                 </div>
                 <Tooltip title="调查设置">
                   <Button
@@ -976,12 +969,7 @@ function AppInner() {
                 </Tooltip>
               </div>
 
-              <section className="right-summary">
-                <Text className="right-label">要查清楚</Text>
-                <Paragraph className="right-goal" ellipsis={{ rows: 4 }}>
-                  {current?.context.goal || current?.context.userPrompt || '还没有写下要解决的问题。'}
-                </Paragraph>
-              </section>
+
 
               <section className="right-section">
                 <div className="right-section-heading">
