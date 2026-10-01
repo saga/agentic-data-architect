@@ -1101,7 +1101,7 @@ function AppInner() {
       >
         {modernizationPlan ? (
           <div className="plain-plan">
-            {(!current?.currentState || modernizationPlan.gaps.some((gap) => gap.kind === 'discovery' && gap.severity === 'high')) ? (
+            {!current?.currentState ? (
               <Card size="small" className="action-card" title="还没查清现有系统">
                 <Paragraph className="action-card-text">
                   现在还不能讨论怎么改。先把数据、数据流、来源和关键业务定义查清楚。
@@ -1110,76 +1110,80 @@ function AppInner() {
                   开始查现状
                 </Button>
               </Card>
-            ) : null}
-
-            <Card size="small" title="现在知道什么">
-              <div className="plain-summary">
-                <span>数据集 <strong>{modernizationPlan.currentState.datasets}</strong></span>
-                <span>数据来路 <strong>{modernizationPlan.currentState.lineageCoverage === null ? '还没统计' : `${Math.round(modernizationPlan.currentState.lineageCoverage * 100)}%`}</strong></span>
-                <span>业务定义 <strong>{modernizationPlan.currentState.semanticAssets}</strong></span>
-                <span>待查 <strong>{current?.context.unknowns.length ?? 0}</strong></span>
-              </div>
-            </Card>
-
-            <Card size="small" title="现在卡在哪里">
-              {modernizationPlan.gaps.length ? (
-                <Flex vertical gap={10}>
-                  {modernizationPlan.gaps.slice(0, 4).map((gap) => (
-                    <div key={gap.id} className="plain-plan-item">
-                      <Text strong>{gap.title}</Text>
-                      <Text type="secondary">{gap.recommendation}</Text>
-                      <Button
-                        className="gap-action"
-                        size="small"
-                        type={gap.severity === 'high' ? 'primary' : 'default'}
-                        onClick={() => handleModernizationAction(gap)}
-                      >
-                        {gap.kind === 'semantic' ? '去找业务定义' : gap.kind === 'lineage' ? '去查数据流' : '去处理'}
-                      </Button>
-                    </div>
-                  ))}
-                </Flex>
-              ) : (
-                <Text type="secondary">目前没有明显卡点，可以继续分析。</Text>
-              )}
-            </Card>
-
-            <Card size="small" title="接下来做什么">
-              {(() => {
-                const nextStage = modernizationPlan.migrationStages.find(
-                  (stage) => stage.blockedByGapIds.length === 0,
-                ) ?? modernizationPlan.migrationStages[0];
-
-                if (!nextStage) {
-                  return <Text type="secondary">先完成一次调查，再决定下一步。</Text>;
-                }
-
-                return (
-                  <div className="plain-plan-next">
-                    <Text strong>{nextStage.name}</Text>
-                    <Text type="secondary">{nextStage.objective}</Text>
-                    {nextStage.outputs.length ? (
-                      <Text type="secondary">会产出：{nextStage.outputs.join('、')}</Text>
-                    ) : null}
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={() => handleModernizationAction(modernizationPlan.gaps.find((gap) =>
-                        nextStage.blockedByGapIds.includes(gap.id),
-                      ))}
-                    >
-                      开始这一步
-                    </Button>
+            ) : (
+              <>
+                <Card size="small" title="现在知道什么">
+                  <div className="plain-summary">
+                    <span>数据集 <strong>{modernizationPlan.currentState.datasets}</strong></span>
+                    <span>数据来路 <strong>{modernizationPlan.currentState.lineageCoverage === null ? '还没统计' : `${Math.round(modernizationPlan.currentState.lineageCoverage * 100)}%`}</strong></span>
+                    <span>业务定义 <strong>{modernizationPlan.currentState.semanticAssets}</strong></span>
+                    <span>待查 <strong>{current?.context.unknowns.length ?? 0}</strong></span>
                   </div>
-                );
-              })()}
-            </Card>
+                </Card>
 
-            <Text type="secondary" className="plain-plan-note">
-              这里是草案。点击上面的按钮后，助手会直接进入对话处理；需要人工确认时会明确告诉你。
-            </Text>
-          </div>
-        ) : (
+                <Card size="small" title="现在卡在哪里">
+                  {modernizationPlan.gaps.filter((gap) => gap.kind !== 'discovery' || gap.title !== '还没查清现有系统').length ? (
+                    <Flex vertical gap={10}>
+                      {modernizationPlan.gaps
+                        .filter((gap) => gap.kind !== 'discovery' || gap.title !== '还没查清现有系统')
+                        .slice(0, 4)
+                        .map((gap) => (
+                          <div key={gap.id} className="plain-plan-item">
+                            <Text strong>{gap.title}</Text>
+                            <Text type="secondary">{gap.recommendation}</Text>
+                            <Button
+                              className="gap-action"
+                              size="small"
+                              type={gap.severity === 'high' ? 'primary' : 'default'}
+                              onClick={() => handleModernizationAction(gap)}
+                            >
+                              {gap.kind === 'semantic' ? '去找业务定义' : gap.kind === 'lineage' ? '去查数据流' : '去处理'}
+                            </Button>
+                          </div>
+                        ))}
+                    </Flex>
+                  ) : (
+                    <Text type="secondary">目前没有明显卡点，可以继续分析。</Text>
+                  )}
+                </Card>
+
+                <Card size="small" title="接下来做什么">
+                  {(() => {
+                    const nextStage = modernizationPlan.migrationStages.find(
+                      (stage) => stage.blockedByGapIds.length === 0,
+                    ) ?? modernizationPlan.migrationStages[0];
+
+                    if (!nextStage) {
+                      return <Text type="secondary">先完成一次调查，再决定下一步。</Text>;
+                    }
+
+                    return (
+                      <div className="plain-plan-next">
+                        <Text strong>{nextStage.name}</Text>
+                        <Text type="secondary">{nextStage.objective}</Text>
+                        {nextStage.outputs.length ? (
+                          <Text type="secondary">会产出：{nextStage.outputs.join('、')}</Text>
+                        ) : null}
+                        <Button
+                          type="primary"
+                          size="small"
+                          onClick={() => handleModernizationAction(modernizationPlan.gaps.find((gap) =>
+                            nextStage.blockedByGapIds.includes(gap.id),
+                          ))}
+                        >
+                          开始这一步
+                        </Button>
+                      </div>
+                    );
+                  })()}
+                </Card>
+
+                <Text type="secondary" className="plain-plan-note">
+                  这里是草案。点击上面的按钮后，助手会直接进入对话处理；需要人工确认时会明确告诉你。
+                </Text>
+              </>
+            )}
+          </div>        ) : (
           <div className="plain-plan-empty">
             <Text strong>还没有开始查现状</Text>
             <Text type="secondary">先把现有数据架构查清楚，再决定下一步。</Text>
