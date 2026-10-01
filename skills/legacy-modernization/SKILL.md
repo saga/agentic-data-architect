@@ -3,6 +3,8 @@ name: legacy-modernization
 description: >
   Data Modernization Journey：用一条有状态的 Markdown Workflow，把 Data Analyst 和 Data Architect
   在 legacy modernization / replatform 中反复出现的工作组织成“当前关卡 → 证据 → Gate → 下一关”。
+metadata:
+  kind: workflow
 ---
 
 # Legacy Modernization Journey
