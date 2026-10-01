@@ -925,7 +925,7 @@ function AppInner() {
 
                   <div className="welcome-footnote">
                     <PaperClipOutlined />
-                    <Text type="secondary">可以上传文件，并在调查过程中配置 GitHub、技能和 MCP。</Text>
+                    <Text type="secondary">可以上传文件，也可以继续添加 GitHub、技能和 MCP。</Text>
                   </div>
                 </div>
               </div>
@@ -1092,12 +1092,12 @@ function AppInner() {
                 <div className="coverage-grid compact">
                   <div><span>{current?.currentState?.coverage.datasets ?? 0}</span><Text type="secondary">数据集</Text></div>
                   <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">发现问题</Text></div>
-                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">未知项</Text></div>
+                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">待查内容</Text></div>
                   <div>
                     <span>{current?.currentState?.coverage.datasetLineageCoverage == null ? '—' : `${(current.currentState.coverage.datasetLineageCoverage * 100).toFixed(0)}%`}</span>
-                    <Text type="secondary">血缘 覆盖</Text>
+                    <Text type="secondary">数据来路</Text>
                   </div>
-                  <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">语义资产</Text></div>
+                  <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">业务定义</Text></div>
                   <div><span>{current?.currentState?.coverage.sqlParseFailures ?? 0}</span><Text type="secondary">SQL 解析失败</Text></div>
                 </div>
               </section>
@@ -1438,7 +1438,7 @@ function AppInner() {
                     <div className="settings-page-header">
                       <Title level={4}>MCP 连接</Title>
                       <Paragraph type="secondary">
-                        Add MCP servers used by this investigation. Configuration changes are 有版本管理 and audit logged.
+                        Add MCP servers used by this investigation. 修改会保留版本，并记录操作记录。
                       </Paragraph>
                     </div>
                     <Card className="settings-card" title="服务器">
