@@ -21,9 +21,6 @@ import {
 } from 'antd';
 import type { UploadFile } from 'antd';
 import {
-  CheckCircleOutlined,
-  FileSearchOutlined,
-  FileTextOutlined,
   FolderOpenOutlined,
   GithubOutlined,
   HistoryOutlined,
@@ -42,7 +39,6 @@ import {
   Conversations,
   Mermaid,
   Sender,
-  Welcome,
   XProvider,
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
@@ -790,7 +786,7 @@ function AppInner() {
             showIcon
             closable
             icon={<InfoCircleOutlined />}
-            message="每个调查都有独立的研究范围、文件和 Agent 配置。"
+            message="每个调查都有自己的资料和设置。"
             onClose={() => {
               setShowLeftTip(false);
               try { localStorage.setItem('ada.tip.left', 'dismissed'); } catch {}
@@ -827,7 +823,7 @@ function AppInner() {
                 {current?.context.userPrompt || current?.context.name || '新建调查'}
               </Title>
               <Text type="secondary">
-                {current?.context.name || 'Start with the question you need to answer'}
+                {current?.context.name || '直接输入你想查清楚的问题'}
               </Text>
             </div>
             <Space>
@@ -855,77 +851,28 @@ function AppInner() {
                 className="bubble-list"
               />
             ) : (
-              <div className="welcome">
-                <div className="welcome-stage">
-                  <div className="welcome-brand">
-                    <div className="welcome-orb">DA</div>
-                    <div>
-                      <Text strong>基于证据的数据调查</Text>
-                      <div><Text type="secondary">先还原数据资产与血缘，再验证事实，最后决定下一步分析什么。</Text></div>
-                    </div>
-                  </div>
+              <div className="empty-chat">
+                <div className="empty-chat-inner">
+                  <Text className="empty-chat-title">开始调查</Text>
+                  <Text className="empty-chat-description">
+                    直接写下你想查清楚的问题。需要时再上传资料或补充信息。
+                  </Text>
 
-                  <Welcome
-                    variant="borderless"
-                    icon={<FileTextOutlined />}
-                    title="我们要解决什么问题？"
-                    description="从目标或问题开始；可以随时补充上下文、文件或研究资料。"
-                  />
-
-                  <div className="starter-grid">
+                  <div className="starter-prompts">
                     {[
-                      {
-                        icon: <CheckCircleOutlined />,
-                        title: '定义目标',
-                        description: '你要解决什么业务或数据问题？',
-                        prompt: 'Help me define the investigation goal and the key questions we should answer.',
-                      },
-                      {
-                        icon: <FileSearchOutlined />,
-                        title: '追踪数据流',
-                        description: '找到关键数据集的来源、转换和上下游关系。',
-                        prompt: 'Trace the lineage of the most important data flow in this investigation.',
-                      },
-                      {
-                        icon: <GithubOutlined />,
-                        title: '研究业务领域',
-                        description: '检索仓库、文档和已有实现，确认可以验证的事实。',
-                        prompt: 'Research the relevant domain patterns and summarize what we can verify.',
-                      },
-                    ].map((item) => (
-                      <button
-                        key={item.title}
-                        className="starter-card"
-                        type="button"
-                        onClick={() => send(item.prompt)}
+                      'Position 最终来自哪里？',
+                      '梳理 Portfolio Market Value 的数据来源和转换过程。',
+                      '这个系统现在有哪些地方还没查清楚？',
+                    ].map((prompt) => (
+                      <Button
+                        key={prompt}
+                        className="starter-prompt"
+                        size="small"
+                        onClick={() => send(prompt)}
                       >
-                        <span className="starter-icon">{item.icon}</span>
-                        <span className="starter-copy">
-                          <Text strong>{item.title}</Text>
-                          <Text type="secondary">{item.description}</Text>
-                        </span>
-                      </button>
+                        {prompt}
+                      </Button>
                     ))}
-                  </div>
-
-                  <div className="quick-start">
-                    <Text className="quick-start-label" type="secondary">快速开始</Text>
-                    <Flex wrap gap={8}>
-                      {[
-                        'Legacy 平台中的 Position 最终来自哪里？',
-                        '梳理 Portfolio Market Value 的完整数据血缘。',
-                        '目前已经确认了哪些 当前现状 数据模型？',
-                      ].map((prompt) => (
-                        <Button key={prompt} className="quick-chip" size="small" onClick={() => send(prompt)}>
-                          {prompt}
-                        </Button>
-                      ))}
-                    </Flex>
-                  </div>
-
-                  <div className="welcome-footnote">
-                    <PaperClipOutlined />
-                    <Text type="secondary">可以上传文件，也可以继续添加 GitHub、技能和 MCP。</Text>
                   </div>
                 </div>
               </div>
@@ -1018,7 +965,7 @@ function AppInner() {
                   <Title level={5} style={{ margin: '3px 0 0' }}>{current?.context.name || '—'}</Title>
                 </div>
                 <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
-                  Configure
+                  设置
                 </Button>
               </div>
 
