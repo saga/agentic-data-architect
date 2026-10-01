@@ -23,6 +23,11 @@ import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { buildReport } from './analysis/report.js';
 import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
+import {
+  buildArchitectureAssessmentPlan,
+  loadArchitectureAssessmentPlan,
+  loadArchitectureAssessmentJourneyState,
+} from './workflow/assessment.js';
 import { config } from './config.js';
 import {
   appendContextInput,
@@ -134,7 +139,11 @@ async function listSessions(): Promise<SessionSummary[]> {
 }
 
 /** 创建新的 Investigation、默认 Control 和初始审计事件；已存在时直接返回。 */
-async function createSession(name?: string, userPrompt?: string, workflow?: 'legacy-modernization' | 'financial-ai-native-architecture') {
+async function createSession(
+  name?: string,
+  userPrompt?: string,
+  workflow?: 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment',
+) {
   const key = sessionKey(
     name?.trim() ||
       'session-' +
@@ -287,12 +296,33 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
   app.get('/api/sessions/:name/journey', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
-    if (context.workflow !== 'legacy-modernization') {
-      res.json({ journey: null });
+    const journey = context.workflow === 'legacy-modernization'
+      ? await loadModernizationJourneyState(name)
+      : context.workflow === 'data-architecture-assessment'
+        ? await loadArchitectureAssessmentJourneyState(name)
+        : null;
+    res.json({ journey });
+  });
+
+  app.get('/api/sessions/:name/assessment', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (context.workflow !== 'data-architecture-assessment') {
+      res.json({ plan: null, path: null });
       return;
     }
-    const journey = await loadModernizationJourneyState(name);
-    res.json({ journey });
+    const rebuild = req.query.rebuild === 'true';
+    const existing = await loadArchitectureAssessmentPlan(name);
+    if (existing && !rebuild) {
+      res.json({ plan: existing, path: null });
+      return;
+    }
+    if (!existing && !rebuild) {
+      res.json({ plan: null, path: null });
+      return;
+    }
+    const result = await buildArchitectureAssessmentPlan(name);
+    res.json(result);
   });
 
   app.get('/api/sessions/:name/modernization', async (req, res) => {
