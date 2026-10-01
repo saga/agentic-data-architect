@@ -1,6 +1,8 @@
 ---
 name: search-leanix
 description: Research SAP LeanIX application facts, relationships, ownership, lifecycle, dependencies, and enterprise architecture evidence.
+metadata:
+  kind: capability
 ---
 
 # Search LeanIX
