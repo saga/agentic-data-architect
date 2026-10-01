@@ -30,12 +30,12 @@ export function buildModernizationGaps(args: {
     gaps.push({
       id: nextGapId('discovery'),
       kind: 'discovery',
-      title: 'Current-State 尚未建立',
-      description: '在设计 Target Architecture 前，还没有可验证的 Current-State Intelligence。',
+      title: '还没查清现有系统',
+      description: '现在还没有足够的资料说明这个系统有哪些数据、怎么流转，以及关键业务定义是什么。',
       severity: 'high',
       affectedAssets: estate?.nodes.map((n) => n.id).slice(0, 20) ?? [],
       evidenceIds: [],
-      recommendation: '先运行 Discovery，并补齐 metadata、lineage、profiling 和语义上下文。',
+      recommendation: '先查现有系统：数据集、主要数据流、SQL/ETL 转换、数据来源和已有业务定义。',
     });
     return gaps;
   }
