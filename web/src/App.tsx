@@ -1185,7 +1185,7 @@ function AppInner() {
                         {modernizationPlan.gaps.slice(0, 2).map((gap) => (
                           <div key={gap.id} className="right-issue">
                             <Text strong ellipsis={{ tooltip: gap.title }}>{gap.title}</Text>
-                            <Text type="secondary" ellipsis={{ rows: 2, tooltip: gap.recommendation }}>
+                            <Text type="secondary" ellipsis={{ tooltip: gap.recommendation }}>
                               {gap.recommendation}
                             </Text>
                             <Button
