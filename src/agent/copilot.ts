@@ -197,7 +197,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
   });
   const offToolComplete = session.on('tool.execution_complete', () => {
-    input.onStatus?.('Thinking…');
+    input.onStatus?.('助手正在整理刚找到的资料，请稍候…');
   });
   // These events are UI status signals, not model chain-of-thought. Keep them
   // operational so the browser never receives hidden reasoning text.
