@@ -669,7 +669,7 @@ function AppInner() {
       }
     } finally {
       setStreamingAnswer(undefined);
-      setTurnStatus('思考中…');
+      setTurnStatus('助手正在处理你的问题，请稍候…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
