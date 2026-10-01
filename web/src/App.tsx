@@ -961,141 +961,117 @@ function AppInner() {
             <aside className="context-panel">
               <div className="panel-header">
                 <div>
-                  <Text className="eyebrow">调查</Text>
-                  <Title level={5} style={{ margin: '3px 0 0' }}>{current?.context.name || '—'}</Title>
+                  <Text className="eyebrow">当前工作</Text>
+                  <Title level={5} style={{ margin: '3px 0 0' }}>
+                    {current?.context.name || '新调查'}
+                  </Title>
                 </div>
-                <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
-                  设置
-                </Button>
+                <Tooltip title="调查设置">
+                  <Button
+                    type="text"
+                    icon={<SettingOutlined />}
+                    aria-label="调查设置"
+                    onClick={() => setSettingsOpen(true)}
+                  />
+                </Tooltip>
               </div>
 
-              <section className="panel-section">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>目标</Text>
-                    <Text type="secondary" className="section-subtitle">这次调查要回答什么</Text>
-                  </div>
-                </div>
-                <Paragraph
-                  ellipsis={{ rows: 5, tooltip: current?.context.goal || current?.context.userPrompt }}
-                  style={{ marginBottom: 0 }}
-                >
-                  {current?.context.goal || current?.context.userPrompt || '还没有定义目标。'}
+              <section className="right-summary">
+                <Text className="right-label">要查清楚</Text>
+                <Paragraph className="right-goal" ellipsis={{ rows: 4 }}>
+                  {current?.context.goal || current?.context.userPrompt || '还没有写下要解决的问题。'}
                 </Paragraph>
               </section>
 
-              <section className="panel-section">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>资料来源</Text>
-                    <Text type="secondary" className="section-subtitle">Agent 当前可用的上下文</Text>
-                  </div>
+              <section className="right-section">
+                <div className="right-section-heading">
+                  <Text strong>现在怎么样</Text>
                 </div>
-                <div className="status-line">
-                  <Text type="secondary">文档</Text>
-                  <Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text>
-                </div>
-                <div className="status-line">
-                  <Text type="secondary">仓库</Text>
-                  <Text>{current?.control?.research.githubRepositories.length ?? 0}</Text>
-                </div>
-                <div className="status-line">
-                  <Text type="secondary">关键词</Text>
-                  <Text>{current?.control?.research.keywords.length ?? 0}</Text>
+                <div className="right-facts">
+                  <span>数据集 {current?.currentState?.coverage.datasets ?? 0}</span>
+                  <span>
+                    数据来路 {current?.currentState?.coverage.datasetLineageCoverage == null
+                      ? '未统计'
+                      : `${Math.round(current.currentState.coverage.datasetLineageCoverage * 100)}%`}
+                  </span>
+                  <span>业务定义 {current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span>
+                  <span>待查 {current?.context.unknowns.length ?? 0}</span>
                 </div>
               </section>
 
-              <section className="panel-section modern-panel-card">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>改造计划</Text>
-                    <Text type="secondary" className="section-subtitle">帮你看清现在的情况，再决定下一步做什么</Text>
-                  </div>
-                </div>
-                <Flex vertical gap={9}>
-                  <Text type="secondary">
-                    这里不讲一堆技术名词，只告诉你：现在知道什么、先解决什么、下一步做什么。
-                  </Text>
-                  <Button
-                    type="primary"
-                    ghost
-                    loading={modernizationLoading}
-                    disabled={!active}
-                    onClick={() => active && void loadModernization(active)}
-                  >
-                    {modernizationPlan ? '看下一步' : '生成改造计划'}
-                  </Button>
-
-                </Flex>
-              </section>
-
-              <section className="panel-section modern-panel-card">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>现在知道什么</Text>
-                    <Text type="secondary" className="section-subtitle">哪些已经查清，哪些还不知道</Text>
-                  </div>
-                </div>
-                <div className="coverage-grid compact">
-                  <div><span>{current?.currentState?.coverage.datasets ?? 0}</span><Text type="secondary">数据集</Text></div>
-                  <div><span>{current?.context.findings.length ?? 0}</span><Text type="secondary">发现问题</Text></div>
-                  <div><span>{current?.context.unknowns.length ?? 0}</span><Text type="secondary">待查内容</Text></div>
-                  <div>
-                    <span>{current?.currentState?.coverage.datasetLineageCoverage == null ? '—' : `${(current.currentState.coverage.datasetLineageCoverage * 100).toFixed(0)}%`}</span>
-                    <Text type="secondary">数据来路</Text>
-                  </div>
-                  <div><span>{current?.currentState?.coverage.semanticAssets ?? current?.semanticAssets?.length ?? 0}</span><Text type="secondary">业务定义</Text></div>
-                  <div><span>{current?.currentState?.coverage.sqlParseFailures ?? 0}</span><Text type="secondary">SQL 解析失败</Text></div>
-                </div>
-              </section>
-
-              <section className="panel-section modern-panel-card">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>下一步要解决</Text>
-                    <Text type="secondary" className="section-subtitle">优先处理会阻塞目标设计的问题</Text>
-                  </div>
+              <section className="right-section">
+                <div className="right-section-heading">
+                  <Text strong>现在卡在哪里</Text>
                 </div>
                 {modernizationPlan?.gaps.length ? (
-                  <Flex vertical gap={8}>
-                    {modernizationPlan.gaps.slice(0, 5).map((gap) => (
-                      <div key={gap.id} className="modern-gap-row">
-                        <Flex justify="space-between" gap={8}>
-                          <Text strong>{gap.title}</Text>
-                          <Tag color={gap.severity === 'high' ? 'red' : gap.severity === 'medium' ? 'orange' : undefined}>
-                            {gap.severity === 'high' ? '高' : gap.severity === 'medium' ? '中' : '低'}
-                          </Tag>
-                        </Flex>
-                        <Text type="secondary">{gap.recommendation}</Text>
+                  <div className="right-issues">
+                    {modernizationPlan.gaps.slice(0, 2).map((gap) => (
+                      <div key={gap.id} className="right-issue">
+                        <Text strong ellipsis={{ tooltip: gap.title }}>{gap.title}</Text>
+                        <Text type="secondary" ellipsis={{ rows: 2, tooltip: gap.recommendation }}>
+                          {gap.recommendation}
+                        </Text>
                       </div>
                     ))}
-                  </Flex>
-                ) : (
+                  </div>
+                ) : current?.context.findings.length ? (
+                  <div className="right-issues">
+                    {current.context.findings.slice(0, 2).map((finding, index) => (
+                      <div key={finding.title ?? index} className="right-issue">
+                        <Text strong>{finding.title || '有一个问题还需要确认'}</Text>
+                      </div>
+                    ))}
+                  </div>
+                ) : current?.context.unknowns.length ? (
                   <Text type="secondary">
-                    目前还没有整理出下一步要处理的问题。先把现有系统查清楚。
+                    还有 {current.context.unknowns.length} 项没查清，继续提问或补充资料即可。
                   </Text>
+                ) : (
+                  <Text type="secondary">目前没有明显卡点，可以继续分析。</Text>
                 )}
               </section>
 
-              <section className="panel-section modern-panel-card">
-                <div className="section-heading">
-                  <div>
-                    <Text strong>资料与能力</Text>
-                    <Text type="secondary" className="section-subtitle">Agent 当前能够使用的上下文</Text>
-                  </div>
+              <section className="right-next">
+                <div className="right-section-heading">
+                  <Text strong>下一步</Text>
                 </div>
-                <div className="status-line"><Text type="secondary">文档</Text><Text>{current?.context.inputs.filter((input) => input.kind === 'document').length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">GitHub 仓库</Text><Text>{current?.control?.research.githubRepositories.length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">关键词</Text><Text>{current?.control?.research.keywords.length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">技能</Text><Text>{current?.control?.agent.skills.length ?? 0}</Text></div>
-                <div className="status-line"><Text type="secondary">MCP</Text><Text>{current?.control?.agent.mcpServers.filter((item) => item.enabled).length ?? 0}</Text></div>
-              </section>
+                {(() => {
+                  const nextStage = modernizationPlan?.migrationStages.find(
+                    (stage) => stage.blockedByGapIds.length === 0,
+                  ) ?? modernizationPlan?.migrationStages[0];
 
-              <Text type="secondary" className="panel-updated">
-                配置 v{current?.control?.version ?? 1}
-                {' · '}
-                最近更新 {current ? formatTime(current.context.updatedAt) : '—'}
-              </Text>
+                  if (!nextStage) {
+                    return (
+                      <div className="right-next-content">
+                        <Text type="secondary">
+                          先完成一次调查，系统才能给出具体的下一步。
+                        </Text>
+                        <Button
+                          type="primary"
+                          size="small"
+                          loading={modernizationLoading}
+                          onClick={() => active && void loadModernization(active)}
+                        >
+                          生成下一步
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="right-next-content">
+                      <Text strong>{nextStage.name}</Text>
+                      <Text type="secondary">{nextStage.objective}</Text>
+                      <Button
+                        size="small"
+                        onClick={() => setModernizationOpen(true)}
+                      >
+                        看完整计划
+                      </Button>
+                    </div>
+                  );
+                })()}
+              </section>
             </aside>
           </div>
         </Content>
