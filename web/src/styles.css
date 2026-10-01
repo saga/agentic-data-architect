@@ -252,18 +252,37 @@ body {
   margin-top: 14px;
 }
 
+/* 调查配置是一个固定大小的工作窗；真正很长的内容只在右侧内容区滚动。 */
+.settings-modal .ant-modal {
+  width: min(1000px, calc(100vw - 40px)) !important;
+  max-width: calc(100vw - 40px);
+  margin: 24px auto;
+}
+
 .settings-modal .ant-modal-content {
+  height: min(840px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+.settings-modal .ant-modal-header,
+.settings-modal .ant-modal-footer {
+  flex: 0 0 auto;
 }
 
 .settings-modal .ant-modal-body {
-  height: min(72vh, 720px);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
   max-height: none;
   overflow: hidden;
-  padding: 0 0 12px;
+  padding: 0;
 }
 
 .settings-tabs {
+  display: flex;
   height: 100%;
   min-height: 0;
 }
@@ -271,12 +290,15 @@ body {
 .settings-tabs > .ant-tabs-nav {
   width: 190px;
   flex: 0 0 190px;
+  align-self: stretch;
   padding: 18px 0 18px 18px;
   margin: 0;
   border-right: 1px solid #f0f0f0;
 }
 
 .settings-tabs > .ant-tabs-content-holder {
+  flex: 1 1 auto;
+  width: 0;
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -285,6 +307,7 @@ body {
 
 .settings-tabs .ant-tabs-content {
   height: 100%;
+  min-height: 0;
 }
 
 .settings-tabs .ant-tabs-tabpane {
@@ -298,7 +321,9 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 26px 30px 32px;
+  scrollbar-gutter: stable;
 }
 
 .settings-page-header {
@@ -423,6 +448,16 @@ body {
   .settings-modal .ant-modal {
     width: calc(100vw - 20px) !important;
     max-width: calc(100vw - 20px);
+    margin: 10px auto;
+  }
+
+  .settings-modal .ant-modal-content {
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .settings-page {
+    padding: 20px;
   }
 
   .settings-tabs > .ant-tabs-nav {
