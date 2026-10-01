@@ -11,6 +11,7 @@
     "discover": "tsx src/cli.ts discover",
     "ask": "tsx src/cli.ts ask",
     "report": "tsx src/cli.ts report",
+    "modernize": "tsx src/cli.ts modernize",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
     "test": "npm run test:python && tsx --test \"tests/**/*.test.ts\"",
     "build": "vite build && tsc",
