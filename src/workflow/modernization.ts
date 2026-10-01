@@ -77,7 +77,7 @@ function buildInitialMappings(
 
 /** 生成首版 Validation Plan，把迁移前必须回答的问题显式化。 */
 function buildValidationPlan(
-  current: DiscoverySnapshot['currentState'],
+  current: DiscoverySnapshot['currentState'] | null,
   mappings: SourceToTargetMapping[],
   gaps: ReturnType<typeof buildModernizationGaps>,
   evidenceIds: string[],
