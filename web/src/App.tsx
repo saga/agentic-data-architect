@@ -167,6 +167,15 @@ interface ModernizationGap {
   recommendation: string;
 }
 
+interface JourneyStage {
+  id: string;
+  title: string;
+  objective: string;
+  status: 'completed' | 'current' | 'locked' | 'future';
+  nodeType: 'task' | 'gate' | 'review' | 'end' | 'stop';
+  unlocked: boolean;
+}
+
 interface ModernizationPlan {
   id: string;
   title: string;
@@ -209,6 +218,13 @@ interface ModernizationPlan {
     validationRule?: string;
     status: string;
   }>;
+  journey?: {
+    workflowId: string;
+    currentNodeId: string;
+    completedNodeIds: string[];
+    unlockedNodeIds: string[];
+    stages: JourneyStage[];
+  };
   validationPlan: {
     checks: Array<{
       id: string;
@@ -1092,6 +1108,40 @@ function AppInner() {
                 </Tooltip>
               </div>
 
+              {modernizationPlan?.journey?.stages.length ? (
+                <section className="right-section right-journey">
+                  <div className="right-section-heading">
+                    <Text strong>路线</Text>
+                  </div>
+                  <div className="journey-map">
+                    {modernizationPlan.journey.stages.map((stage, index) => (
+                      <div
+                        key={stage.id}
+                        className={"journey-map-item journey-map-item-" + stage.status}
+                      >
+                        <div className="journey-map-rail" aria-hidden="true">
+                          <span className="journey-map-dot" />
+                          {index < modernizationPlan.journey!.stages.length - 1 ? (
+                            <span className="journey-map-line" />
+                          ) : null}
+                        </div>
+                        <div className="journey-map-copy">
+                          <Text
+                            strong={stage.status === 'current'}
+                            type={stage.status === 'locked' ? 'secondary' : undefined}
+                          >
+                            {stage.title}
+                          </Text>
+                          {stage.status === 'current' ? (
+                            <Text type="secondary">{stage.objective}</Text>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               <section className="right-section right-blocked">
                 <div className="right-section-heading">
                   <Text strong>现在卡在哪里</Text>
@@ -1206,6 +1256,30 @@ function AppInner() {
             <Text type="secondary">
               这里是详细方案。右侧已经显示当前卡点和直接操作，这里只看完整步骤和方案内容。
             </Text>
+
+            <Card size="small" title="路线图">
+              <div className="plan-stage-list">
+                {modernizationPlan.journey?.stages.map((stage, index) => (
+                  <div key={stage.id} className="plan-stage">
+                    <Flex justify="space-between" gap={8}>
+                      <Text strong>{index + 1}. {stage.title}</Text>
+                      <Tag color={
+                        stage.status === 'completed'
+                          ? 'green'
+                          : stage.status === 'current'
+                            ? 'blue'
+                            : stage.status === 'future'
+                              ? 'default'
+                              : 'default'
+                      }>
+                        {stage.status === 'completed' ? '已完成' : stage.status === 'current' ? '现在' : stage.status === 'future' ? '下一步' : '未解锁'}
+                      </Tag>
+                    </Flex>
+                    <Text type="secondary">{stage.objective}</Text>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
             <Card size="small" title="改造步骤">
               <div className="plan-stage-list">
