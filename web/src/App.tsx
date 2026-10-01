@@ -582,20 +582,47 @@ function AppInner() {
   }, [resizing]);
 
   const bubbleItems = useMemo(() => {
-    const items = (current?.messages ?? []).map((message) => ({
-      key: message.id,
-      role: message.role,
-      content:
-        message.role === 'assistant' ? (
-          <ChatMarkdown content={message.content} />
-        ) : (
-          <Typography.Text>{message.content}</Typography.Text>
-        ),
-      footer:
-        message.role === 'assistant'
-          ? <Text type="secondary">{formatTime(message.capturedAt)}</Text>
-          : undefined,
-    }));
+    const messages = current?.messages ?? [];
+    const lastAssistantIndex = messages.reduce(
+      (lastIndex, message, index) => message.role === 'assistant' ? index : lastIndex,
+      -1,
+    );
+    const items = messages.map((message, index) => {
+      const showGuidance = message.role === 'assistant'
+        && index === lastAssistantIndex
+        && nextGuidance?.questions.length;
+
+      return {
+        key: message.id,
+        role: message.role,
+        content:
+          message.role === 'assistant' ? (
+            <div className="assistant-message-content">
+              <ChatMarkdown content={message.content} />
+              {showGuidance ? (
+                <FollowUpCard
+                  questions={nextGuidance.questions}
+                  value={nextGuidance.value}
+                  loading={loading}
+                  onChange={(value) => setNextGuidance((currentGuidance) => currentGuidance
+                    ? { ...currentGuidance, value }
+                    : currentGuidance)}
+                  onSubmit={() => {
+                    const nextValue = nextGuidance.value.trim();
+                    if (nextValue) void send(nextValue);
+                  }}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <Typography.Text>{message.content}</Typography.Text>
+          ),
+        footer:
+          message.role === 'assistant'
+            ? <Text type="secondary">{formatTime(message.capturedAt)}</Text>
+            : undefined,
+      };
+    });
 
     const currentStreamingAnswer = streamingAnswer;
     if (currentStreamingAnswer && currentStreamingAnswer.key === active) {
@@ -609,7 +636,7 @@ function AppInner() {
       });
     }
     return items;
-  }, [active, current?.messages, streamingAnswer]);
+  }, [active, current?.messages, loading, nextGuidance, streamingAnswer]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
@@ -682,6 +709,7 @@ function AppInner() {
         claimIds: string[];
         warnings: string[];
         unknowns: string[];
+        followUpQuestions: string[];
       } | undefined;
 
       await consumeSse(response, ({ event, data }) => {
@@ -718,6 +746,16 @@ function AppInner() {
       if (activeRef.current === key) {
         await loadSession(key);
         await reloadSessions(false);
+      }
+
+      const questions = Array.isArray(result.followUpQuestions)
+        ? result.followUpQuestions
+          .map((item) => typeof item === 'string' ? item.trim() : '')
+          .filter(Boolean)
+          .slice(0, 3)
+        : [];
+      if (questions.length) {
+        setNextGuidance({ questions, value: '' });
       }
 
       if (result.warnings.length) {
