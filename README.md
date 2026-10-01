@@ -1,6 +1,6 @@
 # agentic-data-architect
 
-面向 **Data Analyst + Data Architect 的 Legacy Modernization / Replatform AI 工作台**。
+面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前包含 Legacy Modernization 和从零建设金融 AI / 数据架构两类固定工作路线。
 
 它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
 
@@ -109,7 +109,44 @@ http://127.0.0.1:3000
 npm run dev
 ~~~
 
-## Modernization Journey
+## Data Architect 工作路线
+
+新建工作时可以选择：
+
+~~~text
+改造已有系统
+  → Legacy Modernization Workflow
+
+从零设计金融 AI / 数据架构
+  → Financial AI-Native Architecture Workflow
+~~~
+
+两条路线都只固定 Data Architect 的大阶段。每一关里面怎么调查、调用哪些工具、是否回到前一关，由 Agent 根据证据决定。
+
+从零建设金融 Portfolio Research Agent 的路线定义在：
+
+~~~text
+skills/financial-ai-native-architecture/SKILL.md
+~~~
+
+典型路线：
+
+~~~text
+明确业务目标
+  → 明确业务需求
+  → 查数据
+  → 定义金融业务模型
+  → 设计数据架构
+  → 设计业务语义
+  → 设计 Agent
+  → 设计安全和运行控制
+  → 设计验证和评估
+  → 形成实施路线
+~~~
+
+该路线直接覆盖 LangChain / DeepAgents、LangSmith、Snowflake Semantic View、金融数据模型和 Portfolio Research 场景。
+
+## Legacy Modernization Workflow
 
 路线定义在：
 
@@ -127,7 +164,7 @@ skills/legacy-modernization/SKILL.md
 @stop
 ~~~
 
-主路线不是一个死板的流程图。发现新的 lineage、业务定义或数据质量问题时，可以回到前面的调查关卡；只有 Current-State、Mapping、Validation 等确定性状态满足条件，Journey 才会推进。
+这条路线不是一条不能回头的流程图。发现新的 lineage、业务定义或数据质量问题时，可以回到前面的调查关卡；只有 Current-State、Mapping、Validation 等确定性状态满足条件，路线才会推进。
 
 Workflow 和 Skill 分工如下：
 
