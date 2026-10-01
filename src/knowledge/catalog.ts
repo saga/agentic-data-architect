@@ -32,6 +32,13 @@ function tokens(value: string): string[] {
     .filter((token) => token.length >= 2);
 }
 
+function chineseBigrams(value: string): string[] {
+  const chars = [...value.toLocaleLowerCase()].filter((char) => /[\u3400-\u9fff]/u.test(char));
+  const result: string[] = [];
+  for (let i = 0; i < chars.length - 1; i += 1) result.push(chars[i] + chars[i + 1]);
+  return result;
+}
+
 /**
  * 轻量关键词检索。
  *
@@ -44,6 +51,7 @@ export async function searchArchitectureKnowledge(
 ): Promise<ArchitectureKnowledge[]> {
   const nodes = await loadKnowledgeFiles();
   const queryTokens = new Set(tokens(query));
+  const queryChineseBigrams = new Set(chineseBigrams(query));
   const scored = nodes
     .filter((node) => node.status === 'active' && node.appliesTo.includes(options.workflow))
     .map((node) => {
@@ -56,9 +64,26 @@ export async function searchArchitectureKnowledge(
         ...node.checks,
       ].join(' '));
       const unique = new Set(haystack);
+      const haystackText = [
+        node.title,
+        node.summary,
+        ...node.tags,
+        ...node.inputs,
+        ...node.outputs,
+        ...node.checks,
+      ].join(' ').toLocaleLowerCase();
+      const textBigrams = new Set(chineseBigrams(haystackText));
       let score = 0;
       for (const token of queryTokens) {
         if (unique.has(token)) score += 1;
+      }
+      // 中文没有天然空格，补一个轻量二字片段匹配，避免中文问题检索不到中文知识。
+      if (queryChineseBigrams.size > 0) {
+        let overlap = 0;
+        for (const token of queryChineseBigrams) {
+          if (textBigrams.has(token)) overlap += 1;
+        }
+        score += Math.min(overlap, 8) * 0.15;
       }
       if (node.knowledgeConfidence === 'high') score += 0.25;
       return { node, score };
@@ -77,7 +102,7 @@ export function renderArchitectureKnowledge(nodes: ArchitectureKnowledge[]): str
     const sourceText = node.sources
       .map((source) => {
         const date = source.publishedAt ? `，资料时间 ${source.publishedAt}` : '';
-        return `- ${source.title}（${source.publisher}；来源可信度 ${source.sourceConfidence}${date}）`;
+        return `- ${source.title}（${source.publisher}；来源可信度 ${source.sourceConfidence}${date}；${source.url}）`;
       })
       .join('\n');
 
