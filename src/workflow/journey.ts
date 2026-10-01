@@ -84,6 +84,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   const nodes: JourneyNode[] = [];
   const issues: string[] = [];
   let flowId: string | undefined;
+  let declaredStart: string | undefined;
   let current: {
     id: string;
     type: JourneyNodeType;
@@ -138,9 +139,14 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       continue;
     }
 
+    const route = routePattern.exec(raw);
+    if (!current && route && route[1].toLowerCase() === 'start') {
+      declaredStart = route[2];
+      continue;
+    }
+
     if (!current) continue;
 
-    const route = routePattern.exec(raw);
     if (route) {
       current.routes.push({
         outcome: route[1].toLowerCase(),
@@ -173,10 +179,11 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
 
   const startNode = nodes.find((node) => node.id === 'start');
   const startRoute = startNode?.routes.find((route) => route.outcome === 'success');
-  if (!startNode || !startRoute) {
-    issues.push('Workflow 必须定义 @task start，并包含 success -> <node>');
-  } else if (!nodes.some((node) => node.id === startRoute.target)) {
-    issues.push('start 指向不存在的节点：' + startRoute.target);
+  const startTarget = declaredStart ?? startRoute?.target;
+  if (!startTarget) {
+    issues.push('Workflow 必须定义 start -> <node>');
+  } else if (!nodes.some((node) => node.id === startTarget)) {
+    issues.push('start 指向不存在的节点：' + startTarget);
   }
 
   for (const node of nodes) {
@@ -187,11 +194,11 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     }
   }
 
-  if (flowId && issues.length === 0 && startRoute) {
+  if (flowId && issues.length === 0 && startTarget) {
     return {
       definition: {
         id: flowId,
-        start: startRoute.target,
+        start: startTarget,
         nodes: nodes.filter((node) => node.id !== 'start'),
       },
       issues,
