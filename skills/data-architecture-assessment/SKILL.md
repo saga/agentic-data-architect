@@ -1,6 +1,8 @@
 ---
 name: data-architecture-assessment
 description: 评估现有数据架构，查清当前情况、主要问题、改进建议和实施顺序。
+metadata:
+  kind: workflow
 ---
 
 # 数据架构评估
