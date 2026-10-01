@@ -76,6 +76,9 @@ export interface JourneyState {
 /**
  * 解析 Markdown Workflow。
  *
+ * 支持两种路线写法：Markdown 列表中的 "- success -> next-task"，
+ * 以及 Workflow 顶部常见的 "start -> first-task"。
+ *
  * parser 只记录作者写了什么，不解释 completeWhen 的业务含义。
  * 普通 Markdown 仍然可以照常写给人看。
  */
@@ -110,7 +113,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   };
 
   const headingPattern = /^##\s+@(flow|task|gate|review|end|stop)\s+([A-Za-z0-9._:-]+)\s*$/;
-  const routePattern = /^[-*]\s+([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)\s*$/;
+  const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)\s*$/;
   const attrPattern = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*?)\s*$/;
 
   for (let index = 0; index < lines.length; index += 1) {
