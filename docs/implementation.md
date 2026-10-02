@@ -67,7 +67,7 @@ npm run start
 
 ## Agent / Skill / Script 原则
 
-当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。
+当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。Workflow 只提供地图骨架；运行时的动态路线由 Agent 结合当前问题、Evidence、Unknowns 和用户动作生成，作为可选导引持久化，不直接驱动状态机。
 
 Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
@@ -101,7 +101,7 @@ Agent 自主调查
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
 - Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
 
-Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统才加载对应 Workflow Skill 并显示 Journey；取消 Workflow 后回到自主调查。切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
+Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”；Journey 只用于导引，不决定唯一下一步。每轮 Agent 还可以根据用户动作、Evidence 和 Unknowns 生成 0～3 条新的动态路线，用户可以选择其中一条、自己提出另一条路线，甚至完全不按地图走；下一轮会重新规划。取消或切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace，并会丢弃旧的动态路线，避免路线与新的工作方式混用。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
 
 金融 AI-native 路线：
 
