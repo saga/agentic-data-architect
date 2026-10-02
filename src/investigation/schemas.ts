@@ -5,7 +5,6 @@
  */
 import * as z from 'zod';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
-import type { GraphifyRunMetadata } from '../evidence/types.js';
 
 /** 当前 Session 使用的固定工作路线；普通聊天不需要专门流程时仍可沿用默认的 Legacy Modernization。 */
 export const WorkflowIdSchema = z.enum([
