@@ -618,7 +618,8 @@ function AppInner() {
   const loadSkills = async () => {
     try {
       const result = await getJson<{ skills: SkillOption[] }>('/api/skills');
-      setSkillOptions(result.skills);
+      const workflowNames = new Set(workflowOptions.map((option) => option.value).filter(Boolean));
+      setSkillOptions(result.skills.filter((skill) => !workflowNames.has(skill.name)));
     } catch {
       // Skill discovery should not block the investigation UI.
     }
