@@ -66,14 +66,24 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
   if (!events.length) return null;
   const first = events[0]!;
   const last = events.at(-1)!;
-  const modelMetrics = usage && typeof usage === 'object' ? (usage as Record<string, unknown>).modelMetrics : undefined;
-  const totalNanoAiu = usage && typeof usage === 'object' && typeof (usage as Record<string, unknown>).totalNanoAiu === 'number'
-    ? (usage as Record<string, unknown>).totalNanoAiu as number : undefined;
-  const totalPremiumRequestCost = usage && typeof usage === 'object' && typeof (usage as Record<string, unknown>).totalPremiumRequestCost === 'number'
-    ? (usage as Record<string, unknown>).totalPremiumRequestCost as number : undefined;
+  const usageSnapshot = [...events].reverse().find((event) => event.type === 'status' && event.details.usageMetrics)?.details.usageMetrics;
+  const usageObject = usage && typeof usage === 'object'
+    ? usage as Record<string, unknown>
+    : usageSnapshot && typeof usageSnapshot === 'object'
+      ? usageSnapshot as Record<string, unknown>
+      : undefined;
+  const modelMetrics = usageObject?.modelMetrics;
+  const totalNanoAiu = typeof usageObject?.totalNanoAiu === 'number' ? usageObject.totalNanoAiu : undefined;
+  const totalPremiumRequestCost = typeof usageObject?.totalPremiumRequestCost === 'number'
+    ? usageObject.totalPremiumRequestCost
+    : undefined;
   const model = [...events].reverse().find((event) => event.model)?.model;
-  const inputTokens = events.reduce((sum, event) => sum + (event.inputTokens ?? 0), 0);
-  const outputTokens = events.reduce((sum, event) => sum + (event.outputTokens ?? 0), 0);
+  const inputTokens = typeof usageObject?.inputTokens === 'number'
+    ? usageObject.inputTokens
+    : events.reduce((sum, event) => sum + (event.inputTokens ?? 0), 0);
+  const outputTokens = typeof usageObject?.outputTokens === 'number'
+    ? usageObject.outputTokens
+    : events.reduce((sum, event) => sum + (event.outputTokens ?? 0), 0);
   const models: TrajectorySummary['models'] = {};
   if (modelMetrics && typeof modelMetrics === 'object') {
     for (const [name, raw] of Object.entries(modelMetrics as Record<string, unknown>)) {
