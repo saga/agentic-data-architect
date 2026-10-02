@@ -18,7 +18,7 @@
   → 切换
 ~~~
 
-Agent 在每一关负责调查和推理；Workflow 决定当前在哪一关、什么时候可以进入下一关，以及发现新问题后回到哪里。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、GitHub、Confluence、Web Search 等由工具执行。
+Agent 在每一关负责调查和推理；Workflow 决定当前在哪一关、什么时候可以进入下一关，以及发现新问题后回到哪里。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、Structural Analysis、GitHub、Confluence、Web Search 等由工具执行。
 
 ## 总体架构
 
@@ -230,6 +230,20 @@ Source
 
 候选只是结构化分析结果，不代表已经确认的业务事实。
 
+## Structural Analysis
+
+当前增加了一个独立的 structural-analysis capability，底层使用 [Graphify](https://github.com/Graphify-Labs/graphify) 把当前 Investigation working directory 中的代码和 SQL 建成可查询的结构图。
+
+它主要帮助 Agent 快速回答：
+
+~~~text
+“这些模块 / 表 / SQL / 文件在结构上怎么连接？”
+“从 A 到 B 中间有哪些依赖？”
+“这个 legacy 系统哪些节点最关键？”
+~~~
+
+Graphify 通过 MCP 注入当前 Copilot Session；第一次调查时由 Skill 运行本地、确定性的结构扫描。Graphify 的结果只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。最终结论仍然必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
+
 ## Semantic Context
 
 核心层只认识通用 Semantic Asset：
@@ -280,7 +294,7 @@ metadata:
 当前 Skill：
 
 ~~~text
-capability: investigation-session / financial-data-review / search-github / search-confluence / search-leanix / working-directory
+capability: investigation-session / financial-data-review / structural-analysis / search-github / search-confluence / search-leanix / working-directory
 workflow: legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
 ~~~
 ## 进一步说明

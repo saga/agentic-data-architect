@@ -23,22 +23,22 @@ function run(command, args) {
 
 if (configuredPython) {
   try {
-    execFileSync(configuredPython, ['-c', 'import sqlglot'], {
+    execFileSync(configuredPython, ['-c', 'import sqlglot; import graphify; import mcp'], {
       cwd: root,
       stdio: 'ignore',
       env: process.env,
     });
-    console.log(`SQLGlot test interpreter: ${configuredPython}`);
+    console.log(`Python test interpreter: ${configuredPython} (sqlglot + graphify + mcp)`);
     process.exit(0);
   } catch {
-    console.error(`SQLGLOT_PYTHON does not have sqlglot installed: ${configuredPython}`);
+    console.error(`SQLGLOT_PYTHON does not have sqlglot + graphify + mcp installed: ${configuredPython}`);
     process.exit(1);
   }
 }
 
-function hasSqlglot() {
+function hasRequiredPythonDeps() {
   try {
-    execFileSync(venvPython, ['-c', 'import sqlglot'], {
+    execFileSync(venvPython, ['-c', 'import sqlglot; import graphify; import mcp'], {
       cwd: root,
       stdio: 'ignore',
       env: process.env,
@@ -54,7 +54,7 @@ if (!existsSync(venvPython)) {
   run(python, ['-m', 'venv', venvDir]);
 }
 
-if (!hasSqlglot()) {
+if (!hasRequiredPythonDeps()) {
   if (!existsSync(requirements)) {
     console.error('Missing requirements-dev.txt');
     process.exit(1);
@@ -64,4 +64,4 @@ if (!hasSqlglot()) {
   run(venvPython, ['-m', 'pip', 'install', '-r', requirements]);
 }
 
-console.log(`SQLGlot test interpreter: ${venvPython}`);
+console.log(`Python test interpreter: ${venvPython} (sqlglot + graphify + mcp)`);

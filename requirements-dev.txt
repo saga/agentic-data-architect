@@ -1,1 +1,2 @@
 sqlglot
+graphifyy[mcp,sql]==0.9.73

@@ -8,6 +8,7 @@ import { CopilotClient, ToolSet } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import { buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -26,6 +27,9 @@ const WORKBENCH_TOOLS = new ToolSet()
 /** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
+  // Graphify 是 structural-analysis capability；把项目 .venv/bin 放进 PATH，
+  // 这样 Skill 中的 graphify 命令与 MCP 使用的是同一份依赖。
+  prepareGraphifyEnvironment();
   if (starting) return starting;
   starting = (async () => {
     // empty 模式不会再默认把 Copilot 状态写到用户家目录。
@@ -144,17 +148,28 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
   const availableSkillNames = await listSkillNames();
-  const selectedSkillNames = new Set(input.skills ?? config.copilotSkills);
+  const selectedSkillNames = new Set([
+    ...(input.skills ?? config.copilotSkills),
+    ...(config.graphifyEnabled ? ['structural-analysis'] : []),
+  ]);
   const disabledSkills = availableSkillNames.filter((name) => !selectedSkillNames.has(name));
+
+  const workingDirectory = input.workingDirectory ?? process.cwd();
+  const graphifyMcp = buildGraphifyMcpServer(workingDirectory);
+  // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
+  const mcpServers = {
+    ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
+    ...(input.mcpServers ?? {}),
+  };
 
   const sessionConfig: CreateSessionConfig = {
     model: input.model ?? config.model,
-    workingDirectory: input.workingDirectory ?? process.cwd(),
+    workingDirectory,
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
     disabledSkills,
     availableTools: WORKBENCH_TOOLS,
-    ...(input.mcpServers && Object.keys(input.mcpServers).length ? { mcpServers: input.mcpServers } : {}),
+    ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
