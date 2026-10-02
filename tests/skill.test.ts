@@ -9,20 +9,20 @@ test('Skill kind only has capability and workflow', () => {
   assert.equal(SkillKindSchema.safeParse('task').success, false);
 });
 
-test('parses capability Skill metadata', async () => {
+test('解析 capability Skill 元数据', async () => {
   const markdown = await readFile('skills/search-confluence/SKILL.md', 'utf8');
   const manifest = parseSkillManifest(markdown, 'skills/search-confluence/SKILL.md');
   assert.equal(manifest.name, 'search-confluence');
   assert.equal(manifest.metadata.kind, 'capability');
-  assert.match(manifest.description, /Confluence/);
+  assert.match(manifest.description, /公司内部 Confluence/);
 });
 
-test('parses workflow Skill metadata including folded description', async () => {
+test('解析 workflow Skill 元数据，包括折叠描述', async () => {
   const markdown = await readFile('skills/legacy-modernization/SKILL.md', 'utf8');
   const manifest = parseSkillManifest(markdown, 'skills/legacy-modernization/SKILL.md');
   assert.equal(manifest.name, 'legacy-modernization');
   assert.equal(manifest.metadata.kind, 'workflow');
-  assert.equal(manifest.description.startsWith('Data Modernization Journey'), true);
+  assert.equal(manifest.description.startsWith('数据现代化工作路线'), true);
 });
 
 test('missing Skill kind is rejected', () => {
