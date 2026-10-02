@@ -1,6 +1,6 @@
 ---
 name: search-github
-description: Research GitHub repositories, source code, issues, pull requests, implementation details, and historical behavior.
+description: 研究 GitHub repository、源代码、Issue、Pull Request、实现细节和历史行为，用于补充当前 Investigation 的实现证据。
 metadata:
   kind: capability
 ---
