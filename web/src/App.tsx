@@ -982,7 +982,7 @@ function AppInner() {
       setAssessmentPlan(undefined);
       await loadSession(active);
       await reloadSessions(false);
-      setWorkflowTarget(null);
+      setWorkflowTarget(undefined);
       setWorkflowConfirmText('');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法调整工作方式');
@@ -1475,7 +1475,7 @@ function AppInner() {
         centered
         destroyOnHidden
         styles={{
-          content: { padding: 0, overflow: 'hidden' },
+          container: { padding: 0, overflow: 'hidden' },
           header: { margin: 0, padding: '14px 18px' },
           body: { height: 'calc(100vh - 150px)', minHeight: 520 },
         }}
@@ -1736,7 +1736,7 @@ function AppInner() {
       >
         {draft ? (
           <Tabs
-            tabPosition="left"
+            tabPlacement="start"
             style={{ height: '100%', minHeight: 0 }}
             activeKey={settingsTab}
             onChange={setSettingsTab}
@@ -1855,7 +1855,7 @@ function AppInner() {
                     </Card>
 
                     <Card className="settings-card" title="重要文档">
-                      <Paragraph type="secondary">文档 that should receive priority when interpreting the investigation.</Paragraph>
+                      <Paragraph type="secondary">Agent 理解本次调查时，应该优先参考哪些文档。</Paragraph>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
@@ -1953,7 +1953,7 @@ function AppInner() {
                     <div className="settings-page-header">
                       <Title level={4}>MCP 连接</Title>
                       <Paragraph type="secondary">
-                        Add MCP servers used by this investigation. 修改会保留版本，并记录操作记录。
+                        填写本次调查要用的 MCP 服务器；每次修改都会存成一个新版本，并记进操作记录。
                       </Paragraph>
                     </div>
                     <Card className="settings-card" title="服务器">

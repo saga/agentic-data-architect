@@ -293,9 +293,14 @@ body {
 }
 
 
+/* antd v6 的 Tabs 结构是 nav / body-holder / body / content，
+   和 v5 的 content-holder / tabpane 不一样；写错类名会让所有子页面一起显示、并且滚不动。 */
 .settings-tabs {
   display: flex;
+  flex: 1 1 auto;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -308,40 +313,35 @@ body {
   border-right: 1px solid #f0f0f0;
 }
 
-.settings-tabs > .ant-tabs-content-holder {
+.settings-tabs > .ant-tabs-body-holder {
   flex: 1 1 auto;
-  width: 0;
-  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   display: flex;
 }
 
-.settings-tabs .ant-tabs-content {
+.settings-tabs .ant-tabs-body {
   flex: 1 1 auto;
-  height: 100%;
-  min-height: 0;
   min-width: 0;
+  min-height: 0;
   display: flex;
 }
 
-.settings-tabs .ant-tabs-tabpane {
+/* 只让当前页占满高度；隐藏页必须保持 display:none，否则切换时会看到多个子页面叠在一起。 */
+.settings-tabs .ant-tabs-content:not(.ant-tabs-content-hidden) {
   flex: 1 1 auto;
-  height: 100%;
-  min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  min-height: 0;
+  display: flex;
 }
 
-.settings-tabs .ant-tabs-tabpane-active {
-  display: flex;
-  min-height: 0;
+.settings-tabs .ant-tabs-content.ant-tabs-content-hidden {
+  display: none;
 }
 
 .settings-page {
   flex: 1 1 auto;
-  height: auto;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
