@@ -292,12 +292,6 @@ body {
   margin-top: 14px;
 }
 
-/* 调查配置是一个固定大小的工作窗；Modal 的高度与滚动交给 Ant Design v6 的 semantic styles。 */
-.settings-modal .ant-modal {
-  width: min(1000px, calc(100vw - 40px)) !important;
-  max-width: calc(100vw - 40px);
-  margin: 24px auto;
-}
 
 .settings-tabs {
   display: flex;
