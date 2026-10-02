@@ -13,14 +13,14 @@ Browser
                            ↘ Skills / Skill scripts
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。 Journey 地图使用 `@xyflow/react` 渲染交互式工作路线，使用 `elkjs` 自动布局；地图只展示 Workflow 骨架、已走路线和 Agent 的可选路线，不作为第二套 Workflow Engine。
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges 渲染工作路线；当前主线采用确定性的横向 roadmap 布局，不依赖运行时自动布局。地图只展示 Workflow 骨架、当前/已完成路径和 Agent 的可选分支，不作为第二套 Workflow Engine。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
 
 当前代码状态、下一步实现和边界。不重复架构理论。
 
-## 当前：V1.4
+## 当前：V1.5
 
 已经具备：
 
@@ -90,7 +90,7 @@ Agent 自主调查
  ↓
 发现新的结构或约束
  ↓
-可选：采用 / 切换 Workflow
+可选：在“调查配置 → 工作方式”经过明确确认后采用 / 切换 Workflow
  ↓
 继续调查
 ```
@@ -101,7 +101,7 @@ Agent 自主调查
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
 - Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
 
-Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”；Journey 只用于导引，不决定唯一下一步。每轮 Agent 还可以根据用户动作、Evidence 和 Unknowns 生成 0～3 条新的动态路线，用户可以选择其中一条、自己提出另一条路线，甚至完全不按地图走；下一轮会重新规划。取消或切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace，并会丢弃旧的动态路线，避免路线与新的工作方式混用。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
+Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”；Journey 只用于导引，不决定唯一下一步。每轮 Agent 还可以根据用户动作、Evidence 和 Unknowns 生成 0～3 条新的动态路线，用户可以选择其中一条、自己提出另一条路线，甚至完全不按地图走；下一轮会重新规划。工作方式不是普通筛选项，首页不提供随手切换；需要在“调查配置 → 工作方式”明确选择并输入确认语句后才会切换。取消或切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace，并会丢弃旧的动态路线，避免路线与新的工作方式混用。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
 
 金融 AI-native 路线：
 
@@ -125,6 +125,15 @@ Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系�
 Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量评估结果，复用 Current-State、Findings、Gap Analysis 和 Evidence；结果写入当前 Investigation 的 `reports/architecture-assessment.json`。
 
 ### Modernization Journey
+
+工作地图是导航视图，不是编辑器。当前实现：
+- 主线节点来自 `GET /api/sessions/:name/journey` 的确定性 Journey 状态。
+- Agent 动态路线来自 `context.journeyPlan.routes`，每轮回答后重新生成并持久化。
+- 主对话区用 Agent recommendation card 展示动态路线；右侧只保留紧凑 Journey / 当前事实。
+- 全屏地图使用 `@xyflow/react` custom node 展示状态、阶段类型和 Agent 分支；当前节点通过 `NodeToolbar` 支持“围绕此阶段继续”。
+- 地图节点不可拖拽、连接或编辑；选择路线只是向 Agent 传递用户意图。
+- Unknowns 也可以从顶部状态标签打开，选择某一项后直接要求 Agent 继续调查。
+
 
 路线定义在：
 
