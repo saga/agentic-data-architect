@@ -126,6 +126,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       importantDocuments: [],
     },
     agent: {
+      platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
         content: '',
@@ -149,6 +150,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       importantDocuments: control.research.importantDocuments.map((item) => ({ ...item })),
     },
     agent: {
+      platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
       skills: control.agent.skills.map((item) => ({ ...item })),
       mcpServers: control.agent.mcpServers.map((item) => ({
@@ -186,6 +188,13 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
         : [],
     },
     agent: {
+      platformCapabilities: Array.isArray(agent.platformCapabilities)
+        ? agent.platformCapabilities.map((item) => ({
+            name: String(item.name ?? '').trim(),
+            version: Number(item.version ?? 1) || 1,
+            enabled: item.enabled !== false,
+          })).filter((item) => item.name)
+        : defaults.agent.platformCapabilities,
       systemPrompt: {
         version: Number(agent.systemPrompt?.version ?? 1) || 1,
         content: typeof agent.systemPrompt?.content === 'string' ? agent.systemPrompt.content : '',
@@ -327,6 +336,9 @@ async function updateInvestigationControlImpl(
       })).filter((item) => item.title && item.reference),
     },
     agent: {
+      // Platform capabilities are controlled by the application, not the per-Investigation UI.
+      // Preserve the current fixed snapshot while Skills/MCP remain user-configurable.
+      platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: {
         version: promptChanged ? current.agent.systemPrompt.version + 1 : current.agent.systemPrompt.version,
         content: next.agent.systemPrompt.content,
@@ -365,6 +377,7 @@ async function updateInvestigationControlImpl(
       promptVersion: control.agent.systemPrompt.version,
       skillVersions: Object.fromEntries(control.agent.skills.map((item) => [item.name, item.version])),
       mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
+      platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
     },
   });
 
