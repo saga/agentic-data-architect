@@ -17,6 +17,7 @@ import {
   toCopilotMcpServers,
 } from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
+import { appendTrajectoryEvent } from '../investigation/trajectory.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
@@ -177,7 +178,15 @@ const prompt = buildQuestionPrompt({
     details: { runtime: graphifyBefore, platformCapabilities: control.agent.platformCapabilities },
   });
 
-const raw = await askCopilot({
+let trajectoryWrite = Promise.resolve();
+  const recordTrajectory = (event: Parameters<typeof appendTrajectoryEvent>[1]) => {
+    trajectoryWrite = trajectoryWrite.then(() => appendTrajectoryEvent(investigationName, {
+      ...event,
+      turnId,
+    })).catch(() => undefined);
+  };
+
+  const raw = await askCopilot({
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
@@ -206,6 +215,7 @@ const raw = await askCopilot({
     turnId,
     shouldAbort: () => abortRequestedTurns.has(turnId),
   });
+  await trajectoryWrite;
   if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
   const graphifyAfter = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
