@@ -145,8 +145,12 @@ export async function updateInvestigationWorkflow(
     const current = await loadWorkspaceContext(name);
     if (current.workflow === workflow) return current;
 
+    const nextState = { ...current };
+    delete nextState.copilotSessionId;
+    delete nextState.copilotConfigurationVersion;
+
     const next = WorkspaceContextSchema.parse({
-      ...current,
+      ...nextState,
       workflow,
       updatedAt: new Date().toISOString(),
     });
