@@ -1594,3 +1594,189 @@ body {
   border: 0;
   opacity: 0;
 }
+
+
+/* 独立子页面：配置和 Agent 轨迹 */
+.subpage-app {
+  min-height: 100vh;
+  background: var(--workspace-bg, #f7f8fa);
+  overflow: auto;
+}
+
+.subpage-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 64px;
+  padding: 0 28px;
+  background: rgba(255,255,255,.96);
+  border-bottom: 1px solid #edf0f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(8px);
+}
+
+.config-page-shell,
+.trajectory-page-shell {
+  min-height: 100vh;
+}
+
+.config-page-body {
+  display: flex;
+  min-height: calc(100vh - 64px);
+}
+
+.config-page-nav {
+  width: 220px;
+  flex: 0 0 220px;
+  padding: 24px 14px;
+  background: #fff;
+  border-right: 1px solid #edf0f3;
+}
+
+.config-page-nav button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  min-height: 42px;
+  margin-bottom: 4px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: #59636e;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.config-page-nav button:hover {
+  background: #f5f7fa;
+  color: #1677ff;
+}
+
+.config-page-nav button.active {
+  background: #eaf3ff;
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.config-page-content {
+  min-width: 0;
+  flex: 1;
+  padding: 32px clamp(24px, 5vw, 72px);
+}
+
+.config-page-content .settings-page {
+  max-width: 980px;
+  margin: 0 auto;
+  overflow: visible;
+  padding: 0 0 48px;
+}
+
+.config-page-content .settings-card {
+  margin-bottom: 16px;
+}
+
+.config-page-content .settings-card > .ant-card-body {
+  padding: 20px;
+}
+
+.mcp-card label,
+.mcp-card .ant-form-item {
+  display: block;
+  margin-top: 14px;
+}
+
+.mcp-card label {
+  color: #59636e;
+  font-size: 13px;
+}
+
+.mcp-card label > .ant-input,
+.mcp-card label > .ant-select {
+  margin-top: 6px;
+}
+
+.mcp-grid {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.workflow-danger-zone {
+  border-color: #ffccc7;
+  background: #fffafa;
+}
+
+.trajectory-page-body {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.trajectory-stat-row .ant-card {
+  height: 100%;
+}
+
+.trajectory-summary-card,
+.trajectory-timeline-card {
+  margin-top: 16px;
+}
+
+.trajectory-timeline-card .ant-timeline {
+  margin-top: 14px;
+}
+
+.trajectory-timeline-card .ant-timeline-item-label {
+  width: 120px;
+  color: #8c959f;
+}
+
+.trajectory-turns-card {
+  margin-top: 16px;
+}
+
+.empty-app-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px;
+}
+
+@media (max-width: 760px) {
+  .subpage-header {
+    padding: 0 14px;
+  }
+
+  .config-page-body {
+    display: block;
+  }
+
+  .config-page-nav {
+    width: auto;
+    display: flex;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid #edf0f3;
+    padding: 10px;
+  }
+
+  .config-page-nav button {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0 4px 0 0;
+  }
+
+  .config-page-content,
+  .trajectory-page-body {
+    padding: 18px 14px 36px;
+  }
+
+  .mcp-grid {
+    grid-template-columns: 1fr;
+  }
+}
