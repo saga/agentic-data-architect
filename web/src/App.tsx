@@ -1713,10 +1713,27 @@ function AppInner() {
         onOk={saveSettings}
         okText="保存修改"
         destroyOnClose
+        styles={{
+          content: {
+            height: 'min(840px, calc(100vh - 48px))',
+            maxHeight: 'calc(100vh - 48px)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          },
+          body: {
+            flex: '1 1 auto',
+            minHeight: 0,
+            padding: 0,
+            overflow: 'hidden',
+            display: 'flex',
+          },
+        }}
       >
         {draft ? (
           <Tabs
             tabPosition="left"
+            style={{ height: '100%', minHeight: 0 }}
             activeKey={settingsTab}
             onChange={setSettingsTab}
             className="settings-tabs"
