@@ -1700,7 +1700,7 @@ function AppInner() {
           </Flex>
         }
         open={settingsOpen}
-        width={1000}
+        width="min(1000px, calc(100vw - 40px))"
         centered
         onCancel={() => {
           setWorkflowTarget(undefined);
