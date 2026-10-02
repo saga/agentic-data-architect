@@ -113,43 +113,86 @@ export async function readTrajectory(name: string, options: { turnId?: string; l
 /** 从 trajectory events 汇总 token、Premium Request Cost 和时间；最终 AI credit 以 SDK usage.getMetrics 为准。 */
 export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown): TrajectorySummary | null {
   if (!events.length) return null;
+
   const first = events[0]!;
   const last = events.at(-1)!;
-  const usageSnapshot = [...events].reverse().find((event) => event.type === 'status' && event.details.usageMetrics)?.details.usageMetrics;
   const usageObject = usage && typeof usage === 'object'
     ? usage as Record<string, unknown>
-    : usageSnapshot && typeof usageSnapshot === 'object'
-      ? usageSnapshot as Record<string, unknown>
-      : undefined;
-  const modelMetrics = usageObject?.modelMetrics;
-  const totalNanoAiu = typeof usageObject?.totalNanoAiu === 'number' ? usageObject.totalNanoAiu : undefined;
-  const totalPremiumRequestCost = typeof usageObject?.totalPremiumRequestCost === 'number'
-    ? usageObject.totalPremiumRequestCost
     : undefined;
+
   const model = [...events].reverse().find((event) => event.model)?.model;
   const inputEventTokens = events.reduce((sum, event) => sum + (event.inputTokens ?? 0), 0);
   const outputEventTokens = events.reduce((sum, event) => sum + (event.outputTokens ?? 0), 0);
+  const totalEventTokens = inputEventTokens + outputEventTokens;
+  const eventPremiumRequestCost = events.reduce((sum, event) => sum + (event.premiumRequestCost ?? 0), 0);
+
+  const turnUsageValues = events
+    .filter((event) => event.type === 'turn_end' && event.details.turnUsage && typeof event.details.turnUsage === 'object')
+    .map((event) => event.details.turnUsage as Record<string, unknown>);
+
+  const summedTurnNanoAiu = turnUsageValues.reduce(
+    (sum, item) => sum + (typeof item.totalNanoAiu === 'number' ? item.totalNanoAiu : 0),
+    0,
+  );
+  const summedTurnPremiumCost = turnUsageValues.reduce(
+    (sum, item) => sum + (typeof item.totalPremiumRequestCost === 'number' ? item.totalPremiumRequestCost : 0),
+    0,
+  );
+
+  const usageInput = usageObject?.inputTokens;
+  const usageOutput = usageObject?.outputTokens;
+  const usageTotal = usageObject?.totalTokens;
+
   const models: TrajectorySummary['models'] = {};
-  if (modelMetrics && typeof modelMetrics === 'object') {
-    for (const [name, raw] of Object.entries(modelMetrics as Record<string, unknown>)) {
+  for (const event of events.filter((item) => item.type === 'model_call')) {
+    const modelName = event.model ?? '未知模型';
+    const item = models[modelName] ?? { inputTokens: 0, outputTokens: 0 };
+    item.inputTokens += event.inputTokens ?? 0;
+    item.outputTokens += event.outputTokens ?? 0;
+    models[modelName] = item;
+  }
+
+  const usageModels = usageObject?.modelMetrics;
+  if (usageModels && typeof usageModels === 'object') {
+    for (const [name, raw] of Object.entries(usageModels as Record<string, unknown>)) {
       const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
       const usageBlock = item.usage && typeof item.usage === 'object' ? item.usage as Record<string, unknown> : {};
       models[name] = {
-        inputTokens: typeof usageBlock.inputTokens === 'number' ? usageBlock.inputTokens : 0,
-        outputTokens: typeof usageBlock.outputTokens === 'number' ? usageBlock.outputTokens : 0,
+        inputTokens: typeof usageBlock.inputTokens === 'number' ? usageBlock.inputTokens : models[name]?.inputTokens ?? 0,
+        outputTokens: typeof usageBlock.outputTokens === 'number' ? usageBlock.outputTokens : models[name]?.outputTokens ?? 0,
         ...(typeof item.totalNanoAiu === 'number' ? { totalNanoAiu: item.totalNanoAiu } : {}),
       };
     }
   }
+
+  const totalNanoAiu =
+    summedTurnNanoAiu > 0
+      ? summedTurnNanoAiu
+      : typeof usageObject?.totalNanoAiu === 'number'
+        ? usageObject.totalNanoAiu
+        : undefined;
+
+  const totalPremiumRequestCost =
+    summedTurnPremiumCost > 0
+      ? summedTurnPremiumCost
+      : eventPremiumRequestCost > 0
+        ? eventPremiumRequestCost
+        : typeof usageObject?.totalPremiumRequestCost === 'number'
+          ? usageObject.totalPremiumRequestCost
+          : undefined;
+
   const finishedAt = last.type === 'turn_end' ? last.timestamp : undefined;
   return TrajectorySummarySchema.parse({
     turnId: first.turnId,
     startedAt: first.timestamp,
-    ...(finishedAt ? { finishedAt, durationMs: new Date(finishedAt).getTime() - new Date(first.timestamp).getTime() } : {}),
+    ...(finishedAt ? {
+      finishedAt,
+      durationMs: new Date(finishedAt).getTime() - new Date(first.timestamp).getTime(),
+    } : {}),
     ...(model ? { model } : {}),
-    inputTokens: totalFromUsage(usageObject, 'inputTokens', Object.values(models).reduce((sum, item) => sum + item.inputTokens, 0) || inputEventTokens),
-    outputTokens: totalFromUsage(usageObject, 'outputTokens', Object.values(models).reduce((sum, item) => sum + item.outputTokens, 0) || outputEventTokens),
-    totalTokens: totalFromUsage(usageObject, 'totalTokens', Object.values(models).reduce((sum, item) => sum + item.inputTokens + item.outputTokens, 0) || inputEventTokens + outputEventTokens),
+    inputTokens: typeof usageInput === 'number' ? usageInput : inputEventTokens,
+    outputTokens: typeof usageOutput === 'number' ? usageOutput : outputEventTokens,
+    totalTokens: typeof usageTotal === 'number' ? usageTotal : totalEventTokens,
     ...(totalNanoAiu !== undefined ? { totalNanoAiu } : {}),
     ...(totalPremiumRequestCost !== undefined ? { totalPremiumRequestCost } : {}),
     models,
