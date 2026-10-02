@@ -1183,7 +1183,7 @@ body {
 
 
 
-/* Full-screen interactive work map. React Flow provides the canvas; these styles keep it visually consistent with Ant Design. */
+/* Full-screen interactive work map. The canvas reads as a roadmap first, graph second. */
 .journey-map-modal .ant-modal {
   max-width: calc(100vw - 24px);
   padding-bottom: 0;
@@ -1202,87 +1202,121 @@ body {
   width: 100%;
   height: 100%;
   min-height: 520px;
-  background: #f7f9fc;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(22, 119, 255, 0.035), transparent 38%),
+    #f7f9fc;
 }
 
 .journey-map-canvas .react-flow {
   --xy-background-color: #f7f9fc;
-  --xy-node-border-radius: 12px;
-  --xy-edge-stroke-default: #d9d9d9;
+  --xy-node-border-radius-default: 14px;
+  --xy-node-border-default: 1px solid #d9e1ec;
+  --xy-node-background-color-default: #ffffff;
+  --xy-node-boxshadow-default: 0 8px 26px rgba(31, 42, 55, 0.08);
+  --xy-edge-stroke-default: #c9d2df;
+  --xy-edge-stroke-width-default: 2;
+  --xy-background-pattern-dots-color: #d9e1ec;
+  --xy-controls-button-background-color-default: rgba(255, 255, 255, 0.94);
+  --xy-minimap-background-color: rgba(255, 255, 255, 0.94);
 }
 
 .journey-flow-node {
-  border: 1px solid #d9d9d9;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  border: 1px solid #d9e1ec;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
   color: rgba(0, 0, 0, 0.88);
+  box-shadow: 0 8px 26px rgba(31, 42, 55, 0.08);
+  overflow: hidden;
 }
 
 .journey-flow-node-content {
   display: grid;
+  gap: 8px;
+  padding: 13px 14px;
+}
+
+.journey-flow-stage-content {
+  min-height: 84px;
+}
+
+.journey-flow-node-kicker {
+  display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 12px 14px;
-}
-
-.journey-flow-node-status {
-  display: inline-flex;
-  width: fit-content;
-  padding: 2px 6px;
-  border-radius: 999px;
+  min-width: 0;
   font-size: 10px;
-  line-height: 1.35;
-  font-weight: 600;
-  background: #f5f5f5;
-  color: rgba(0, 0, 0, 0.55);
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
-.journey-flow-node-status-completed {
-  background: #f6ffed;
+.journey-flow-node-kicker-completed {
   color: #389e0d;
 }
 
-.journey-flow-node-status-current {
-  background: #e6f4ff;
+.journey-flow-node-kicker-current {
   color: #1677ff;
 }
 
-.journey-flow-node-status-future {
-  background: #fafafa;
-  color: rgba(0, 0, 0, 0.45);
+.journey-flow-node-kicker-future {
+  color: #6b7a90;
 }
 
-.journey-flow-node-status-locked {
-  background: #f5f5f5;
-  color: rgba(0, 0, 0, 0.4);
+.journey-flow-node-kicker-locked {
+  color: #9aa6b5;
+}
+
+.journey-flow-node-kicker-route {
+  color: #1677ff;
+}
+
+.journey-flow-node-type {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #7b8794;
+  font-weight: 600;
 }
 
 .journey-flow-node-title {
-  font-weight: 600;
+  font-weight: 650;
   font-size: 14px;
   line-height: 1.45;
 }
 
 .journey-flow-node-subtitle {
-  color: rgba(0, 0, 0, 0.55);
-  font-size: 12px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 11px;
   line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.journey-flow-node-subtitle-current {
+  color: rgba(0, 0, 0, 0.66);
+  -webkit-line-clamp: 3;
 }
 
 .journey-flow-node-completed {
   border-color: #95de64;
-  background: #f6ffed;
+  background: linear-gradient(180deg, #fbfff8 0%, #f6ffed 100%);
 }
 
 .journey-flow-node-current {
-  border-color: #1677ff;
-  background: #f0f7ff;
-  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.08), 0 8px 22px rgba(0, 0, 0, 0.08);
+  border-color: #91caff;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f7ff 100%);
+  box-shadow:
+    0 0 0 4px rgba(22, 119, 255, 0.08),
+    0 12px 30px rgba(22, 119, 255, 0.12);
 }
 
 .journey-flow-node-locked {
   border-style: dashed;
-  opacity: 0.45;
+  opacity: 0.48;
   box-shadow: none;
 }
 
@@ -1292,63 +1326,241 @@ body {
 }
 
 .journey-flow-node-route {
-  border-style: dashed;
   border-color: #91caff;
-  background: #f8fbff;
+  background: linear-gradient(180deg, #fbfdff 0%, #f0f7ff 100%);
+  box-shadow: 0 10px 28px rgba(22, 119, 255, 0.10);
 }
 
-.journey-flow-node-route-step {
-  border-color: #bae0ff;
-  background: rgba(248, 251, 255, 0.96);
+.journey-flow-route-content {
+  gap: 7px;
 }
 
-.journey-flow-route-meta {
+.journey-flow-route-title {
+  font-size: 14px;
+}
+
+.journey-route-steps {
+  display: grid;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.journey-route-step {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  color: rgba(0, 0, 0, 0.64);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.journey-route-step-index {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e6f4ff;
+  color: #1677ff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.journey-flow-route-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(22, 119, 255, 0.10);
 }
 
-.journey-flow-route-meta .ant-tag {
-  margin-inline-end: 0;
-  padding-inline: 5px;
-  color: #1677ff;
-  background: #e6f4ff;
+.journey-flow-route-footer .ant-typography {
+  font-size: 10px;
+  line-height: 1.4;
 }
 
-.journey-flow-route-action {
-  height: auto;
-  padding: 0;
+.journey-route-action,
+.journey-node-toolbar-button {
+  flex: 0 0 auto;
+  height: 28px;
+  padding-inline: 10px;
+}
+
+.journey-node-toolbar {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.journey-node-toolbar .journey-node-toolbar-button {
+  box-shadow: 0 5px 16px rgba(22, 119, 255, 0.18);
 }
 
 .journey-flow-edge {
-  stroke: #d9d9d9;
-  stroke-width: 1.5;
+  stroke: #c9d2df;
+  stroke-width: 2;
 }
 
 .journey-flow-edge-traversed {
   stroke: #52c41a;
-  stroke-width: 2;
+  stroke-width: 2.6;
+}
+
+.journey-flow-edge-current {
+  stroke: #1677ff;
+  stroke-width: 2.8;
 }
 
 .journey-flow-edge-suggested {
-  stroke: #91caff;
-  stroke-width: 2;
-  stroke-dasharray: 6 5;
+  stroke: #69b1ff;
+  stroke-width: 2.2;
+  stroke-dasharray: 7 6;
+}
+
+.journey-map-heading-panel,
+.journey-map-summary-panel,
+.journey-map-legend {
+  margin: 14px;
+}
+
+.journey-map-heading-panel {
+  pointer-events: none;
+}
+
+.journey-map-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 310px;
+  max-width: 450px;
+  padding: 11px 13px;
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(31, 42, 55, 0.07);
+  backdrop-filter: blur(10px);
+}
+
+.journey-map-heading-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.journey-map-heading-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.journey-map-heading-subtitle {
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.54);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.journey-map-summary {
+  display: grid;
+  gap: 5px;
+  min-width: 210px;
+  padding: 11px 13px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(31, 42, 55, 0.07);
+  backdrop-filter: blur(10px);
+}
+
+.journey-map-summary-eyebrow {
+  color: rgba(0, 0, 0, 0.43);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.journey-map-summary-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .journey-map-legend {
-  margin: 12px;
-  padding: 8px 10px;
-  border: 1px solid #f0f0f0;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  padding: 8px 10px !important;
+  border: 1px solid #e6eaf0;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 8px 22px rgba(31, 42, 55, 0.06);
+  backdrop-filter: blur(10px);
 }
 
 .journey-map-legend .ant-typography {
   font-size: 12px;
+}
+
+.journey-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.journey-map-legend-item > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b5c0cf;
+}
+
+.journey-map-legend-completed > span {
+  background: #52c41a;
+}
+
+.journey-map-legend-current > span {
+  background: #1677ff;
+}
+
+.journey-map-legend-future > span {
+  background: #91caff;
+}
+
+.journey-map-legend-suggested > span {
+  border: 2px dashed #69b1ff;
+  background: transparent;
+}
+
+.journey-map-canvas .react-flow__controls {
+  margin: 14px;
+  overflow: hidden;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px rgba(31, 42, 55, 0.08);
+}
+
+.journey-map-canvas .react-flow__minimap {
+  margin: 14px;
+  overflow: hidden;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(31, 42, 55, 0.08);
+}
+
+.journey-flow-handle {
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
 }
 
 .journey-map-empty {
@@ -1358,6 +1570,7 @@ body {
   min-height: 520px;
   background: #f7f9fc;
 }
+
 
 @media (max-width: 680px) {
   .journey-map-modal .ant-modal {
