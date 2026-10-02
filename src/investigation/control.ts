@@ -209,6 +209,11 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
               ...(typeof (item as { sourceHash?: unknown }).sourceHash === 'string'
                 ? { sourceHash: (item as { sourceHash: string }).sourceHash }
                 : {}),
+              parameters: item && typeof item === 'object' && (item as { parameters?: unknown }).parameters
+                && typeof (item as { parameters?: unknown }).parameters === 'object'
+                && !Array.isArray((item as { parameters?: unknown }).parameters)
+                ? { ...((item as { parameters: Record<string, unknown> }).parameters) }
+                : {},
             }))
             .filter((item) => item.name && !WORKFLOW_SKILL_NAMES.has(item.name))
         : defaults.agent.skills,
@@ -306,6 +311,7 @@ async function updateInvestigationControlImpl(
         name: item.name.trim(),
         version: old ? old.version + (changed ? 1 : 0) : 1,
         ...(sourceHash ? { sourceHash } : {}),
+        parameters: { ...(item.parameters ?? {}) },
       };
     }))
     .then((items) => items.filter((item) => item.name));
