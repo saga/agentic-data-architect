@@ -165,21 +165,22 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
     }
   }
 
-  const totalNanoAiu =
-    summedTurnNanoAiu > 0
-      ? summedTurnNanoAiu
-      : typeof usageObject?.totalNanoAiu === 'number'
-        ? usageObject.totalNanoAiu
-        : undefined;
+  const hasTurnNanoAiu = turnUsageValues.some((item) => typeof item.totalNanoAiu === 'number');
+  const hasTurnPremiumCost = turnUsageValues.some((item) => typeof item.totalPremiumRequestCost === 'number');
 
-  const totalPremiumRequestCost =
-    summedTurnPremiumCost > 0
-      ? summedTurnPremiumCost
-      : eventPremiumRequestCost > 0
-        ? eventPremiumRequestCost
-        : typeof usageObject?.totalPremiumRequestCost === 'number'
-          ? usageObject.totalPremiumRequestCost
-          : undefined;
+  const totalNanoAiu = hasTurnNanoAiu
+    ? summedTurnNanoAiu
+    : typeof usageObject?.totalNanoAiu === 'number'
+      ? usageObject.totalNanoAiu
+      : undefined;
+
+  const totalPremiumRequestCost = hasTurnPremiumCost
+    ? summedTurnPremiumCost
+    : eventPremiumRequestCost > 0
+      ? eventPremiumRequestCost
+      : typeof usageObject?.totalPremiumRequestCost === 'number'
+        ? usageObject.totalPremiumRequestCost
+        : undefined;
 
   const completionEvent = [...events].reverse().find((event) =>
     event.type === 'turn_end'
