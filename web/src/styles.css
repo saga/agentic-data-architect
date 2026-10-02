@@ -343,22 +343,35 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  display: flex;
 }
 
 .settings-tabs .ant-tabs-content {
+  flex: 1 1 auto;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  display: flex;
 }
 
 .settings-tabs .ant-tabs-tabpane {
+  flex: 1 1 auto;
   height: 100%;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
+  display: flex;
+}
+
+.settings-tabs .ant-tabs-tabpane-active {
+  min-height: 0;
 }
 
 .settings-page {
-  height: 100%;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -689,6 +702,9 @@ body {
 .settings-modal .ant-modal-content {
   border-radius: 16px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+}
+.settings-modal .ant-modal-body {
+  min-height: 0;
 }
 
 .settings-tabs > .ant-tabs-nav {
