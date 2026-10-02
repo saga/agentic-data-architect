@@ -1658,7 +1658,7 @@ function AppInner() {
             activeKey={settingsTab}
             onChange={setSettingsTab}
             className="settings-tabs"
-            items={            items={[
+            items={[
               {
                 key: 'workflow',
                 label: <span><SettingOutlined /> 工作方式</span>,
@@ -1695,7 +1695,6 @@ function AppInner() {
                   </div>
                 ),
               },
-              {
               {
                 key: 'research',
                 label: <span><GithubOutlined /> 研究范围</span>,
