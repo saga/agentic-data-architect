@@ -2,6 +2,17 @@
 
 README 只保留项目定位、总体架构和主要工作路线；本文件保存开发和运行时需要查阅的细节。
 
+## Python 依赖与检查
+
+Python 依赖的唯一声明位置是根目录 `pyproject.toml`；本地环境由 `uv` 管理。
+
+~~~bash
+uv sync
+npm test
+~~~
+
+`npm test` 中的 Python 环境检查通过 `uv run` 执行 `scripts/check-python-deps.py`。不再维护 `requirements.txt` / `requirements-dev.txt` 或项目专用 Python 解释器环境变量。
+
 ## Web UI
 
 ~~~bash
@@ -124,7 +135,6 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | COPILOT_MODEL | Agent 使用的模型 | gpt-5-mini |
 | GITHUB_TOKEN | 服务端 Copilot Token | 空 |
 | TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
-| SQLGLOT_PYTHON | SQLGlot Python 解释器 | python3 |
 | SKILLS_DIR | Skill 根目录 | skills |
 | KNOWLEDGE_DIR | 可复用架构知识根目录 | knowledge |
 | COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture,data-architecture-assessment |
