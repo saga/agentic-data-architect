@@ -10,7 +10,12 @@ import { ControlAgentSchema, ControlResearchSchema, WorkflowIdSchema } from '../
 export const CreateSessionBodySchema = z.object({
   name: z.string().trim().min(1).optional(),
   userPrompt: z.string().trim().optional(),
-  workflow: WorkflowIdSchema.optional(),
+  workflow: WorkflowIdSchema.nullable().optional(),
+}).strict();
+
+/** 修改 Investigation 当前采用的可选工作路线。null 表示回到自主调查。 */
+export const UpdateWorkflowBodySchema = z.object({
+  workflow: WorkflowIdSchema.nullable(),
 }).strict();
 
 /** 保存 Investigation research / Agent 配置的 HTTP 请求体 Schema。 */
