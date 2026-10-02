@@ -209,7 +209,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   input.onTrajectory?.({ type: 'turn_start', name: 'Agent turn', status: 'started' });
 
-  const trajectoryToolStarts = new Map<string, number>();
+  let content = '';
+  const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
   const offMessageDelta = session.on('assistant.message_delta', (e) => {
     if (e.data.deltaContent) {
       content += e.data.deltaContent;
@@ -229,7 +230,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const offToolStart = session.on('tool.execution_start', (e) => {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : toolName;
-    trajectoryToolStarts.set(toolCallId, Date.now());
+    trajectoryToolStarts.set(toolCallId, { startedAt: Date.now(), name: toolName || '工具调用' });
     input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
     input.onTrajectory?.({
       type: 'tool_call',
@@ -244,14 +245,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
   });
   const offToolComplete = session.on('tool.execution_complete', (e) => {
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : '';
-    const startedAt = trajectoryToolStarts.get(toolCallId);
-    const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '工具调用';
+    const toolRun = trajectoryToolStarts.get(toolCallId);
+    const toolName = toolRun?.name ?? '工具调用';
     input.onStatus?.('助手正在整理刚找到的资料，请稍候…');
     input.onTrajectory?.({
       type: 'tool_result',
       name: toolName,
       status: e.data.success === false ? 'failed' : 'completed',
-      ...(startedAt ? { durationMs: Date.now() - startedAt } : {}),
+      ...(toolRun ? { durationMs: Date.now() - toolRun.startedAt } : {}),
       details: {
         toolCallId,
         ...(typeof e.data.error === 'string' ? { error: e.data.error } : {}),
@@ -267,9 +268,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       type: 'permission',
       name: '需要确认',
       status: 'waiting',
-      details: {
-        ...(typeof e.data.permissionType === 'string' ? { permissionType: e.data.permissionType } : {}),
-      },
+      details: {},
     });
   });
   const offCompaction = session.on('session.compaction_start', () => {
@@ -287,19 +286,29 @@ export async function askCopilot(input: AskInput): Promise<string> {
     });
   });
   const offUsage = session.on('assistant.usage', (e) => {
-    input.onTrajectory?.({
+    const event: {
+      type: 'model_call';
+      name: string;
+      status: 'completed';
+      model?: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      premiumRequestCost?: number;
+      durationMs?: number;
+      details: Record<string, unknown>;
+    } = {
       type: 'model_call',
       name: '模型调用',
       status: 'completed',
-      model: typeof e.data.model === 'string' ? e.data.model : undefined,
-      inputTokens: typeof e.data.inputTokens === 'number' ? e.data.inputTokens : undefined,
-      outputTokens: typeof e.data.outputTokens === 'number' ? e.data.outputTokens : undefined,
-      premiumRequestCost: typeof e.data.cost === 'number' ? e.data.cost : undefined,
-      durationMs: typeof e.data.duration === 'number' ? e.data.duration : undefined,
-      details: {
-        ...(typeof e.data.apiEndpoint === 'string' ? { apiEndpoint: e.data.apiEndpoint } : {}),
-      },
-    });
+      details: {},
+    };
+    if (typeof e.data.model === 'string') event.model = e.data.model;
+    if (typeof e.data.inputTokens === 'number') event.inputTokens = e.data.inputTokens;
+    if (typeof e.data.outputTokens === 'number') event.outputTokens = e.data.outputTokens;
+    if (typeof e.data.cost === 'number') event.premiumRequestCost = e.data.cost;
+    if (typeof e.data.duration === 'number') event.durationMs = e.data.duration;
+    if (typeof e.data.apiEndpoint === 'string') event.details.apiEndpoint = e.data.apiEndpoint;
+    input.onTrajectory?.(event);
   });
   const offUsageInfo = session.on('session.usage_info', (e) => {
     input.onTrajectory?.({
@@ -327,7 +336,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           type: 'status',
           name: '累计 AI 用量',
           status: 'info',
-          details: { usageMetrics: redactTrajectoryValue(usageMetrics) as Record<string, unknown> },
+          details: { usageMetrics: redactTrajectoryValue(usageMetrics) },
         });
       }
     } catch {
