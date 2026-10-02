@@ -55,15 +55,15 @@ conversations.db 保存 user / assistant / system 消息，并使用 SQLite FTS5
 
 shared/ 保存跨 session 可以复用的研究资料。
 
-## 工作路线
+## Investigation 与工作路线
 
-新建工作可以选择：
+新建工作默认采用自主调查，不要求选择 Workflow。可选工作路线为：
 
 - `legacy-modernization`
 - `financial-ai-native-architecture`
 - `data-architecture-assessment`
 
-Session 会把选择保存到 context.json；当前没有额外的 Workflow Registry。
+Workflow 只是当前 Investigation 的可选工作方法，不是 Investigation 类型。用户可以在调查过程中切换或取消路线；context、消息、Evidence、Findings 和 workspace 状态不会因此重置。
 
 ## API
 
@@ -137,7 +137,7 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
 | SKILLS_DIR | Skill 根目录 | skills |
 | KNOWLEDGE_DIR | 可复用架构知识根目录 | knowledge |
-| COPILOT_SKILLS | 新 Investigation 默认 Skill | investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture,data-architecture-assessment |
+| COPILOT_SKILLS | 新 Investigation 默认 capability Skill | investigation-session,financial-data-review,structural-analysis,search-github,search-confluence,search-leanix,working-directory |
 
 ## 检查
 
