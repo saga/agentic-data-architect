@@ -228,6 +228,46 @@ export function abortStaleConversationTurn(turnId: string, error = 'The previous
   return Number(result.changes) > 0;
 }
 
+export interface ConversationTurnSummary {
+  turnId: string;
+  sessionName: string;
+  status: ConversationTurn['status'];
+  createdAt: string;
+  updatedAt: string;
+  question?: string;
+}
+
+/** 按时间倒序读取本次 Investigation 的用户问题轮次；用于轨迹页补全旧记录。 */
+export function listConversationTurns(sessionName: string, limit = 200): ConversationTurnSummary[] {
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 1000));
+  const rows = dbOrThrow().prepare(`
+    SELECT
+      t.turn_id,
+      t.session_name,
+      t.status,
+      t.created_at,
+      t.updated_at,
+      (
+        SELECT m.content
+        FROM conversation_messages m
+        WHERE m.message_id = t.turn_id || ':user'
+        LIMIT 1
+      ) AS question
+    FROM conversation_turns t
+    WHERE t.session_name = ?
+    ORDER BY t.created_at DESC
+    LIMIT ?
+  `).all(sessionName, safeLimit) as Array<Record<string, unknown>>;
+
+  return rows.map((row) => ({
+    turnId: String(row.turn_id),
+    sessionName: String(row.session_name),
+    status: row.status as ConversationTurn['status'],
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    ...(typeof row.question === 'string' && row.question.trim() ? { question: row.question } : {}),
+  }));
+}
 /** 查询当前 Investigation 是否存在 running turn。 */
 export function getRunningConversationTurn(sessionName: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
