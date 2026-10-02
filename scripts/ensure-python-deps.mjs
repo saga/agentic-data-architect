@@ -7,7 +7,8 @@ import path from 'node:path';
 const root = process.cwd();
 const venvDir = path.join(root, '.venv');
 const requirements = path.join(root, 'requirements-dev.txt');
-const configuredPython = process.env['SQLGLOT_PYTHON'];
+const legacyPython = process.env['SQLGLOT_PYTHON'];
+const configuredPython = process.env['PYTHON_TOOLCHAIN'] ?? legacyPython;
 const python = process.env['PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3');
 const venvPython = process.platform === 'win32'
   ? path.join(venvDir, 'Scripts', 'python.exe')
@@ -29,9 +30,10 @@ if (configuredPython) {
       env: process.env,
     });
     console.log(`Python test interpreter: ${configuredPython} (sqlglot + graphify + mcp)`);
+    if (legacyPython && !process.env['PYTHON_TOOLCHAIN']) console.warn('SQLGLOT_PYTHON is deprecated; use PYTHON_TOOLCHAIN instead.');
     process.exit(0);
   } catch {
-    console.error(`SQLGLOT_PYTHON does not have sqlglot + graphify + mcp installed: ${configuredPython}`);
+    console.error(`PYTHON_TOOLCHAIN does not have sqlglot + graphify + mcp installed: ${configuredPython}`);
     process.exit(1);
   }
 }
