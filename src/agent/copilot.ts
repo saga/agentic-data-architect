@@ -76,7 +76,7 @@ export interface AskInput {
   systemPrompt: string;
   /** 记录本轮可展示的 Agent 执行轨迹；不包含思维链正文。 */
   onTrajectory?: (event: {
-    type: 'turn_start' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'permission' | 'compaction' | 'turn_end' | 'error' | 'status';
+    type: 'user_input' | 'turn_start' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'permission' | 'compaction' | 'turn_end' | 'error' | 'status';
     name: string;
     status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
     durationMs?: number;
