@@ -24,6 +24,8 @@ test('workflow can be changed without replacing investigation state', async () =
   investigation.goal = 'Find the source of Position';
   investigation.scope = ['Position'];
   investigation.unknowns = ['source of truth'];
+  investigation.copilotSessionId = 'old-session';
+  investigation.copilotConfigurationVersion = 4;
   await saveInvestigation(investigation);
 
   const assessment = await updateInvestigationWorkflow('switchable', 'data-architecture-assessment');
@@ -31,6 +33,8 @@ test('workflow can be changed without replacing investigation state', async () =
   assert.equal(assessment.goal, 'Find the source of Position');
   assert.deepEqual(assessment.scope, ['Position']);
   assert.deepEqual(assessment.unknowns, ['source of truth']);
+  assert.equal(assessment.copilotSessionId, undefined);
+  assert.equal(assessment.copilotConfigurationVersion, undefined);
 
   const autonomous = await updateInvestigationWorkflow('switchable', null);
   assert.equal(autonomous.workflow, null);
