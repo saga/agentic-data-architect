@@ -6,7 +6,7 @@
 import * as z from 'zod';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
 
-/** 当前 Session 使用的固定工作路线；普通聊天不需要专门流程时仍可沿用默认的 Legacy Modernization。 */
+/** Investigation 可选的工作路线；null 表示由 Agent 自主调查，不采用固定路线。 */
 export const WorkflowIdSchema = z.enum([
   'legacy-modernization',
   'financial-ai-native-architecture',
@@ -41,7 +41,7 @@ export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
   name: z.string().min(1),
   userPrompt: z.string(),
-  workflow: WorkflowIdSchema.default('legacy-modernization'),
+  workflow: WorkflowIdSchema.nullable(),
   goal: z.string(),
   scope: z.array(z.string()),
   systems: z.array(z.string()),
