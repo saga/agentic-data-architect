@@ -5,6 +5,7 @@
  */
 import * as z from 'zod';
 import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
+import { JourneyRouteOptionSchema } from '../investigation/schemas.js';
 
 /**
  * 结构化 Agent 结果：
@@ -27,6 +28,9 @@ export const AgentAnswerSchema = z.object({
     .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
   unknowns: z.array(z.string().max(500)).catch([]),
   followUpQuestions: z.array(z.string().max(500)).catch([]),
+  routeOptions: z.array(JourneyRouteOptionSchema.nullable().catch(null))
+    .catch([])
+    .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
@@ -61,6 +65,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       claims: [],
       unknowns: ['模型没有返回合法 JSON，需要重问或收紧提示词'],
       followUpQuestions: [],
+      routeOptions: [],
       warnings: ['这次回答没有返回可解析的结构化结果，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
@@ -73,6 +78,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       claims: [],
       unknowns: ['模型返回的结构化结果不符合预期，需要重问或收紧提示词'],
       followUpQuestions: [],
+      routeOptions: [],
       warnings: ['这次回答不符合结构化结果 Schema，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
@@ -98,6 +104,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     claims,
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
+    routeOptions: parsed.data.routeOptions,
     warnings,
     droppedEvidenceRefs,
   };
