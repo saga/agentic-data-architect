@@ -563,7 +563,6 @@ function AppInner() {
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
-  // null = 尚未选择；'autonomous' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
   // undefined = 尚未选择；'' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
   const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | '' | undefined>(undefined);
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
