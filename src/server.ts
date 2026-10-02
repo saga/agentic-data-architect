@@ -121,7 +121,7 @@ async function listSessions(): Promise<SessionSummary[]> {
 async function createSession(
   name?: string,
   userPrompt?: string,
-  workflow?: 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment',
+  workflow?: 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment' | null,
 ) {
   const key = sessionKey(
     name?.trim() ||
