@@ -1,3 +1,20 @@
+## 2026-10-02 — Graphify structural analysis / Control / Evidence hardening
+
+### 做了什么
+
+- Graphify 从运行时隐式注入改成平台级 capability：`control.json` 固定 `graphify-structural-analysis` capability version；普通 Skills / MCP 仍可按 Investigation 配置。
+- Graphify runtime 增加 package version、MCP command、graph path、graph SHA-256、extraction mode，并进入 Discovery run / turn audit。
+- 本地目录 Discovery 为源文件建立 `source_file` Evidence；Graphify 只能用于定位候选文件，最终 Claim 仍引用 deterministic Evidence。
+- `supported` 状态不再只看 Evidence 数量，同一个文件/hash 的多条 Evidence 不算两个独立来源。
+- Graphify 从 `requirements.txt` 明确作为运行时 Python 依赖；CI 增加 `pip-audit`。
+- `SQLGLOT_PYTHON` 更名为 `PYTHON_TOOLCHAIN`，旧变量暂时保留兼容。
+- 增加真实 Graphify extraction / runtime integration test。
+
+### 不变的边界
+
+Graphify 是结构导航工具，不是业务事实来源。SQL AST lineage、database metadata、profiling、targeted query 和 semantic context 仍然是 Evidence 来源。
+
+---
 ## 2026-09-30 — Skill-driven domain logic
 
 ### 为什么改
@@ -82,7 +99,7 @@ readline 形式不适合作为长期 Data Investigation 工作台。真实使用
 
 - `package.json`：增加 `start` / `dev`，默认进入 interactive session。
 - `src/cli.ts`：无命令、`start`、`dev` 都进入持续 session；旧 `init/discover/ask/report` 保留。
-- `src/workflow/session.ts`：新增 readline 循环；启动时逐步咨询；每轮允许补充、提问和纠正；提供 `/report`、`/context`、`/exit`；不指定名称时使用可恢复的 `default` session。
+- `src/cli.ts`：保留兼容 CLI；Web Workbench 是当前主入口。启动时逐步咨询；每轮允许补充、提问和纠正；提供 `/report`、`/context`、`/exit`；不指定名称时使用可恢复的 `default` session。
 - `src/agent/copilot.ts`：支持为同一 investigation 固定 sessionId，使退出重启后可以恢复 Copilot session。
 - `src/config.ts`：当前 workspace 默认改为 `.workspace`；`.data` 仅保留 legacy migration。
 - `src/investigation/workspace.ts`：session 根目录收敛为 `.workspace/<name>`；新增 `shared/index.json`、shared artifact registration 和 transcript。
