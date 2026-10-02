@@ -93,11 +93,26 @@ export const DiscoveryRunSchema = z.object({
 export type DiscoveryRun = z.infer<typeof DiscoveryRunSchema>;
 
 /** 根据确定性 Evidence 数量校正 Agent 声称的 Claim 状态，防止模型自行授予 verified。 */
-export function calibrateStatus(evidenceCount: number, claimed: ClaimStatus): ClaimStatus {
+/**
+ * 根据 Evidence 的来源独立性校正 Claim。
+ * 两条 Evidence 如果来自同一个文件/同一个 source hash，不应仅因为记录数=2 就视为独立支持。
+ * 兼容旧调用方传入 number，但新代码应传 EvidenceRef[]。
+ */
+export function calibrateStatus(evidence: number | EvidenceRef[], claimed: ClaimStatus): ClaimStatus {
+  const evidenceCount = typeof evidence === 'number' ? evidence : evidence.length;
   if (evidenceCount === 0) return 'unknown';
   if (claimed === 'verified') return 'inferred';
-  if (claimed === 'supported' && evidenceCount < 2) return 'inferred';
   if (claimed === 'contradicted') return 'contradicted';
+  if (claimed === 'supported') {
+    const independent = typeof evidence === 'number'
+      ? evidenceCount
+      : new Set(evidence.map((item) => {
+          if (item.sourceHash) return 'hash:' + item.sourceHash;
+          if (item.file) return 'file:' + item.file;
+          return item.type + ':' + item.source;
+        })).size;
+    if (independent < 2) return 'inferred';
+  }
   return claimed;
 }
 
