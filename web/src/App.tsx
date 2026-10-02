@@ -112,9 +112,16 @@ interface AuditEvent {
 
 type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
 
+const workflowOptions = [
+  { value: '', label: '自主调查' },
+  { value: 'legacy-modernization', label: '改造已有系统' },
+  { value: 'financial-ai-native-architecture', label: '金融 AI / 数据架构设计' },
+  { value: 'data-architecture-assessment', label: '数据架构评估' },
+] as const;
+
 interface SessionContext {
   name: string;
-  workflow: WorkflowId;
+  workflow: WorkflowId | null;
   userPrompt: string;
   goal: string;
   scope: string[];
@@ -469,7 +476,9 @@ function AppInner() {
   const [nextGuidance, setNextGuidance] = useState<{ questions: string[]; value: string }>();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId>('legacy-modernization');
+  const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
+  const [newSessionGoal, setNewSessionGoal] = useState('');
+  const [workflowSaving, setWorkflowSaving] = useState(false);
   const [error, setError] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('research');
@@ -860,6 +869,34 @@ function AppInner() {
     }
   };
 
+  const changeWorkflow = async (workflow: WorkflowId | null) => {
+    if (!active || workflowSaving) return;
+
+    setWorkflowSaving(true);
+    setError(undefined);
+    try {
+      const result = await getJson<{ context: SessionContext }>(
+        `/api/sessions/${encodeURIComponent(active)}/workflow`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workflow }),
+        },
+      );
+
+      setCurrent((existing) => existing ? { ...existing, context: result.context } : existing);
+      setJourney(undefined);
+      setModernizationPlan(undefined);
+      setAssessmentPlan(undefined);
+      await loadSession(active);
+      await reloadSessions(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法调整工作方式');
+    } finally {
+      setWorkflowSaving(false);
+    }
+  };
+
   const createSession = async () => {
     const name = newSessionName.trim();
     if (!name) return;
@@ -867,11 +904,16 @@ function AppInner() {
       const created = await getJson<{ context: SessionContext }>('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, workflow: newSessionWorkflow }),
+        body: JSON.stringify({
+          name,
+          userPrompt: newSessionGoal.trim() || undefined,
+          workflow: newSessionWorkflow,
+        }),
       });
       setNewSessionOpen(false);
       setNewSessionName('');
-      setNewSessionWorkflow('legacy-modernization');
+      setNewSessionGoal('');
+      setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
       setTimeout(() => setSettingsOpen(true), 0);
@@ -1177,6 +1219,31 @@ function AppInner() {
                   />
                 </Tooltip>
               </div>
+
+              {current ? (
+                <section className="right-section">
+                  <div className="right-section-heading">
+                    <Text strong>工作方式</Text>
+                    <Select
+                      size="small"
+                      value={current.context.workflow ?? ''}
+                      loading={workflowSaving}
+                      disabled={workflowSaving || loading}
+                      onChange={(value) => {
+                        void changeWorkflow(value ? value as WorkflowId : null);
+                      }}
+                      options={workflowOptions.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      style={{ minWidth: 180 }}
+                    />
+                  </div>
+                  <Text type="secondary">
+                    自主调查不绑定固定路线；需要时可以随时采用一套工作路线，调查资料和 Evidence 都会保留。
+                  </Text>
+                </section>
+              ) : null}
 
               {journey?.stages.length ? (
                 <section className="right-section right-journey">
@@ -1486,37 +1553,42 @@ function AppInner() {
       </Modal>
       <Modal
         title="新建工作"
-
         open={newSessionOpen}
         onCancel={() => setNewSessionOpen(false)}
         onOk={createSession}
         okButtonProps={{ disabled: !newSessionName.trim() }}
       >
-        <Radio.Group
-          value={newSessionWorkflow}
-          onChange={(event) => setNewSessionWorkflow(event.target.value as WorkflowId)}
-          className="new-workflow-choice"
-        >
-          <Space direction="vertical" size={8}>
-            <Radio value="legacy-modernization">改造已有系统</Radio>
-            <Radio value="financial-ai-native-architecture">从零设计金融 AI / 数据架构</Radio>
-            <Radio value="data-architecture-assessment">评估现有数据架构</Radio>
-          </Space>
-        </Radio.Group>
-        <Divider />
-        <Input
-          autoFocus
-          value={newSessionName}
-          onChange={(event) => setNewSessionName(event.target.value)}
-          placeholder="例如：portfolio-research-agent"
-          onPressEnter={createSession}
-        />
-        <Alert
-          className="modal-tip"
-          type="info"
-          showIcon
-          message="路线只决定工作的大阶段；每一阶段里，助手仍会自己调查、分析和调用工具。"
-        />
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Input
+            autoFocus
+            value={newSessionName}
+            onChange={(event) => setNewSessionName(event.target.value)}
+            placeholder="工作名称，例如：portfolio-position-lineage"
+          />
+          <Input.TextArea
+            value={newSessionGoal}
+            onChange={(event) => setNewSessionGoal(event.target.value)}
+            placeholder="先说清楚你想解决什么，例如：为什么两个系统的 Position 不一致？（可选）"
+            autoSize={{ minRows: 3, maxRows: 6 }}
+          />
+          <Select
+            value={newSessionWorkflow ?? ''}
+            onChange={(value) => {
+              setNewSessionWorkflow(value ? value as WorkflowId : null);
+            }}
+            options={workflowOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            style={{ width: '100%' }}
+          />
+          <Alert
+            className="modal-tip"
+            type="info"
+            showIcon
+            message="默认自主调查。路线是可选的工作方法，开始后也可以切换，不会丢失已有调查资料。"
+          />
+        </Space>
       </Modal>
 
       <Modal
