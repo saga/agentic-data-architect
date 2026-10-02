@@ -119,7 +119,16 @@ npm run dev
 
 ## Data Architect 工作路线
 
-新建工作时可以选择：
+新建工作默认采用自主调查，不要求选择 Workflow：
+
+~~~text
+New Investigation
+  → 目标 / 问题
+  → 默认：自主调查
+  → 可选：采用一套工作路线
+~~~
+
+当前提供三套可选的工作路线：
 
 ~~~text
 改造已有系统
@@ -132,7 +141,7 @@ npm run dev
   → Data Architecture Assessment Workflow
 ~~~
 
-三条路线都只固定 Data Architect 的大阶段。每一关里面怎么调查、调用哪些工具、是否回到前一关，由 Agent 根据证据决定。
+路线不是 Investigation 类型，而是 Agent 可以采用的 playbook。自主调查时没有固定 Journey；调查过程中可以切换工作路线，已有消息、Discovery、Evidence、Findings 和 workspace 都会保留。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
 
 从零建设金融 Portfolio Research Agent 的路线定义在：
 
