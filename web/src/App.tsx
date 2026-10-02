@@ -529,6 +529,16 @@ function AppInner() {
     setPage(nextPage);
   };
 
+  const navigateToSession = (key: string, replace = false) => {
+    const nextPath = '/investigations/' + encodeURIComponent(key);
+    if (window.location.pathname !== nextPath) {
+      if (replace) window.history.replaceState({ session: key, page: 'chat' }, '', nextPath);
+      else window.history.pushState({ session: key, page: 'chat' }, '', nextPath);
+    }
+    setPage('chat');
+    setActive(key);
+  };
+
   const { message: toast } = AntApp.useApp();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
