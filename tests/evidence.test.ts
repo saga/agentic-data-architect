@@ -11,9 +11,21 @@ describe('calibrateStatus: 模型自报 status 只做输入', () => {
   it('verified is never granted to the agent', () => {
     assert.equal(calibrateStatus(3, 'verified'), 'inferred');
   });
-  it('supported needs 2+ evidence', () => {
+  it('supported needs 2+ independent evidence sources', () => {
     assert.equal(calibrateStatus(1, 'supported'), 'inferred');
     assert.equal(calibrateStatus(2, 'supported'), 'supported');
+    const sameFile = [
+      { id: 'ev-a', type: 'sql_statement', source: 'a.sql:1-2', file: 'a.sql', sourceHash: 'hash-a', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' },
+      { id: 'ev-b', type: 'lineage', source: 'a.sql:3-4', file: 'a.sql', sourceHash: 'hash-a', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' },
+    ] as const;
+    assert.equal(calibrateStatus([...sameFile], 'supported'), 'inferred');
+    assert.equal(
+      calibrateStatus(
+        [...sameFile, { id: 'ev-c', type: 'metadata', source: 'snowflake:RAW.POSITIONS', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' }],
+        'supported',
+      ),
+      'supported',
+    );
   });
   it('contradicted passes through', () => {
     assert.equal(calibrateStatus(2, 'contradicted'), 'contradicted');
@@ -22,6 +34,10 @@ describe('calibrateStatus: 模型自报 status 只做输入', () => {
 
 describe('parseAgentAnswer', () => {
   const existing = new Set(['ev-a', 'ev-b']);
+  const evidenceMap = new Map([
+    ['ev-a', { id: 'ev-a', type: 'sql_statement', source: 'a.sql:1-2', file: 'a.sql', sourceHash: 'hash-a', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' }],
+    ['ev-b', { id: 'ev-b', type: 'metadata', source: 'snowflake:RAW.POSITIONS', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' }],
+  ]);
 
   it('keeps valid claims, drops unknown evidence ids with warning', () => {
     const raw = JSON.stringify({
@@ -37,6 +53,17 @@ describe('parseAgentAnswer', () => {
     assert.ok(p.warnings.length > 0);
     // 只剩 1 个证据，supported 被降级为 inferred
     assert.equal(p.claims[0]?.status, 'inferred');
+  });
+
+  it('uses evidence provenance when calibrating supported claims', () => {
+    const raw = JSON.stringify({
+      answer: 'a',
+      claims: [{ claim: 'c', status: 'supported', evidenceIds: ['ev-a', 'ev-b'] }],
+      unknowns: [],
+      followUpQuestions: [],
+    });
+    const p = parseAgentAnswer(raw, evidenceMap);
+    assert.equal(p.claims[0]?.status, 'supported');
   });
 
   it('unparseable output yields no claims', () => {
