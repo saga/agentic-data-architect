@@ -6,8 +6,8 @@
 - Graphify runtime 增加 package version、MCP command、graph path、graph SHA-256、extraction mode，并进入 Discovery run / turn audit。
 - 本地目录 Discovery 为源文件建立 `source_file` Evidence；Graphify 只能用于定位候选文件，最终 Claim 仍引用 deterministic Evidence。
 - `supported` 状态不再只看 Evidence 数量，同一个文件/hash 的多条 Evidence 不算两个独立来源。
-- Graphify 从 `requirements.txt` 明确作为运行时 Python 依赖；CI 增加 `pip-audit`。
-- `SQLGLOT_PYTHON` 更名为 `PYTHON_TOOLCHAIN`，旧变量暂时保留兼容。
+- Python 运行时依赖从 `requirements*.txt` 收敛到根目录 `pyproject.toml`，由 `uv` 统一创建、同步和执行。
+- `npm test` 的 Python 检查改为 `uv run scripts/check-python-deps.py`；CI 使用 `uv sync`，生产依赖通过 `uv export --no-dev` 后交给 `pip-audit`。
 - 增加真实 Graphify extraction / runtime integration test。
 
 ### 不变的边界
