@@ -44,6 +44,43 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 npm run start
 ```
 
+## Memory / History
+
+当前 Investigation 的“记忆”实际上由四层组成：
+
+```text
+1. context.json
+   → 当前业务状态：goal / scope / Evidence / Findings / Unknowns / Journey Plan
+2. conversations.db
+   → 完整 user / assistant / system transcript
+3. discovery / reports / artifacts
+   → 调查产物和可追溯原始结果
+4. Copilot Session
+   → Agent runtime 自己的 session history，SDK 可以做上下文 compaction
+```
+
+当前已经做到“原始记录持久化”，但还没有完整的 application-owned Memory Archive：
+
+- `listConversationMessages(limit)` 只是限制返回数量，不是完整的 cursor pagination。
+- `searchConversation(... beforeRowId)` 已有一个内部时间水位，但没有形成统一的 Memory Page API。
+- Copilot SDK 的 compaction 是 runtime 侧的上下文压缩，不等于本项目自己的长期记忆归档。
+- 当前没有 `MemoryArchive` / `memory summary` 持久化层，因此不能保证很长调查经过多次上下文压缩后仍有一份独立、可分页、可回溯的历史摘要。
+
+目标模型应改为：
+
+```text
+完整 transcript 永不删除
+        ↓
+按 cursor 分页读取
+        ↓
+长期历史生成 Archive Summary
+        ↓
+当前 Agent 只拿 Working Memory + 相关历史
+```
+
+`@saga/agent-memory` 已在 `saga/common-agent-lib` 中定义这个公共 contract；本项目下一步应在现有 SQLite 上实现适配器，而不是把 SQLite 模型反向放进 common lib。
+
+Archive 必须保留 `sourceRecordIds` / sequence 范围，摘要只是压缩后的导航，不是事实源。当前 `context.json`、Evidence 和原始 transcript 仍然是事实和可追溯记录。
 ## Workspace 边界
 
 ```text
