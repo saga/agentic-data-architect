@@ -563,7 +563,8 @@ function AppInner() {
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
-  const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | null>(null);
+  // null = 尚未选择；'autonomous' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
+  const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | 'autonomous' | null>(null);
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [error, setError] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1677,7 +1678,15 @@ function AppInner() {
                         </div>
                         <div>
                           <div className="field-label">调整为</div>
-                          <Select value={workflowTarget ?? '__none__'} style={{ width: '100%' }} options={workflowOptions.filter((option) => option.value !== (current?.context.workflow ?? '')).map((option) => ({ value: option.value || '__none__', label: option.label }))} onChange={(value) => setWorkflowTarget(value === '__none__' ? null : value as WorkflowId)} placeholder="选择新的工作方式" />
+                          <Select
+                            value={workflowTarget ?? '__unset__'}
+                            style={{ width: '100%' }}
+                            options={workflowOptions
+                              .filter((option) => option.value !== (current?.context.workflow ?? ''))
+                              .map((option) => ({ value: option.value || 'autonomous', label: option.label }))}
+                            onChange={(value) => setWorkflowTarget(value === '__unset__' ? null : value as WorkflowId | 'autonomous')}
+                            placeholder="选择新的工作方式"
+                          />
                         </div>
                       </div>
                       <div className="workflow-confirm-block">
@@ -1685,7 +1694,22 @@ function AppInner() {
                         <Input value={workflowConfirmText} onChange={(event) => setWorkflowConfirmText(event.target.value)} placeholder="输入：我确认调整工作方式" />
                         <Flex justify="space-between" align="center" gap={12} wrap>
                           <Text type="secondary">不会删除调查资料，但 Agent 会从新的工作方式重新开始导航。</Text>
-                          <Button danger type="primary" loading={workflowSaving} disabled={!active || !workflowTarget || workflowTarget === current?.context.workflow || workflowConfirmText.trim() !== '我确认调整工作方式'} onClick={() => void changeWorkflow(workflowTarget)}>确认调整工作方式</Button>
+                          <Button
+                            danger
+                            type="primary"
+                            loading={workflowSaving}
+                            disabled={
+                              !active ||
+                              workflowTarget === null ||
+                              (workflowTarget === 'autonomous'
+                                ? current?.context.workflow === null
+                                : workflowTarget === current?.context.workflow) ||
+                              workflowConfirmText.trim() !== '我确认调整工作方式'
+                            }
+                            onClick={() => void changeWorkflow(workflowTarget === 'autonomous' ? null : workflowTarget)}
+                          >
+                            确认调整工作方式
+                          </Button>
                         </Flex>
                       </div>
                     </Card>
