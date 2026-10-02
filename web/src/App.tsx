@@ -1286,10 +1286,21 @@ function AppInner() {
 
               {journey?.stages.length ? (
                 <section className="right-section right-journey">
-                  <div className="right-section-heading">
-                    <Text strong>地图导引</Text>
-                    <Tag bordered={false}>参考</Tag>
-                  </div>
+                  <Flex className="right-section-heading" justify="space-between" align="center">
+                    <Space size={6}>
+                      <Text strong>地图导引</Text>
+                      <Tag bordered={false}>参考</Tag>
+                    </Space>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<FullscreenOutlined />}
+                      disabled={loading}
+                      onClick={() => setJourneyMapOpen(true)}
+                    >
+                      展开地图
+                    </Button>
+                  </Flex>
                   <div className="journey-map">
                     {journey.stages.map((stage, index) => (
                       <div
@@ -1321,9 +1332,18 @@ function AppInner() {
 
               {current?.context.journeyPlan?.routes.length ? (
                 <section className="right-section right-route-options">
-                  <div className="right-section-heading">
+                  <Flex className="right-section-heading" justify="space-between" align="center">
                     <Text strong>可走路线</Text>
-                  </div>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<FullscreenOutlined />}
+                      disabled={loading}
+                      onClick={() => setJourneyMapOpen(true)}
+                    >
+                      看地图
+                    </Button>
+                  </Flex>
                   <Text type="secondary">
                     这是 Agent 根据最近一次行动、已有证据和当前目标重新规划的路线。可以选其中一条，也可以完全不按它走。
                   </Text>
@@ -1484,6 +1504,33 @@ function AppInner() {
       </Layout>
 
                   <Modal
+        className="journey-map-modal"
+        title={
+          <Flex align="center" gap={8}>
+            <span>工作地图</span>
+            {current?.context.workflow ? <Tag bordered={false}>地图骨架：{workflowOptions.find((item) => item.value === current.context.workflow)?.label}</Tag> : <Tag bordered={false}>自主调查</Tag>}
+          </Flex>
+        }
+        open={journeyMapOpen}
+        width="100%"
+        centered
+        destroyOnHidden
+        styles={{
+          content: { padding: 0, overflow: 'hidden' },
+          header: { margin: 0, padding: '14px 18px' },
+          body: { height: 'calc(100vh - 150px)', minHeight: 520 },
+        }}
+        onCancel={() => setJourneyMapOpen(false)}
+        footer={null}
+      >
+        <JourneyMap
+          journey={journey ?? modernizationPlan?.journey ?? assessmentPlan?.journey}
+          routes={current?.context.journeyPlan?.routes ?? []}
+          loading={loading}
+          onChooseRoute={chooseRoute}
+        />
+      </Modal>
+      <Modal
         className="modernization-modal"
         title={current?.context.workflow === 'data-architecture-assessment' ? '架构评估结果' : '完整改造方案'}
         open={modernizationOpen}
