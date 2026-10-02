@@ -21,7 +21,7 @@ export const TrajectoryEventSchema = z.object({
 export type TrajectoryEvent = z.infer<typeof TrajectoryEventSchema>;
 
 export const TrajectorySummarySchema = z.object({
-  turnId: z.string().min(1),
+  turnId: z.string().min(1).optional(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().optional(),
   durationMs: z.number().nonnegative().optional(),
