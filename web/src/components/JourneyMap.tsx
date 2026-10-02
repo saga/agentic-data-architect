@@ -65,8 +65,8 @@ const LAYOUT_OPTIONS = {
 };
 
 function nodeDimensions(node: JourneyFlowNode) {
-  if (node.nodeData.kind === 'route') return { width: 290, height: 132 };
-  if (node.nodeData.kind === 'route-step') return { width: 250, height: 68 };
+  if (node.data.kind === 'route') return { width: 290, height: 132 };
+  if (node.data.kind === 'route-step') return { width: 250, height: 68 };
   return { width: 230, height: 76 };
 }
 
@@ -100,7 +100,7 @@ async function layoutNodes(nodes: JourneyFlowNode[], edges: Edge[]) {
 
 function stageNode(stage: JourneyMapStage): JourneyFlowNode {
   return {
-    id: \`stage:\${stage.id}\`,
+    id: `stage:${stage.id}`,
     position: { x: 0, y: 0 },
     draggable: false,
     selectable: false,
@@ -116,7 +116,7 @@ function stageNode(stage: JourneyMapStage): JourneyFlowNode {
       width: 230,
       minHeight: 76,
     },
-    className: \`journey-flow-node journey-flow-node-stage journey-flow-node-\${stage.status}\`,
+    className: `journey-flow-node journey-flow-node-stage journey-flow-node-${stage.status}`,
   };
 }
 
@@ -133,10 +133,11 @@ function makeRouteGraph(
     const current = stages[index];
     const next = stages[index + 1];
     const traversed = next.status === 'completed' || next.status === 'current';
+
     edges.push({
-      id: \`stage-edge:\${current.id}:\${next.id}\`,
-      source: \`stage:\${current.id}\`,
-      target: \`stage:\${next.id}\`,
+      id: `stage-edge:${current.id}:${next.id}`,
+      source: `stage:${current.id}`,
+      target: `stage:${next.id}`,
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: traversed ? 'journey-flow-edge journey-flow-edge-traversed' : 'journey-flow-edge',
@@ -150,6 +151,7 @@ function makeRouteGraph(
       draggable: false,
       selectable: false,
       sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
       data: {
         kind: 'stage',
         status: 'current',
@@ -166,10 +168,11 @@ function makeRouteGraph(
     [...stages].reverse().find((stage) => stage.status === 'completed') ??
     stages[0];
 
-  const anchorId = anchorStage ? \`stage:\${anchorStage.id}\` : 'stage:current';
+  const anchorId = anchorStage ? `stage:${anchorStage.id}` : 'stage:current';
 
   routes.slice(0, 3).forEach((route, routeIndex) => {
-    const routeNodeId = \`route:\${route.id}\`;
+    const routeNodeId = `route:${route.id}`;
+
     nodes.push({
       id: routeNodeId,
       position: { x: 0, y: 0 },
@@ -199,7 +202,7 @@ function makeRouteGraph(
     });
 
     edges.push({
-      id: \`route-anchor:\${route.id}\`,
+      id: `route-anchor:${route.id}`,
       source: anchorId,
       target: routeNodeId,
       type: 'smoothstep',
@@ -208,8 +211,9 @@ function makeRouteGraph(
     });
 
     route.steps.slice(0, 6).forEach((step, index) => {
-      const stepId = \`route-step:\${route.id}:\${index}\`;
-      const previousId = index === 0 ? routeNodeId : \`route-step:\${route.id}:\${index - 1}\`;
+      const stepId = `route-step:${route.id}:${index}`;
+      const previousId = index === 0 ? routeNodeId : `route-step:${route.id}:${index - 1}`;
+
       nodes.push({
         id: stepId,
         position: { x: 0, y: 0 },
@@ -220,13 +224,14 @@ function makeRouteGraph(
         data: {
           kind: 'route-step',
           title: step,
-          subtitle: \`路线 \${routeIndex + 1} · 第 \${index + 1} 步\`,
+          subtitle: `路线 ${routeIndex + 1} · 第 ${index + 1} 步`,
         },
         style: { width: 250, minHeight: 68 },
         className: 'journey-flow-node journey-flow-node-route-step',
       });
+
       edges.push({
-        id: \`route-edge:\${route.id}:\${index}\`,
+        id: `route-edge:${route.id}:${index}`,
         source: previousId,
         target: stepId,
         type: 'smoothstep',
@@ -241,18 +246,19 @@ function makeRouteGraph(
 
 function JourneyNode({ data }: NodeProps) {
   const nodeData = data as JourneyFlowNodeData;
+
   return (
     <>
       <Handle type="target" position={Position.Top} className="journey-flow-handle" />
       <div className="journey-flow-node-content">
-      <div className="journey-flow-node-title">{nodeData.title}</div>
-      {nodeData.subtitle ? <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div> : null}
-      {nodeData.kind === 'route' ? (
-        <div className="journey-flow-route-meta">
-          <Tag bordered={false}>Agent 建议</Tag>
-          {nodeData.action}
-        </div>
-      ) : null}
+        <div className="journey-flow-node-title">{nodeData.title}</div>
+        {nodeData.subtitle ? <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div> : null}
+        {nodeData.kind === 'route' ? (
+          <div className="journey-flow-route-meta">
+            <Tag bordered={false}>Agent 建议</Tag>
+            {nodeData.action}
+          </div>
+        ) : null}
       </div>
       <Handle type="source" position={Position.Bottom} className="journey-flow-handle" />
     </>
@@ -325,10 +331,10 @@ export function JourneyMap({
           pannable
           zoomable
           nodeColor={(node) => {
-            const data = node.data as JourneyFlowNodeData;
+            const nodeData = node.data as JourneyFlowNodeData;
             if (nodeData.kind === 'route') return '#1677ff';
-            if (data.status === 'completed') return '#52c41a';
-            if (data.status === 'current') return '#1677ff';
+            if (nodeData.status === 'completed') return '#52c41a';
+            if (nodeData.status === 'current') return '#1677ff';
             return '#d9d9d9';
           }}
         />
