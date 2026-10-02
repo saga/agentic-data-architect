@@ -168,6 +168,10 @@ const prompt = buildQuestionPrompt({
     ...control.agent.skills.map((item) => item.name),
     ...(inv.workflow ? [inv.workflow] : []),
   ])];
+  const skillParameters = control.agent.skills
+    .filter((item) => Object.keys(item.parameters ?? {}).length > 0)
+    .map((item) => `- ${item.name}: ${JSON.stringify(item.parameters)}`)
+    .join('\n');
 
   const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
   await appendAuditEvent(investigationName, {
@@ -190,6 +194,7 @@ let trajectoryWrite = Promise.resolve();
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
+      skillParameters ? '本次已配置的技能运行参数（只在对应 Skill 明确使用时生效）：\n' + skillParameters : '',
       inv.workflow
         ? 'Selected work playbook: ' + inv.workflow + '. Treat its Markdown Workflow as a reference map, not a mandatory sequence. The user may choose another path, skip suggested stages, pursue a different question, or change direction; use judgment within stages and replan when new evidence or user actions change the most useful route.'
         : 'No fixed work playbook is selected. Drive the investigation autonomously from the goal, evidence, unknowns and the most useful next action. You may propose adopting a playbook later, but do not assume one.',
