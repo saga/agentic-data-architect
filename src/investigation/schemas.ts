@@ -36,6 +36,25 @@ export const WorkspaceInputSchema = z.object({
 }).strict();
 export type WorkspaceInput = z.infer<typeof WorkspaceInputSchema>;
 
+/** Agent 根据当前问题和证据生成的可选动态路线；它只是导引，不是强制执行的 Workflow。 */
+export const JourneyRouteOptionSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(120),
+  reason: z.string().trim().min(1).max(400),
+  steps: z.array(z.string().trim().min(1).max(300)).min(1).max(6),
+}).strict();
+export type JourneyRouteOption = z.infer<typeof JourneyRouteOptionSchema>;
+
+/** 最近一次 Agent 生成的动态路线集合；旧 Workflow 地图仍然独立存在。 */
+export const JourneyPlanSchema = z.object({
+  version: z.literal(1),
+  source: z.literal('agent'),
+  generatedAt: z.string().min(1),
+  turnId: z.string().min(1).optional(),
+  routes: z.array(JourneyRouteOptionSchema).max(3),
+}).strict();
+export type JourneyPlan = z.infer<typeof JourneyPlanSchema>;
+
 /** Investigation 的核心 context.json Schema；它是持久化状态的运行时边界。 */
 export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
@@ -53,6 +72,7 @@ export const WorkspaceContextSchema = z.object({
   unknowns: z.array(z.string()),
   importantInformation: z.array(z.string()),
   inputs: z.array(WorkspaceInputSchema),
+  journeyPlan: JourneyPlanSchema.optional(),
   copilotSessionId: z.string().optional(),
   copilotConfigurationVersion: z.number().int().positive().optional(),
   updatedAt: z.string().min(1),
