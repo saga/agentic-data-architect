@@ -1,6 +1,6 @@
 ---
 name: working-directory
-description: Workspace conventions for investigation state, shared research artifacts, evidence, reports, and generated files.
+description: 定义 Investigation workspace 的目录和文件约定，包括 session 状态、共享研究资料、Evidence、报告和生成文件的保存方式。
 metadata:
   kind: capability
 ---
