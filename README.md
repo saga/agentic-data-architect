@@ -2,7 +2,7 @@
 
 面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前提供三套可选工作路线：改造已有系统、从零设计金融 AI / 数据架构、评估现有数据架构。
 
-它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
+它不是一个单纯的 Chat，而是围绕 Data Architect 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping / Architecture Assessment，并为后续验证留下 Evidence。
 
 核心不是“聊天”，而是围绕三类工作路线推进调查、评估和设计；其中已有系统改造路线带有有状态的 Journey：
 
@@ -18,7 +18,7 @@
   → 切换
 ~~~
 
-Agent 在每一关负责调查和推理；Workflow 决定当前在哪一关、什么时候可以进入下一关，以及发现新问题后回到哪里。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、Structural Analysis、GitHub、Confluence、Web Search 等由工具执行。
+Agent 在每一关负责调查和推理；Workflow / Journey 提供当前导航位置和确定性通关条件，但不替 Agent 决定唯一下一步。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、Structural Analysis、GitHub、Confluence、Web Search 等由工具执行。
 
 ## 总体架构
 
@@ -141,7 +141,7 @@ New Investigation
   → Data Architecture Assessment Workflow
 ~~~
 
-路线不是 Investigation 类型，而是 Agent 可以采用的 playbook。自主调查时没有固定 Journey；调查过程中可以切换工作路线，已有消息、Discovery、Evidence、Findings 和 workspace 都会保留。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
+路线不是 Investigation 类型，而是 Agent 可以采用的 playbook。自主调查时没有固定 Journey；调查过程中可以改变工作方式，但这不是首页上的普通下拉选择，而是在“调查配置 → 工作方式”里经过明确确认后执行。已有消息、Discovery、Evidence、Findings 和 workspace 都会保留；旧的动态路线建议会被清除并重新规划。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
 
 从零建设金融 Portfolio Research Agent 的路线定义在：
 
@@ -209,10 +209,11 @@ skills/legacy-modernization/SKILL.md
 Workflow 和 Skill 分工如下：
 
 ~~~text
-Workflow → 现在做什么、什么时候能过、失败回哪里
+Workflow → 提供高层导航骨架和确定性通关条件
+Journey  → 把当前 Workflow 变成当前可见位置
+Agent    → 理解证据、选择调查动作、生成动态路线和下一步建议
 Skill    → 这一关具体怎么查
 Tool     → 真正执行 SQL / profiling / lineage / search
-Agent    → 理解证据、选择调查动作、解释结果
 Human    → 确认业务定义、范围和例外
 ~~~
 
