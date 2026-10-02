@@ -1,6 +1,6 @@
 ---
 name: investigation-session
-description: Continuous human-agent data investigation: clarify goals, preserve multi-turn context, separate evidence from inference, and drive the investigation toward useful next questions and outputs.
+description: 持续的人机协作数据调查：明确目标、保留多轮上下文、区分 Evidence 与推断，并持续推进有价值的下一步问题和调查产出。
 metadata:
   kind: capability
 ---
