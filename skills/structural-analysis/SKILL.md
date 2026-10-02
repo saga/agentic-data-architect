@@ -1,6 +1,6 @@
 ---
 name: structural-analysis
-description: Use Graphify to build and query a local structural knowledge graph of source code, SQL, configuration, and related project files before deep investigation.
+description: 使用 Graphify 建立并查询本地代码、SQL、配置和项目文件的结构关系，帮助在深入调查前快速定位依赖、调用链和关键架构节点。
 metadata:
   kind: capability
 ---
