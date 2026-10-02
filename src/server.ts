@@ -22,6 +22,7 @@ import {
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
+import { readTrajectory, summarizeTrajectory } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
 import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
 import {
@@ -185,6 +186,18 @@ app.post('/api/sessions', async (req, res) => {
 
   app.get('/api/skills', async (_req, res) => {
     res.json({ skills: await listSkillManifests() });
+  });
+
+  app.get('/api/sessions/:name/trajectory', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const turnId = typeof req.query.turnId === 'string' ? req.query.turnId : undefined;
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 1000;
+    const events = await readTrajectory(name, {
+      ...(turnId ? { turnId } : {}),
+      limit: Number.isFinite(limit) ? limit : 1000,
+    });
+    const summary = summarizeTrajectory(events);
+    res.json({ events, summary });
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
