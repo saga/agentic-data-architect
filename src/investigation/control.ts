@@ -188,13 +188,13 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
         : [],
     },
     agent: {
-      platformCapabilities: Array.isArray(agent.platformCapabilities)
-        ? agent.platformCapabilities.map((item) => ({
-            name: String(item.name ?? '').trim(),
-            version: Number(item.version ?? 1) || 1,
-            enabled: item.enabled !== false,
-          })).filter((item) => item.name)
-        : defaults.agent.platformCapabilities,
+      platformCapabilities: config.graphifyEnabled
+        ? [{
+            name: 'graphify-structural-analysis',
+            version: config.graphifyPlatformCapabilityVersion,
+            enabled: true,
+          }]
+        : [],
       systemPrompt: {
         version: Number(agent.systemPrompt?.version ?? 1) || 1,
         content: typeof agent.systemPrompt?.content === 'string' ? agent.systemPrompt.content : '',
