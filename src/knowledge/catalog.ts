@@ -47,13 +47,13 @@ function chineseBigrams(value: string): string[] {
  */
 export async function searchArchitectureKnowledge(
   query: string,
-  options: { workflow: WorkflowId; limit?: number },
+  options: { workflow?: WorkflowId | null; limit?: number },
 ): Promise<ArchitectureKnowledge[]> {
   const nodes = await loadKnowledgeFiles();
   const queryTokens = new Set(tokens(query));
   const queryChineseBigrams = new Set(chineseBigrams(query));
   const scored = nodes
-    .filter((node) => node.status === 'active' && node.appliesTo.includes(options.workflow))
+    .filter((node) => node.status === 'active' && (!options.workflow || node.appliesTo.includes(options.workflow)))
     .map((node) => {
       const haystack = tokens([
         node.title,
