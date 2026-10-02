@@ -23,7 +23,7 @@ import { WorkspaceContextSchema } from './schemas.js';
 export type Investigation = WorkspaceContext;
 
 /** 创建一个空的 Investigation 初始状态；不负责写盘。 */
-export function newInvestigation(name: string, userPrompt = '', workflow: Investigation['workflow'] = 'legacy-modernization'): Investigation {
+export function newInvestigation(name: string, userPrompt = '', workflow: Investigation['workflow'] = null): Investigation {
   return {
     schemaVersion: 3,
     name,
@@ -136,13 +136,33 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
   throw new Error('Investigation 不存在：' + name);
 }
 
+/** 修改当前 Investigation 的工作路线；不改变 Evidence、消息或其它调查状态。 */
+export async function updateInvestigationWorkflow(
+  name: string,
+  workflow: Investigation['workflow'],
+): Promise<Investigation> {
+  return withWorkspaceContextLock(name, async () => {
+    const current = await loadWorkspaceContext(name);
+    if (current.workflow === workflow) return current;
+
+    const next = WorkspaceContextSchema.parse({
+      ...current,
+      workflow,
+      updatedAt: new Date().toISOString(),
+    });
+    await writeJsonAtomic(contextFile(name), next);
+    return next;
+  });
+}
+
 /** 把旧版/不完整 context 转成当前 schemaVersion=3 的可信 Investigation。 */
+
 function normalizeInvestigation(name: string, raw: Partial<Investigation>): Investigation {
   return WorkspaceContextSchema.parse({
     schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
-    workflow: raw.workflow ?? 'legacy-modernization',
+    // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；新建 Investigation 明确使用 null。
     goal: raw.goal ?? '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
