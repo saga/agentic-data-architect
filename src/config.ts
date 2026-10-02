@@ -13,7 +13,7 @@ const EnvSchema = z.object({
   DATA_DIR: z.string().default('.data'),
   SKILLS_DIR: z.string().default('skills'),
   KNOWLEDGE_DIR: z.string().default('knowledge'),
-  COPILOT_SKILLS: z.string().default('investigation-session,financial-data-review,legacy-modernization,financial-ai-native-architecture,data-architecture-assessment'),
+  COPILOT_SKILLS: z.string().default('investigation-session,financial-data-review,structural-analysis,legacy-modernization,financial-ai-native-architecture,data-architecture-assessment'),
   GITHUB_TOKEN: z.string().optional(),
   COPILOT_MODEL: z.string().default('gpt-5-mini'),
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
