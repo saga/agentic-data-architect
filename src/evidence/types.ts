@@ -36,6 +36,19 @@ export const EvidenceRefSchema = z.object({
 }).strict();
 export type EvidenceRef = z.infer<typeof EvidenceRefSchema>;
 
+/** Graphify 本轮运行环境快照；Discovery/turn 用它记录结构图的可重放指纹。 */
+export const GraphifyRunMetadataSchema = z.object({
+  enabled: z.boolean(),
+  status: z.enum(['available', 'missing', 'disabled']),
+  command: z.string().optional(),
+  packageVersion: z.string().optional(),
+  graphPath: z.string().optional(),
+  graphHash: z.string().optional(),
+  extractionMode: z.string().optional(),
+  capturedAt: z.string().min(1),
+}).strict();
+export type GraphifyRunMetadata = z.infer<typeof GraphifyRunMetadataSchema>;
+
 /** Claim 持久化结构 Schema，只保存 evidenceIds，不嵌套完整 Evidence。 */
 export const ClaimSchema = z.object({
   id: z.string().min(1),
@@ -89,6 +102,7 @@ export const DiscoveryRunSchema = z.object({
   lineageEdgesFound: z.number().int().nonnegative(),
   sqlParseFailures: z.number().int().nonnegative().optional(),
   semanticAssetsFound: z.number().int().nonnegative().optional(),
+  graphify: GraphifyRunMetadataSchema.optional(),
 }).strict();
 export type DiscoveryRun = z.infer<typeof DiscoveryRunSchema>;
 
