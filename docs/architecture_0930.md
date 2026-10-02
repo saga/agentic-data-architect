@@ -167,9 +167,11 @@ Core Platform
           └── skillDirectories → skills/*/SKILL.md
                                   ├─ investigation-session
                                   ├─ financial-data-review
+                                  ├─ structural-analysis
                                   ├─ search-github
                                   ├─ search-confluence
-                                  └─ search-leanix
+                                  ├─ search-leanix
+                                  └─ working-directory
 
 Skill
   └─ scripts/   deterministic domain procedure
