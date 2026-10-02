@@ -105,6 +105,70 @@ export interface AskInput {
 // turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
 
+async function getSessionUsageMetrics(session: unknown): Promise<Record<string, unknown> | undefined> {
+  try {
+    const usage = (session as { usage?: { getMetrics?: () => Promise<unknown> } }).usage;
+    if (!usage?.getMetrics) return undefined;
+    const metrics = await usage.getMetrics();
+    return metrics && typeof metrics === 'object' ? metrics as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function diffNumber(after: unknown, before: unknown): number | undefined {
+  const a = readNumber(after);
+  const b = readNumber(before);
+  if (a === undefined || b === undefined) return undefined;
+  return Math.max(0, a - b);
+}
+
+function diffUsageMetrics(
+  after: Record<string, unknown> | undefined,
+  before: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!after) return undefined;
+  const result: Record<string, unknown> = {};
+  for (const field of ['totalNanoAiu', 'totalPremiumRequestCost', 'inputTokens', 'outputTokens', 'totalTokens']) {
+    const value = diffNumber(after[field], before?.[field]);
+    if (value !== undefined) result[field] = value;
+  }
+  const afterModels = after.modelMetrics;
+  const beforeModels = before?.modelMetrics;
+  if (afterModels && typeof afterModels === 'object') {
+    const models: Record<string, unknown> = {};
+    for (const [model, raw] of Object.entries(afterModels as Record<string, unknown>)) {
+      const afterModel = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+      const beforeModel = beforeModels && typeof beforeModels === 'object'
+        ? (beforeModels as Record<string, unknown>)[model]
+        : undefined;
+      const beforeModelObject = beforeModel && typeof beforeModel === 'object'
+        ? beforeModel as Record<string, unknown>
+        : {};
+      const afterUsage = afterModel.usage && typeof afterModel.usage === 'object'
+        ? afterModel.usage as Record<string, unknown>
+        : {};
+      const beforeUsage = beforeModelObject.usage && typeof beforeModelObject.usage === 'object'
+        ? beforeModelObject.usage as Record<string, unknown>
+        : {};
+      const modelDiff: Record<string, unknown> = {};
+      for (const field of ['inputTokens', 'outputTokens']) {
+        const value = diffNumber(afterUsage[field], beforeUsage[field]);
+        if (value !== undefined) modelDiff[field] = value;
+      }
+      const aiu = diffNumber(afterModel.totalNanoAiu, beforeModelObject.totalNanoAiu);
+      if (aiu !== undefined) modelDiff.totalNanoAiu = aiu;
+      if (Object.keys(modelDiff).length) models[model] = modelDiff;
+    }
+    if (Object.keys(models).length) result.models = models;
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
 /** 把 SDK intent 映射成简短的用户可见状态，不向前端暴露内部 reasoning 文本。 */
 function statusFromIntent(intent: string): string {
   const value = intent.toLowerCase();
@@ -207,7 +271,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // Skill reload is best-effort; session creation still works on older runtimes.
   }
 
-  input.onTrajectory?.({ type: 'turn_start', name: 'Agent turn', status: 'started' });
+  const usageBefore = await getSessionUsageMetrics(session);
+
+  input.onTrajectory?.({
+    type: 'turn_start',
+    name: 'Agent 本轮开始',
+    status: 'started',
+    model: input.model ?? config.model,
+    details: { sessionId: session.sessionId },
+  });
 
   let content = '';
   const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
@@ -328,21 +400,16 @@ export async function askCopilot(input: AskInput): Promise<string> {
       throw new Error('Turn aborted.');
     }
     const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
-    try {
-      const usageApi = (session as unknown as { usage?: { getMetrics?: () => Promise<unknown> } }).usage;
-      const usageMetrics = usageApi?.getMetrics ? await usageApi.getMetrics() : undefined;
-      if (usageMetrics) {
-        input.onTrajectory?.({
-          type: 'status',
-          name: '累计 AI 用量',
-          status: 'info',
-          details: { usageMetrics: redactTrajectoryValue(usageMetrics) },
-        });
-      }
-    } catch {
-      // 用量快照失败不影响业务回答；本轮仍保留 assistant.usage 事件作为最小统计。
-    }
-    input.onTrajectory?.({ type: 'turn_end', name: 'Agent turn', status: 'completed' });
+    const usageAfter = await getSessionUsageMetrics(session);
+    const turnUsage = diffUsageMetrics(usageAfter, usageBefore);
+    input.onTrajectory?.({
+      type: 'turn_end',
+      name: 'Agent 本轮结束',
+      status: 'completed',
+      details: {
+        ...(turnUsage ? { turnUsage: redactTrajectoryValue(turnUsage) } : {}),
+      },
+    });
     return final?.data.content || content;
   } catch (e) {
     input.onTrajectory?.({
