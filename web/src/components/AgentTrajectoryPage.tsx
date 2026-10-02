@@ -69,6 +69,15 @@ interface TrajectoryTurnSummary {
   compactions: number;
 }
 
+interface ConversationTurnSummary {
+  turnId: string;
+  sessionName: string;
+  status: 'running' | 'completed' | 'failed' | 'aborted';
+  createdAt: string;
+  updatedAt: string;
+  question?: string;
+}
+
 function formatTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString();
@@ -262,6 +271,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
   const [events, setEvents] = useState<TrajectoryEvent[]>([]);
   const [summary, setSummary] = useState<TrajectorySummary | null>(null);
   const [turns, setTurns] = useState<TrajectoryTurnSummary[]>([]);
+  const [conversationTurns, setConversationTurns] = useState<ConversationTurnSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
@@ -273,10 +283,12 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
         events: TrajectoryEvent[];
         summary: TrajectorySummary | null;
         turns: TrajectoryTurnSummary[];
+        conversationTurns: ConversationTurnSummary[];
       };
       setEvents(data.events);
       setSummary(data.summary);
       setTurns(data.turns);
+      setConversationTurns(data.conversationTurns);
     } finally {
       setLoading(false);
     }
@@ -296,7 +308,34 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
     return grouped;
   }, [events]);
 
-  const totalToolCalls = turns.reduce((sum, turn) => sum + turn.toolCalls, 0);
+  const displayTurns = useMemo<TrajectoryTurnSummary[]>(() => {
+    const byId = new Map(turns.map((turn) => [turn.turnId, turn]));
+    for (const turn of conversationTurns) {
+      if (byId.has(turn.turnId)) continue;
+      byId.set(turn.turnId, {
+        turnId: turn.turnId,
+        userQuestion: turn.question,
+        summary: {
+          turnId: turn.turnId,
+          startedAt: turn.createdAt,
+          ...(turn.status === 'completed' ? { finishedAt: turn.updatedAt } : {}),
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          models: {},
+          eventCount: 0,
+        },
+        modelCalls: 0,
+        toolCalls: 0,
+        failedEvents: turn.status === 'failed' ? 1 : 0,
+        compactions: 0,
+      });
+    }
+    return [...byId.values()].sort((a, b) => a.summary.startedAt.localeCompare(b.summary.startedAt));
+  }, [conversationTurns, turns]);
+
+  const totalToolCalls = displayTurns.reduce((sum, turn) => sum + turn.toolCalls, 0);
+
   const totalModelCalls = turns.reduce((sum, turn) => sum + turn.modelCalls, 0);
   const contextEvents = events.filter((event) => event.type === 'status' && event.name === '上下文占用');
   const latestContext = contextEvents.at(-1);
@@ -334,7 +373,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
             <Card className="trajectory-overview-card">
               <Flex justify="space-between" align="center" gap={12} wrap>
                 <Space wrap>
-                  <Tag>{turns.length} 轮</Tag>
+                  <Tag>{displayTurns.length} 轮</Tag>
                   <Tag icon={<RobotOutlined />}>{totalModelCalls} 次模型调用</Tag>
                   <Tag icon={<ToolOutlined />}>{totalToolCalls} 次工具调用</Tag>
                   {summary?.totalPremiumRequestCost !== undefined ? (
@@ -360,8 +399,8 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
 
             <Collapse
               className="trajectory-turn-list"
-              defaultActiveKey={turns.length ? [turns.at(-1)!.turnId] : []}
-              items={turns.slice().reverse().map((turn) => ({
+              defaultActiveKey={displayTurns.length ? [displayTurns.at(-1)!.turnId] : []}
+              items={displayTurns.slice().reverse().map((turn) => ({
                 key: turn.turnId,
                 label: (
                   <Flex justify="space-between" align="center" gap={12} wrap>
