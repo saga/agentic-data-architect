@@ -151,7 +151,7 @@ function graphifyPackageVersion(command: string): string | undefined {
 }
 
 /** 返回当前 Investigation 实际看到的 Graphify runtime + graph 快照。 */
-export async function getGraphifyRuntimeMetadata(workingDirectory: string): Promise<GraphifyRuntimeMetadata> {
+export async function getGraphifyRuntimeMetadata(workingDirectory: string): Promise<GraphifyRunMetadata> {
   const capturedAt = new Date().toISOString();
   if (!config.graphifyEnabled) {
     return { enabled: false, status: 'disabled', capturedAt };
