@@ -299,7 +299,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       : context.workflow === 'data-architecture-assessment'
         ? await loadArchitectureAssessmentJourneyState(name)
         : null;
-    res.json({ journey });
+    res.json({ journey, routePlan: context.journeyPlan ?? null });
   });
 
   app.get('/api/sessions/:name/assessment', async (req, res) => {
