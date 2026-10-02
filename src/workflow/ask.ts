@@ -190,6 +190,13 @@ let trajectoryWrite = Promise.resolve();
     })).catch(() => undefined);
   };
 
+  recordTrajectory({
+    type: 'user_input',
+    name: '用户问题',
+    status: 'info',
+    details: { question },
+  });
+
   const raw = await askCopilot({
     prompt,
     systemPrompt: [
