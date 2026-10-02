@@ -188,7 +188,11 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
   const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
     trajectoryWrite = trajectoryWrite
       .then(async () => {
-        await appendTrajectoryEvent(investigationName, { ...event, turnId });
+        await appendTrajectoryEvent(investigationName, {
+          ...event,
+          turnId,
+          details: event.details ?? {},
+        });
       })
       .catch(() => undefined);
   };
