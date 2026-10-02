@@ -17,7 +17,7 @@ import {
   type WorkspaceContext,
 } from './workspace.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
-import { WorkspaceContextSchema } from './schemas.js';
+import { JourneyPlanSchema, WorkspaceContextSchema, type JourneyPlan } from './schemas.js';
 
 /** Investigation 是 WorkspaceContext 在业务层的别名，代表持久化的当前分析状态。 */
 export type Investigation = WorkspaceContext;
@@ -150,10 +150,40 @@ export async function updateInvestigationWorkflow(
     const nextState = { ...current };
     delete nextState.copilotSessionId;
     delete nextState.copilotConfigurationVersion;
+    // 工作方式换了，上一条 Agent 动态路线也不再可信。
+    delete nextState.journeyPlan;
 
     const next = WorkspaceContextSchema.parse({
       ...nextState,
       workflow,
+      updatedAt: new Date().toISOString(),
+    });
+    await writeJsonAtomic(contextFile(name), next);
+    return next;
+  });
+}
+
+/** 原子更新最近一次 Agent 动态路线；不会触碰 Evidence、消息和调查事实。 */
+export async function updateInvestigationJourneyPlan(
+  name: string,
+  journeyPlan: JourneyPlan | undefined,
+  expectedWorkflow?: Investigation['workflow'],
+): Promise<Investigation> {
+  return withWorkspaceContextLock(name, async () => {
+    const current = await loadWorkspaceContext(name);
+
+    // 如果用户已经在 Agent 执行期间切换了 Workflow，丢弃旧 turn 生成的路线，避免路线地图倒退。
+    if (typeof expectedWorkflow !== 'undefined' && current.workflow !== expectedWorkflow) {
+      return current;
+    }
+
+    const parsed = journeyPlan ? JourneyPlanSchema.parse(journeyPlan) : undefined;
+    const nextState = { ...current };
+    if (parsed) nextState.journeyPlan = parsed;
+    else delete nextState.journeyPlan;
+
+    const next = WorkspaceContextSchema.parse({
+      ...nextState,
       updatedAt: new Date().toISOString(),
     });
     await writeJsonAtomic(contextFile(name), next);
