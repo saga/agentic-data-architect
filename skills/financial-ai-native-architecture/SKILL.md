@@ -1,6 +1,6 @@
 ---
 name: financial-ai-native-architecture
-description: 从零设计金融服务 AI-native 数据与 Agent 架构，适用于 Portfolio Research、Investment Analytics 和类似新建平台。
+description: 从零设计金融服务 AI 与数据架构的工作路线，适用于 Portfolio Research、Investment Analytics 和类似的新建平台。
 metadata:
   kind: workflow
 ---
