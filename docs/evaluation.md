@@ -31,7 +31,7 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 
 1. 提示词层：`prompts.ts` 禁止模型自报 `verified`。
 2. 校验层：`result.ts` 剔除不存在的 evidenceId（记 warning），`calibrateStatus`
-   按证据数量重算（无证据→unknown，verified→inferred，supported 需 2+ 证据）。
+   按 evidence provenance 重算（无证据→unknown，verified→inferred，supported 需要至少 2 个独立来源）。同一个文件/hash 的多条 Evidence 不会因为数量达到 2 就自动变成 supported。
 3. 测试层：`golden.test.ts` 断言谎称 verified 的输出被校正为 unknown。
 
 换模型（GPT / Claude / Gemini）时直接重跑同一套 golden，对比上表即可，
@@ -44,6 +44,12 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 - workspace safety：覆盖 database URI 脱敏，避免密码/token 写入 context。
 - profiling performance：PostgreSQL / Snowflake 的 profile 已收敛为每表一次聚合 + 一次小样本，而不是每列多次全表查询。
 
+## Structural Analysis 回归
+
+- Graphify runtime 安装检查：`graphify-mcp --help` 必须能够启动。
+- Graphify extraction：真实生成 `graphify-out/graph.json`，并检查 graph SHA-256 可计算。
+- Graphify graph/version/hash 进入 Discovery snapshot 和 turn audit；Graphify 结果本身不直接成为 Evidence。
+
 ## 依赖安全回归
 
-CI 对生产依赖执行 critical blocking audit；high severity audit 当前为 informational，因为 Snowflake driver 的已知 `toml` 传递依赖问题尚无兼容的上游修复。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
+CI 对 Node 生产依赖执行 critical audit，同时对 `requirements.txt` 运行 `pip-audit`。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
