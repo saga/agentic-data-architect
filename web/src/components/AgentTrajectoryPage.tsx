@@ -336,7 +336,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
 
   const totalToolCalls = displayTurns.reduce((sum, turn) => sum + turn.toolCalls, 0);
 
-  const totalModelCalls = turns.reduce((sum, turn) => sum + turn.modelCalls, 0);
+  const totalModelCalls = displayTurns.reduce((sum, turn) => sum + turn.modelCalls, 0);
   const contextEvents = events.filter((event) => event.type === 'status' && event.name === '上下文占用');
   const latestContext = contextEvents.at(-1);
 
@@ -357,7 +357,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
         ) : (
           <>
             <Row gutter={[12, 12]} className="trajectory-stat-row">
-              <Col xs={12} lg={6}><Card><Statistic title="总 Token" value={summary?.totalTokens ?? 0} /></Card></Col>
+              <Col xs={12} lg={6}><Card><Statistic title="已采集总 Token" value={summary?.totalTokens ?? 0} /></Card></Col>
               <Col xs={12} lg={6}><Card><Statistic title="输入 Token" value={summary?.inputTokens ?? 0} /></Card></Col>
               <Col xs={12} lg={6}><Card><Statistic title="输出 Token" value={summary?.outputTokens ?? 0} /></Card></Col>
               <Col xs={12} lg={6}>
