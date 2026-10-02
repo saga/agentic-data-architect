@@ -12,9 +12,10 @@ import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
 import { appendContextInput, redactSensitiveUri } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
-import type { DiscoveryRun } from '../evidence/types.js';
+import { nextId, type DiscoveryRun, type EvidenceRef } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
+import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -81,8 +82,24 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
   const semanticAssets: SemanticAsset[] = [];
   const unknowns: string[] = [];
 
+  let graphify;
+
   if (opts.path) {
     inventory = await discoverDirectory(opts.path, runId);
+    // Source-file Evidence 建立 Graphify → source provenance 的桥：Graphify 只负责定位候选文件。
+    const sourceEvidence: EvidenceRef[] = inventory.files.map((file) => ({
+      id: nextId('ev'),
+      type: 'source_file',
+      investigationId: name,
+      discoveryRunId: runId,
+      source: `${file.path} (${file.kind}, ${file.lineCount} lines)`,
+      file: file.path,
+      sourceHash: file.sha256,
+      value: { kind: file.kind, sizeBytes: file.sizeBytes, lineCount: file.lineCount, modifiedAt: file.modifiedAt },
+      collectedAt: new Date().toISOString(),
+    }));
+    inv.evidence.push(...sourceEvidence);
+    graphify = await getGraphifyRuntimeMetadata(opts.path);
     unknowns.push(...inventory.unknowns);
     lineage = await buildLineage(
       inventory.files
@@ -129,6 +146,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
     lineageEdgesFound: lineage?.edges.length ?? 0,
     sqlParseFailures: lineage?.parseFailures.length ?? 0,
     semanticAssetsFound: semanticAssets.length,
+    ...(graphify ? { graphify } : {}),
   };
   inv.discoveryRuns.push(run);
 
