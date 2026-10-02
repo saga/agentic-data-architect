@@ -8,7 +8,7 @@ export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
   timestamp: z.string().datetime(),
-  type: z.enum(['turn_start','intent','model_call','tool_call','tool_result','permission','compaction','turn_end','error','status']),
+  type: z.enum(['user_input','turn_start','intent','model_call','tool_call','tool_result','permission','compaction','turn_end','error','status']),
   name: z.string().min(1),
   status: z.enum(['started','completed','failed','waiting','info']).optional(),
   durationMs: z.number().nonnegative().optional(),
@@ -78,12 +78,8 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
     ? usageObject.totalPremiumRequestCost
     : undefined;
   const model = [...events].reverse().find((event) => event.model)?.model;
-  const inputTokens = typeof usageObject?.inputTokens === 'number'
-    ? usageObject.inputTokens
-    : events.reduce((sum, event) => sum + (event.inputTokens ?? 0), 0);
-  const outputTokens = typeof usageObject?.outputTokens === 'number'
-    ? usageObject.outputTokens
-    : events.reduce((sum, event) => sum + (event.outputTokens ?? 0), 0);
+  const inputEventTokens = events.reduce((sum, event) => sum + (event.inputTokens ?? 0), 0);
+  const outputEventTokens = events.reduce((sum, event) => sum + (event.outputTokens ?? 0), 0);
   const models: TrajectorySummary['models'] = {};
   if (modelMetrics && typeof modelMetrics === 'object') {
     for (const [name, raw] of Object.entries(modelMetrics as Record<string, unknown>)) {
@@ -102,9 +98,9 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
     startedAt: first.timestamp,
     ...(finishedAt ? { finishedAt, durationMs: new Date(finishedAt).getTime() - new Date(first.timestamp).getTime() } : {}),
     ...(model ? { model } : {}),
-    inputTokens: totalFromUsage(usage, 'inputTokens', inputTokens),
-    outputTokens: totalFromUsage(usage, 'outputTokens', outputTokens),
-    totalTokens: totalFromUsage(usage, 'totalTokens', inputTokens + outputTokens),
+    inputTokens: totalFromUsage(usageObject, 'inputTokens', Object.values(models).reduce((sum, item) => sum + item.inputTokens, 0) || inputEventTokens),
+    outputTokens: totalFromUsage(usageObject, 'outputTokens', Object.values(models).reduce((sum, item) => sum + item.outputTokens, 0) || outputEventTokens),
+    totalTokens: totalFromUsage(usageObject, 'totalTokens', Object.values(models).reduce((sum, item) => sum + item.inputTokens + item.outputTokens, 0) || inputEventTokens + outputEventTokens),
     ...(totalNanoAiu !== undefined ? { totalNanoAiu } : {}),
     ...(totalPremiumRequestCost !== undefined ? { totalPremiumRequestCost } : {}),
     models,
