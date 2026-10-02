@@ -6,7 +6,6 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   LockOutlined,
-  BulbOutlined,
 } from '@ant-design/icons';
 import { Button, Empty, Flex, Tag, Typography } from 'antd';
 import {
@@ -253,16 +252,12 @@ function buildGraph(
     visibleStages[0];
 
   const anchorIndex = Math.max(0, visibleStages.findIndex((stage) => stage.id === anchorStage.id));
-  const anchorX = visibleStages.slice(0, anchorIndex + 1).reduce(
-    (x, stage) => x + stageWidth(stage) + NODE_GAP,
-    0,
-  ) - stageWidth(anchorStage) - NODE_GAP;
 
   routes.slice(0, 3).forEach((route, routeIndex) => {
     const node = routeNode(route, routeIndex, onChooseRoute);
     const centeredOffset = (routeIndex - (Math.min(routes.length, 3) - 1) / 2) * (ROUTE_WIDTH + 24);
     node.position = {
-      x: anchorX + centeredOffset,
+      x: centeredOffset,
       y: 220,
     };
     nodes.push(node);
