@@ -62,7 +62,7 @@ export type WorkspaceContext = z.infer<typeof WorkspaceContextSchema>;
 /** 创建新 Workspace 时允许传入的初始化字段 Schema。 */
 export const WorkspaceSeedSchema = z.object({
   userPrompt: z.string().optional(),
-  workflow: WorkflowIdSchema.optional(),
+  workflow: WorkflowIdSchema.nullable().optional(),
   goal: z.string().optional(),
   scope: z.array(z.string()).optional(),
   systems: z.array(z.string()).optional(),
