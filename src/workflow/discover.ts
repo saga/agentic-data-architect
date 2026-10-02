@@ -12,7 +12,7 @@ import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
 import { appendContextInput, redactSensitiveUri } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
-import { nextId, type DiscoveryRun, type EvidenceRef } from '../evidence/types.js';
+import { nextId, type DiscoveryRun, type EvidenceRef, type GraphifyRunMetadata } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
@@ -82,7 +82,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
   const semanticAssets: SemanticAsset[] = [];
   const unknowns: string[] = [];
 
-  let graphify;
+  let graphify: GraphifyRunMetadata | undefined;
 
   if (opts.path) {
     inventory = await discoverDirectory(opts.path, runId);
