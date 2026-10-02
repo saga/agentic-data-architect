@@ -1644,7 +1644,7 @@ function AppInner() {
             className="modal-tip"
             type="info"
             showIcon
-            message="默认自主调查。路线是可选的工作方法，开始后也可以切换，不会丢失已有调查资料。"
+            message="默认自主调查。路线是可选的工作方法；开始后不会在首页随手切换，确需改变时到“调查配置 → 工作方式”执行明确调整。"
           />
         </Space>
       </Modal>
