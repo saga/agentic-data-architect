@@ -3,6 +3,7 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 import {
   Background,
   Controls,
+  Handle,
   MiniMap,
   Panel,
   Position,
@@ -240,7 +241,9 @@ function makeRouteGraph(
 
 function JourneyNode({ data }: NodeProps<JourneyFlowNode>) {
   return (
-    <div className="journey-flow-node-content">
+    <>
+      <Handle type="target" position={Position.Top} className="journey-flow-handle" />
+      <div className="journey-flow-node-content">
       <div className="journey-flow-node-title">{data.title}</div>
       {data.subtitle ? <div className="journey-flow-node-subtitle">{data.subtitle}</div> : null}
       {data.kind === 'route' ? (
@@ -249,7 +252,9 @@ function JourneyNode({ data }: NodeProps<JourneyFlowNode>) {
           {data.action}
         </div>
       ) : null}
-    </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="journey-flow-handle" />
+    </>
   );
 }
 
