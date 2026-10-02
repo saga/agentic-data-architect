@@ -12,7 +12,7 @@
 |---|---|---|---|
 | Investigation State | .workspace/<session>/context.json | goal、scope、evidence、claims、findings、inputs、Copilot session reference | Investigation 当前状态 |
 | Conversation State | .workspace/conversations.db | user/assistant 消息、turn 状态 | 对话与执行生命周期 |
-| Control State | .workspace/<session>/control.json | Research、Skill、Prompt、MCP、版本历史 | Agent 执行配置 |
+| Control State | .workspace/<session>/control.json | Research、Skill、Prompt、MCP、平台能力、版本历史 | Agent 执行配置 |
 
 Copilot session 本身不作为业务状态源，而是由 context.json 保存的可恢复引用。
 
@@ -374,6 +374,7 @@ research
 skills
 systemPrompt
 MCP
+platform capabilities
 ~~~
 
 形成该 turn 的 execution configuration。
@@ -388,6 +389,16 @@ Next turn -> uses v11
 ~~~
 
 这是有意的。
+
+### Graphify 的可重放边界
+
+Graphify 不绕过 Control version。`control.json` 固定 `graphify-structural-analysis` 平台 capability version；turn audit 记录本次实际 Graphify package version、MCP command、graph.json path 和 graph SHA-256。Discovery run 也会保存当时的 Graphify runtime metadata。
+
+因此一个 turn 即使运行过程中通过 Skill 创建或更新 `graphify-out/graph.json`，也能区分“平台工具版本”和“实际读取的 graph 快照”。Graphify 结果只是结构导航，最终 Claim 仍必须回到 deterministic Evidence。
+
+### Graphify 与 Evidence
+
+本地目录 Discovery 为每个源文件创建 `source_file` Evidence。它记录文件路径、sha256、大小、行数和 mtime；Agent 可以先用 Graphify 定位文件，再使用源码读取工具检查具体内容。source_file Evidence 是 provenance anchor，不等同于“这段代码表达了某个业务事实”。
 
 不能允许一个 turn 执行到一半：
 
