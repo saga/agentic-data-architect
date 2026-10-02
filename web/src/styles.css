@@ -1060,3 +1060,161 @@ body {
   border-top: 1px solid #f0f0f0;
 }
 
+
+
+/* Full-screen interactive work map. React Flow provides the canvas; these styles keep it visually consistent with Ant Design. */
+.journey-map-modal .ant-modal {
+  max-width: calc(100vw - 24px);
+  padding-bottom: 0;
+}
+
+.journey-map-modal .ant-modal-content {
+  height: calc(100vh - 32px);
+}
+
+.journey-map-modal .ant-modal-body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.journey-map-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  background: #f7f9fc;
+}
+
+.journey-map-canvas .react-flow {
+  --xy-background-color: #f7f9fc;
+  --xy-node-border-radius: 12px;
+  --xy-edge-stroke-default: #d9d9d9;
+}
+
+.journey-flow-node {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.journey-flow-node-content {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+}
+
+.journey-flow-node-title {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.journey-flow-node-subtitle {
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.journey-flow-node-completed {
+  border-color: #b7eb8f;
+  background: #f6ffed;
+}
+
+.journey-flow-node-current {
+  border-color: #91caff;
+  background: #f0f7ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.07);
+}
+
+.journey-flow-node-locked {
+  opacity: 0.55;
+}
+
+.journey-flow-node-future {
+  border-color: #d6e4ff;
+}
+
+.journey-flow-node-route {
+  border-style: dashed;
+  border-color: #91caff;
+  background: #f8fbff;
+}
+
+.journey-flow-node-route-step {
+  border-color: #bae0ff;
+  background: rgba(248, 251, 255, 0.96);
+}
+
+.journey-flow-route-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.journey-flow-route-meta .ant-tag {
+  margin-inline-end: 0;
+  padding-inline: 5px;
+  color: #1677ff;
+  background: #e6f4ff;
+}
+
+.journey-flow-route-action {
+  height: auto;
+  padding: 0;
+}
+
+.journey-flow-edge {
+  stroke: #d9d9d9;
+  stroke-width: 1.5;
+}
+
+.journey-flow-edge-traversed {
+  stroke: #52c41a;
+  stroke-width: 2;
+}
+
+.journey-flow-edge-suggested {
+  stroke: #91caff;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.journey-map-legend {
+  margin: 12px;
+  padding: 8px 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.journey-map-legend .ant-typography {
+  font-size: 12px;
+}
+
+.journey-map-empty {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  min-height: 520px;
+  background: #f7f9fc;
+}
+
+@media (max-width: 680px) {
+  .journey-map-modal .ant-modal {
+    max-width: calc(100vw - 8px);
+    margin: 4px auto;
+  }
+
+  .journey-map-modal .ant-modal-content {
+    height: calc(100vh - 8px);
+  }
+
+  .journey-map-canvas,
+  .journey-map-empty {
+    min-height: 420px;
+  }
+}
