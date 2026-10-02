@@ -1487,6 +1487,17 @@ function AppInner() {
           routes={current?.context.journeyPlan?.routes ?? []}
           loading={loading}
           onChooseRoute={chooseRoute}
+          onAskStage={(stage) => {
+            void send(
+              [
+                `请继续推进工作地图中的“${stage.title}”。`,
+                `当前阶段目标：${stage.objective}`,
+                '',
+                '请直接判断最有价值的下一步；能自动检索、检查或分析的就直接执行。',
+                '完成后更新相关 Evidence / Unknown，并告诉我这一步查清了什么，以及下一步怎么走。',
+              ].join('\n'),
+            );
+          }}
         />
       </Modal>
       <Modal
