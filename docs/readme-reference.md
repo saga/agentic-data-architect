@@ -103,7 +103,7 @@ metadata:
   kind: workflow
 ~~~
 
-capability 是 Agent 可以自由组合的能力；workflow 是由 Journey 约束阶段、顺序、Gate 和完成条件的完整工作路线。当前 workflow 是 legacy-modernization、financial-ai-native-architecture、data-architecture-assessment；search-confluence、search-github、search-leanix、financial-data-review 等都是 capability。
+capability 是 Agent 可以自由组合的能力；workflow 是可选的、由 Journey 约束阶段、顺序、Gate 和完成条件的完整工作路线。当前可选 workflow 是 legacy-modernization、financial-ai-native-architecture、data-architecture-assessment；search-confluence、search-github、search-leanix、financial-data-review 等都是 capability。
 
 task 不是第三种 Skill 类型。复杂程度也不是分类标准。
 
