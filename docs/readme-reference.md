@@ -75,6 +75,7 @@ GET  /api/sessions/:name
 GET  /api/sessions/:name/messages?q=...
 POST /api/sessions/:name/messages
 POST /api/sessions/:name/messages/stream
+PATCH /api/sessions/:name/workflow
 POST /api/sessions/:name/messages/abort
 GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/modernization
