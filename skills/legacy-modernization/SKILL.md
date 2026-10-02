@@ -1,6 +1,6 @@
 ---
 name: legacy-modernization
-description: >
+description: 数据现代化工作路线：用有状态的 Markdown Workflow，把 Data Analyst 和 Data Architect 在 legacy modernization、replatform 和迁移中的工作组织成“当前关卡 → Evidence → Gate → 下一关”。
   Data Modernization Journey：用一条有状态的 Markdown Workflow，把 Data Analyst 和 Data Architect
   在 legacy modernization / replatform 中反复出现的工作组织成“当前关卡 → 证据 → Gate → 下一关”。
 metadata:
