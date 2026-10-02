@@ -4,6 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
 import { askCopilot, hasActiveCopilotTurn } from '../agent/copilot.js';
+import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
@@ -117,6 +118,7 @@ const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
     evidence: inv.evidence,
     currentState: snapshot?.currentState ?? null,
     semanticAssets: snapshot?.semanticAssets ?? [],
+    inventory: snapshot?.inventory ?? null,
   });
   // 历史对话只作为 conversation context，不提升成 Evidence，避免旧模型回答污染当前事实来源。
 const priorConversation = searchConversation(investigationName, question, {
@@ -158,6 +160,15 @@ const prompt = buildQuestionPrompt({
     // The prompt and configuration snapshot are fixed for this turn; later
     // UI changes apply only to the next turn.
     // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
+  const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
+  await appendAuditEvent(investigationName, {
+    actor: 'system',
+    action: 'investigation.graphify.runtime.started',
+    summary: 'Captured Graphify runtime metadata before Agent execution.',
+    configurationVersion: control.version,
+    details: { runtime: graphifyBefore, platformCapabilities: control.agent.platformCapabilities },
+  });
+
 const raw = await askCopilot({
     prompt,
     systemPrompt: [
@@ -178,6 +189,7 @@ const raw = await askCopilot({
     },
     workingDirectory: workspaceRoot(inv.name),
     skills: control.agent.skills.map((item) => item.name),
+    platformCapabilities: control.agent.platformCapabilities,
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
     ...(onStatus ? { onStatus } : {}),
@@ -185,6 +197,15 @@ const raw = await askCopilot({
     shouldAbort: () => abortRequestedTurns.has(turnId),
   });
   if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
+
+  const graphifyAfter = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
+  await appendAuditEvent(investigationName, {
+    actor: 'system',
+    action: 'investigation.graphify.runtime.completed',
+    summary: 'Captured Graphify runtime and graph hash after Agent execution.',
+    configurationVersion: control.version,
+    details: { runtime: graphifyAfter, platformCapabilities: control.agent.platformCapabilities },
+  });
 
   // Once the model has returned, move into a non-cancelable commit phase.
   // This prevents a Stop request from leaving context state and conversation
@@ -196,7 +217,7 @@ activeAfterExecution.phase = 'committing';
   }
   abortRequestedTurns.delete(turnId);
 
-  const parsed = parseAgentAnswer(raw, existingIds);
+  const parsed = parseAgentAnswer(raw, existingEvidence);
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
   if (!inv.questions.includes(question)) inv.questions.push(question);
