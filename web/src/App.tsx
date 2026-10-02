@@ -131,6 +131,19 @@ interface SessionContext {
   unknowns: string[];
   claims: unknown[];
   inputs: WorkspaceInput[];
+  /** 最近一次 Agent 根据用户动作与证据重新规划的可选路线。 */
+  journeyPlan?: {
+    version: number;
+    source: 'agent';
+    generatedAt: string;
+    turnId?: string;
+    routes: Array<{
+      id: string;
+      title: string;
+      reason: string;
+      steps: string[];
+    }>;
+  };
   updatedAt: string;
 }
 
