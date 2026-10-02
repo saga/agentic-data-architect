@@ -1196,8 +1196,40 @@ body {
 
 .journey-flow-node-content {
   display: grid;
-  gap: 5px;
-  padding: 13px 14px;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.journey-flow-node-status {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 600;
+  background: #f5f5f5;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.journey-flow-node-status-completed {
+  background: #f6ffed;
+  color: #389e0d;
+}
+
+.journey-flow-node-status-current {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.journey-flow-node-status-future {
+  background: #fafafa;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.journey-flow-node-status-locked {
+  background: #f5f5f5;
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .journey-flow-node-title {
