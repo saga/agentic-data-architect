@@ -49,18 +49,31 @@ export type ArchitectureAssessmentPlan = z.infer<typeof ArchitectureAssessmentPl
 
 const planFile = (name: string): string => path.join(reportsDir(name), 'architecture-assessment.json');
 
-function recommendationForFinding(type: string): string {
-  switch (type) {
-    case 'multiple_sources_of_truth': return '确认关键业务数据的权威来源和 owner，并减少重复维护的来源。';
-    case 'duplicate_transformation': return '合并重复转换逻辑，把业务规则放到明确且可测试的层。';
-    case 'identifier_fragmentation': return '统一关键业务标识和映射规则，明确跨系统 identifier ownership。';
-    case 'missing_lineage': return '补关键数据的端到端 lineage，并优先覆盖真正影响业务/风险的数据。';
-    case 'semantic_conflict': return '确认冲突的业务定义，形成清晰的 glossary / semantic contract，并保留来源。';
-    case 'possible_stale_documentation': return '用实际代码、运行结果和最新资料重新确认文档，不把旧文档当作事实。';
-    case 'data_quality_issue': return '把质量规则和阈值落到数据源/转换链，并明确异常处理和监控。';
-    case 'temporal_risk': return '明确有效时间、观察时间和数据时点要求，避免把事后知识带入历史分析。';
-    default: return '补足证据并确认影响范围，再决定是否需要架构调整。';
-  }
+interface FindingRecommendationRule {
+  id: string;
+  version: number;
+  enabled: boolean;
+  type: string;
+  recommendation: string;
+}
+
+interface FindingRecommendationRulesFile {
+  schemaVersion: number;
+  rules: FindingRecommendationRule[];
+}
+
+/** 从可审查的 JSON 规则表读取 Finding → Recommendation 映射。 */
+async function loadFindingRecommendationRules(): Promise<FindingRecommendationRulesFile> {
+  const file = path.join(process.cwd(), 'config', 'rules', 'assessment-finding-recommendations.json');
+  const raw = JSON.parse(await fs.readFile(file, 'utf8')) as FindingRecommendationRulesFile;
+  if (raw.schemaVersion !== 1 || !Array.isArray(raw.rules)) throw new Error('Finding recommendation rules 配置不正确。');
+  return raw;
+}
+
+function recommendationForFinding(type: string, rules: FindingRecommendationRule[]): string {
+  return rules.find((rule) => rule.enabled && rule.type === type)?.recommendation
+    ?? rules.find((rule) => rule.enabled && rule.type === '*')?.recommendation
+    ?? '补足证据并确认影响范围，再决定是否需要架构调整。';
 }
 
 function dedupe(values: string[]): string[] { return [...new Set(values.filter(Boolean))]; }
@@ -72,10 +85,11 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
   const timestamp = new Date().toISOString();
+  const recommendationRules = (await loadFindingRecommendationRules()).rules;
 
   const findings = inv.findings.slice(0, 50).map((finding) => ({
     id: finding.id, title: finding.title, severity: finding.severity, description: finding.description,
-    recommendation: recommendationForFinding(finding.type), evidenceIds: finding.evidenceIds,
+    recommendation: recommendationForFinding(finding.type, recommendationRules), evidenceIds: finding.evidenceIds,
   }));
 
   // deterministic gap analyzer 可能先发现问题、但还没有落成 Finding；这里把它标成待确认项。
