@@ -22,6 +22,7 @@ import {
 import type { UploadFile } from 'antd';
 import {
   FolderOpenOutlined,
+  FullscreenOutlined,
   GithubOutlined,
   HistoryOutlined,
   LoadingOutlined,
@@ -42,6 +43,7 @@ import {
   XProvider,
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
+import { JourneyMap } from './components/JourneyMap';
 import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
