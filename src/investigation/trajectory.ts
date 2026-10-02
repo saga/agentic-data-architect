@@ -40,6 +40,55 @@ export const TrajectorySummarySchema = z.object({
 }).strict();
 export type TrajectorySummary = z.infer<typeof TrajectorySummarySchema>;
 
+export interface TrajectoryTurnSummary {
+  turnId: string;
+  summary: TrajectorySummary;
+  userQuestion?: string;
+  modelCalls: number;
+  toolCalls: number;
+  failedEvents: number;
+  compactions: number;
+}
+
+export function summarizeTrajectoryTurns(events: TrajectoryEvent[]): TrajectoryTurnSummary[] {
+  const groups = new Map<string, TrajectoryEvent[]>();
+  for (const event of events) {
+    const group = groups.get(event.turnId) ?? [];
+    group.push(event);
+    groups.set(event.turnId, group);
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => a[0]!.timestamp.localeCompare(b[0]!.timestamp))
+    .map((turnEvents) => {
+      const userEvent = turnEvents.find((event) => event.type === 'user_input');
+      const turnEnd = [...turnEvents].reverse().find((event) => event.type === 'turn_end');
+      const turnUsage = turnEnd?.details.turnUsage;
+      const usageObject = turnUsage && typeof turnUsage === 'object'
+        ? turnUsage as Record<string, unknown>
+        : undefined;
+      const summary = summarizeTrajectory(turnEvents, usageObject);
+      return {
+        turnId: turnEvents[0]!.turnId,
+        summary: summary ?? TrajectorySummarySchema.parse({
+          turnId: turnEvents[0]!.turnId,
+          startedAt: turnEvents[0]!.timestamp,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          eventCount: turnEvents.length,
+        }),
+        ...(typeof userEvent?.details.question === 'string'
+          ? { userQuestion: userEvent.details.question }
+          : {}),
+        modelCalls: turnEvents.filter((event) => event.type === 'model_call').length,
+        toolCalls: turnEvents.filter((event) => event.type === 'tool_call').length,
+        failedEvents: turnEvents.filter((event) => event.status === 'failed').length,
+        compactions: turnEvents.filter((event) => event.type === 'compaction').length,
+      };
+    });
+}
+
 function trajectoryFile(name: string): string {
   return path.join(workspaceRoot(name), 'trajectory.jsonl');
 }
