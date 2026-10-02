@@ -210,8 +210,8 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
       LEAD_SYSTEM_PROMPT,
       skillParameters ? '本次已配置的技能运行参数（只在对应 Skill 明确使用时生效）：\n' + skillParameters : '',
       inv.workflow
-        ? 'Selected work playbook: ' + inv.workflow + '. Treat its Markdown Workflow as a reference map, not a mandatory sequence. The user may choose another path, skip suggested stages, pursue a different question, or change direction; use judgment within stages and replan when new evidence or user actions change the most useful route.'
-        : 'No fixed work playbook is selected. Drive the investigation autonomously from the goal, evidence, unknowns and the most useful next action. You may propose adopting a playbook later, but do not assume one.',
+        ? '当前工作方式：' + inv.workflow + '。把其中的 Markdown Workflow 当作参考地图，不是强制顺序。用户可以跳过阶段、改查别的问题或改变方向；当新证据或用户动作改变最有价值的路线时重新规划。'
+        : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
       knowledgeText,
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
@@ -231,6 +231,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
     ...(onStatus ? { onStatus } : {}),
+    onTrajectory: recordTrajectory,
     turnId,
     shouldAbort: () => abortRequestedTurns.has(turnId),
   });
@@ -302,6 +303,18 @@ activeAfterExecution.phase = 'committing';
     followUpQuestions: parsed.followUpQuestions,
     routeOptions: parsed.routeOptions,
   };
+  recordTrajectory({
+    type: 'status',
+    name: '结果已保存',
+    status: 'completed',
+    details: {
+      claimCount: claims.length,
+      unknownCount: parsed.unknowns.length,
+      routeCount: parsed.routeOptions.length,
+      followUpCount: parsed.followUpQuestions.length,
+    },
+  });
+  await trajectoryWrite;
   // durable turn 最后才标记 completed，保证数据库状态代表已经真正写完结果。
 finishConversationTurn(turnId, 'completed', JSON.stringify(result));
   return result;
