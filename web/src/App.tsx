@@ -1783,7 +1783,10 @@ function AppInner() {
                                 : workflowTarget === current?.context.workflow) ||
                               workflowConfirmText.trim() !== '我确认调整工作方式'
                             }
-                            onClick={() => void changeWorkflow(workflowTarget === '' ? null : workflowTarget)}
+                            onClick={() => {
+                              if (workflowTarget === undefined) return;
+                              void changeWorkflow(workflowTarget === '' ? null : workflowTarget);
+                            }}
                           >
                             确认调整工作方式
                           </Button>
