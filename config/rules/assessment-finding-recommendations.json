@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "multiple-sources-of-truth",
+      "version": 1,
+      "enabled": true,
+      "type": "multiple_sources_of_truth",
+      "recommendation": "确认关键业务数据的权威来源和 owner，并减少重复维护的来源。"
+    },
+    {
+      "id": "duplicate-transformation",
+      "version": 1,
+      "enabled": true,
+      "type": "duplicate_transformation",
+      "recommendation": "合并重复转换逻辑，把业务规则放到明确且可测试的层。"
+    },
+    {
+      "id": "identifier-fragmentation",
+      "version": 1,
+      "enabled": true,
+      "type": "identifier_fragmentation",
+      "recommendation": "统一关键业务标识和映射规则，明确跨系统 identifier ownership。"
+    },
+    {
+      "id": "missing-lineage",
+      "version": 1,
+      "enabled": true,
+      "type": "missing_lineage",
+      "recommendation": "补关键数据的端到端 lineage，并优先覆盖真正影响业务/风险的数据。"
+    },
+    {
+      "id": "semantic-conflict",
+      "version": 1,
+      "enabled": true,
+      "type": "semantic_conflict",
+      "recommendation": "确认冲突的业务定义，形成清晰的 glossary / semantic contract，并保留来源。"
+    },
+    {
+      "id": "possible-stale-documentation",
+      "version": 1,
+      "enabled": true,
+      "type": "possible_stale_documentation",
+      "recommendation": "用实际代码、运行结果和最新资料重新确认文档，不把旧文档当作事实。"
+    },
+    {
+      "id": "data-quality-issue",
+      "version": 1,
+      "enabled": true,
+      "type": "data_quality_issue",
+      "recommendation": "把质量规则和阈值落到数据源/转换链，并明确异常处理和监控。"
+    },
+    {
+      "id": "temporal-risk",
+      "version": 1,
+      "enabled": true,
+      "type": "temporal_risk",
+      "recommendation": "明确有效时间、观察时间和数据时点要求，避免把事后知识带入历史分析。"
+    },
+    {
+      "id": "default",
+      "version": 1,
+      "enabled": true,
+      "type": "*",
+      "recommendation": "补足证据并确认影响范围，再决定是否需要架构调整。"
+    }
+  ]
+}
