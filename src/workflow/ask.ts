@@ -160,6 +160,12 @@ const prompt = buildQuestionPrompt({
     // The prompt and configuration snapshot are fixed for this turn; later
     // UI changes apply only to the next turn.
     // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
+  // Workflow is a work mode, not a user-configurable capability. In the selected mode load only that workflow Skill; in autonomous mode load none.
+  const selectedSkills = [...new Set([
+    ...control.agent.skills.map((item) => item.name),
+    ...(inv.workflow ? [inv.workflow] : []),
+  ])];
+
   const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
   await appendAuditEvent(investigationName, {
     actor: 'system',
@@ -190,7 +196,7 @@ const raw = await askCopilot({
       inv.copilotConfigurationVersion = control.version;
     },
     workingDirectory: workspaceRoot(inv.name),
-    skills: control.agent.skills.map((item) => item.name),
+    skills: selectedSkills,
     platformCapabilities: control.agent.platformCapabilities,
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
