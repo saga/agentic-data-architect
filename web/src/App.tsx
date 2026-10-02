@@ -1072,6 +1072,8 @@ function AppInner() {
       setCurrent((existing) => existing ? { ...existing, control: result.control } : existing);
       setDraft(result.control);
       setMcpDraft(JSON.stringify(result.control.agent.mcpServers, null, 2));
+      setWorkflowTarget(undefined);
+      setWorkflowConfirmText('');
       setSettingsOpen(false);
       await loadSession(active);
       toast.success(`配置已保存为 v${result.control.version}`);
@@ -1700,7 +1702,11 @@ function AppInner() {
         open={settingsOpen}
         width={1000}
         centered
-        onCancel={() => setSettingsOpen(false)}
+        onCancel={() => {
+          setWorkflowTarget(undefined);
+          setWorkflowConfirmText('');
+          setSettingsOpen(false);
+        }}
         onOk={saveSettings}
         okText="保存修改"
         destroyOnHidden
