@@ -8,7 +8,7 @@ import { CopilotClient, ToolSet } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
-import { buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
+import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -27,9 +27,10 @@ const WORKBENCH_TOOLS = new ToolSet()
 /** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
-  // Graphify 是 structural-analysis capability；把项目 .venv/bin 放进 PATH，
+  // Graphify 是平台级 structural-analysis capability；把项目 .venv/bin 放进 PATH，
   // 这样 Skill 中的 graphify 命令与 MCP 使用的是同一份依赖。
   prepareGraphifyEnvironment();
+  assertGraphifyRuntimeAvailable();
   if (starting) return starting;
   starting = (async () => {
     // empty 模式不会再默认把 Copilot 状态写到用户家目录。
@@ -79,6 +80,8 @@ export interface AskInput {
   model?: string;
   skills?: string[];
   skillDirectories?: string[];
+  /** Platform capabilities are fixed by the Control snapshot for this turn. */
+  platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
   onStatus?: (status: string) => void;
@@ -148,14 +151,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
   const availableSkillNames = await listSkillNames();
-  const selectedSkillNames = new Set([
-    ...(input.skills ?? config.copilotSkills),
-    ...(config.graphifyEnabled ? ['structural-analysis'] : []),
-  ]);
+  const selectedSkillNames = new Set(input.skills ?? config.copilotSkills);
   const disabledSkills = availableSkillNames.filter((name) => !selectedSkillNames.has(name));
 
   const workingDirectory = input.workingDirectory ?? process.cwd();
-  const graphifyMcp = buildGraphifyMcpServer(workingDirectory);
+  const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
+  const graphifyEnabled = graphifyCapability ? graphifyCapability.enabled : config.graphifyEnabled;
+  const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const mcpServers = {
     ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
