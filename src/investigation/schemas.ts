@@ -138,6 +138,27 @@ export const ControlResearchSchema = z.object({
 export type ControlResearch = z.infer<typeof ControlResearchSchema>;
 
 /** Agent 侧 configuration 的持久化 Schema，包括 system prompt、Skills 和 MCP。 */
+/** 平台内置能力的固定配置；用户不能通过 Investigation Agent 配置关闭它，但每个 turn 会记录版本。 */
+export const PlatformCapabilitySettingSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().positive(),
+  enabled: z.boolean(),
+}).strict();
+export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySettingSchema>;
+
+/** Graphify 本轮运行环境快照，记录实际使用的工具和 graph 指纹。 */
+export const GraphifyRunMetadataSchema = z.object({
+  enabled: z.boolean(),
+  status: z.enum(['available', 'missing', 'disabled']),
+  command: z.string().optional(),
+  packageVersion: z.string().optional(),
+  graphPath: z.string().optional(),
+  graphHash: z.string().optional(),
+  extractionMode: z.string().optional(),
+  capturedAt: z.string().min(1),
+}).strict();
+export type GraphifyRunMetadata = z.infer<typeof GraphifyRunMetadataSchema>;
+
 export const ControlAgentSchema = z.object({
   systemPrompt: z.object({
     version: z.number().int().positive(),
@@ -145,6 +166,7 @@ export const ControlAgentSchema = z.object({
   }).strict(),
   skills: z.array(SkillSettingSchema),
   mcpServers: z.array(McpServerSettingSchema),
+  platformCapabilities: z.array(PlatformCapabilitySettingSchema).default([]),
 }).strict();
 export type ControlAgent = z.infer<typeof ControlAgentSchema>;
 
