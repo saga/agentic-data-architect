@@ -182,7 +182,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
       schemaVersion: 3,
       name,
       userPrompt: seed.userPrompt ?? seed.goal ?? '',
-      workflow: seed.workflow ?? 'legacy-modernization',
+      workflow: seed.workflow ?? null,
       goal: seed.goal ?? '',
       scope: seed.scope ?? [],
       systems: seed.systems ?? [],
