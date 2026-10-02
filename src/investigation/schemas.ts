@@ -145,6 +145,8 @@ export const SkillSettingSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
   sourceHash: z.string().optional(),
+  /** 本次 Investigation 传给该 Skill 的运行参数；Skill 不声明参数时可以为空。 */
+  parameters: z.record(z.string(), z.unknown()).default({}),
 }).strict();
 export type SkillSetting = z.infer<typeof SkillSettingSchema>;
 
