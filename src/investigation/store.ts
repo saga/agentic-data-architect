@@ -64,7 +64,8 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   return withWorkspaceContextLock(inv.name, async () => {
     await ensureWorkspace(inv.name, {
       userPrompt: inv.userPrompt,
-      workflow: inv.workflow,
+      // Workflow 由独立更新 API 管理；这里必须保留 save 前最新值，避免旧 Agent turn 覆盖用户刚切换的路线。
+      workflow: current.workflow,
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
