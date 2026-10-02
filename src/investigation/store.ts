@@ -199,6 +199,7 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     name,
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
     // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；新建 Investigation 明确使用 null。
+    workflow: raw.workflow ?? 'legacy-modernization',
     goal: raw.goal ?? '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
@@ -215,7 +216,11 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     unknowns: raw.unknowns ?? [],
     importantInformation: raw.importantInformation ?? [],
     inputs: raw.inputs ?? [],
+    ...(raw.journeyPlan ? { journeyPlan: raw.journeyPlan } : {}),
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
+    ...(typeof raw.copilotConfigurationVersion === 'number'
+      ? { copilotConfigurationVersion: raw.copilotConfigurationVersion }
+      : {}),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   });
 }
