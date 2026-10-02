@@ -1,6 +1,6 @@
 # agentic-data-architect
 
-面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前包含三类固定工作路线：改造已有系统、从零设计金融 AI / 数据架构、评估现有数据架构。
+面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前提供三套可选工作路线：改造已有系统、从零设计金融 AI / 数据架构、评估现有数据架构。
 
 它不是一个单纯的 Chat，而是围绕 modernization 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping，并为迁移和验证留下 Evidence。
 
