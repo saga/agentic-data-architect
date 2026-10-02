@@ -4,7 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键边界，方便后续维护。
  */
 import * as z from 'zod';
-import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus } from '../evidence/types.js';
+import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
 
 /**
  * 结构化 Agent 结果：
@@ -49,7 +49,7 @@ function extractJson(raw: string): string {
 }
 
 /** 解析并校验模型答案，再删除不存在的 Evidence 引用并重新校正 Claim 状态。 */
-export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedAnswer {
+export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Map<string, EvidenceRef>): ParsedAnswer {
   const warnings: string[] = [];
   const droppedEvidenceRefs: string[] = [];
   let data: unknown;
@@ -81,14 +81,15 @@ export function parseAgentAnswer(raw: string, existingIds: Set<string>): ParsedA
   const claims: AgentClaimDraft[] = [];
   for (const draft of parsed.data.claims) {
     const kept = draft.evidenceIds.filter((id) => {
-      if (existingIds.has(id)) return true;
+      if ((existingEvidence instanceof Set ? existingEvidence.has(id) : existingEvidence.has(id))) return true;
       droppedEvidenceRefs.push(id);
       return false;
     });
     if (kept.length < draft.evidenceIds.length) {
       warnings.push(`回答引用了不存在的 Evidence，系统已删除 ${draft.evidenceIds.length - kept.length} 个无效引用。`);
     }
-    const status: ClaimStatus = calibrateStatus(kept.length, draft.status);
+    const keptEvidence = kept.map((id) => existingEvidence instanceof Set ? undefined : existingEvidence.get(id)).filter((item): item is EvidenceRef => Boolean(item));
+    const status: ClaimStatus = calibrateStatus(existingEvidence instanceof Set ? kept.length : keptEvidence, draft.status);
     claims.push({ claim: draft.claim.slice(0, 2000), status, evidenceIds: kept });
   }
 
