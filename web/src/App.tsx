@@ -564,7 +564,8 @@ function AppInner() {
   const [newSessionGoal, setNewSessionGoal] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
   // null = 尚未选择；'autonomous' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
-  const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | 'autonomous' | null>(null);
+  // undefined = 尚未选择；'' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
+  const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | '' | undefined>(undefined);
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
@@ -1702,14 +1703,18 @@ function AppInner() {
         onCancel={() => setSettingsOpen(false)}
         onOk={saveSettings}
         okText="保存修改"
-        destroyOnClose
+        destroyOnHidden
         styles={{
-          content: {
+          container: {
             height: 'min(840px, calc(100vh - 48px))',
             maxHeight: 'calc(100vh - 48px)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+          },
+          header: {
+            flex: '0 0 auto',
+            margin: 0,
           },
           body: {
             flex: '1 1 auto',
@@ -1717,6 +1722,9 @@ function AppInner() {
             padding: 0,
             overflow: 'hidden',
             display: 'flex',
+          },
+          footer: {
+            flex: '0 0 auto',
           },
         }}
       >
@@ -1727,6 +1735,7 @@ function AppInner() {
             activeKey={settingsTab}
             onChange={setSettingsTab}
             className="settings-tabs"
+            animated={false}
             items={[
               {
                 key: 'workflow',
@@ -1747,12 +1756,12 @@ function AppInner() {
                         <div>
                           <div className="field-label">调整为</div>
                           <Select
-                            value={workflowTarget ?? '__unset__'}
+                            value={workflowTarget}
                             style={{ width: '100%' }}
                             options={workflowOptions
                               .filter((option) => option.value !== (current?.context.workflow ?? ''))
-                              .map((option) => ({ value: option.value || 'autonomous', label: option.label }))}
-                            onChange={(value) => setWorkflowTarget(value === '__unset__' ? null : value as WorkflowId | 'autonomous')}
+                              .map((option) => ({ value: option.value, label: option.label }))}
+                            onChange={(value) => setWorkflowTarget(value as WorkflowId | '')}
                             placeholder="选择新的工作方式"
                           />
                         </div>
@@ -1768,13 +1777,13 @@ function AppInner() {
                             loading={workflowSaving}
                             disabled={
                               !active ||
-                              workflowTarget === null ||
-                              (workflowTarget === 'autonomous'
+                              workflowTarget === undefined ||
+                              (workflowTarget === ''
                                 ? current?.context.workflow === null
                                 : workflowTarget === current?.context.workflow) ||
                               workflowConfirmText.trim() !== '我确认调整工作方式'
                             }
-                            onClick={() => void changeWorkflow(workflowTarget === 'autonomous' ? null : workflowTarget)}
+                            onClick={() => void changeWorkflow(workflowTarget === '' ? null : workflowTarget)}
                           >
                             确认调整工作方式
                           </Button>
