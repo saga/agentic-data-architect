@@ -25,6 +25,8 @@ function controlFile(name: string): string {
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
 const controlInitLocks = new Map<string, Promise<void>>();
+const WORKFLOW_SKILL_NAMES = new Set(['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment']);
+
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
@@ -131,7 +133,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
         version: 1,
         content: '',
       },
-      skills: config.copilotSkills.map((name) => ({ name, version: 1 })),
+      skills: config.copilotSkills.filter((name) => !WORKFLOW_SKILL_NAMES.has(name)).map((name) => ({ name, version: 1 })),
       mcpServers: [],
     },
   };
@@ -208,7 +210,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
                 ? { sourceHash: (item as { sourceHash: string }).sourceHash }
                 : {}),
             }))
-            .filter((item) => item.name)
+            .filter((item) => item.name && !WORKFLOW_SKILL_NAMES.has(item.name))
         : defaults.agent.skills,
       mcpServers: normalizeMcpServers(agent.mcpServers),
     },
