@@ -82,7 +82,7 @@ readline 形式不适合作为长期 Data Investigation 工作台。真实使用
 
 没有再引入一个独立 chat framework。直接使用 Ant Design X 原子组件；Markdown 使用官方 `@ant-design/x-markdown`，Mermaid 使用 Ant Design X 的 `Mermaid` 组件。
 
-当前消息 API 仍是一次请求返回最终答案，先保持后端 Agent result / evidence 逻辑不变；Copilot delta callback 已预留，后续可以直接接 Ant Design X streaming。
+当前 Web UI 使用 `/messages/stream` + SSE，把 Copilot delta/status 作为实时 UI 状态输出；Agent result / Evidence 仍在 workflow commit 阶段一次性持久化。
 
 ---
 ## 2026-09-30 — Interactive Investigation Session 与 Workspace 收敛
