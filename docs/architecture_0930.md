@@ -156,6 +156,51 @@ Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Arc
 
 右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区，避免被窄侧栏弱化。全屏工作地图展示 Workflow 主线、当前节点、已完成路径和 Agent 建议分支；选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。当前节点还可以通过 NodeToolbar 直接要求 Agent 围绕该阶段继续。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
 
+## Agent Trajectory / 执行轨迹
+
+Investigation 现在持久化 Agent 执行轨迹到 `.workspace/<session>/trajectory.jsonl`。
+
+轨迹只记录可展示、可审查的运行事件，不保存模型隐式思维链正文：
+
+```text
+用户问题
+  ↓
+Agent turn
+  ├─ intent
+  ├─ model call / usage
+  ├─ tool call
+  ├─ tool result
+  ├─ permission
+  ├─ context compaction
+  └─ final turn
+```
+
+UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查轨迹，展示 Token、模型、工具调用、上下文占用以及 Copilot SDK 的 AI credit / Premium Request Cost。
+
+成本口径遵循 Copilot SDK：`assistant.usage` 是单次模型调用的 token 与 Premium Request Cost multiplier；`session.usage.getMetrics` 是整个 session 累计 AI credit 与 token。这里的 cost 不是货币金额。SDK 还提供 per-model usage breakdown，因此后续可以按模型拆分成本。
+
+这套 UI 结构参考 LangSmith 的 trace tree / token-cost breakdown，以及 DeepSeek 的“模型 → tool call → tool result → 后续模型调用”执行链；不展示 reasoning / chain-of-thought 正文。
+
+## Investigation Configuration Page / 配置页
+
+调查配置已经从 Modal 改为独立路由：
+
+```text
+/investigations/:name/config
+```
+
+配置页包含：
+
+- 研究范围
+- 技能与指导
+- MCP
+- 工作方式
+- 版本历史
+
+Skill 可以保存本次 Investigation 的运行参数。MCP 可以配置连接方式、URL / command、args、允许使用的 tools 和 headers。MCP 工具每次真正执行时的 input 仍由 Agent 根据任务决定，不作为静态配置。
+
+工作方式属于危险操作：目标路线可以选择，但只有明确输入确认语句后才真正切换。
+
 ## Memory / Rule / State 边界
 
 当前代码检查发现三类逻辑值得进一步公共化，但职责必须分开：
