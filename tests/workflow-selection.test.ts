@@ -36,9 +36,14 @@ test('workflow can be changed without replacing investigation state', async () =
   assert.equal(assessment.copilotSessionId, undefined);
   assert.equal(assessment.copilotConfigurationVersion, undefined);
 
+  const staleAgentSnapshot = await loadInvestigation('switchable');
   const autonomous = await updateInvestigationWorkflow('switchable', null);
   assert.equal(autonomous.workflow, null);
   assert.equal(autonomous.goal, 'Find the source of Position');
+
+  // A stale Agent turn must not restore the old workflow when it saves its state.
+  staleAgentSnapshot.importantInformation.push('agent completed a turn');
+  await saveInvestigation(staleAgentSnapshot);
 
   const reloaded = await loadInvestigation('switchable');
   assert.equal(reloaded.workflow, null);
