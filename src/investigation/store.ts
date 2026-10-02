@@ -198,8 +198,8 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
-    // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；新建 Investigation 明确使用 null。
-    workflow: raw.workflow ?? 'legacy-modernization',
+    // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；显式 null 表示自主调查。
+    workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
     goal: raw.goal ?? '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
