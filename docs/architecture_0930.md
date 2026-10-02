@@ -1,4 +1,4 @@
-# 当前实现状态（V1.4）
+# 当前实现状态（V1.5）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -15,6 +15,8 @@ V1.2 增加 Current-State Intelligence：canonical asset types、parse coverage�
 V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization Workbench：增加 Analysis Case、Target Architecture、Source-to-Target Mapping、Architecture Decision、Gap Analysis 和 Modernization Plan。它们先作为轻量、可验证的工作产物存在，不引入重量级 workflow engine。
 
 V1.4 增加 Structural Analysis：Graphify 作为平台级 structural-analysis capability 运行，平台能力配置随 Control version 固定并进入 audit；Graphify graph.json 记录运行时 hash/version，source_file Evidence 把 Graphify 的结构导航结果重新接回本 Investigation 的 deterministic provenance。Graphify 不直接产生 Claim Evidence，supported 仍要求独立来源。
+
+V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工作导航：主对话区显示 Agent 根据最近一次行动、Evidence、Unknowns 生成的 0～3 条可选路线；全屏工作地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges 展示 Workflow 主线与 Agent 分支。主线位置由当前 Journey 状态决定，当前节点可直接让 Agent 继续推进；地图是只读导航视图，不允许用户编辑流程，也不引入第二套 workflow engine。
 
 后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
 
@@ -86,6 +88,8 @@ Data Architecture Assessment
 
 三条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；每轮还可以根据用户动作和最新证据生成 0～3 条动态路线。用户可以选其中一条、跳到别的问题、组合路线，或者完全不按地图走。
 
+当前 UI 不提供首页上的普通 Workflow 下拉切换。工作方式属于 Investigation 的重要持久化状态：只有在“调查配置 → 工作方式”的明确调整区选择目标、输入确认语句后才执行切换。这样可以保持工作方式灵活，但避免一次误点击就改变本次调查的导航语义。
+
 Financial AI-Native Architecture 的 Skill 重点覆盖：
 
 - Portfolio Research / Investment Analytics 业务范围
@@ -119,7 +123,7 @@ skills/data-architecture-assessment/SKILL.md
 
 运行时位于 `src/workflow/assessment.ts`。它复用已有 Current-State、Finding、Gap Analysis 和 Evidence，不重新做一套 discovery engine；生成的评估结果保存为 `reports/architecture-assessment.json`。
 
-右侧工作区使用同一个 Journey runtime 展示 Assessment 路线；评估结果里展示当前范围、主要问题、建议和实施顺序。
+右侧工作区用紧凑 Journey 导引展示 Assessment 路线；主对话区承载 Agent 动态建议；用户需要查看完整路线时打开全屏 React Flow 工作地图。评估结果里展示当前范围、主要问题、建议和实施顺序。
 
 ## Legacy Modernization Workflow
 
@@ -150,7 +154,7 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 
 Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
 
-右侧工作区展示当前地图的紧凑导引；同时显示 Agent 最近一次重新规划出的可选路线。选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
+右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区，避免被窄侧栏弱化。全屏工作地图展示 Workflow 主线、当前节点、已完成路径和 Agent 建议分支；选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。当前节点还可以通过 NodeToolbar 直接要求 Agent 围绕该阶段继续。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
 
 ## Skill / Core / Agent 边界
 
