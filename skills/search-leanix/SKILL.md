@@ -1,6 +1,6 @@
 ---
 name: search-leanix
-description: Research SAP LeanIX application facts, relationships, ownership, lifecycle, dependencies, and enterprise architecture evidence.
+description: 研究 SAP LeanIX 中的 Fact Sheet、应用关系、owner、生命周期、依赖和企业架构事实，用于补充当前架构调查。
 metadata:
   kind: capability
 ---
