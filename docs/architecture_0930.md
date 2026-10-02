@@ -123,7 +123,7 @@ skills/data-architecture-assessment/SKILL.md
 
 ## Legacy Modernization Workflow
 
-Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由一个 Markdown Workflow 定义固定的工作路线：
+Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由一个 Markdown Workflow 定义可选的固定高层路线；只有 Investigation 选择这套 playbook 时才启用 Journey：
 
 ```text
 接到任务
