@@ -477,6 +477,63 @@ function FollowUpCard(props: {
   );
 }
 
+function AgentRecommendationCard(props: {
+  routes: NonNullable<SessionContext['journeyPlan']>['routes'];
+  workflow: WorkflowId | null;
+  loading: boolean;
+  active: boolean;
+  onChooseRoute: (route: NonNullable<SessionContext['journeyPlan']>['routes'][number]) => void;
+  onOpenMap: () => void;
+  onUseDefault: () => void;
+}) {
+  const workflowLabel = workflowOptions.find((option) => option.value === (props.workflow ?? ''))?.label ?? '自主调查';
+  const hasRoutes = props.routes.length > 0;
+  return (
+    <Card className={'agent-recommendation-card' + (hasRoutes ? ' agent-recommendation-card-routes' : '')}>
+      <Flex justify="space-between" align="flex-start" gap={16} wrap>
+        <div className="agent-recommendation-head">
+          <div className="agent-recommendation-eyebrow">Agent 建议</div>
+          <Text strong className="agent-recommendation-title">
+            {hasRoutes ? '根据刚才的行动，下一步可以这样走' : '当前还没有锁定下一步，先给你一个可选起点'}
+          </Text>
+          <Text type="secondary" className="agent-recommendation-note">
+            {hasRoutes
+              ? '这些是导航建议，不是固定流程。你可以直接问别的问题，也可以让 Agent 随新证据重新规划。'
+              : props.workflow
+                ? '当前工作方式：' + workflowLabel + '。它提供一个参考骨架，不要求你按固定顺序执行。'
+                : '当前是自主调查，Agent 会根据你的目标、证据和新信息动态决定调查方向。'}
+          </Text>
+        </div>
+        <Button size="small" icon={<FullscreenOutlined />} onClick={props.onOpenMap} disabled={props.loading}>工作地图</Button>
+      </Flex>
+      {hasRoutes ? (
+        <div className="agent-recommendation-routes">
+          {props.routes.slice(0, 3).map((route, index) => (
+            <div className="agent-recommendation-route" key={route.id}>
+              <Flex justify="space-between" align="flex-start" gap={10}>
+                <div className="agent-recommendation-route-copy">
+                  <Text strong>{index + 1}. {route.title}</Text>
+                  <Text type="secondary">{route.reason}</Text>
+                </div>
+                <Button type="primary" ghost size="small" disabled={!props.active || props.loading} onClick={() => props.onChooseRoute(route)}>采用</Button>
+              </Flex>
+              <div className="agent-recommendation-route-steps">
+                {route.steps.slice(0, 4).map((step, stepIndex) => (
+                  <Text key={stepIndex} type="secondary">{stepIndex + 1}. {step}</Text>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Flex gap={8} wrap className="agent-recommendation-actions">
+          <Button type="primary" ghost size="small" disabled={!props.active || props.loading} onClick={props.onUseDefault}>采用这个起点</Button>
+          <Text type="secondary">也可以直接在下面输入你真正想解决的问题。</Text>
+        </Flex>
+      )}
+    </Card>
+  );
+}
 function AppInner() {
   const routeSession = () => {
     const match = window.location.pathname.match(/^\/investigations\/([^/]+)\/?$/);
@@ -506,6 +563,9 @@ function AppInner() {
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [workflowGuardOpen, setWorkflowGuardOpen] = useState(false);
+  const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | null>(null);
+  const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [error, setError] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('research');
@@ -920,6 +980,9 @@ function AppInner() {
       setAssessmentPlan(undefined);
       await loadSession(active);
       await reloadSessions(false);
+      setWorkflowGuardOpen(false);
+      setWorkflowTarget(null);
+      setWorkflowConfirmText('');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法调整工作方式');
     } finally {
@@ -1130,6 +1193,17 @@ function AppInner() {
 
         <Content className="chat-layout">
           <div className="chat-main">
+            {current ? (
+              <AgentRecommendationCard
+                routes={current.context.journeyPlan?.routes ?? []}
+                workflow={current.context.workflow}
+                loading={loading}
+                active={Boolean(active)}
+                onChooseRoute={chooseRoute}
+                onOpenMap={() => setJourneyMapOpen(true)}
+                onUseDefault={() => void send('请先帮我快速建立当前问题需要的事实基础，再根据查到的证据决定下一步；不要假定必须按照固定顺序执行。')}
+              />
+            ) : null}
             {bubbleItems.length ? (
               <Bubble.List
                 role={{
@@ -1264,27 +1338,17 @@ function AppInner() {
               </div>
 
               {current ? (
-                <section className="right-section">
-                  <div className="right-section-heading">
-                    <Text strong>工作方式</Text>
-                    <Select
-                      size="small"
-                      value={current.context.workflow ?? ''}
-                      loading={workflowSaving}
-                      disabled={workflowSaving || loading}
-                      onChange={(value) => {
-                        void changeWorkflow(value ? value as WorkflowId : null);
-                      }}
-                      options={workflowOptions.map((option) => ({
-                        value: option.value,
-                        label: option.label,
-                      }))}
-                      style={{ minWidth: 180 }}
-                    />
-                  </div>
+                <section className="right-section right-work-mode">
+                  <div className="right-section-heading"><Text strong>工作方式</Text></div>
+                  <Tag color={current.context.workflow ? 'blue' : undefined} bordered={false}>
+                    {workflowOptions.find((option) => option.value === (current.context.workflow ?? ''))?.label ?? '自主调查'}
+                  </Tag>
                   <Text type="secondary">
-                    自主调查不绑定固定路线；需要时可以随时采用一套工作路线，调查资料和 Evidence 都会保留。
+                    工作方式进入调查后不在首页随手切换。需要改变时，到调查设置里的“工作方式”执行一次明确的调整。
                   </Text>
+                  <Button type="link" size="small" onClick={() => { setSettingsTab('workflow'); setSettingsOpen(true); }}>
+                    打开工作方式设置
+                  </Button>
                 </section>
               ) : null}
 
@@ -1334,137 +1398,15 @@ function AppInner() {
                 </section>
               ) : null}
 
-              {current?.context.journeyPlan?.routes.length ? (
-                <section className="right-section right-route-options">
-                  <Flex className="right-section-heading" justify="space-between" align="center">
-                    <Text strong>可走路线</Text>
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<FullscreenOutlined />}
-                      disabled={loading}
-                      onClick={() => setJourneyMapOpen(true)}
-                    >
-                      看地图
-                    </Button>
-                  </Flex>
-                  <Text type="secondary">
-                    这是 Agent 根据最近一次行动、已有证据和当前目标重新规划的路线。可以选其中一条，也可以完全不按它走。
-                  </Text>
-                  <div className="route-option-list">
-                    {current.context.journeyPlan.routes.map((route) => (
-                      <div key={route.id} className="route-option">
-                        <Text strong>{route.title}</Text>
-                        <Text type="secondary">{route.reason}</Text>
-                        <div className="route-option-steps">
-                          {route.steps.map((step, index) => (
-                            <Text key={index} type="secondary">
-                              {index + 1}. {step}
-                            </Text>
-                          ))}
-                        </div>
-                        <Button
-                          type="link"
-                          size="small"
-                          disabled={!active || loading}
-                          onClick={() => chooseRoute(route)}
-                        >
-                          选择这条路线
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <section className="right-section right-guidance">
-                <div className="right-section-heading">
-                  <Text strong>Agent 建议</Text>
-                </div>
-                <Text type="secondary">
-                  这里是可选的导引，不是必须执行的步骤。你可以直接在下面提问，Agent 会根据目标、已有证据和新信息调整调查方向。
-                </Text>
-                <Button
-                  type="link"
-                  size="small"
-                  disabled={!active || loading}
-                  onClick={() => setValue('我想换一个方向：')}
-                >
-                  不按路线，自己选方向
-                </Button>
-
-                {current?.context.workflow === 'data-architecture-assessment' ? (
-                  <div className="right-guidance-card">
-                    <Text strong>当前路线建议：先建立评估所需的事实基础</Text>
-                    <Text type="secondary">
-                      通常先确认范围、目标和关键风险，再决定查哪些资产、数据流、治理和质量信息。也可以直接从一个具体问题开始。
-                    </Text>
-                    <Button
-                      type="link"
-                      size="small"
-                      disabled={!active || loading}
-                      onClick={() => void send('请先帮我明确这次评估最重要的目标、范围和交付物；然后根据这些信息决定下一步需要查什么。不要假定必须按照固定顺序执行。')}
-                    >
-                      采用这个建议
-                    </Button>
-                  </div>
-                ) : current?.context.workflow === 'financial-ai-native-architecture' ? (
-                  <div className="right-guidance-card">
-                    <Text strong>当前路线建议：先把真正要解决的问题说清楚</Text>
-                    <Text type="secondary">
-                      先确认用户、业务目标、关键场景和约束，再决定数据、业务语义和 Agent 怎么设计。也可以先问一个具体问题。
-                    </Text>
-                    <Button
-                      type="link"
-                      size="small"
-                      disabled={!active || loading}
-                      onClick={() => void send('请先帮我澄清这个设计要解决的业务问题、用户、关键场景和约束；然后再决定需要调查或设计什么。不要先假定固定架构。')}
-                    >
-                      采用这个建议
-                    </Button>
-                  </div>
-                ) : !current?.currentState ? (
-                  <div className="right-guidance-card">
-                    <Text strong>可以从这里开始，但不必从这里开始</Text>
-                    <Text type="secondary">
-                      当前还没有形成事实地图。一个常见的起点是先看数据、来源、转换和已有业务定义；也可以直接追一个具体问题，或者先上传资料。
-                    </Text>
-                    <Space size={4} wrap>
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={!active || loading}
-                        onClick={() => handleModernizationAction()}
-                      >
-                        建议：先查现状
-                      </Button>
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={loading}
-                        onClick={() => setValue('我想先解决一个具体问题：')}
-                      >
-                        直接提具体问题
-                      </Button>
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={loading}
-                        onClick={() => setAttachmentsOpen(true)}
-                      >
-                        先上传资料
-                      </Button>
-                    </Space>
-                  </div>
+              <section className="right-section right-current-state">
+                <div className="right-section-heading"><Text strong>当前事实</Text></div>
+                {!current?.currentState ? (
+                  <Text type="secondary">还没有形成完整的事实地图。主区会优先展示 Agent 建议，你也可以直接提出真正想解决的问题。</Text>
                 ) : (
                   <>
                     <div className="right-facts">
                       <span>数据集 {current.currentState.coverage.datasets}</span>
-                      <span>
-                        数据来路 {current.currentState.coverage.datasetLineageCoverage == null
-                          ? "未统计"
-                          : `${Math.round(current.currentState.coverage.datasetLineageCoverage * 100)}%`}
-                      </span>
+                      <span>数据来路 {current.currentState.coverage.datasetLineageCoverage == null ? '未统计' : Math.round(current.currentState.coverage.datasetLineageCoverage * 100) + '%'}</span>
                       <span>业务定义 {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}</span>
                       <span>待查 {current.context.unknowns.length}</span>
                     </div>
@@ -1473,41 +1415,56 @@ function AppInner() {
                         {modernizationPlan.gaps.slice(0, 2).map((gap) => (
                           <div key={gap.id} className="right-issue">
                             <Text strong ellipsis={{ tooltip: gap.title }}>{gap.title}</Text>
-                            <Text type="secondary" ellipsis={{ tooltip: gap.recommendation }}>
-                              {gap.recommendation}
-                            </Text>
-                            <Button
-                              className="gap-action"
-                              size="small"
-                              type="link"
-                              onClick={() => handleModernizationAction(gap)}
-                            >
-                              建议：{gap.kind === "semantic" ? "查业务定义" : gap.kind === "lineage" ? "查数据流" : "继续处理"}
-                            </Button>
+                            <Text type="secondary" ellipsis={{ tooltip: gap.recommendation }}>{gap.recommendation}</Text>
                           </div>
                         ))}
                       </div>
-                    ) : current.context.findings.length ? (
-                      <div className="right-issues">
-                        {current.context.findings.slice(0, 2).map((finding, index) => (
-                          <div key={finding.title ?? index} className="right-issue">
-                            <Text strong>{finding.title || "有一个问题还需要确认"}</Text>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <Text type="secondary">目前没有明显需要优先处理的问题。可以继续提问，也可以让 Agent 自己重新规划调查。</Text>
-                    )}
+                    ) : null}
                   </>
                 )}
               </section>
-
             </aside>
           </div>
         </Content>
       </Layout>
 
                   <Modal
+        title="调整工作方式"
+        open={workflowGuardOpen}
+        onCancel={() => {
+          if (!workflowSaving) {
+            setWorkflowGuardOpen(false);
+            setWorkflowTarget(null);
+            setWorkflowConfirmText('');
+          }
+        }}
+        footer={null}
+        width={620}
+        centered
+      >
+        <Card className="workflow-danger-zone" bordered={false}>
+          <Alert type="warning" showIcon message="这是一次明确的状态变更" description="不要把它当成普通下拉选择。只有在你的真实目标发生变化时才执行。" />
+          <div className="workflow-danger-grid">
+            <div>
+              <div className="field-label">当前</div>
+              <Tag bordered={false}>{workflowOptions.find((option) => option.value === (current?.context.workflow ?? ''))?.label ?? '自主调查'}</Tag>
+            </div>
+            <div>
+              <div className="field-label">调整为</div>
+              <Select value={workflowTarget ?? '__none__'} style={{ width: '100%' }} options={workflowOptions.filter((option) => option.value !== (current?.context.workflow ?? '')).map((option) => ({ value: option.value || '__none__', label: option.label }))} onChange={(value) => setWorkflowTarget(value === '__none__' ? null : value as WorkflowId)} placeholder="选择新的工作方式" />
+            </div>
+          </div>
+          <div className="workflow-confirm-block">
+            <div className="field-label">输入确认语句</div>
+            <Input value={workflowConfirmText} onChange={(event) => setWorkflowConfirmText(event.target.value)} placeholder="我确认调整工作方式" autoComplete="off" />
+          </div>
+          <Flex justify="flex-end" gap={8}>
+            <Button onClick={() => setWorkflowGuardOpen(false)} disabled={workflowSaving}>取消</Button>
+            <Button danger type="primary" loading={workflowSaving} disabled={!workflowTarget || workflowTarget === current?.context.workflow || workflowConfirmText.trim() !== '我确认调整工作方式'} onClick={() => void changeWorkflow(workflowTarget)}>确认调整</Button>
+          </Flex>
+        </Card>
+      </Modal>
+      <Modal
         className="journey-map-modal"
         title={
           <Flex align="center" gap={8}>
@@ -1739,7 +1696,44 @@ function AppInner() {
             activeKey={settingsTab}
             onChange={setSettingsTab}
             className="settings-tabs"
-            items={[
+            items={            items={[
+              {
+                key: 'workflow',
+                label: <span><SettingOutlined /> 工作方式</span>,
+                children: (
+                  <div className="settings-page">
+                    <div className="settings-page-header">
+                      <Title level={4}>工作方式</Title>
+                      <Paragraph type="secondary">工作方式是本次调查的导航骨架，不是普通筛选项。改变它会清除旧的 Agent 会话与动态路线建议，但会保留消息、Evidence、发现和调查资料。</Paragraph>
+                    </div>
+                    <Card className="settings-card workflow-danger-zone" title="危险区域">
+                      <Alert type="warning" showIcon message="不要为了试试看而切换" description="只有当你的真实目标已经发生变化，或者你明确决定采用另一套调查/设计方法时，才应该在这里调整。模糊表达不会自动触发切换。" />
+                      <div className="workflow-danger-grid">
+                        <div>
+                          <div className="field-label">当前工作方式</div>
+                          <Tag bordered={false}>{workflowOptions.find((option) => option.value === (current?.context.workflow ?? ''))?.label ?? '自主调查'}</Tag>
+                        </div>
+                        <div>
+                          <div className="field-label">调整为</div>
+                          <Select value={workflowTarget ?? '__none__'} style={{ width: '100%' }} options={workflowOptions.filter((option) => option.value !== (current?.context.workflow ?? '')).map((option) => ({ value: option.value || '__none__', label: option.label }))} onChange={(value) => setWorkflowTarget(value === '__none__' ? null : value as WorkflowId)} placeholder="选择新的工作方式" />
+                        </div>
+                      </div>
+                      <div className="workflow-confirm-block">
+                        <div className="field-label">确认这次调整</div>
+                        <Input value={workflowConfirmText} onChange={(event) => setWorkflowConfirmText(event.target.value)} placeholder="输入：我确认调整工作方式" />
+                        <Flex justify="space-between" align="center" gap={12} wrap>
+                          <Text type="secondary">不会删除调查资料，但 Agent 会从新的工作方式重新开始导航。</Text>
+                          <Button danger type="primary" loading={workflowSaving} disabled={!active || !workflowTarget || workflowTarget === current?.context.workflow || workflowConfirmText.trim() !== '我确认调整工作方式'} onClick={() => void changeWorkflow(workflowTarget)}>确认调整工作方式</Button>
+                        </Flex>
+                      </div>
+                    </Card>
+                    <Card className="settings-card" title="如何改变更自然">
+                      <Paragraph type="secondary">最自然的方式仍然是直接告诉 Agent 你的目标发生了什么变化。当前 Agent 只把明确的工作方式调整当作用户意图；不会因为一句模糊的“换个思路”就替你修改调查状态。</Paragraph>
+                    </Card>
+                  </div>
+                ),
+              },
+[
               {
                 key: 'research',
                 label: <span><GithubOutlined /> 研究范围</span>,
