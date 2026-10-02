@@ -63,7 +63,7 @@ shared/ 保存跨 session 可以复用的研究资料。
 - `financial-ai-native-architecture`
 - `data-architecture-assessment`
 
-Workflow 只是当前 Investigation 的可选工作方法，不是 Investigation 类型。用户可以在调查过程中切换或取消路线；context、消息、Evidence、Findings 和 workspace 状态不会因此重置。
+Workflow 只是当前 Investigation 的可选工作方法，不是 Investigation 类型。用户可以在调查过程中切换或取消路线，但需要在“调查配置 → 工作方式”执行明确的调整确认；context、消息、Evidence、Findings 和 workspace 状态不会因此重置，旧的动态路线会被丢弃并重新规划。
 
 ## API
 
