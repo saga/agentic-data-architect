@@ -1280,57 +1280,76 @@ function AppInner() {
                 </section>
               ) : null}
 
-              <section className="right-section right-blocked">
+              <section className="right-section right-guidance">
                 <div className="right-section-heading">
-                  <Text strong>现在卡在哪里</Text>
+                  <Text strong>Agent 建议</Text>
                 </div>
+                <Text type="secondary">
+                  这里是可选的导引，不是必须执行的步骤。你可以直接在下面提问，Agent 会根据目标、已有证据和新信息调整调查方向。
+                </Text>
+
                 {current?.context.workflow === 'data-architecture-assessment' ? (
-                  <div className="right-blocked-card">
-                    <Text strong>先把现状和主要问题查清楚</Text>
+                  <div className="right-guidance-card">
+                    <Text strong>当前路线建议：先建立评估所需的事实基础</Text>
                     <Text type="secondary">
-                      先看数据资产、数据流、模型、来源、治理和现有技术，再给出问题清单、建议和实施顺序。
+                      通常先确认范围、目标和关键风险，再决定查哪些资产、数据流、治理和质量信息。也可以直接从一个具体问题开始。
                     </Text>
                     <Button
-                      type="primary"
+                      type="link"
                       size="small"
-                      loading={loading}
                       disabled={!active || loading}
-                      onClick={() => void send('先按“数据架构评估”路线开始。请先明确这次评估的范围、目标和交付物，再检查当前架构、数据流、数据模型、治理、安全、质量和主要技术风险。不要直接给结论，先把证据和未知项查清楚。')}
+                      onClick={() => void send('请先帮我明确这次评估最重要的目标、范围和交付物；然后根据这些信息决定下一步需要查什么。不要假定必须按照固定顺序执行。')}
                     >
-                      开始评估
+                      采用这个建议
                     </Button>
                   </div>
                 ) : current?.context.workflow === 'financial-ai-native-architecture' ? (
-                  <div className="right-blocked-card">
-                    <Text strong>先把方案目标说清楚</Text>
+                  <div className="right-guidance-card">
+                    <Text strong>当前路线建议：先把真正要解决的问题说清楚</Text>
                     <Text type="secondary">
-                      先明确用户、业务问题、范围和最终交付物，再决定数据、Semantic View 和 Agent 怎么设计。
+                      先确认用户、业务目标、关键场景和约束，再决定数据、业务语义和 Agent 怎么设计。也可以先问一个具体问题。
                     </Text>
                     <Button
-                      type="primary"
+                      type="link"
                       size="small"
-                      loading={loading}
                       disabled={!active || loading}
-                      onClick={() => void send('先按“金融 AI / 数据架构”路线开始。请先明确用户、业务目标、范围、关键使用场景和最终交付物，再决定数据和 Agent 方案。')}
+                      onClick={() => void send('请先帮我澄清这个设计要解决的业务问题、用户、关键场景和约束；然后再决定需要调查或设计什么。不要先假定固定架构。')}
                     >
-                      开始设计
+                      采用这个建议
                     </Button>
                   </div>
                 ) : !current?.currentState ? (
-                  <div className="right-blocked-card">
-                    <Text strong>还没查清现有系统</Text>
+                  <div className="right-guidance-card">
+                    <Text strong>可以从这里开始，但不必从这里开始</Text>
                     <Text type="secondary">
-                      先把数据、数据流、来源和已有业务定义查清楚，再决定怎么改。
+                      当前还没有形成事实地图。一个常见的起点是先看数据、来源、转换和已有业务定义；也可以直接追一个具体问题，或者先上传资料。
                     </Text>
-                    <Button
-                      type="primary"
-                      size="small"
-                      loading={loading}
-                      disabled={!active || loading}
-                      onClick={() => handleModernizationAction()}
-                    >
-                      开始查现状
-                    </Button>
+                    <Space size={4} wrap>
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={!active || loading}
+                        onClick={() => handleModernizationAction()}
+                      >
+                        建议：先查现状
+                      </Button>
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={loading}
+                        onClick={() => setValue('我想先解决一个具体问题：')}
+                      >
+                        直接提具体问题
+                      </Button>
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={loading}
+                        onClick={() => setAttachmentsOpen(true)}
+                      >
+                        先上传资料
+                      </Button>
+                    </Space>
                   </div>
                 ) : (
                   <>
@@ -1355,10 +1374,10 @@ function AppInner() {
                             <Button
                               className="gap-action"
                               size="small"
-                              type={gap.severity === "high" ? "primary" : "default"}
+                              type="link"
                               onClick={() => handleModernizationAction(gap)}
                             >
-                              {gap.kind === "semantic" ? "去找业务定义" : gap.kind === "lineage" ? "去查数据流" : "去处理"}
+                              建议：{gap.kind === "semantic" ? "查业务定义" : gap.kind === "lineage" ? "查数据流" : "继续处理"}
                             </Button>
                           </div>
                         ))}
@@ -1372,7 +1391,7 @@ function AppInner() {
                         ))}
                       </div>
                     ) : (
-                      <Text type="secondary">目前没有明显卡点，可以继续分析。</Text>
+                      <Text type="secondary">目前没有明显需要优先处理的问题。可以继续提问，也可以让 Agent 自己重新规划调查。</Text>
                     )}
                   </>
                 )}
@@ -1381,7 +1400,7 @@ function AppInner() {
               {(current?.context.workflow === 'legacy-modernization' || current?.context.workflow === 'data-architecture-assessment') && current?.currentState ? (
                 <section className="right-next">
                   <div className="right-section-heading">
-                    <Text strong>下一步</Text>
+                    <Text strong>路线提示</Text>
                   </div>
                   {(() => {
                     const nextStage = journey?.stages.find(
@@ -1397,6 +1416,7 @@ function AppInner() {
                         <Text strong>{nextStage.title}</Text>
                         <Text type="secondary">{nextStage.objective}</Text>
                         <Button
+                          type="link"
                           size="small"
                           loading={modernizationLoading}
                           onClick={() => {
