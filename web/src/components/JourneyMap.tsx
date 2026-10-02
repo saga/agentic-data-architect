@@ -45,6 +45,7 @@ interface JourneyMapProps {
 type JourneyFlowNodeData = {
   title: string;
   subtitle?: string;
+  statusLabel?: string;
   kind: 'stage' | 'route' | 'route-step';
   status?: JourneyMapStage['status'];
   routeId?: string;
@@ -111,6 +112,14 @@ function stageNode(stage: JourneyMapStage): JourneyFlowNode {
       status: stage.status,
       title: stage.title,
       subtitle: stage.status === 'current' ? stage.objective : undefined,
+      statusLabel:
+        stage.status === 'completed'
+          ? '已完成'
+          : stage.status === 'current'
+            ? '当前'
+            : stage.status === 'locked'
+              ? '暂不可走'
+              : '待进入',
     },
     style: {
       width: 230,
@@ -157,6 +166,7 @@ function makeRouteGraph(
         status: 'current',
         title: '当前调查',
         subtitle: '没有固定 Workflow，路线由当前目标、证据和用户动作决定。',
+        statusLabel: '当前',
       },
       style: { width: 230, minHeight: 76 },
       className: 'journey-flow-node journey-flow-node-stage journey-flow-node-current',
@@ -184,6 +194,7 @@ function makeRouteGraph(
         kind: 'route',
         title: route.title,
         subtitle: route.reason,
+        statusLabel: 'Agent 建议',
         routeId: route.id,
         action: onChooseRoute ? (
           <Button
@@ -251,6 +262,9 @@ function JourneyNode({ data }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} className="journey-flow-handle" />
       <div className="journey-flow-node-content">
+        {nodeData.statusLabel ? (
+          <span className={'journey-flow-node-status journey-flow-node-status-' + nodeData.status}>{nodeData.statusLabel}</span>
+        ) : null}
         <div className="journey-flow-node-title">{nodeData.title}</div>
         {nodeData.subtitle ? <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div> : null}
         {nodeData.kind === 'route' ? (
@@ -341,8 +355,10 @@ export function JourneyMap({
         <Controls showInteractive={false} />
         <Panel position="top-left" className="journey-map-legend">
           <Flex gap={8} wrap>
-            <Text type="secondary">实线：已走路线</Text>
-            <Text type="secondary">虚线：Agent 建议</Text>
+            <Text type="secondary">绿色：已完成</Text>
+            <Text type="secondary">蓝色：当前</Text>
+            <Text type="secondary">灰色：待进入</Text>
+            <Text type="secondary">虚线：Agent 建议路线</Text>
             {layouting ? <Tag bordered={false}>正在整理布局…</Tag> : null}
           </Flex>
         </Panel>
