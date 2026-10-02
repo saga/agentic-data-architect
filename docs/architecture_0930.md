@@ -1,4 +1,4 @@
-# 当前实现状态（V1.3）
+# 当前实现状态（V1.4）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -14,7 +14,27 @@ V1.2 增加 Current-State Intelligence：canonical asset types、parse coverage�
 
 V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization Workbench：增加 Analysis Case、Target Architecture、Source-to-Target Mapping、Architecture Decision、Gap Analysis 和 Modernization Plan。它们先作为轻量、可验证的工作产物存在，不引入重量级 workflow engine。
 
+V1.4 增加 Structural Analysis：Graphify 作为平台级 structural-analysis capability 运行，平台能力配置随 Control version 固定并进入 audit；Graphify graph.json 记录运行时 hash/version，source_file Evidence 把 Graphify 的结构导航结果重新接回本 Investigation 的 deterministic provenance。Graphify 不直接产生 Claim Evidence，supported 仍要求独立来源。
+
 后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
+
+### Structural Analysis 控制边界
+
+```text
+Control version
+  ├─ user-configurable Skills / MCP / Prompt
+  └─ platform capability: graphify-structural-analysis
+        ↓
+Graphify MCP
+        ↓ 只做结构导航
+文件 / SQL / metadata
+        ↓
+deterministic Evidence
+        ↓
+Claim
+```
+
+Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭。Skill `structural-analysis` 只负责告诉 Agent 何时以及如何使用该能力；真正的 Graphify executable、版本和 graph hash 在 turn audit 中记录。
 详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
