@@ -387,23 +387,9 @@ export function JourneyMap({
     [journey, routes, onChooseRoute, onAskStage],
   );
   const [nodes, setNodes] = useState<JourneyFlowNode[]>(graph.nodes);
-  const [layouting, setLayouting] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
     setNodes(graph.nodes);
-    setLayouting(true);
-
-    // Mainline positions are deterministic; ELK is intentionally retained only as a safe
-    // fallback for future graph expansion. The current work-map intentionally reads as a
-    // roadmap rather than an arbitrary node graph.
-    Promise.resolve().then(() => {
-      if (!cancelled) setLayouting(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
   }, [graph]);
 
   if (!graph.nodes.length || loading) {
@@ -473,7 +459,6 @@ export function JourneyMap({
             <span className="journey-map-legend-item journey-map-legend-current"><span />当前</span>
             <span className="journey-map-legend-item journey-map-legend-future"><span />待进入</span>
             <span className="journey-map-legend-item journey-map-legend-suggested"><span />Agent 建议</span>
-            {layouting ? <Tag bordered={false}>正在更新地图…</Tag> : null}
           </Flex>
         </Panel>
 
