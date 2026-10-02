@@ -52,4 +52,4 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 
 ## 依赖安全回归
 
-CI 对 Node 生产依赖执行 critical audit，同时对 `requirements.txt` 运行 `pip-audit`。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
+CI 对 Node 生产依赖执行 critical audit；Python 生产依赖从 `uv` 锁定项目导出后交给 `pip-audit` 做 strict audit。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
