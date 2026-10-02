@@ -15,8 +15,11 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
     "test": "npm run flow:lint && npm run test:python && tsx --test \"tests/**/*.test.ts\"",
     "build": "vite build && tsc",
-    "test:python": "uv run python scripts/check-python-deps.py",
-    "flow:lint": "tsx src/workflow/lint.ts"
+    "test:python": "npm run python:check",
+    "flow:lint": "tsx src/workflow/lint.ts",
+    "python:sync": "uv sync",
+    "python:lock": "uv lock",
+    "python:check": "uv run python scripts/check-python-deps.py"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
