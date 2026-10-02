@@ -838,6 +838,86 @@ body {
   color: rgba(0, 0, 0, 0.45);
 }
 
+/* 主对话区的 Agent 建议 */
+.agent-recommendation-card {
+  margin: 14px 18px 10px;
+  border: 1px solid rgba(22, 119, 255, 0.2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+.agent-recommendation-card .ant-card-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.agent-recommendation-head {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.agent-recommendation-eyebrow {
+  font-size: 11px;
+  color: #1677ff;
+  font-weight: 600;
+}
+.agent-recommendation-title {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.agent-recommendation-note {
+  max-width: 760px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.agent-recommendation-routes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 9px;
+}
+.agent-recommendation-route {
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #fff;
+}
+.agent-recommendation-route-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.agent-recommendation-route-steps {
+  display: grid;
+  gap: 2px;
+  padding-top: 2px;
+}
+.agent-recommendation-actions {
+  align-items: center;
+}
+
+.workflow-danger-zone {
+  border-color: #ffccc7;
+  background: #fffaf9;
+}
+.workflow-danger-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 18px;
+  margin-top: 16px;
+}
+.workflow-confirm-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #ffe1dc;
+}
+
+@media (max-width: 760px) {
+  .agent-recommendation-card { margin-inline: 8px; }
+  .workflow-danger-grid { grid-template-columns: 1fr; }
+}
 .right-section,
 .right-next {
   padding: 15px 2px;
