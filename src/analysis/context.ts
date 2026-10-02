@@ -113,7 +113,7 @@ export function buildQuestionContext(args: {
     out.push('');
   }
 
-  out.push('Related datasets:'); ${top.map((r) => r.t).join(', ') || '(none scored)'}`);
+  out.push('Related datasets: ' + (top.map((r) => r.t).join(', ') || '(none scored)'));
   out.push('');
   out.push('Lineage:');
   let edgeCount = 0;
