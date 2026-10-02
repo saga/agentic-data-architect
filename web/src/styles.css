@@ -1218,3 +1218,10 @@ body {
     min-height: 420px;
   }
 }
+
+.journey-flow-handle {
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+}
