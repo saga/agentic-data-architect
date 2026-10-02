@@ -4,7 +4,8 @@
  * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
  */
 import * as z from 'zod';
-import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema } from '../evidence/types.js';
+import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
+import type { GraphifyRunMetadata } from '../evidence/types.js';
 
 /** 当前 Session 使用的固定工作路线；普通聊天不需要专门流程时仍可沿用默认的 Legacy Modernization。 */
 export const WorkflowIdSchema = z.enum([
@@ -145,19 +146,6 @@ export const PlatformCapabilitySettingSchema = z.object({
   enabled: z.boolean(),
 }).strict();
 export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySettingSchema>;
-
-/** Graphify 本轮运行环境快照，记录实际使用的工具和 graph 指纹。 */
-export const GraphifyRunMetadataSchema = z.object({
-  enabled: z.boolean(),
-  status: z.enum(['available', 'missing', 'disabled']),
-  command: z.string().optional(),
-  packageVersion: z.string().optional(),
-  graphPath: z.string().optional(),
-  graphHash: z.string().optional(),
-  extractionMode: z.string().optional(),
-  capturedAt: z.string().min(1),
-}).strict();
-export type GraphifyRunMetadata = z.infer<typeof GraphifyRunMetadataSchema>;
 
 export const ControlAgentSchema = z.object({
   systemPrompt: z.object({
