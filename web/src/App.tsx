@@ -563,7 +563,6 @@ function AppInner() {
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
-  const [workflowGuardOpen, setWorkflowGuardOpen] = useState(false);
   const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | null>(null);
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [error, setError] = useState<string>();
@@ -980,7 +979,6 @@ function AppInner() {
       setAssessmentPlan(undefined);
       await loadSession(active);
       await reloadSessions(false);
-      setWorkflowGuardOpen(false);
       setWorkflowTarget(null);
       setWorkflowConfirmText('');
     } catch (e) {
@@ -1429,42 +1427,6 @@ function AppInner() {
       </Layout>
 
                   <Modal
-        title="调整工作方式"
-        open={workflowGuardOpen}
-        onCancel={() => {
-          if (!workflowSaving) {
-            setWorkflowGuardOpen(false);
-            setWorkflowTarget(null);
-            setWorkflowConfirmText('');
-          }
-        }}
-        footer={null}
-        width={620}
-        centered
-      >
-        <Card className="workflow-danger-zone" bordered={false}>
-          <Alert type="warning" showIcon message="这是一次明确的状态变更" description="不要把它当成普通下拉选择。只有在你的真实目标发生变化时才执行。" />
-          <div className="workflow-danger-grid">
-            <div>
-              <div className="field-label">当前</div>
-              <Tag bordered={false}>{workflowOptions.find((option) => option.value === (current?.context.workflow ?? ''))?.label ?? '自主调查'}</Tag>
-            </div>
-            <div>
-              <div className="field-label">调整为</div>
-              <Select value={workflowTarget ?? '__none__'} style={{ width: '100%' }} options={workflowOptions.filter((option) => option.value !== (current?.context.workflow ?? '')).map((option) => ({ value: option.value || '__none__', label: option.label }))} onChange={(value) => setWorkflowTarget(value === '__none__' ? null : value as WorkflowId)} placeholder="选择新的工作方式" />
-            </div>
-          </div>
-          <div className="workflow-confirm-block">
-            <div className="field-label">输入确认语句</div>
-            <Input value={workflowConfirmText} onChange={(event) => setWorkflowConfirmText(event.target.value)} placeholder="我确认调整工作方式" autoComplete="off" />
-          </div>
-          <Flex justify="flex-end" gap={8}>
-            <Button onClick={() => setWorkflowGuardOpen(false)} disabled={workflowSaving}>取消</Button>
-            <Button danger type="primary" loading={workflowSaving} disabled={!workflowTarget || workflowTarget === current?.context.workflow || workflowConfirmText.trim() !== '我确认调整工作方式'} onClick={() => void changeWorkflow(workflowTarget)}>确认调整</Button>
-          </Flex>
-        </Card>
-      </Modal>
-      <Modal
         className="journey-map-modal"
         title={
           <Flex align="center" gap={8}>
@@ -1733,7 +1695,7 @@ function AppInner() {
                   </div>
                 ),
               },
-[
+              {
               {
                 key: 'research',
                 label: <span><GithubOutlined /> 研究范围</span>,
