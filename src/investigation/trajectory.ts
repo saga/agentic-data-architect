@@ -181,7 +181,12 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
           ? usageObject.totalPremiumRequestCost
           : undefined;
 
-  const finishedAt = last.type === 'turn_end' ? last.timestamp : undefined;
+  const completionEvent = [...events].reverse().find((event) =>
+    event.type === 'turn_end'
+    || (event.type === 'status' && event.name === '结果已保存')
+    || event.type === 'error'
+  );
+  const finishedAt = completionEvent?.timestamp;
   return TrajectorySummarySchema.parse({
     turnId: first.turnId,
     startedAt: first.timestamp,
