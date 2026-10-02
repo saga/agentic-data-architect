@@ -154,7 +154,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
     agent: {
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
-      skills: control.agent.skills.map((item) => ({ ...item })),
+      skills: control.agent.skills.map((item) => ({ ...item, parameters: { ...(item.parameters ?? {}) } })),
       mcpServers: control.agent.mcpServers.map((item) => ({
         ...item,
         ...(item.args ? { args: [...item.args] } : {}),
