@@ -44,6 +44,8 @@ import {
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
 import { JourneyMap } from './components/JourneyMap';
+import { InvestigationConfigPage } from './components/InvestigationConfigPage';
+import { AgentTrajectoryPage } from './components/AgentTrajectoryPage';
 import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
@@ -535,18 +537,24 @@ function AgentRecommendationCard(props: {
   );
 }
 function AppInner() {
-  const routeSession = () => {
-    const match = window.location.pathname.match(/^\/investigations\/([^/]+)\/?$/);
-    return match ? decodeURIComponent(match[1]) : undefined;
+  const routeInfo = () => {
+    const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory))?\/?$/);
+    return match
+      ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' }
+      : undefined;
   };
 
-  const navigateToSession = (key: string, replace = false) => {
-    const nextPath = `/investigations/${encodeURIComponent(key)}`;
+  const routeSession = () => routeInfo()?.session;
+  const [page, setPage] = useState<'chat' | 'config' | 'trajectory'>(() => routeInfo()?.page ?? 'chat');
+
+  const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory') => {
+    if (!active) return;
+    const suffix = nextPage === 'chat' ? '' : '/' + nextPage;
+    const nextPath = '/investigations/' + encodeURIComponent(active) + suffix;
     if (window.location.pathname !== nextPath) {
-      if (replace) window.history.replaceState({ session: key }, '', nextPath);
-      else window.history.pushState({ session: key }, '', nextPath);
+      window.history.pushState({ session: active, page: nextPage }, '', nextPath);
     }
-    setActive(key);
+    setPage(nextPage);
   };
 
   const { message: toast } = AntApp.useApp();
@@ -717,8 +725,11 @@ function AppInner() {
 
   useEffect(() => {
     const onPopState = () => {
-      const key = routeSession();
-      if (key) setActive(key);
+      const routed = routeInfo();
+      if (routed) {
+        setPage(routed.page);
+        setActive(routed.session);
+      }
     };
     window.addEventListener('popstate', onPopState);
     reloadSessions().catch((e) => setError(e.message));
@@ -1036,7 +1047,7 @@ function AppInner() {
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
-      setTimeout(() => setSettingsOpen(true), 0);
+      navigatePage('config');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法创建调查');
     }
@@ -1127,6 +1138,43 @@ function AppInner() {
       <Tag key={input.id}>{input.title}</Tag>
     )) ?? [];
 
+  if (!active || !current) {
+    return (
+      <Layout className="app-shell">
+        <Content className="empty-app-page">
+          <Empty description="还没有选择调查。请先从左侧创建或选择一个 Investigation。" />
+        </Content>
+      </Layout>
+    );
+  }
+
+  if (page === 'config') {
+    return (
+      <div className="subpage-app">
+        <InvestigationConfigPage
+          control={current.control}
+          skills={skillOptions}
+          workflow={current.context.workflow ?? ''}
+          onBack={() => navigatePage('chat')}
+          onWorkflowChange={async (workflow) => {
+            await changeWorkflow(workflow === '' ? null : workflow);
+          }}
+          onSaved={async () => {
+            await loadSession(active);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (page === 'trajectory') {
+    return (
+      <div className="subpage-app">
+        <AgentTrajectoryPage sessionName={active} onBack={() => navigatePage('chat')} />
+      </div>
+    );
+  }
+
   return (
     <Layout className={`app-shell${resizing ? ' is-resizing' : ''}`}>
       <Sider width={leftWidth} theme="light" className="session-sider">
@@ -1201,6 +1249,12 @@ function AppInner() {
               {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">发现问题 {current.context.findings.length}</Tag> : null}
+              <Button type="text" size="small" icon={<ToolOutlined />} onClick={() => navigatePage('trajectory')}>
+                Agent 轨迹
+              </Button>
+              <Button type="text" size="small" icon={<SettingOutlined />} onClick={() => navigatePage('config')}>
+                调查配置
+              </Button>
               {current?.context.unknowns.length ? (
                 <Tag
                   bordered={false}
@@ -1365,7 +1419,7 @@ function AppInner() {
                     type="text"
                     icon={<SettingOutlined />}
                     aria-label="调查设置"
-                    onClick={() => setSettingsOpen(true)}
+                    onClick={() => navigatePage('config')}
                   />
                 </Tooltip>
               </div>
@@ -1379,7 +1433,7 @@ function AppInner() {
                   <Text type="secondary">
                     工作方式进入调查后不在首页随手切换。需要改变时，到调查设置里的“工作方式”执行一次明确的调整。
                   </Text>
-                  <Button type="link" size="small" onClick={() => { setSettingsTab('workflow'); setSettingsOpen(true); }}>
+                  <Button type="link" size="small" onClick={() => navigatePage('config')}>
                     打开工作方式设置
                   </Button>
                 </section>
