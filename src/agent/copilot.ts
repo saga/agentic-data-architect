@@ -379,6 +379,21 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (typeof e.data.outputTokens === 'number') event.outputTokens = e.data.outputTokens;
     if (typeof e.data.cost === 'number') event.premiumRequestCost = e.data.cost;
     if (typeof e.data.duration === 'number') event.durationMs = e.data.duration;
+    const usageData = e.data as Record<string, unknown>;
+    const promptDetails = usageData.inputTokensDetails;
+    const outputDetails = usageData.outputTokensDetails;
+    const cachedInputTokens =
+      readNumber(usageData.cachedInputTokens)
+      ?? (promptDetails && typeof promptDetails === 'object'
+        ? readNumber((promptDetails as Record<string, unknown>).cachedTokens)
+        : undefined);
+    const reasoningTokens =
+      readNumber(usageData.reasoningTokens)
+      ?? (outputDetails && typeof outputDetails === 'object'
+        ? readNumber((outputDetails as Record<string, unknown>).reasoningTokens)
+        : undefined);
+    if (cachedInputTokens !== undefined) event.details.cachedInputTokens = cachedInputTokens;
+    if (reasoningTokens !== undefined) event.details.reasoningTokens = reasoningTokens;
     if (typeof e.data.apiEndpoint === 'string') event.details.apiEndpoint = e.data.apiEndpoint;
     input.onTrajectory?.(event);
   });
