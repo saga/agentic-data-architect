@@ -292,33 +292,11 @@ body {
   margin-top: 14px;
 }
 
-/* 调查配置是一个固定大小的工作窗；真正很长的内容只在右侧内容区滚动。 */
+/* 调查配置是一个固定大小的工作窗；Modal 的高度与滚动交给 Ant Design v6 的 semantic styles。 */
 .settings-modal .ant-modal {
   width: min(1000px, calc(100vw - 40px)) !important;
   max-width: calc(100vw - 40px);
   margin: 24px auto;
-}
-
-.settings-modal .ant-modal-content {
-  height: min(840px, calc(100vh - 48px));
-  max-height: calc(100vh - 48px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.settings-modal .ant-modal-header,
-.settings-modal .ant-modal-footer {
-  flex: 0 0 auto;
-}
-
-.settings-modal .ant-modal-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  max-height: none;
-  overflow: hidden;
-  padding: 0;
 }
 
 .settings-tabs {
@@ -360,10 +338,10 @@ body {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  display: flex;
 }
 
 .settings-tabs .ant-tabs-tabpane-active {
+  display: flex;
   min-height: 0;
 }
 
