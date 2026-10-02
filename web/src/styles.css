@@ -974,7 +974,8 @@ body {
   line-height: 1.5;
 }
 
-.right-blocked-card {
+.right-blocked-card,
+.right-guidance-card {
   display: grid;
   gap: 7px;
   padding: 11px 12px;
