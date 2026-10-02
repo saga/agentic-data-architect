@@ -221,6 +221,18 @@ interface ArchitectureAssessmentPlan {
     unlockedNodeIds: string[];
     stages: JourneyStage[];
   };
+  journeyPlan?: {
+    version: number;
+    source: 'agent';
+    generatedAt: string;
+    turnId?: string;
+    routes: Array<{
+      id: string;
+      title: string;
+      reason: string;
+      steps: string[];
+    }>;
+  };
 }
 
 interface ModernizationPlan {
@@ -898,6 +910,19 @@ function AppInner() {
     }
   };
 
+  const chooseRoute = (route: NonNullable<SessionContext['journeyPlan']>['routes'][number]) => {
+    if (!active || loading) return;
+    const message = [
+      `我选择这条路线：“${route.title}”。`,
+      route.reason,
+      '',
+      `建议方向：${route.steps.join(' → ')}`,
+      '',
+      '请按这个方向推进，但把它当成导航建议而不是固定流程；如果新证据或我的后续动作表明另一条路更合适，请重新规划。',
+    ].join('\n');
+    void send(message);
+  };
+
   const createSession = async () => {
     const name = newSessionName.trim();
     if (!name) return;
@@ -1249,7 +1274,8 @@ function AppInner() {
               {journey?.stages.length ? (
                 <section className="right-section right-journey">
                   <div className="right-section-heading">
-                    <Text strong>路线</Text>
+                    <Text strong>地图导引</Text>
+                    <Tag bordered={false}>参考</Tag>
                   </div>
                   <div className="journey-map">
                     {journey.stages.map((stage, index) => (
@@ -1280,6 +1306,40 @@ function AppInner() {
                 </section>
               ) : null}
 
+              {current?.context.journeyPlan?.routes.length ? (
+                <section className="right-section right-route-options">
+                  <div className="right-section-heading">
+                    <Text strong>可走路线</Text>
+                  </div>
+                  <Text type="secondary">
+                    这是 Agent 根据最近一次行动、已有证据和当前目标重新规划的路线。可以选其中一条，也可以完全不按它走。
+                  </Text>
+                  <div className="route-option-list">
+                    {current.context.journeyPlan.routes.map((route) => (
+                      <div key={route.id} className="route-option">
+                        <Text strong>{route.title}</Text>
+                        <Text type="secondary">{route.reason}</Text>
+                        <div className="route-option-steps">
+                          {route.steps.map((step, index) => (
+                            <Text key={index} type="secondary">
+                              {index + 1}. {step}
+                            </Text>
+                          ))}
+                        </div>
+                        <Button
+                          type="link"
+                          size="small"
+                          disabled={!active || loading}
+                          onClick={() => chooseRoute(route)}
+                        >
+                          选择这条路线
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               <section className="right-section right-guidance">
                 <div className="right-section-heading">
                   <Text strong>Agent 建议</Text>
@@ -1287,6 +1347,14 @@ function AppInner() {
                 <Text type="secondary">
                   这里是可选的导引，不是必须执行的步骤。你可以直接在下面提问，Agent 会根据目标、已有证据和新信息调整调查方向。
                 </Text>
+                <Button
+                  type="link"
+                  size="small"
+                  disabled={!active || loading}
+                  onClick={() => setValue('我想换一个方向：')}
+                >
+                  不按路线，自己选方向
+                </Button>
 
                 {current?.context.workflow === 'data-architecture-assessment' ? (
                   <div className="right-guidance-card">
@@ -1397,51 +1465,6 @@ function AppInner() {
                 )}
               </section>
 
-              {(current?.context.workflow === 'legacy-modernization' || current?.context.workflow === 'data-architecture-assessment') && current?.currentState ? (
-                <section className="right-next">
-                  <div className="right-section-heading">
-                    <Text strong>路线提示</Text>
-                  </div>
-                  {(() => {
-                    const nextStage = journey?.stages.find(
-                      (stage) => stage.status === 'current',
-                    ) ?? journey?.stages.find((stage) => stage.status === 'future');
-
-                    if (!nextStage) {
-                      return <Text type="secondary">先完成当前检查，再决定下一步。</Text>;
-                    }
-
-                    return (
-                      <div className="right-next-content">
-                        <Text strong>{nextStage.title}</Text>
-                        <Text type="secondary">{nextStage.objective}</Text>
-                        <Button
-                          type="link"
-                          size="small"
-                          loading={modernizationLoading}
-                          onClick={() => {
-                            if (current?.context.workflow === 'data-architecture-assessment') {
-                              if (assessmentPlan) {
-                                setModernizationOpen(true);
-                              } else if (active) {
-                                void loadAssessment(active);
-                              }
-                            } else if (modernizationPlan) {
-                              setModernizationOpen(true);
-                            } else if (active) {
-                              void loadModernization(active);
-                            }
-                          }}
-                        >
-                          {current?.context.workflow === 'data-architecture-assessment'
-                            ? (assessmentPlan ? '看评估结果' : '生成评估结果')
-                            : (modernizationPlan ? '看完整方案' : '生成完整方案')}
-                        </Button>
-                      </div>
-                    );
-                  })()}
-                </section>
-              ) : null}
             </aside>
           </div>
         </Content>
