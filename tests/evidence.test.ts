@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calibrateStatus } from '../src/evidence/types.js';
+import { calibrateStatus, type EvidenceRef } from '../src/evidence/types.js';
 import { parseAgentAnswer, toClaims } from '../src/agent/result.js';
 
 describe('calibrateStatus: 模型自报 status 只做输入', () => {
@@ -34,7 +34,7 @@ describe('calibrateStatus: 模型自报 status 只做输入', () => {
 
 describe('parseAgentAnswer', () => {
   const existing = new Set(['ev-a', 'ev-b']);
-  const evidenceMap = new Map([
+  const evidenceMap = new Map<string, EvidenceRef>([
     ['ev-a', { id: 'ev-a', type: 'sql_statement', source: 'a.sql:1-2', file: 'a.sql', sourceHash: 'hash-a', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' }],
     ['ev-b', { id: 'ev-b', type: 'metadata', source: 'snowflake:RAW.POSITIONS', investigationId: 'i', discoveryRunId: 'r', collectedAt: 'now' }],
   ]);
