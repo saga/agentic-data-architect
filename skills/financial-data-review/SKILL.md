@@ -1,6 +1,6 @@
 ---
 name: financial-data-review
-description: Financial-services data investigation and review for investment management, portfolio, security master, price, research, lineage, identifiers, and point-in-time semantics. Use when a question involves Position, Security, Price, Portfolio, Transaction, Performance, Research, or financial data provenance.
+description: 金融服务数据调查与审查，覆盖投资管理、Portfolio、Security Master、Price、Research、Lineage、identifier 和 point-in-time 等语义；适用于 Position、Security、Price、Portfolio、Transaction、Performance、Research 等金融数据问题。
 metadata:
   kind: capability
 ---
