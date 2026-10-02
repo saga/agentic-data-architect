@@ -16,7 +16,7 @@ import {
   loadInvestigationControl,
   toCopilotMcpServers,
 } from '../investigation/control.js';
-import { loadInvestigation, loadLatestSnapshot, saveInvestigation } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
@@ -42,6 +42,8 @@ export interface AnswerSummary {
   unknowns: string[];
   /** 回答后的下一步问题；前端用它生成主动引导输入卡片。 */
   followUpQuestions: string[];
+  /** Agent 根据当前目标、证据和动作生成的可选路线；只是导引，不是强制流程。 */
+  routeOptions: Array<{ id: string; title: string; reason: string; steps: string[] }>;
 }
 
 /** 完整执行一轮 Investigation 问答：抢占 turn → 固定 Control → 构造证据上下文 → 执行 Agent → 解析答案 → 原子提交结果。 */
@@ -235,6 +237,29 @@ activeAfterExecution.phase = 'committing';
 
   const answer = parsed.answer || raw.slice(0, 2000);
   await saveInvestigation(inv);
+
+  // 每轮回答后重新生成动态路线。它是“导航建议”，不是状态机跳转；
+  // 下一轮用户动作、Evidence 或 Unknown 改变后，会再次生成新的路线。
+  const journeyPlan = {
+    version: 1 as const,
+    source: 'agent' as const,
+    generatedAt: new Date().toISOString(),
+    turnId,
+    routes: parsed.routeOptions,
+  };
+  await updateInvestigationJourneyPlan(investigationName, journeyPlan, inv.workflow);
+  await appendAuditEvent(investigationName, {
+    actor: 'system',
+    action: 'investigation.route.replanned',
+    summary: 'Replanned optional investigation routes after the latest Agent turn.',
+    configurationVersion: control.version,
+    details: {
+      turnId,
+      workflow: inv.workflow,
+      routeCount: parsed.routeOptions.length,
+    },
+  });
+
   saveConversationMessage({
     sessionName: investigationName,
     role: 'assistant',
@@ -246,6 +271,7 @@ activeAfterExecution.phase = 'committing';
     warnings: parsed.warnings,
     unknowns: parsed.unknowns,
     followUpQuestions: parsed.followUpQuestions,
+    routeOptions: parsed.routeOptions,
   };
   // durable turn 最后才标记 completed，保证数据库状态代表已经真正写完结果。
 finishConversationTurn(turnId, 'completed', JSON.stringify(result));
