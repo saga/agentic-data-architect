@@ -14,19 +14,10 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
+import type { GraphifyRunMetadata } from '../evidence/types.js';
+export type { GraphifyRunMetadata } from '../evidence/types.js';
 
 export const GRAPHIFY_MCP_NAME = 'graphify-structural-analysis';
-
-export interface GraphifyRuntimeMetadata {
-  enabled: boolean;
-  status: 'available' | 'missing' | 'disabled';
-  command?: string;
-  packageVersion?: string;
-  graphPath?: string;
-  graphHash?: string;
-  extractionMode?: string;
-  capturedAt: string;
-}
 
 export interface GraphifyMcpServer {
   name: typeof GRAPHIFY_MCP_NAME;
@@ -171,11 +162,12 @@ export async function getGraphifyRuntimeMetadata(workingDirectory: string): Prom
   }
   const graphPath = graphifyGraphPath(workingDirectory);
   const hash = await graphHash(graphPath);
+  const packageVersion = graphifyPackageVersion(command);
   return {
     enabled: true,
     status: 'available',
     command,
-    ...(graphifyPackageVersion(command) ? { packageVersion: graphifyPackageVersion(command) } : {}),
+    ...(packageVersion ? { packageVersion } : {}),
     graphPath,
     ...(hash ? { graphHash: hash } : {}),
     extractionMode: '--code-only --no-viz',
