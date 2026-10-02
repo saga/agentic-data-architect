@@ -60,7 +60,7 @@ export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
   name: z.string().min(1),
   userPrompt: z.string(),
-  workflow: WorkflowIdSchema.nullable(),
+  workflow: WorkflowIdSchema.nullable().default(null),
   goal: z.string(),
   scope: z.array(z.string()),
   systems: z.array(z.string()),
