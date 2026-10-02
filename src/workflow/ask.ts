@@ -182,12 +182,15 @@ const prompt = buildQuestionPrompt({
     details: { runtime: graphifyBefore, platformCapabilities: control.agent.platformCapabilities },
   });
 
-let trajectoryWrite = Promise.resolve();
-  const recordTrajectory = (event: Parameters<typeof appendTrajectoryEvent>[1]) => {
-    trajectoryWrite = trajectoryWrite.then(() => appendTrajectoryEvent(investigationName, {
-      ...event,
-      turnId,
-    })).catch(() => undefined);
+let trajectoryWrite: Promise<void> = Promise.resolve();
+  type TrajectoryCallbackEvent =
+    NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
+  const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
+    trajectoryWrite = trajectoryWrite
+      .then(async () => {
+        await appendTrajectoryEvent(investigationName, { ...event, turnId });
+      })
+      .catch(() => undefined);
   };
 
   recordTrajectory({
