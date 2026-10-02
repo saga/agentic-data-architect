@@ -198,7 +198,8 @@ app.post('/api/sessions', async (req, res) => {
     });
     const summary = summarizeTrajectory(events);
     const turns = summarizeTrajectoryTurns(events);
-    res.json({ events, summary, turns });
+    const conversationTurns = listConversationTurns(name, 200);
+    res.json({ events, summary, turns, conversationTurns });
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
