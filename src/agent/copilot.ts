@@ -156,7 +156,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   const workingDirectory = input.workingDirectory ?? process.cwd();
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
-  const graphifyEnabled = graphifyCapability ? graphifyCapability.enabled : config.graphifyEnabled;
+  const graphifyEnabled = config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const mcpServers = {
