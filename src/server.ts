@@ -45,6 +45,7 @@ import {
   getConversationSummary,
   getConversationTurn,
   listConversationMessages,
+  listConversationTurns,
   searchConversation,
 } from './investigation/conversation.js';
 import { abortCopilotTurn, stopClient } from './agent/copilot.js';
