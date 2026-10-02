@@ -566,6 +566,7 @@ function AppInner() {
   // null = 尚未选择；'autonomous' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
   const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | 'autonomous' | null>(null);
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
+  const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('research');
@@ -989,6 +990,20 @@ function AppInner() {
     }
   };
 
+  const continueUnknown = (unknown: string) => {
+    if (!active || loading) return;
+    setUnknownsOpen(false);
+    void send(
+      [
+        '请继续处理这条待查内容：',
+        '',
+        unknown,
+        '',
+        '请把它当成当前调查中的一个明确待办事项：先判断最有价值的下一步，能自动检索或检查的直接执行，不要只给我建议；把查到的证据纳入当前调查，明确哪些已经查清、哪些仍然未知，并根据结果重新给出下一步导引。',
+      ].join('\n'),
+    );
+  };
+
   const chooseRoute = (route: NonNullable<SessionContext['journeyPlan']>['routes'][number]) => {
     if (!active || loading) return;
     const message = [
@@ -1184,7 +1199,24 @@ function AppInner() {
               {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
               {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
               {current?.context.findings.length ? <Tag bordered={false} color="gold">发现问题 {current.context.findings.length}</Tag> : null}
-              {current?.context.unknowns.length ? <Tag bordered={false} color="orange">待查内容 {current.context.unknowns.length}</Tag> : null}
+              {current?.context.unknowns.length ? (
+                <Tag
+                  bordered={false}
+                  color="orange"
+                  className="clickable-status-tag"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setUnknownsOpen(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setUnknownsOpen(true);
+                    }
+                  }}
+                >
+                  待查内容 {current.context.unknowns.length}
+                </Tag>
+              ) : null}
 
             </Space>
           </Flex>
@@ -1619,6 +1651,42 @@ function AppInner() {
         </Space>
       </Modal>
 
+      <Modal
+        title={
+          <Flex align="center" gap={8}>
+            <span>待查内容</span>
+            <Tag bordered={false} color="orange">{current?.context.unknowns.length ?? 0} 项</Tag>
+          </Flex>
+        }
+        open={unknownsOpen}
+        onCancel={() => setUnknownsOpen(false)}
+        footer={null}
+        width={720}
+        centered
+      >
+        <div className="unknown-items">
+          {(current?.context.unknowns ?? []).map((unknown, index) => (
+            <Card key={unknown + index} size="small" className="unknown-item-card">
+              <div className="unknown-item-copy">
+                <div className="unknown-item-index">待查 {index + 1}</div>
+                <Text strong className="unknown-item-title">{unknown}</Text>
+                <Text type="secondary" className="unknown-item-guidance">
+                  导引：让 Agent 直接围绕这条未知项继续检索、核对 Evidence，并在完成后重新判断它是否已经查清。
+                </Text>
+              </div>
+              <Button
+                type="primary"
+                size="small"
+                icon={<SendOutlined />}
+                disabled={!active || loading}
+                onClick={() => continueUnknown(unknown)}
+              >
+                让 Agent 继续查
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </Modal>
       <Modal
         className="settings-modal"
         title={
