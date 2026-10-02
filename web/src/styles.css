@@ -1245,22 +1245,25 @@ body {
 }
 
 .journey-flow-node-completed {
-  border-color: #b7eb8f;
+  border-color: #95de64;
   background: #f6ffed;
 }
 
 .journey-flow-node-current {
-  border-color: #91caff;
+  border-color: #1677ff;
   background: #f0f7ff;
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.08), 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
 .journey-flow-node-locked {
-  opacity: 0.55;
+  border-style: dashed;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .journey-flow-node-future {
   border-color: #d6e4ff;
+  background: #fcfdff;
 }
 
 .journey-flow-node-route {
