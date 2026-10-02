@@ -91,10 +91,18 @@ sequenceDiagram
 
 ## 快速开始
 
+Python 依赖由 `pyproject.toml` 管理，运行环境由 `uv` 创建和同步；不要再直接执行 `pip install -r requirements*.txt`。首次运行或依赖变化后执行：
+
 ~~~bash
 npm install
-python3 -m pip install -r requirements.txt
+uv sync
 npm run start
+~~~
+
+需要更新依赖锁文件时执行：
+
+~~~bash
+uv lock
 ~~~
 
 浏览器打开：
