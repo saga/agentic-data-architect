@@ -182,7 +182,7 @@ const raw = await askCopilot({
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
       inv.workflow
-        ? 'Selected work playbook: ' + inv.workflow + '. Follow its Markdown Workflow for high-level stages, but use agent judgment within stages and adapt when new evidence changes the investigation.'
+        ? 'Selected work playbook: ' + inv.workflow + '. Treat its Markdown Workflow as a reference map, not a mandatory sequence. The user may choose another path, skip suggested stages, pursue a different question, or change direction; use judgment within stages and replan when new evidence or user actions change the most useful route.'
         : 'No fixed work playbook is selected. Drive the investigation autonomously from the goal, evidence, unknowns and the most useful next action. You may propose adopting a playbook later, but do not assume one.',
       knowledgeText,
       buildResearchConfigPrompt(control),
