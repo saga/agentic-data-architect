@@ -140,7 +140,7 @@ const priorConversation = searchConversation(investigationName, question, {
 
   // 通用知识用于“怎么做”的参考，不得冒充当前 Investigation 的事实证据。
   const knowledge = await searchArchitectureKnowledge(
-    [inv.workflow, inv.goal, question].filter(Boolean).join('\n'),
+    [inv.goal, question].filter(Boolean).join('\n'),
     { workflow: inv.workflow, limit: 6 },
   );
   const knowledgeText = renderArchitectureKnowledge(knowledge);
@@ -173,7 +173,9 @@ const raw = await askCopilot({
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
-      'Session workflow: ' + inv.workflow + '. When this workflow has a matching Skill, follow its Markdown Workflow for the high-level work stages; within a stage, use agent judgment and tools.',
+      inv.workflow
+        ? 'Selected work playbook: ' + inv.workflow + '. Follow its Markdown Workflow for high-level stages, but use agent judgment within stages and adapt when new evidence changes the investigation.'
+        : 'No fixed work playbook is selected. Drive the investigation autonomously from the goal, evidence, unknowns and the most useful next action. You may propose adopting a playbook later, but do not assume one.',
       knowledgeText,
       buildResearchConfigPrompt(control),
       control.agent.systemPrompt.content.trim(),
