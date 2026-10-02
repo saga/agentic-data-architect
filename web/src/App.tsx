@@ -1152,6 +1152,7 @@ function AppInner() {
     return (
       <div className="subpage-app">
         <InvestigationConfigPage
+          sessionName={active}
           control={current.control}
           skills={skillOptions}
           workflow={current.context.workflow ?? ''}
