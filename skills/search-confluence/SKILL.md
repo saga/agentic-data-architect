@@ -1,6 +1,6 @@
 ---
 name: search-confluence
-description: Research internal Confluence architecture, ADRs, business documentation, runbooks, processes, and constraints.
+description: 研究公司内部 Confluence 中的架构文档、ADR、业务说明、运行手册、流程和约束，用于补充内部业务与架构证据。
 metadata:
   kind: capability
 ---
