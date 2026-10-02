@@ -133,7 +133,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
         version: 1,
         content: '',
       },
-      skills: config.copilotSkills.filter((name) => !WORKFLOW_SKILL_NAMES.has(name)).map((name) => ({ name, version: 1 })),
+      skills: config.copilotSkills.filter((name) => !WORKFLOW_SKILL_NAMES.has(name)).map((name) => ({ name, version: 1, parameters: {} })),
       mcpServers: [],
     },
   };
