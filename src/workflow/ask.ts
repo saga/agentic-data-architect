@@ -3,7 +3,7 @@
  *
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
-import { askCopilot, hasActiveCopilotTurn } from '../agent/copilot.js';
+import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
