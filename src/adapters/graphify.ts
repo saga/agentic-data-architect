@@ -72,7 +72,7 @@ export function requireGraphifyMcpCommand(): string {
   const command = resolveGraphifyMcpCommand();
   if (!command) {
     throw new Error(
-      'Graphify structural analysis is enabled but graphify-mcp was not found. Install requirements.txt or set GRAPHIFY_MCP_COMMAND; set GRAPHIFY_ENABLED=false only when the capability is intentionally disabled.',
+      'Graphify structural analysis is enabled but graphify-mcp was not found. Run `uv sync` or set GRAPHIFY_MCP_COMMAND; set GRAPHIFY_ENABLED=false only when the capability is intentionally disabled.',
     );
   }
   return command;
