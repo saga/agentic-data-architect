@@ -1,3 +1,19 @@
+## 2026-10-02 — Adaptive navigation / actionable work map
+
+### 做了什么
+
+- Agent 的动态 `routeOptions` 持久化为 `context.journeyPlan`，作为下一步导航建议，不直接驱动 Journey 状态。
+- Agent 建议从右侧栏提升到主对话区，路线可以直接“采用”；下一步建议不再被窄侧栏弱化。
+- 顶部“待查内容”状态标签变成可点击入口，可查看具体 Unknown，并直接让 Agent 继续调查某一条 Unknown。
+- 工作方式不再在首页通过普通下拉随手切换；改为“调查配置 → 工作方式”的明确调整区，需要选择目标并输入确认语句。
+- 全屏工作地图改为 React Flow custom nodes + NodeToolbar + Panel + MiniMap + animated edges 的 roadmap / branch 视图；主线是 Workflow 骨架，Agent 建议路线从当前节点分支。
+- 地图本身是只读导航视图，不能拖拽编辑节点或连接，不引入第二套 Workflow Engine。
+
+### 设计边界
+
+工作方式属于持久化调查状态，动态路线属于临时导航建议；模糊的“换个思路”只触发路线重新规划，不自动修改工作方式。
+
+---
 ## 2026-10-02 — Optional / switchable Investigation Workflow
 
 ### 做了什么
