@@ -65,7 +65,23 @@ export function buildQuestionContext(args: {
   };
 
   if (!lineage) {
-    return { text: '(no discovery yet — run discover first)', evidenceIds: [] };
+    const sourceLines: string[] = [];
+    const sourceIds: string[] = [];
+    for (const file of (inventory?.files ?? []).slice(0, 20)) {
+      const sourceEvidence = evidence.find(
+        (e) => e.type === 'source_file' && e.file === file.path && e.sourceHash === file.sha256,
+      );
+      if (sourceEvidence) {
+        sourceIds.push(sourceEvidence.id);
+        sourceLines.push('- ' + file.path + ' [' + sourceEvidence.id + ']');
+      } else {
+        sourceLines.push('- ' + file.path);
+      }
+    }
+    return {
+      text: ['(no SQL lineage yet — run discover first)', sourceLines.length ? 'Source files (provenance only):' : '', ...sourceLines].filter(Boolean).join('\n'),
+      evidenceIds: sourceIds,
+    };
   }
   const ranked = lineage.tables
     .filter((t) => !t.startsWith('file:'))
