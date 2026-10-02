@@ -13,7 +13,7 @@ Browser
                            ↘ Skills / Skill scripts
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。 Journey 地图使用 `@xyflow/react` 渲染交互式工作路线，使用 `elkjs` 自动布局；地图只展示 Workflow 骨架、已走路线和 Agent 的可选路线，不作为第二套 Workflow Engine。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
