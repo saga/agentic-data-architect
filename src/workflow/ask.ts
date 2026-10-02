@@ -146,7 +146,7 @@ const priorConversation = searchConversation(investigationName, question, {
   const knowledgeText = renderArchitectureKnowledge(knowledge);
 
   // Evidence ownership 边界：模型只能引用当前 Investigation 已存在的 Evidence ID。
-const existingIds = new Set(inv.evidence.map((e) => e.id));
+const existingEvidence = new Map(inv.evidence.map((e) => [e.id, e]));
   // Prompt 在本次 turn 内固定；之后用户修改配置只影响下一轮，避免 TOCTOU。
 const prompt = buildQuestionPrompt({
     investigationName: inv.name,
