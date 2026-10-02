@@ -8,6 +8,7 @@ import type { EvidenceRef, Finding } from '../evidence/types.js';
 import type { LineageGraph } from './lineage.js';
 import type { CurrentStateIntelligence } from '../model/current-state.js';
 import type { SemanticAsset } from '../semantic/types.js';
+import type { Inventory } from '../discovery/scanner.js';
 
 /**
  * Evidence Retrieval（§十八）：按问题取相关节点/边/profile/finding，
@@ -46,9 +47,10 @@ export function buildQuestionContext(args: {
   evidence: EvidenceRef[];
   currentState?: CurrentStateIntelligence | null;
   semanticAssets?: SemanticAsset[];
+  inventory?: Inventory | null;
   maxDatasets?: number;
 }): QuestionContext {
-  const { question, lineage, profiles, findings, evidence, currentState, semanticAssets = [] } = args;
+  const { question, lineage, profiles, findings, evidence, currentState, semanticAssets = [], inventory = null } = args;
   const qt = tokens(question);
   const byId = new Map(evidence.map((e) => [e.id, e]));
   const out: string[] = [];
@@ -75,7 +77,27 @@ export function buildQuestionContext(args: {
   );
   const topNames = new Set(top.map((r) => r.t.toLowerCase()));
 
-  out.push(`Related datasets: ${top.map((r) => r.t).join(', ') || '(none scored)'}`);
+  if (inventory?.files.length) {
+    const rankedFiles = inventory.files
+      .map((file) => ({ file, score: scoreDataset(qt, file.path.toLowerCase()) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.file.path.localeCompare(b.file.path))
+      .slice(0, 12);
+    const sourceFiles = rankedFiles.length > 0
+      ? rankedFiles
+      : inventory.files.slice(0, 12).map((file) => ({ file, score: 0 }));
+    out.push('Source files (structural navigation targets; provenance only):');
+    for (const item of sourceFiles) {
+      const sourceEvidence = evidence.find(
+        (e) => e.type === 'source_file' && e.file === item.file.path && e.sourceHash === item.file.sha256,
+      );
+      const ref = sourceEvidence ? use(sourceEvidence.id) : null;
+      out.push('- ' + item.file.path + (ref ? ' ' + ref : ''));
+    }
+    out.push('');
+  }
+
+  out.push('Related datasets:'); ${top.map((r) => r.t).join(', ') || '(none scored)'}`);
   out.push('');
   out.push('Lineage:');
   let edgeCount = 0;
