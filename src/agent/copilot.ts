@@ -319,6 +319,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
       throw new Error('Turn aborted.');
     }
     const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
+    try {
+      const usageApi = (session as unknown as { usage?: { getMetrics?: () => Promise<unknown> } }).usage;
+      const usageMetrics = usageApi?.getMetrics ? await usageApi.getMetrics() : undefined;
+      if (usageMetrics) {
+        input.onTrajectory?.({
+          type: 'status',
+          name: '累计 AI 用量',
+          status: 'info',
+          details: { usageMetrics: redactTrajectoryValue(usageMetrics) as Record<string, unknown> },
+        });
+      }
+    } catch {
+      // 用量快照失败不影响业务回答；本轮仍保留 assistant.usage 事件作为最小统计。
+    }
     input.onTrajectory?.({ type: 'turn_end', name: 'Agent turn', status: 'completed' });
     return final?.data.content || content;
   } catch (e) {
