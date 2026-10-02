@@ -41,6 +41,7 @@ export const config = {
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   graphifyEnabled: envConfig.GRAPHIFY_ENABLED === 'true',
   graphifyMcpCommand: envConfig.GRAPHIFY_MCP_COMMAND,
+  graphifyPlatformCapabilityVersion: 1,
   port: envConfig.PORT,
   host: envConfig.HOST,
   nodeEnv: envConfig.NODE_ENV,
