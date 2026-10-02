@@ -22,7 +22,7 @@ import {
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
-import { readTrajectory, summarizeTrajectory } from './investigation/trajectory.js';
+import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
 import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
 import {
@@ -197,7 +197,8 @@ app.post('/api/sessions', async (req, res) => {
       limit: Number.isFinite(limit) ? limit : 1000,
     });
     const summary = summarizeTrajectory(events);
-    res.json({ events, summary });
+    const turns = summarizeTrajectoryTurns(events);
+    res.json({ events, summary, turns });
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
