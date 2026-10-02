@@ -839,6 +839,59 @@ body {
 }
 
 /* 主对话区的 Agent 建议 */
+.clickable-status-tag {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.clickable-status-tag:hover,
+.clickable-status-tag:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.unknown-items {
+  display: grid;
+  gap: 10px;
+  max-height: min(62vh, 620px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.unknown-item-card {
+  border-color: #ffe7ba;
+  background: #fffdf7;
+}
+.unknown-item-card .ant-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.unknown-item-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.unknown-item-index {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #d46b08;
+  font-weight: 600;
+}
+.unknown-item-title {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.unknown-item-guidance {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .unknown-item-card .ant-card-body {
+    flex-direction: column;
+  }
+}
 .agent-recommendation-card {
   margin: 14px 18px 10px;
   border: 1px solid rgba(22, 119, 255, 0.2);
