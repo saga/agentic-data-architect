@@ -10,11 +10,23 @@
  * 运行时只依赖它提供的 graphify-mcp CLI。
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 
 export const GRAPHIFY_MCP_NAME = 'graphify-structural-analysis';
+
+export interface GraphifyRuntimeMetadata {
+  enabled: boolean;
+  status: 'available' | 'missing' | 'disabled';
+  command?: string;
+  packageVersion?: string;
+  graphPath?: string;
+  graphHash?: string;
+  extractionMode?: string;
+  capturedAt: string;
+}
 
 export interface GraphifyMcpServer {
   name: typeof GRAPHIFY_MCP_NAME;
@@ -64,6 +76,17 @@ export function prepareGraphifyEnvironment(): string | undefined {
 }
 
 /** 找到 Graphify MCP executable；显式配置优先，没有则寻找项目 .venv / PATH。 */
+/** 当 Graphify 已启用时要求 MCP executable 必须存在；避免服务“正常启动但能力其实失效”。 */
+export function requireGraphifyMcpCommand(): string {
+  const command = resolveGraphifyMcpCommand();
+  if (!command) {
+    throw new Error(
+      'Graphify structural analysis is enabled but graphify-mcp was not found. Install requirements.txt or set GRAPHIFY_MCP_COMMAND; set GRAPHIFY_ENABLED=false only when the capability is intentionally disabled.',
+    );
+  }
+  return command;
+}
+
 export function resolveGraphifyMcpCommand(): string | undefined {
   if (!config.graphifyEnabled) return undefined;
 
@@ -87,7 +110,7 @@ export function buildGraphifyMcpServer(
   workingDirectory: string,
   commandOverride?: string,
 ): GraphifyMcpServer | undefined {
-  const command = commandOverride ?? resolveGraphifyMcpCommand();
+  const command = commandOverride ?? requireGraphifyMcpCommand();
   if (!command) return undefined;
 
   const graphPath = graphifyGraphPath(workingDirectory);
@@ -109,4 +132,58 @@ export function buildGraphifyMcpServer(
       ],
     },
   };
+}
+
+
+/** 读取 graph.json 的 SHA-256，作为本轮结构图快照的可重放指纹。 */
+async function graphHash(graphPath: string): Promise<string | undefined> {
+  try {
+    const raw = await fs.promises.readFile(graphPath);
+    return createHash('sha256').update(raw).digest('hex');
+  } catch {
+    return undefined;
+  }
+}
+
+/** 尽量从 graphify-mcp 所在 Python 环境读取 graphifyy 版本；失败时保留命令但不伪造版本。 */
+function graphifyPackageVersion(command: string): string | undefined {
+  const candidatePython = path.join(path.dirname(command), process.platform === 'win32' ? 'python.exe' : 'python');
+  const python = fs.existsSync(candidatePython) ? candidatePython : (process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3'));
+  try {
+    return execFileSync(python, ['-c', "import importlib.metadata as m; print(m.version('graphifyy'))"], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      env: process.env,
+    }).toString('utf8').trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 返回当前 Investigation 实际看到的 Graphify runtime + graph 快照。 */
+export async function getGraphifyRuntimeMetadata(workingDirectory: string): Promise<GraphifyRuntimeMetadata> {
+  const capturedAt = new Date().toISOString();
+  if (!config.graphifyEnabled) {
+    return { enabled: false, status: 'disabled', capturedAt };
+  }
+  const command = resolveGraphifyMcpCommand();
+  if (!command) {
+    return { enabled: true, status: 'missing', capturedAt };
+  }
+  const graphPath = graphifyGraphPath(workingDirectory);
+  const hash = await graphHash(graphPath);
+  return {
+    enabled: true,
+    status: 'available',
+    command,
+    ...(graphifyPackageVersion(command) ? { packageVersion: graphifyPackageVersion(command) } : {}),
+    graphPath,
+    ...(hash ? { graphHash: hash } : {}),
+    extractionMode: '--code-only --no-viz',
+    capturedAt,
+  };
+}
+
+/** 启动 Copilot 前做一次显式依赖检查，避免能力静默降级。 */
+export function assertGraphifyRuntimeAvailable(): void {
+  if (config.graphifyEnabled) requireGraphifyMcpCommand();
 }
