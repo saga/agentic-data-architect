@@ -20,7 +20,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 
 当前代码状态、下一步实现和边界。不重复架构理论。
 
-## 当前：V1.2
+## 当前：V1.4
 
 已经具备：
 
@@ -71,7 +71,11 @@ npm run start
 
 Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
+Structural Analysis 是一个例外边界：Graphify executable 属于平台级 capability，不由 Investigation 的 MCP/Skill 列表决定是否安装。每个 turn 的 Control snapshot 记录平台 capability version；runtime audit 再记录实际 Graphify package version、graph path 和 graph hash。这样既保留能力的稳定可用性，又避免 toolchain 漂移而无法重放。
+
 不要把会变化的命令、tool schema 或研究流程再复制成大量 prompt 文本。
+
+Graphify 只做 structural navigation。Discovery 会为扫描到的源文件建立 `source_file` Evidence（包含 file + sha256 + line count）；Agent 可以用 Graphify 找到文件，再回到源码、SQL AST、metadata 或 profiling 等 deterministic Evidence。source_file Evidence 只证明“当时分析的是哪个文件版本”，不自动证明业务语义。
 
 ## V1.3：Legacy Modernization Workbench
 
