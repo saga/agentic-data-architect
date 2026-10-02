@@ -1,3 +1,20 @@
+## 2026-10-02 — Optional / switchable Investigation Workflow
+
+### 做了什么
+
+- 新建 Investigation 默认不绑定 Workflow，用户可以直接进入自主调查。
+- Legacy Modernization、Financial AI-Native Architecture、Data Architecture Assessment 从“工作类型”调整为可选 playbook。
+- Investigation 过程中可以切换或取消 Workflow；已有 messages、Discovery、Evidence、Findings 和 workspace 状态保持不变。
+- Workflow Skill 不再属于普通 capability Skill 配置；当前工作方式决定是否加载对应 Workflow Skill。
+- 增加 `PATCH /api/sessions/:name/workflow`，Workflow 变化进入 audit。
+- 自主模式下没有 Journey；选择 Workflow 后才显示对应 Journey。
+
+### 设计边界
+
+Agent 决定下一步调查和什么时候需要改变方向；Workflow 只提供需要确定阶段、Gate 和完成条件时的可选约束。不要把 Workflow 再升级成一个固定的全局 Agent 状态机。
+
+---
+
 ## 2026-10-02 — Graphify structural analysis / Control / Evidence hardening
 
 ### 做了什么
