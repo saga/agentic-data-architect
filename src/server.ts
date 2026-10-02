@@ -17,6 +17,7 @@ import {
   MessageBodySchema,
   RequestValidationError,
   UpdateConfigBodySchema,
+  UpdateWorkflowBodySchema,
   parseRequest,
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
@@ -36,7 +37,7 @@ import {
   loadWorkspaceContext,
   workspaceRoot,
 } from './investigation/workspace.js';
-import { investigationExists, newInvestigation, saveInvestigation, loadLatestSnapshot } from './investigation/store.js';
+import { investigationExists, newInvestigation, saveInvestigation, loadLatestSnapshot, updateInvestigationWorkflow } from './investigation/store.js';
 import {
   closeConversationStore,
   recoverRunningConversationTurns,
@@ -130,7 +131,7 @@ async function createSession(
   if (await investigationExists(key)) {
     return loadWorkspaceContext(key);
   }
-  const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? 'legacy-modernization');
+  const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? null);
   await saveInvestigation(investigation);
   await loadInvestigationControl(key);
   await appendAuditEvent(key, {
@@ -190,6 +191,25 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 100;
     res.json({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) });
+  });
+
+  app.patch('/api/sessions/:name/workflow', async (req, res) => {
+    const name = sessionKey(routeParam(req.params.name));
+    const body = parseRequest(UpdateWorkflowBodySchema, req.body);
+    const current = await loadWorkspaceContext(name);
+    const context = await updateInvestigationWorkflow(name, body.workflow);
+    if (current.workflow !== body.workflow) {
+      await appendAuditEvent(name, {
+        actor: 'user',
+        action: 'investigation.workflow.changed',
+        summary: 'Changed the investigation work mode.',
+        details: {
+          fromWorkflow: current.workflow,
+          toWorkflow: body.workflow,
+        },
+      });
+    }
+    res.json({ context });
   });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
