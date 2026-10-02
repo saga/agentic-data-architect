@@ -984,7 +984,8 @@ body {
   background: #f8fbff;
 }
 
-.right-blocked-card .ant-typography {
+.right-blocked-card .ant-typography,
+.right-guidance-card .ant-typography {
   font-size: 13px;
   line-height: 1.55;
 }
