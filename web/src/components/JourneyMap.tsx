@@ -58,7 +58,7 @@ const elk = new ELK();
 
 const LAYOUT_OPTIONS = {
   'elk.algorithm': 'layered',
-  'elk.direction': 'DOWN',
+  'elk.direction': 'RIGHT',
   'elk.edgeRouting': 'ORTHOGONAL',
   'elk.layered.spacing.nodeNodeBetweenLayers': '58',
   'elk.spacing.nodeNode': '34',
@@ -105,8 +105,8 @@ function stageNode(stage: JourneyMapStage): JourneyFlowNode {
     position: { x: 0, y: 0 },
     draggable: false,
     selectable: false,
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
     data: {
       kind: 'stage',
       status: stage.status,
@@ -159,8 +159,8 @@ function makeRouteGraph(
       position: { x: 0, y: 0 },
       draggable: false,
       selectable: false,
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
       data: {
         kind: 'stage',
         status: 'current',
@@ -230,8 +230,8 @@ function makeRouteGraph(
         position: { x: 0, y: 0 },
         draggable: false,
         selectable: false,
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
         data: {
           kind: 'route-step',
           title: step,
