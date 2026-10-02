@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
     "test": "npm run flow:lint && npm run test:python && tsx --test \"tests/**/*.test.ts\"",
     "build": "vite build && tsc",
-    "test:python": "node scripts/ensure-python-deps.mjs",
+    "test:python": "uv run python scripts/check-python-deps.py",
     "flow:lint": "tsx src/workflow/lint.ts"
   },
   "dependencies": {
