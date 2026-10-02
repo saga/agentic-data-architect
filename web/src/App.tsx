@@ -518,6 +518,8 @@ function AppInner() {
   const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
   const [assessmentPlan, setAssessmentPlan] = useState<ArchitectureAssessmentPlan>();
   const [journey, setJourney] = useState<ModernizationPlan['journey']>();
+  /** 工作地图全屏视图是否打开。*/
+  const [journeyMapOpen, setJourneyMapOpen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
