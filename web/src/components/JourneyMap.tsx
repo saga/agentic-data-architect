@@ -65,8 +65,8 @@ const LAYOUT_OPTIONS = {
 };
 
 function nodeDimensions(node: JourneyFlowNode) {
-  if (node.data.kind === 'route') return { width: 290, height: 132 };
-  if (node.data.kind === 'route-step') return { width: 250, height: 68 };
+  if (node.nodeData.kind === 'route') return { width: 290, height: 132 };
+  if (node.nodeData.kind === 'route-step') return { width: 250, height: 68 };
   return { width: 230, height: 76 };
 }
 
@@ -239,17 +239,18 @@ function makeRouteGraph(
   return { nodes, edges };
 }
 
-function JourneyNode({ data }: NodeProps<JourneyFlowNode>) {
+function JourneyNode({ data }: NodeProps) {
+  const nodeData = data as JourneyFlowNodeData;
   return (
     <>
       <Handle type="target" position={Position.Top} className="journey-flow-handle" />
       <div className="journey-flow-node-content">
-      <div className="journey-flow-node-title">{data.title}</div>
-      {data.subtitle ? <div className="journey-flow-node-subtitle">{data.subtitle}</div> : null}
-      {data.kind === 'route' ? (
+      <div className="journey-flow-node-title">{nodeData.title}</div>
+      {nodeData.subtitle ? <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div> : null}
+      {nodeData.kind === 'route' ? (
         <div className="journey-flow-route-meta">
           <Tag bordered={false}>Agent 建议</Tag>
-          {data.action}
+          {nodeData.action}
         </div>
       ) : null}
       </div>
@@ -325,7 +326,7 @@ export function JourneyMap({
           zoomable
           nodeColor={(node) => {
             const data = node.data as JourneyFlowNodeData;
-            if (data.kind === 'route') return '#1677ff';
+            if (nodeData.kind === 'route') return '#1677ff';
             if (data.status === 'completed') return '#52c41a';
             if (data.status === 'current') return '#1677ff';
             return '#d9d9d9';
