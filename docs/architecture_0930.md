@@ -156,6 +156,38 @@ Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Arc
 
 右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区，避免被窄侧栏弱化。全屏工作地图展示 Workflow 主线、当前节点、已完成路径和 Agent 建议分支；选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。当前节点还可以通过 NodeToolbar 直接要求 Agent 围绕该阶段继续。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
 
+## Memory / Rule / State 边界
+
+当前代码检查发现三类逻辑值得进一步公共化，但职责必须分开：
+
+### Memory
+
+`agentic-data-architect` 已经把 transcript、Investigation state、discovery/artifacts 和 Copilot session 分开保存；但目前没有独立的 application-owned archive summary 和统一 cursor pagination。
+
+这不是“没有保存历史”，而是“还没有把长期历史整理成稳定的 Agent Memory 层”。完整 transcript 应永久保留；Archive 只是对旧记录的压缩导航，不能替代原始记录。
+
+`@saga/agent-memory` 已定义 MemoryRecord、MemoryArchive、MemoryStore、分页以及 working-memory window / archive candidate contract。
+
+### Rule
+
+当前 deterministic 判断主要散落在：
+
+- `src/analysis/findings.ts`：Finding 规则和数据质量阈值。
+- `src/analysis/gap.ts`：Current-State / Finding → Gap / Recommendation。
+- `src/workflow/journey.ts`：`completeWhen` → Journey 状态。
+- `src/workflow/modernization.ts` / `src/workflow/assessment.ts`：Validation readiness 和评估阶段完成条件。
+
+这些都属于“facts → deterministic result”，适合由声明式 Rule Engine 承载条件和优先级；复杂的数据扫描算法仍然保留在代码里。
+
+`@saga/agent-rules` 已提供最小的声明式规则评估器。`recommendationForFinding` 如果重新引入，应实现成应用规则配置，而不是散落在 `if/else` 或 prompt 中。
+
+### State
+
+`@saga/markdown-workflow` 本身已经是 Workflow 层状态运行时；不需要再造第二套 Workflow Engine。
+
+但底层已经有多处稳定的状态转移：Conversation turn 的 `running → completed/failed/aborted`、Investigation turn 的 `executing → committing`、以及 Workflow 的 `node + outcome → next node`。
+
+`@saga/agent-state-machine` 提供最小 state / event / transition 原语。后续可以逐步让 `markdown-workflow` 和 turn lifecycle 复用这个底层能力，但不应把业务状态、权限或副作用塞进公共状态机。
 ## Skill / Core / Agent 边界
 
 当前架构明确把容易变化的业务知识从核心 workflow 中拿出来：
