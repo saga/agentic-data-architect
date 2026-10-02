@@ -226,7 +226,8 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     schemaVersion: 3,
     name,
     userPrompt: raw.userPrompt ?? '',
-    workflow: raw.workflow ?? 'legacy-modernization',
+    // 新 context 缺失 workflow 时兼容旧数据；显式 null 必须保留为自主调查。
+    workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
     goal: raw.goal ?? '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
@@ -238,6 +239,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     unknowns: raw.unknowns ?? [],
     importantInformation: raw.importantInformation ?? [],
     inputs: raw.inputs ?? [],
+    ...(raw.journeyPlan ? { journeyPlan: raw.journeyPlan } : {}),
     ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
     ...(typeof raw.copilotConfigurationVersion === 'number'
       ? { copilotConfigurationVersion: raw.copilotConfigurationVersion }
