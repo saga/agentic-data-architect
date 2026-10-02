@@ -29,6 +29,7 @@ interface TrajectorySummary {
   totalTokens:number;
   totalNanoAiu?:number;
   totalPremiumRequestCost?:number;
+  models:Record<string,{inputTokens:number;outputTokens:number;totalNanoAiu?:number}>;
   eventCount:number;
 }
 
@@ -78,6 +79,13 @@ export function AgentTrajectoryPage(props:{sessionName:string;onBack:()=>void}){
           <Col xs={24} md={6}><Card><Statistic title="输出 Token" value={summary?.outputTokens??0}/></Card></Col>
           <Col xs={24} md={6}><Card><Statistic title="AI 额度（nano-AI）" value={summary?.totalNanoAiu??0}/></Card></Col>
         </Row>
+        {Object.entries(summary?.models??{}).length>0 ? <Card title="按模型统计" className="trajectory-model-card">
+          <Space wrap>
+            {Object.entries(summary?.models??{}).map(([model,usage])=><Tag key={model}>
+              {model} · 输入 {usage.inputTokens.toLocaleString()} · 输出 {usage.outputTokens.toLocaleString()} · nano-AI {usage.totalNanoAiu?.toLocaleString()??'—'}
+            </Tag>)}
+          </Space>
+        </Card> : null}
         <Card className="trajectory-summary-card">
           <Flex justify="space-between" wrap gap={16}>
             <Space wrap>
