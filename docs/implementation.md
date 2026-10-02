@@ -79,15 +79,29 @@ Graphify 只做 structural navigation。Discovery 会为扫描到的源文件建
 
 ## V1.3：Legacy Modernization Workbench
 
-### Data Architect Workflow
+### Investigation 与 Data Architect Workflow
 
-当前工作台支持三条固定的大阶段路线：
+当前 Investigation 不要求绑定 Workflow。新建工作默认是自主调查：
+
+```text
+Goal
+ ↓
+Agent 自主调查
+ ↓
+发现新的结构或约束
+ ↓
+可选：采用 / 切换 Workflow
+ ↓
+继续调查
+```
+
+当前提供三套可选的大阶段路线：
 
 - Legacy Modernization：已有系统改造、replatform、迁移和切换。
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
 - Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
 
-三条路线都放在 Skill 的 Markdown Workflow 中。Session 创建时保存所选路线；Agent 会在本轮使用对应 Skill，路线只限制高层阶段，阶段内部仍由 Agent 自主调查和调用工具。
+Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统才加载对应 Workflow Skill 并显示 Journey；取消 Workflow 后回到自主调查。切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
 
 金融 AI-native 路线：
 
@@ -106,7 +120,7 @@ Graphify 只做 structural navigation。Discovery 会为扫描到的源文件建
 
 
 
-当前已经从 Current-State Discovery 进入完整 modernization 工作包，并支持三条高层工作路线。Legacy Modernization 与 Data Architecture Assessment 共用同一个 Journey runtime。
+当前已经从 Current-State Discovery 进入完整 modernization 工作包；Legacy Modernization 与 Data Architecture Assessment 在被选中时共用同一个 Journey runtime。
 
 Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量评估结果，复用 Current-State、Findings、Gap Analysis 和 Evidence；结果写入当前 Investigation 的 `reports/architecture-assessment.json`。
 
