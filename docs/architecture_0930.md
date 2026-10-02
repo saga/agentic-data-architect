@@ -84,7 +84,7 @@ Data Architecture Assessment
     → 排出实施顺序
 ~~~
 
-三条 Workflow 都只固定“大阶段”。Agent 在阶段内部自由调查、使用工具和反复验证。
+三条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；每轮还可以根据用户动作和最新证据生成 0～3 条动态路线。用户可以选其中一条、跳到别的问题、组合路线，或者完全不按地图走。
 
 Financial AI-Native Architecture 的 Skill 重点覆盖：
 
@@ -141,7 +141,8 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 
 边界：
 
-- Workflow：决定现在做什么、什么时候能进入下一关、失败后回哪里。
+- Workflow：提供高层地图、阶段和典型回退路径。
+- 动态路线：由 Agent 根据当前问题、Evidence、Unknowns 和用户动作临时生成，是可选导引，不直接驱动状态机。
 - Skill：说明这一关具体怎么调查。
 - Tool：执行 SQL、profiling、lineage、GitHub、Confluence、Web Search 等动作。
 - Agent：根据当前证据决定具体调查动作，并解释结果。
@@ -149,7 +150,7 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 
 Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
 
-右侧工作区展示当前路线的紧凑地图；完整路线和详细方案仍在“完整改造方案”中查看。发现新的 lineage / semantic / data-quality 问题时，Journey 可以回到调查关卡，而不是继续向后推进。
+右侧工作区展示当前地图的紧凑导引；同时显示 Agent 最近一次重新规划出的可选路线。选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
 
 ## Skill / Core / Agent 边界
 
