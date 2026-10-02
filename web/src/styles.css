@@ -1720,24 +1720,118 @@ body {
 
 .trajectory-stat-row .ant-card {
   height: 100%;
+  border-radius: 12px;
 }
 
-.trajectory-summary-card,
-.trajectory-timeline-card {
-  margin-top: 16px;
-}
-
-.trajectory-timeline-card .ant-timeline {
+.trajectory-overview-card {
   margin-top: 14px;
+  border-radius: 12px;
 }
 
-.trajectory-timeline-card .ant-timeline-item-label {
-  width: 120px;
-  color: #8c959f;
+.trajectory-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
-.trajectory-turns-card {
-  margin-top: 16px;
+.trajectory-context-meter {
+  width: min(280px, 100%);
+  display: grid;
+  gap: 4px;
+}
+
+.trajectory-turn-list {
+  margin-top: 14px;
+  border-radius: 12px;
+}
+
+.trajectory-turn-list .ant-collapse-item {
+  border-radius: 10px !important;
+}
+
+.trajectory-turn-list .ant-collapse-header {
+  align-items: center !important;
+  padding: 12px 16px !important;
+}
+
+.trajectory-collapse-question {
+  min-width: 260px;
+  max-width: 660px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.trajectory-turn-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.trajectory-turn-card .ant-card-body {
+  padding: 4px 0 8px;
+}
+
+.trajectory-turn-heading {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.trajectory-turn-title {
+  max-width: 720px;
+  line-height: 1.5;
+}
+
+.trajectory-turn-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  margin: 12px 0 14px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #f7f9fc;
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 12px;
+}
+
+.trajectory-turn-timeline {
+  margin: 0;
+  padding: 4px 6px 0 2px;
+}
+
+.trajectory-turn-timeline .ant-timeline-item {
+  padding-bottom: 16px;
+}
+
+.trajectory-event-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trajectory-event-row .ant-tag {
+  margin-inline-end: 0;
+}
+
+.trajectory-turn-card .ant-alert {
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .trajectory-page-body {
+    padding: 18px 14px 36px;
+  }
+
+  .trajectory-collapse-question {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .trajectory-context-meter {
+    width: 100%;
+  }
 }
 
 .empty-app-page {
