@@ -60,9 +60,31 @@ skills/<workflow>/SKILL.md
 没有自定义 Workflow 时，直接读取 Skill 内置 Markdown；版本为 0。
 
 工作地图进入后就是编辑状态。人工编辑和 AI 修改都只改变当前画布；点击“保存”后，服务端验证并创建新的 Investigation Workflow version。保存成功后会清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。若当前执行节点仍存在于新 Workflow，会保留当前节点和仍然存在的已完成节点；只有当前节点被删除时才回到新 Workflow 的 start。
-## 3. DSL：保持小，不建立 BPMN
+## 3. DSL：保持小，但吸收高价值的 BPMN 语义
 
-当前 DSL 仍然只有少量核心构件：
+当前 DSL 仍然只保留少量核心构件，不追求完整 BPMN 2.0 XML：
+
+~~~text
+Workflow DSL
+   ↓
+轻量 BPMN-like 语义
+   ↓
+React Flow
+~~~
+
+当前只增加两个低成本、高收益的语义：
+- `actor`：声明这一步主要由 Agent、人或系统执行。
+- route `condition`：给分支增加一个确定性条件，形成轻量的 Conditional Sequence Flow。
+
+现有构件可以自然对应一小部分 BPMN 思维：
+- `task + actor: agent`：Agent task。
+- `task + actor: system`：系统/自动化 task。
+- `review + actor: human`：接近 User Task。
+- `gate`：接近 Exclusive Gateway，仍保持当前单 token 执行模型。
+- `end / stop`：接近 End Event。
+- `route condition`：接近 Conditional Sequence Flow。
+
+这不是完整 BPMN 2.0 runtime；暂不实现 parallel / inclusive gateway、timer / message event、subprocess、多 token join 等需要额外执行状态的能力。
 
 ~~~text
 @flow
@@ -83,9 +105,27 @@ success -> next
 needs-input -> intake
 retry -> investigate
 rollback -> investigate
+success -> target if validation
 ~~~
 
-没有新增 @branch、@condition、@switch、@loop 等语法。
+仍然没有新增 `@branch`、`@switch`、`@loop` 等节点语法；条件直接附着在已有 route 上。
+
+### actor
+
+~~~yaml
+actor: agent
+~~~
+
+可选值：`agent`、`human`、`system`。为保持旧 Workflow 兼容，未写 actor 时，`review` 默认按 human，其它节点默认按 agent。当前 actor 用于 Workflow 语义、地图显示和 Agent 指令，不额外引入人员分配系统。
+
+### conditional route
+
+~~~text
+- success -> review if validation
+- needs-input -> intake
+~~~
+
+`condition` 只能使用现有 deterministic completion 条件。对于 deterministic 节点，命中的条件出口优先于普通 `success / pass / done` 出口；多个条件按 DSL 出现顺序先匹配者优先。这相当于给现有 outcome 增加一个很轻的 Conditional Sequence Flow，而不是建立规则引擎。
 
 ### completion
 
@@ -223,8 +263,10 @@ AI 不直接保存。返回结果只替换当前画布，用户检查后再点�
 8. 是否有不可达节点
 9. 是否存在无法到达 end / stop 的节点
 10. deterministic 是否有 completeWhen
-11. completeWhen 是否是已知条件
-12. 每个节点是否有画布位置
+11. actor 是否属于 agent / human / system
+12. route condition 是否属于已知 deterministic 条件
+13. completeWhen 是否是已知条件
+14. 每个节点是否有画布位置
 ~~~
 
 ### 恢复内置
@@ -468,7 +510,7 @@ POST /api/sessions/:name/workflow/reset
 - /journey：调查页面使用的简化状态。
 - /workflow：工作地图完整快照。
 - PUT /workflow：保存当前工作地图，并创建新版本。
-- /workflow/ai：工作地图专用 AI，生成或修改 Flow。
+- /workflow/ai：工作地图专用多轮 AI；请求可带最近 12 条对话和当前未保存 Definition。
 - /workflow/reset：恢复内置 Skill。
 - /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要。
 ## 12. 与现有代码的边界
@@ -594,7 +636,7 @@ React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 l
 - 任何节点都可以通过“连接到现有步骤”直接选择目标和 outcome。
 - 也可以拖动右侧 source Handle 到目标节点左侧 target Handle。
 
-这些操作最后仍然只生成原来的 Markdown DSL；没有增加第二套图语法。
+这些操作最后仍然只生成同一套 Markdown DSL；React Flow 不会成为第二套 Workflow 语义格式。
 
 ### 15. 地图显示原则
 
@@ -629,7 +671,8 @@ JourneyFlowEdge.tsx
   └── Edge / self-loop / outcome label
 
 JourneyMapInspector.tsx
-  └── 节点与分支属性编辑
+  ├── 节点与分支属性编辑
+  └── JourneyMapAiChat.tsx（Ant Design X 多轮对话）
 ```
 
 其中自动布局使用 React Flow 完成节点尺寸测量后再执行最终布局；这和 React Flow 官方 `useNodesInitialized` 的推荐使用方式一致。ELK multiple-handles 方案也要求为 port 使用稳定 ID、正确 side 和 `FIXED_ORDER`，当前实现按这个模式处理分支连接点。（参考 React Flow 官方 useNodesInitialized、ELK Multiple Handles 文档）
