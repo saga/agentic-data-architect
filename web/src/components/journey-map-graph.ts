@@ -406,6 +406,8 @@ export function graphFromDefinition(
 
     const connectionIssue = issues.get(item.id);
     const terminal = item.type === 'end' || item.type === 'stop';
+    const waiting = snapshot.execution.status === 'waiting'
+      && snapshot.execution.currentNodeId === item.id;
 
     return {
       id: item.id,
@@ -445,6 +447,7 @@ export function graphFromDefinition(
         + STATUS_CLASS[status]
         + ' journey-flow-node-type-' + item.type
         + ' journey-flow-node-actor-' + item.actor
+        + (waiting ? ' journey-flow-node-waiting' : '')
         + (!item.visible ? ' journey-flow-node-deemphasized' : '')
         + (connectionIssue ? ' journey-flow-node-connection-' + connectionIssue.severity : '')
         + (newNodeIds.has(item.id) ? ' journey-flow-node-new' : ''),
