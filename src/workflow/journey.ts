@@ -124,6 +124,7 @@ export interface JourneyRunEvent {
 export interface JourneyExecution {
   workflowId: string;
   workflowVersion: number;
+  runId: string;
   currentNodeId: string;
   completedNodeIds: string[];
   status: 'active' | 'waiting' | 'completed' | 'stopped';
@@ -498,6 +499,7 @@ export function initialJourneyExecution(
   return {
     workflowId: definition.id,
     workflowVersion,
+    runId: definition.id + '-v' + String(workflowVersion),
     currentNodeId: definition.start,
     completedNodeIds: [],
     status: waitingForHuman ? 'waiting' : 'active',
@@ -556,8 +558,9 @@ export function applyJourneyTransition(
         ? 'waiting'
         : 'active';
 
+  const { pendingInteraction: _pendingInteraction, ...executionWithoutPending } = execution;
   return {
-    ...execution,
+    ...executionWithoutPending,
     currentNodeId: target.id,
     completedNodeIds: [...completed],
     status: nextStatus,
@@ -570,7 +573,7 @@ export function applyJourneyTransition(
             requestedAt: new Date().toISOString(),
           },
         }
-      : { pendingInteraction: undefined }),
+      : {}),
   };
 }
 
@@ -593,10 +596,12 @@ function advanceDeterministicJourney(
     if (!node) break;
     if (node.type === 'end') {
       status = 'completed';
+      pendingInteraction = undefined;
       break;
     }
     if (node.type === 'stop') {
       status = 'stopped';
+      pendingInteraction = undefined;
       break;
     }
     if (node.actor === 'human') {
@@ -622,12 +627,13 @@ function advanceDeterministicJourney(
     currentNodeId = route.target;
   }
 
+  const { pendingInteraction: _pendingInteraction, ...executionWithoutPending } = execution;
   return {
-    ...execution,
+    ...executionWithoutPending,
     currentNodeId,
     completedNodeIds: [...completed],
     status,
-    ...(status === 'waiting' ? { pendingInteraction } : { pendingInteraction: undefined }),
+    ...(status === 'waiting' && pendingInteraction ? { pendingInteraction } : {}),
   };
 }
 
