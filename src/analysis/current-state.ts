@@ -155,10 +155,13 @@ export function buildCurrentStateIntelligence(args: {
     .filter((node) => node.type === 'dataset')
     .map((node) => node.name);
 
-  const connected = new Set<string>();
+  const datasetNames = new Set(datasets.map((name) => name.toLowerCase()));
+  // 这里只统计当前 estate 中已知 dataset 的连接，避免把外部/未建模对象算进 datasets。
   for (const edge of args.lineage?.edges || []) {
-    connected.add(edge.source.toLowerCase());
-    connected.add(edge.target.toLowerCase());
+    for (const endpoint of [edge.source, edge.target]) {
+      const normalized = endpoint.toLowerCase();
+      if (datasetNames.has(normalized)) connected.add(normalized);
+    }
   }
 
   const sourceOfTruthCandidates = buildSourceCandidates(args.estate, args.lineage);
