@@ -23,13 +23,13 @@ export function createLocalDataTools(sessionName: string) {
     defineTool('local_catalog', {
       description: '列出当前 Investigation workspace 中可分析的数据集。首次分析本地数据时优先调用。',
       parameters: z.object({
-        refresh: z.boolean().optional().describe('重新扫描 workspace 中的 CSV、JSON、JSONL、Parquet 文件。'),
+        refresh: z.boolean().optional().describe('是否重新扫描 workspace 中的 CSV、JSON、JSONL、Parquet 文件；默认会扫描。'),
       }),
       skipPermission: true,
       handler: async ({ refresh }) => ({
-        datasets: refresh
-          ? await discoverLocalDatasets(sessionName)
-          : listLocalDatasets(sessionName),
+        datasets: refresh === false
+          ? listLocalDatasets(sessionName)
+          : await discoverLocalDatasets(sessionName),
       }),
     }),
     defineTool('local_register_dataset', {
