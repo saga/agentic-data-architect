@@ -104,6 +104,7 @@ function buildSystemPrompt(workflowId: WorkflowId): string {
     '- 每个节点都必须从 start 可到达，并最终能到达 end 或 stop；',
     '- deterministic 节点必须有合法 completeWhen；',
     '- actor 只能是 agent、human、system；review 默认由 human 执行；',
+    '- tools 只是当前 Workflow 的提示性标签，不代表 Agent 获得任何额外工具、MCP 权限或授权；',
     '- route 可以写 condition，但只能使用已知 completeWhen 条件；',
     '- route condition 的 DSL 写法是“- success -> target if goal”，命中的条件出口优先；',
     '- visible、completion、actor、objective 等字段要完整填写；requires / produces 使用字符串数组。',
