@@ -140,16 +140,6 @@ export const McpServerSettingSchema = z.object({
 }).strict();
 export type McpServerSetting = z.infer<typeof McpServerSettingSchema>;
 
-/** Investigation 选中的 Skill 及其版本/内容指纹。 */
-export const SkillSettingSchema = z.object({
-  name: z.string().min(1),
-  version: z.number().int().positive(),
-  sourceHash: z.string().optional(),
-  /** 本次 Investigation 传给该 Skill 的运行参数；Skill 不声明参数时可以为空。 */
-  parameters: z.record(z.string(), z.unknown()).default({}),
-}).strict();
-export type SkillSetting = z.infer<typeof SkillSettingSchema>;
-
 /** Research configuration 的持久化 Schema。 */
 export const ControlResearchSchema = z.object({
   githubRepositories: z.array(z.string()),
@@ -173,7 +163,6 @@ export const ControlAgentSchema = z.object({
     version: z.number().int().positive(),
     content: z.string(),
   }).strict(),
-  skills: z.array(SkillSettingSchema),
   mcpServers: z.array(McpServerSettingSchema),
   platformCapabilities: z.array(PlatformCapabilitySettingSchema).default([]),
 }).strict();
