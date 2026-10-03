@@ -321,8 +321,12 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
         ) : null}
       </div>
 
-      {data.editing || !terminal ? (
-        <Handle type="source" position={Position.Right} className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'} />
+      {!terminal ? (
+        <Handle
+          type="source"
+          position={Position.Right}
+          className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+        />
       ) : null}
     </>
   );
@@ -844,9 +848,14 @@ export function JourneyMap({
           body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
         },
       );
-      const body = await response.json() as { issues?: string[]; error?: string };
+      const body = await response.json() as {
+        issues?: string[];
+        error?: string;
+        snapshot?: WorkflowSnapshot;
+      };
       if (!response.ok) throw new Error(body.error || response.statusText);
       setValidationIssues(body.issues ?? []);
+      if (body.snapshot) setSnapshot(body.snapshot);
       setUsingDraft(true);
       message.success(body.issues?.length ? '草稿已保存，但还有校验问题。' : 'Workflow 草稿已保存。');
     } catch (error) {
