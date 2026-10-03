@@ -48,8 +48,7 @@ function sessionNameFromUrl(): string | undefined {
 interface JourneyWorkflowEditorResult {
   snapshot?: WorkflowSnapshot;
   fetching: boolean;
-  editing: boolean;
-  usingDraft: boolean;
+  dirty: boolean;
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedNode?: FlowNode;
@@ -62,11 +61,8 @@ interface JourneyWorkflowEditorResult {
   currentDefinition?: WorkflowDefinition;
   currentStage?: JourneyMapStage;
   completedCount: number;
-  enterEdit: () => void;
-  cancelEdit: () => Promise<void>;
-  saveDraft: () => Promise<void>;
-  validate: () => Promise<string[]>;
-  applyWorkflow: () => Promise<void>;
+  saveWorkflow: () => Promise<void>;
+  aiEditFlow: (mode: 'generate' | 'modify', prompt: string) => Promise<{ message: string } | undefined>;
   resetWorkflow: () => void;
   autoLayout: () => Promise<void>;
   createStandaloneNode: () => Promise<void>;
@@ -100,8 +96,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot>();
   const [fetching, setFetching] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [usingDraft, setUsingDraft] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
@@ -182,6 +177,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       }
 
       setSnapshot(await response.json() as WorkflowSnapshot);
+      setDirty(false);
+      setValidationIssues([]);
+      newNodeIdsRef.current = new Set();
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -195,11 +193,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   const currentDefinition = useMemo(() => {
     if (!snapshot) return undefined;
-    const base = editing && usingDraft && snapshot.draft
-      ? snapshot.draft.definition
-      : snapshot.definition;
-    return definitionFromGraph(nodes, edges, base);
-  }, [snapshot, editing, usingDraft, nodes, edges]);
+    return definitionFromGraph(nodes, edges, snapshot.definition);
+  }, [snapshot, nodes, edges]);
 
   const selectedNode = selectedNodeId
     ? nodes.find((node) => node.id === selectedNodeId)
@@ -250,23 +245,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const pushHistory = () => {
     setPast((items) => [...items.slice(-30), snapshotNow()]);
     setFuture([]);
-  };
-
-  const enterEdit = () => {
-    if (!snapshot) return;
-    setUsingDraft(Boolean(snapshot.draft));
-    setEditing(true);
-    setValidationIssues(snapshot.draft?.issues ?? []);
-  };
-
-  const cancelEdit = async () => {
-    setEditing(false);
-    setUsingDraft(false);
-    newNodeIdsRef.current = new Set();
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setValidationIssues([]);
-    await loadWorkflow();
+    setDirty(true);
   };
 
   // ---- Graph 编辑动作 ----------------------------------------------------
@@ -413,7 +392,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     nextNewIds.add(id);
     newNodeIdsRef.current = nextNewIds;
 
-    const semanticBase = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const semanticBase = currentSnapshot.definition;
     const definition = definitionFromGraph(nextNodes, nextEdges, semanticBase);
     const graph = graphFromDefinition(
       definition,
@@ -470,7 +449,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         nextNewIds.delete(id);
         newNodeIdsRef.current = nextNewIds;
 
-        const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+        const base = currentSnapshot.definition;
         const definition = definitionFromGraph(nextNodes, nextEdges, base);
         const graph = graphFromDefinition(
           definition,
@@ -501,7 +480,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const currentSnapshot = snapshotRef.current;
     if (!currentSnapshot) return undefined;
 
-    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const base = currentSnapshot.definition;
     const definition = definitionFromGraph(nextNodes, nextEdges, base);
     const graph = graphFromDefinition(
       definition,
@@ -528,8 +507,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   };
 
   const onConnect = async (connection: Connection) => {
-    if (!editing) return;
-
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
     const edge = normalizeConnection(connection, currentNodes, currentEdges);
@@ -584,7 +561,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   const handleNodesChange = (changes: NodeChange<FlowNode>[]) => {
     const removed = changes.filter((change) => change.type === 'remove');
-    if (!editing || !removed.length) {
+    if (changes.some((change) => change.type !== 'select')) setDirty(true);
+    if (!removed.length) {
       onNodesChangeInternal(changes);
       return;
     }
@@ -614,7 +592,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   const handleEdgesChange = (changes: EdgeChange<FlowEdge>[]) => {
     const removed = changes.filter((change) => change.type === 'remove');
-    if (!editing || !removed.length) {
+    if (changes.length) setDirty(true);
+    if (!removed.length) {
       onEdgesChangeInternal(changes);
       return;
     }
@@ -653,7 +632,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const currentSnapshot = snapshotRef.current;
     if (!currentSnapshot) return;
-    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const base = currentSnapshot.definition;
     const definition = definitionFromGraph(nextNodes, currentEdges, base);
     const graph = graphFromDefinition(
       definition,
@@ -794,7 +773,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     nextIds.add(id);
     newNodeIdsRef.current = nextIds;
 
-    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const base = currentSnapshot.definition;
     const definition = definitionFromGraph([...currentNodes, node], currentEdges, base);
     const graph = graphFromDefinition(
       definition,
@@ -821,7 +800,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    * 因此只在 drag start 保存一次 Undo snapshot。
    */
   const beginNodeDrag = () => {
-    if (editing) pushHistory();
+    pushHistory();
   };
 
   const undo = () => {
@@ -830,6 +809,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const current = snapshotNow();
     setFuture((items) => [...items, current]);
     setPast((items) => items.slice(0, -1));
+    setDirty(true);
     setNodes(previous.nodes);
     setEdges(previous.edges);
   };
@@ -840,6 +820,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const current = snapshotNow();
     setPast((items) => [...items, current]);
     setFuture((items) => items.slice(0, -1));
+    setDirty(true);
     setNodes(next.nodes);
     setEdges(next.edges);
   };
@@ -867,40 +848,32 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setValidationIssues([]);
   };
 
-  /** 画布的唯一重建入口：锁定模式画已应用版本，编辑模式优先画草稿。
-   *
-   * graphKey 决定"什么时候该重画"——来源（已应用 / 草稿）、版本、编辑模式，
-   * 再加一份内容签名，因为"恢复内置"不一定改版本号。
-   * 保存草稿不会改 key，所以画布不会重建，撤销栈、选中状态和当前视角都留得住。
-   *
-   * 签名必须排序：服务端保存后返回的 definition 里节点顺序和画布上的顺序不一样，
-   * 不排序的话"保存草稿"会被当成内容变了，画布重建、视角被重置，
-   * 用户正看着的那一块会突然跳走。
-   */
+  /** 画布只显示当前已保存版本；所有打开后的编辑都直接发生在本地画布。 */
   const graphKey = (() => {
     if (!snapshot) return 'none';
-    const useDraft = editing && usingDraft && Boolean(snapshot.draft);
-    const source = useDraft && snapshot.draft ? snapshot.draft.definition : snapshot.definition;
+
+    const source = snapshot.definition;
     const signature = source.nodes
-      .map((node) => node.id + ':' + String(node.routes.length))
+      .map((node) => JSON.stringify({
+        id: node.id,
+        type: node.type,
+        title: node.title,
+        objective: node.objective,
+        visible: node.visible,
+        completion: node.completion,
+        completeWhen: node.completeWhen,
+        routes: node.routes.map(({ outcome, target }) => ({ outcome, target })),
+      }))
       .sort()
       .join('|');
 
-    return [
-      snapshot.source,
-      String(snapshot.version),
-      editing ? 'edit' : 'lock',
-      useDraft ? 'draft' : 'active',
-      signature,
-    ].join('#');
+    return [snapshot.source, String(snapshot.version), signature].join('#');
   })();
 
   useEffect(() => {
-    // 每次真正切换 active/draft/edit 状态时，都允许 React Flow 的实测尺寸
-    // 触发一次最终自动排版；否则相同节点数量的 Workflow 切换后不会重新计算。
+    // 服务端版本变化后重建画布；普通节点拖动不会改变 graphKey，因此不会被这个 effect 覆盖。
     lastMeasuredNodeCountRef.current = 0;
 
-    // 依赖里只放 graphKey：snapshot 对象换了但内容没换（保存草稿）时不该重画。
     const current = snapshotRef.current;
     if (!current) {
       setNodes([]);
@@ -908,22 +881,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       return;
     }
 
-    const useDraft = editing && usingDraft && Boolean(current.draft);
-    const sourceDefinition = useDraft && current.draft
-      ? current.draft.definition
-      : current.definition;
-    const sourceLayout = useDraft && current.draft
-      ? current.draft.layout
-      : current.layout;
-
     let cancelled = false;
 
     const initializeGraph = async () => {
       const graph = graphFromDefinition(
-        sourceDefinition,
-        sourceLayout,
+        current.definition,
+        current.layout,
         current,
-        editing,
+        true,
         setSelectedNodeId,
         (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
@@ -932,7 +897,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         newNodeIdsRef.current,
       );
 
-      const layoutedNodes = sourceLayout.engine === 'elk-v2'
+      const layoutedNodes = current.layout.engine === 'elk-v2'
         ? graph.nodes
         : await autoLayoutJourney(graph.nodes, graph.edges);
 
@@ -944,6 +909,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId(undefined);
       setPast([]);
       setFuture([]);
+      setDirty(false);
     };
 
     void initializeGraph();
@@ -966,7 +932,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    * 放在 nodes 上就天然是"等新节点真的落到画布之后"才重排。
    */
   useEffect(() => {
-    if (!editing || !nodesInitialized || !nodes.length) return;
+    if (!nodesInitialized || !nodes.length) return;
 
     if (lastMeasuredNodeCountRef.current === nodes.length) return;
     lastMeasuredNodeCountRef.current = nodes.length;
@@ -1015,37 +981,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
 
-  // ---- Draft / Validate / Apply -----------------------------------------
-  /**
-   * 所有发送给服务端的 definition/layout 都来自当前 React Flow graph，
-   * 浏览器端的 validation 只做体验优化，最终规则仍以服务端结果为准。
-   */
-  const validate = async (): Promise<string[]> => {
-    const name = sessionNameFromUrl();
-    if (!name || !definitionPayload) return ['没有当前 Workflow。'];
-
-    const response = await fetch(
-      '/api/sessions/' + encodeURIComponent(name) + '/workflow/validate',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
-      },
-    );
-    const body = await response.json() as { issues?: string[]; error?: string };
-    if (!response.ok) throw new Error(body.error || response.statusText);
-    const issues = body.issues ?? [];
-    setValidationIssues(issues);
-    return issues;
-  };
-
-  const saveDraft = async () => {
+  /** 保存当前画布。服务端会重新检查结构，通过后才创建新的 Workflow 版本。 */
+  const saveWorkflow = async () => {
     const name = sessionNameFromUrl();
     if (!name || !definitionPayload) return;
 
     try {
       const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow/draft',
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow',
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
@@ -1053,50 +996,91 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         },
       );
       const body = await response.json() as {
+        snapshot?: WorkflowSnapshot;
         issues?: string[];
         error?: string;
-        snapshot?: WorkflowSnapshot;
       };
-      if (!response.ok) throw new Error(body.error || response.statusText);
-      setValidationIssues(body.issues ?? []);
+
+      if (!response.ok) {
+        const issues = body.issues ?? [];
+        setValidationIssues(issues);
+        throw new Error(
+          issues.length
+            ? '工作地图还不能保存，请先修正：' + issues.join('；')
+            : body.error || response.statusText,
+        );
+      }
+
       if (body.snapshot) setSnapshot(body.snapshot);
-      // 当前画布本身就是刚保存的草稿，不重新装载，避免保存后清空撤销栈和选中状态。
-      message.success(body.issues?.length ? '草稿已保存，但还有校验问题。' : 'Workflow 草稿已保存。');
+      setDirty(false);
+      setValidationIssues([]);
+      newNodeIdsRef.current = new Set();
+      setPast([]);
+      setFuture([]);
+      message.success('工作地图已保存。');
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     }
   };
 
-  const applyWorkflow = async () => {
-    const issues = await validate();
-    if (issues.length) {
-      message.error('验证未通过，先修正工作地图中的问题。');
-      return;
-    }
-
+  /** 调用工作地图专用 AI。AI 只改图，不直接替用户保存。 */
+  const aiEditFlow = async (mode: 'generate' | 'modify', prompt: string) => {
     const name = sessionNameFromUrl();
-    if (!name || !definitionPayload) return;
+    if (!name || !prompt.trim()) return undefined;
 
     try {
       const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow/apply',
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow/ai',
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
+          body: JSON.stringify({ mode, prompt: prompt.trim() }),
         },
       );
-      const body = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(body.error || response.statusText);
+      const body = await response.json() as {
+        definition?: WorkflowDefinition;
+        message?: string;
+        error?: string;
+      };
+      if (!response.ok || !body.definition) {
+        throw new Error(body.error || response.statusText || 'AI 没有返回工作地图。');
+      }
 
-      message.success('Workflow 已应用；能保留的当前执行位置会继续使用新版本。');
-      setEditing(false);
-      setUsingDraft(false);
+      const currentSnapshot = snapshotRef.current;
+      if (!currentSnapshot) return undefined;
+
+      pushHistory();
+      const graph = graphFromDefinition(
+        body.definition,
+        layoutFromNodes(nodesRef.current),
+        {
+          ...currentSnapshot,
+          definition: body.definition,
+        },
+        true,
+        setSelectedNodeId,
+        (id) => { void addNodeAfter(id, false); },
+        (id) => { void addNodeAfter(id, true); },
+        deleteNode,
+        setSelectedEdgeId,
+        new Set(),
+      );
+      const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
+      if (!layoutedNodes) return undefined;
+
       newNodeIdsRef.current = new Set();
+      setNodes(layoutedNodes);
+      setEdges(graph.edges);
+      setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
       setValidationIssues([]);
-      await loadWorkflow();
+      setDirty(true);
+      pendingFitRef.current = true;
+
+      return { message: body.message?.trim() || 'AI 已更新工作地图，请检查后保存。' };
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
+      return undefined;
     }
   };
 
@@ -1105,8 +1089,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     if (!name) return;
 
     Modal.confirm({
-      title: '恢复内置 Workflow？',
-      content: '当前 Investigation 的自定义 Workflow、草稿、布局和执行位置都会恢复到 Skill 内置版本。',
+      title: '恢复内置工作地图？',
+      content: '当前自定义工作地图会被删除，改回这个工作方式自带的路线。',
       okText: '恢复',
       cancelText: '取消',
       onOk: async () => {
@@ -1114,14 +1098,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           '/api/sessions/' + encodeURIComponent(name) + '/workflow/reset',
           { method: 'POST' },
         );
+        const body = await response.json().catch(() => ({})) as { error?: string };
         if (!response.ok) {
-          message.error(await response.text());
+          message.error(body.error || '恢复工作地图失败，请重试。');
           return;
         }
-        message.success('已恢复内置 Workflow。');
-        setEditing(false);
-        setUsingDraft(false);
-        newNodeIdsRef.current = new Set();
+        message.success('已恢复内置工作地图。');
         await loadWorkflow();
       },
     });
@@ -1129,9 +1111,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
 
   // 把所有编辑动作集中在 hook 内，JourneyMap 只负责布局 UI。
-  const activeDefinition = editing && usingDraft && snapshot?.draft
-    ? snapshot.draft.definition
-    : snapshot?.definition;
+  const activeDefinition = snapshot?.definition;
 
   const currentStage = snapshot
     ? snapshot.state.stages.find((stage) => stage.id === snapshot.state.currentNodeId)
@@ -1149,8 +1129,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   return {
     snapshot,
     fetching,
-    editing,
-    usingDraft,
+    dirty,
     nodes,
     edges,
     selectedNode,
@@ -1163,11 +1142,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     currentDefinition: activeDefinition,
     currentStage,
     completedCount,
-    enterEdit,
-    cancelEdit,
-    saveDraft,
-    validate,
-    applyWorkflow,
+    saveWorkflow,
+    aiEditFlow,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
