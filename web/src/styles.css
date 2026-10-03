@@ -1922,7 +1922,7 @@ body {
 }
 
 .journey-map-inspector-tabs .ant-tabs-tab {
-  padding: 12px 2px 10px;
+  padding: 11px 2px 10px;
 }
 
 .journey-map-inspector-tabs .ant-tabs-tab-btn {
@@ -1931,9 +1931,19 @@ body {
   min-height: 20px;
 }
 
-.journey-map-inspector-tabs .ant-tabs-content-holder {
+.journey-map-inspector-tabs > .ant-tabs-content-holder {
+  display: flex;
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.journey-map-inspector-tabs .ant-tabs-body {
   display: flex;
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1941,23 +1951,27 @@ body {
 
 .journey-map-inspector-tabs .ant-tabs-content {
   display: flex;
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
-.journey-map-inspector-tabs .ant-tabs-tabpane {
+.journey-map-inspector-tabs .ant-tabs-content > [role="tabpanel"] {
   display: flex;
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
   padding: 14px 16px 16px;
+}
+
+.journey-map-inspector-tabs .ant-tabs-content > .ant-tabs-content-hidden {
+  display: none;
 }
 
 .journey-map-inspector-section {
@@ -1968,6 +1982,7 @@ body {
   min-height: 0;
   box-sizing: border-box;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .journey-map-inspector-head {
@@ -1975,6 +1990,7 @@ body {
   flex: 0 0 auto;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   min-height: 48px;
 }
 
@@ -1985,13 +2001,14 @@ body {
 
 .journey-map-inspector-properties-scroll {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   gap: 10px;
   overflow: auto;
-  padding: 2px 2px 2px 0;
+  padding: 2px 4px 2px 0;
+  scrollbar-gutter: stable;
 }
 
 .journey-map-property-id {
@@ -2027,20 +2044,25 @@ body {
   flex: 1 1 auto;
   flex-direction: column;
   gap: 10px;
+  overflow: hidden;
+}
+
+.journey-map-ai-chat-title-row {
+  min-height: 24px;
 }
 
 .journey-map-ai-chat-header {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 76px;
+  align-items: stretch;
+  gap: 7px;
+  min-width: 0;
 }
 
 .journey-map-ai-chat-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   width: 100%;
   gap: 8px;
 }
@@ -2059,29 +2081,36 @@ body {
   text-align: center;
 }
 
-.journey-map-ai-chat-header > .ant-flex:last-child {
+.journey-map-ai-chat-body {
+  display: flex;
+  flex: 1 1 0;
   width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 2px 0 0;
 }
 
-.journey-map-ai-chat-body {
+.journey-map-ai-chat-body .ant-bubble-list {
   display: flex;
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
-  padding: 0 2px 0 0;
+  overflow: hidden;
 }
 
-.journey-map-ai-chat-body .ant-bubble-list {
-  width: 100%;
-  min-height: max-content;
+.journey-map-ai-chat-body .ant-bubble-list-scroll-box {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .journey-map-ai-chat .ant-sender {
   width: 100%;
   flex: 0 0 auto;
-  margin-top: auto;
+  margin: 0;
   border-radius: 10px;
 }
 
@@ -2090,6 +2119,7 @@ body {
   flex: 0 1 auto;
   gap: 8px;
   max-height: 190px;
+  min-height: 0;
   margin: 0;
   padding: 10px;
   overflow: auto;
