@@ -54,7 +54,7 @@ test('journey editor serialization round-trips semantic graph', () => {
   assert.equal(parsed.definition?.nodes[0]?.completion, 'deterministic');
   assert.equal(parsed.definition?.nodes[0]?.actor, 'system');
   assert.deepEqual(
-    parsed.definition?.nodes[0]?.routes.map(({ outcome, target }) => ({ outcome, target })),
+    parsed.definition?.nodes[0]?.routes.map(({ outcome, target, condition }) => ({ outcome, target, condition })),
     [
       { outcome: 'success', target: 'review', condition: 'goal' },
       { outcome: 'needs-input', target: 'intake' },
