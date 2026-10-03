@@ -323,7 +323,7 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 
 Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；deterministic 节点只根据当前 Investigation 状态推进，而需要判断的 agent 节点必须返回当前节点实际存在的 outcome，服务端才会推进。
 
-右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区。全屏工作地图展示 Workflow 主线和 Agent 临时建议；进入编辑模式后，用户可以拖动节点、添加步骤、增加分支、修改 outcome/目标、删除节点或分支。保存草稿不会改变执行；服务端验证通过并 Apply 后，生成新的 Workflow version，并从修改后的 Workflow 重新执行。
+右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区。全屏工作地图展示 Workflow 主线和 Agent 临时建议；进入编辑模式后，用户可以拖动节点、添加步骤、增加分支、修改 outcome/目标、删除节点或分支。保存草稿不会改变执行；服务端验证通过并 Apply 后，生成新的 Workflow version，并尽量保留当前执行位置；只有当前节点被删除时才回到新 Workflow 的 start。
 
 ## Agent Trajectory / 执行轨迹
 
