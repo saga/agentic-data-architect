@@ -350,6 +350,9 @@ function graphFromDefinition(
           + (sourceCompleted ? ' journey-flow-edge-traversed' : ''),
         data: {
           outcome: route.outcome,
+          labelOffsetY:
+            (index - (node.routes.length - 1) / 2) * 18
+            + (Math.max(0, incomingIndex) - (Math.max(0, targetIncoming.length) - 1) / 2) * 8,
           onSelect: onSelectEdge,
         },
       });
@@ -812,6 +815,8 @@ export function JourneyMap({
   const cancelEdit = async () => {
     setEditing(false);
     setUsingDraft(false);
+    newNodeIdsRef.current = new Set();
+    setNewNodeIds(new Set());
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
@@ -1042,9 +1047,9 @@ export function JourneyMap({
     nextNodes: FlowNode[],
     nextEdges: FlowEdge[],
     nextNewIds = new Set(newNodeIdsRef.current),
-  ) => {
+  ): Promise<{ nodes: FlowNode[]; edges: FlowEdge[] } | undefined> => {
     const currentSnapshot = snapshotRef.current;
-    if (!currentSnapshot) return;
+    if (!currentSnapshot) return undefined;
 
     const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
     const definition = definitionFromGraph(nextNodes, nextEdges, base);
@@ -1061,12 +1066,14 @@ export function JourneyMap({
       nextNewIds,
     );
 
-    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    const layoutedNodes = await layoutWithElk(graph.nodes, graph.edges);
+    setNodes(layoutedNodes);
     setEdges(graph.edges);
     setValidationIssues([]);
     requestAnimationFrame(() => {
       flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
     });
+    return { nodes: layoutedNodes, edges: graph.edges };
   };
 
   const onConnect = async (connection: Connection) => {
@@ -1077,20 +1084,19 @@ export function JourneyMap({
     const edge = normalizeConnection(connection, currentNodes, currentEdges);
     if (!edge) return;
 
-    // Duplicate source + target 连接没有意义；用户可以通过 edge inspector 改 outcome。
-    if (currentEdges.some(
-      (item) => item.source === edge.source && item.target === edge.target,
-    )) {
-      message.info('这两个步骤已经有连接了；点击已有连线标签可以修改 outcome。');
-      return;
-    }
-
     pushHistory();
-    await rebuildStructuralGraph(
+    const rebuilt = await rebuildStructuralGraph(
       [...currentNodes],
       addEdge(edge, currentEdges),
     );
-    setSelectedEdgeId(edge.id);
+    setSelectedEdgeId(
+      rebuilt?.edges.find(
+        (item) =>
+          item.source === edge.source
+          && item.target === edge.target
+          && item.data?.outcome === edge.data?.outcome,
+      )?.id,
+    );
   };
 
   const onReconnect = async (oldEdge: FlowEdge, connection: Connection) => {
@@ -1104,11 +1110,18 @@ export function JourneyMap({
       sourceHandle: connection.sourceHandle ?? oldEdge.sourceHandle,
       targetHandle: connection.targetHandle,
     };
-    await rebuildStructuralGraph(
+    const rebuilt = await rebuildStructuralGraph(
       [...currentNodes],
       reconnectEdge(oldEdge, nextConnection, currentEdges),
     );
-    setSelectedEdgeId(oldEdge.id);
+    setSelectedEdgeId(
+      rebuilt?.edges.find(
+        (item) =>
+          item.source === connection.source
+          && item.target === connection.target
+          && item.data?.outcome === oldEdge.data?.outcome,
+      )?.id,
+    );
   };
 
   const applyNodeDraft = async () => {
@@ -1468,6 +1481,8 @@ export function JourneyMap({
       message.success('Workflow 已应用，新版本会从修改后的 start 重新执行。');
       setEditing(false);
       setUsingDraft(false);
+      newNodeIdsRef.current = new Set();
+      setNewNodeIds(new Set());
       setValidationIssues([]);
       await loadWorkflow();
     } catch (error) {
@@ -1496,6 +1511,8 @@ export function JourneyMap({
         message.success('已恢复内置 Workflow。');
         setEditing(false);
         setUsingDraft(false);
+        newNodeIdsRef.current = new Set();
+        setNewNodeIds(new Set());
         await loadWorkflow();
       },
     });
@@ -1603,12 +1620,18 @@ export function JourneyMap({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            onInit={(instance) => {
+              flowInstanceRef.current = instance;
+            }>
             edgeTypes={edgeTypes}
             nodesDraggable={editing}
             nodesConnectable={editing}
             elementsSelectable={editing}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodeDragStart={() => {
+              if (editing) pushHistory();
+            }}
             onConnect={onConnect}
             onReconnect={onReconnect}
             onNodeClick={(_, node) => editing && setSelectedNodeId(node.id)}
