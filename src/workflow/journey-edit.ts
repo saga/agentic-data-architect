@@ -98,13 +98,29 @@ export interface JourneyAnalysisIssue {
 
 function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
   return {
-    ...definition,
+    id: definition.id,
+    start: definition.start,
     nodes: definition.nodes.map((node) => ({
-      ...node,
-      tools: node.tools ? [...node.tools] : undefined,
-      requires: node.requires ? [...node.requires] : undefined,
-      produces: node.produces ? [...node.produces] : undefined,
-      routes: node.routes.map((route) => ({ ...route })),
+      id: node.id,
+      type: node.type,
+      title: node.title,
+      visible: node.visible,
+      completion: node.completion,
+      actor: node.actor,
+      body: node.body,
+      attrs: { ...node.attrs },
+      routes: node.routes.map((route) => ({
+        outcome: route.outcome,
+        target: route.target,
+        ...(route.condition ? { condition: route.condition } : {}),
+        ...(route.line !== undefined ? { line: route.line } : {}),
+      })),
+      ...(node.objective ? { objective: node.objective } : {}),
+      ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
+      ...(node.tools?.length ? { tools: [...node.tools] } : {}),
+      ...(node.requires?.length ? { requires: [...node.requires] } : {}),
+      ...(node.produces?.length ? { produces: [...node.produces] } : {}),
+      ...(node.line !== undefined ? { line: node.line } : {}),
     })),
   };
 }
@@ -134,7 +150,29 @@ export function applyJourneyWorkflowChanges(
         if (definition.nodes.some((node) => node.id === change.node.id)) {
           throw new Error('不能新增重复节点：' + change.node.id);
         }
-        definition.nodes.push(cloneDefinition({ id: definition.id, start: definition.start, nodes: [change.node] }).nodes[0]!);
+        const node = change.node;
+        definition.nodes.push({
+          id: node.id,
+          type: node.type,
+          title: node.title,
+          visible: node.visible,
+          completion: node.completion,
+          actor: node.actor,
+          body: node.body,
+          attrs: { ...node.attrs },
+          routes: node.routes.map((route) => ({
+            outcome: route.outcome,
+            target: route.target,
+            ...(route.condition ? { condition: route.condition } : {}),
+            ...(route.line !== undefined ? { line: route.line } : {}),
+          })),
+          ...(node.objective ? { objective: node.objective } : {}),
+          ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
+          ...(node.tools?.length ? { tools: [...node.tools] } : {}),
+          ...(node.requires?.length ? { requires: [...node.requires] } : {}),
+          ...(node.produces?.length ? { produces: [...node.produces] } : {}),
+          ...(node.line !== undefined ? { line: node.line } : {}),
+        });
         break;
 
       case 'update-node': {
