@@ -21,6 +21,7 @@ import { appendTrajectoryEvent } from '../investigation/trajectory.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
+import type { JourneyRouteOption } from '../investigation/schemas.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -54,7 +55,13 @@ export async function answerQuestion(
   onDelta?: (delta: string) => void,
   turnId?: string,
   onStatus?: (status: string) => void,
+  options?: { selectedRoute?: JourneyRouteOption },
 ): Promise<AnswerSummary> {
+  const selectedRoute = options?.selectedRoute;
+  const effectiveQuestion = selectedRoute
+    ? '选择下一步：' + selectedRoute.title
+    : question;
+
   if (!turnId) turnId = nextId('turn');
 
   // 第一层并发保护：同一 Investigation 在进程内只能有一个活动 turn。
@@ -99,7 +106,7 @@ const userMessage = saveConversationMessage({
     id: turnId + ':user',
     sessionName: investigationName,
     role: 'user',
-    content: question,
+    content: effectiveQuestion,
   });
   const inv = await loadInvestigation(investigationName);
   const control = await loadInvestigationControl(investigationName);
@@ -108,7 +115,10 @@ const userMessage = saveConversationMessage({
     action: 'investigation.question',
     summary: 'Asked investigation question.',
     configurationVersion: control.version,
-    details: { questionLength: question.length },
+    details: {
+      questionLength: effectiveQuestion.length,
+      ...(selectedRoute ? { selectedRouteId: selectedRoute.id } : {}),
+    },
   });
 
   // 本轮只读取一个固定的 Discovery snapshot；后续 UI/Discovery 变化不应影响已经开始的模型请求。
@@ -143,7 +153,7 @@ const priorConversation = searchConversation(investigationName, question, {
 
   // 通用知识用于“怎么做”的参考，不得冒充当前 Investigation 的事实证据。
   const knowledge = await searchArchitectureKnowledge(
-    [inv.goal, question].filter(Boolean).join('\n'),
+    [inv.goal, effectiveQuestion].filter(Boolean).join('\n'),
     { workflow: inv.workflow, limit: 6 },
   );
   const knowledgeText = renderArchitectureKnowledge(knowledge);
@@ -155,14 +165,29 @@ const prompt = buildQuestionPrompt({
     investigationName: inv.name,
     goal: inv.goal,
     scope: inv.scope,
-    question,
+    question: effectiveQuestion,
     contextText: questionContextText,
+    selectedRoute,
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
     // The prompt and configuration snapshot are fixed for this turn; later
     // UI changes apply only to the next turn.
-    // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
+    if (selectedRoute) {
+    await appendAuditEvent(investigationName, {
+      actor: 'user',
+      action: 'investigation.route.selected',
+      summary: '用户选择了一个下一步调查动作。',
+      configurationVersion: control.version,
+      details: {
+        routeId: selectedRoute.id,
+        title: selectedRoute.title,
+        steps: selectedRoute.steps,
+      },
+    });
+  }
+
+  // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
   // Workflow is a work mode, not a user-configurable capability. In the selected mode load only that workflow Skill; in autonomous mode load none.
   // Capability Skills remain discoverable to Copilot. The selected Workflow is the
   // only Workflow Skill left eligible, so the Agent does not mix routes.
@@ -258,7 +283,7 @@ activeAfterExecution.phase = 'committing';
   const parsed = parseAgentAnswer(raw, evidenceAfterTools);
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
-  if (!inv.questions.includes(question)) inv.questions.push(question);
+  if (!inv.questions.includes(effectiveQuestion)) inv.questions.push(effectiveQuestion);
   for (const u of parsed.unknowns) {
     if (!inv.unknowns.includes(u)) inv.unknowns.push(u);
   }
