@@ -10,7 +10,7 @@ import type { FlowEdge, FlowNodeData } from './journey-map-types.js';
 
 /**
  * 工作地图边的交互重点是“这条线从哪里到哪里”。
- * React Flow 默认只把选中的边加深，复杂工作流里不够明显，所以选中后同时标出两端节点。
+ * 选中后用鲜明的蓝色 + 黄色 glow 强调整条边，并明确标出两端。
  */
 export function JourneyFlowEdge({
   id,
@@ -25,6 +25,10 @@ export function JourneyFlowEdge({
   selected = false,
   data,
 }: EdgeProps<FlowEdge>) {
+  // 工作地图不展示 self-loop。
+  // 这类 route 即使存在于旧 Workflow Definition 中，也不应该污染画布。
+  if (source === target) return null;
+
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -47,7 +51,14 @@ export function JourneyFlowEdge({
         id={id}
         path={path}
         markerEnd={MarkerType.ArrowClosed}
-        className={selected ? 'journey-flow-edge-path journey-flow-edge-path-selected' : 'journey-flow-edge-path'}
+        className="journey-flow-edge-path"
+        style={selected
+          ? {
+              stroke: '#1677ff',
+              strokeWidth: 4,
+              filter: 'drop-shadow(0 0 3px #ffd666) drop-shadow(0 0 7px rgba(255, 214, 102, 0.95))',
+            }
+          : undefined}
       />
 
       <EdgeLabelRenderer>
