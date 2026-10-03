@@ -75,7 +75,16 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           position={Position.Left}
           id={handle.id}
           className="journey-flow-handle journey-flow-handle-edit"
-          style={handleStyle(index, data.targetHandles.length)}
+          style={{
+            ...handleStyle(index, data.targetHandles.length),
+            // 保留真实 Handle 作为连线热区，但不再显示一个突兀的蓝色圆点。
+            opacity: 0,
+            background: 'transparent',
+            border: 0,
+            boxShadow: 'none',
+            width: 16,
+            height: 24,
+          }}
         />
       ))}
 
@@ -195,7 +204,16 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               position={Position.Right}
               id={handle.id}
               className="journey-flow-handle journey-flow-handle-edit"
-              style={handleStyle(index, data.sourceHandles.length)}
+              style={{
+                ...handleStyle(index, data.sourceHandles.length),
+                // Handle 仍可用于拖线，但视觉上完全透明；方向由连线本身的 source dot + target arrow 表示。
+                opacity: 0,
+                background: 'transparent',
+                border: 0,
+                boxShadow: 'none',
+                width: 16,
+                height: 24,
+              }}
             />
           ))
         : null}
