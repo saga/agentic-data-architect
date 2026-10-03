@@ -10,11 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { config } from './config.js';
 import { createApp } from './server.js';
-import { parseRequest } from './api/schemas.js';
 import {
   buildJourneyAgentInstruction,
   getJourneySnapshot,
-  resetJourneyCustomization,
 } from './workflow/journey-editor.js';
 import { loadWorkspaceContext } from './investigation/workspace.js';
 import { closeConversationStore, recoverRunningConversationTurns } from './investigation/conversation.js';
@@ -63,103 +61,6 @@ function registerJourneyRoutes(app: express.Express): void {
     }
   });
 
-<<<<<<< HEAD
-  /** 编辑器需要的完整 Workflow + layout + execution + draft。 */
-  app.get('/api/sessions/:name/workflow', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      res.json(await getJourneySnapshot(name, context.workflow));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 保存编辑草稿，不改变 active Workflow。 */
-  app.put('/api/sessions/:name/workflow/draft', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      const result = await saveJourneyDraft(
-        name,
-        context.workflow,
-        body.definition,
-        body.layout,
-      );
-      res.json({
-        saved: true,
-        issues: result.issues,
-        warnings: result.warnings,
-        snapshot: await getJourneySnapshot(name, context.workflow),
-      });
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 只验证，不落盘。 */
-  app.post('/api/sessions/:name/workflow/validate', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      res.json(validateJourneyEdit(body.definition, body.layout));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 应用时服务端再次完整验证，并创建新 Workflow version。 */
-  app.post('/api/sessions/:name/workflow/apply', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      res.json(await applyJourneyDefinition(
-        name,
-        context.workflow,
-        body.definition,
-        body.layout,
-      ));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-=======
->>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
-  /** 恢复 Skill 内置路线，并清除 Investigation 级自定义 Workflow。 */
-  app.post('/api/sessions/:name/workflow/reset', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      res.json(await resetJourneyCustomization(name, context.workflow));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
 
   /** 测试 / 调试入口：查看 Agent 本轮会收到的 Workflow 控制摘要。 */
   app.get('/api/sessions/:name/workflow/instruction', async (req, res) => {
