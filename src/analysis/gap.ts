@@ -53,17 +53,17 @@ export function buildModernizationGaps(args: {
     });
   }
 
-  const coverage = currentState.coverage.datasetLineageCoverage;
-  if (coverage !== null && coverage < 0.8) {
+  const connectionRate = currentState.coverage.datasetLineageConnectionRate;
+  if (connectionRate !== null && connectionRate < 1) {
     gaps.push({
       id: nextGapId('lineage'),
       kind: 'lineage',
-      title: 'Dataset lineage 覆盖不足',
-      description: `当前 lineage coverage 为 ${(coverage * 100).toFixed(1)}%，不足以直接支撑完整迁移影响分析。`,
+      title: '仍有数据集没有进入已发现血缘',
+      description: `当前有 ${currentState.coverage.datasets - currentState.coverage.connectedDatasets} 个数据集没有出现在已发现的 lineage 连接中；连接率为 ${(connectionRate * 100).toFixed(1)}%。`,
       severity: 'high',
       affectedAssets: [],
       evidenceIds: [],
-      recommendation: '优先补齐关键数据集上下游关系，再确定迁移边界和切换顺序。',
+      recommendation: '先确认这些数据集是否真的孤立、是否来自外部系统，或补齐关键上下游关系。',
     });
   }
 
@@ -83,10 +83,10 @@ export function buildModernizationGaps(args: {
   if (currentState.sourceOfTruthCandidates.length > 0) {
     gaps.push({
       id: nextGapId('sot'),
-      kind: 'architecture',
+      kind: 'source-of-truth',
       title: 'Source-of-Truth 仍是候选，不是确认事实',
-      description: `发现 ${currentState.sourceOfTruthCandidates.length} 组 source-of-truth candidates，至少部分需要业务确认。`,
-      severity: 'medium',
+      description: `发现 ${currentState.sourceOfTruthCandidates.length} 组 source-of-truth candidates；这些候选需要业务/数据负责人确认。`,
+      severity: 'high',
       affectedAssets: currentState.sourceOfTruthCandidates.flatMap((c) => c.candidateDatasetIds).slice(0, 30),
       evidenceIds: currentState.sourceOfTruthCandidates.flatMap((c) => c.evidenceIds).slice(0, 30),
       recommendation: '建立 Analyst / SME review，把确认后的结果转成 approved business context 或 architecture decision。',
