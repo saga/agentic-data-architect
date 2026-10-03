@@ -41,10 +41,10 @@
 SQLite、DuckDB、Parquet 的职责必须保持分开：
 
 - SQLite 是应用状态的 system of record，保存对话、Investigation、Dataset Registry 和分析运行记录。
-- DuckDB 是本地分析引擎，每个 Investigation 有自己的 analysis.duckdb。
+- DuckDB 是本地分析引擎，每个 Investigation 有自己的 local.duckdb。
 - Parquet 是大型数据和分析中间结果的首选格式。
 - 原始文件和用户可直接查看的产物继续保存在 workspace 文件系统中。
-- Agent 不直接打开 analysis.duckdb；使用 local_catalog / local_register_dataset / local_describe / local_sample / local_profile / local_query。
+- Agent 不直接打开 local.duckdb；使用 local_catalog / local_register_dataset / local_describe / local_sample / local_profile / local_query。
 - local_query 必须经过只读检查，不能借此访问 workspace 外部文件、网络或其它数据库。
 - 本地分析 Evidence 必须记录 dataset version、SHA-256、SQL 和 analysis run。
 - 不要为了统一而增加复杂数据库抽象；LocalAnalyticsEngine 已经足够作为本地分析边界。**凡是用户能看到的内容，都优先用最简单、最直接的中文。**
