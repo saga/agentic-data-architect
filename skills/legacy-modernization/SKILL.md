@@ -249,17 +249,14 @@ tools: read,url
 - success -> cutover
 - needs-input -> investigate
 
-## @task cutover
+## @review cutover
 
-title: 切换
-objective: 只有验证完成后才进入 mock migration、parallel run、cutover、rollback 和旧系统退役。
-completeWhen: cutover
-completion: deterministic
+title: 切换确认
+objective: 验证已经完成后，由负责人确认切换条件、回退方案和运行准备，再进入实际切换；工作台不会把“生成了一份计划”当成已经切换完成。
+actor: human
 tools: read,url
 
-这里不把“生成了一份计划”当成真正切换完成。
-
-- success -> done
+- approved -> done
 - rollback -> investigate
 
 ## @end done
