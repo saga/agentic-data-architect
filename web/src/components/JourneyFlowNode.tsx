@@ -149,6 +149,9 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
             {ACTOR_META[data.actor].icon}
             {ACTOR_META[data.actor].label}
           </span>
+          {data.status === 'current' && data.actor === 'human' ? (
+            <span className="journey-flow-node-waiting-label">等待人工</span>
+          ) : null}
 
           {data.connectionIssue ? (
             <Tooltip title={data.connectionIssueText}>
