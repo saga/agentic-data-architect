@@ -1,10 +1,3 @@
-import type React from 'react';
-import {
-  AimOutlined,
-  CheckCircleFilled,
-  ClockCircleOutlined,
-  LockOutlined,
-} from '@ant-design/icons';
 import type { Edge, Node } from '@xyflow/react';
 
 /** DSL 中允许出现的 Workflow 节点类型。保持小集合，避免演变成 BPMN。 */
@@ -137,24 +130,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge<FlowEdgeData>;
 
-export const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
-  task: '任务',
-  gate: '判断点',
-  review: '评审',
-  end: '完成',
-  stop: '停止',
-};
-
-export const STATUS_META: Record<
-  JourneyMapStage['status'],
-  { label: string; icon: React.ReactNode }
-> = {
-  completed: { label: '已完成', icon: <CheckCircleFilled /> },
-  current: { label: '当前', icon: <AimOutlined /> },
-  future: { label: '待进入', icon: <ClockCircleOutlined /> },
-  locked: { label: '暂不可走', icon: <LockOutlined /> },
-};
-
+/** 节点状态对应的 CSS class；视觉细节留在 styles.css。 */
 export const STATUS_CLASS: Record<JourneyMapStage['status'], string> = {
   completed: 'journey-flow-node-completed',
   current: 'journey-flow-node-current',
