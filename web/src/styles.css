@@ -2393,3 +2393,79 @@ body {
 .journey-map-locked-mode .react-flow__edge {
   pointer-events: none;
 }
+
+
+/* Connection diagnostics -------------------------------------------------- */
+.journey-flow-node-connection-warning {
+  color: #d48806;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.journey-flow-node-connection-tag {
+  margin-top: 7px;
+  margin-inline-end: 0;
+  align-self: flex-start;
+  font-weight: 600;
+}
+
+.journey-flow-node-connection-error {
+  border: 2px solid #ff4d4f !important;
+  background: #fff2f0 !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 77, 79, 0.10),
+    0 7px 20px rgba(255, 77, 79, 0.12);
+}
+
+.journey-flow-node-connection-warning {
+  border: 2px solid #faad14 !important;
+  background: #fffbe6 !important;
+  box-shadow:
+    0 0 0 3px rgba(250, 173, 20, 0.10),
+    0 7px 20px rgba(250, 173, 20, 0.10);
+}
+
+/* Readonly uses the exact same graph and handles as edit mode, but handles
+   are visual only because nodesConnectable/edgesReconnectable are disabled. */
+.journey-flow-handle-readonly {
+  opacity: 1;
+  width: 7px !important;
+  height: 7px !important;
+  background: #b8c2cf !important;
+  border: 1px solid #fff !important;
+  box-shadow: 0 0 0 1px #b8c2cf;
+  pointer-events: none;
+}
+
+.journey-flow-node-current .journey-flow-handle-readonly {
+  background: #1677ff !important;
+  box-shadow: 0 0 0 1px #1677ff;
+}
+
+.journey-flow-node-connection-error .journey-flow-handle-readonly {
+  background: #ff4d4f !important;
+  box-shadow: 0 0 0 1px #ff4d4f;
+}
+
+.journey-flow-node-connection-warning .journey-flow-handle-readonly {
+  background: #faad14 !important;
+  box-shadow: 0 0 0 1px #faad14;
+}
+
+.journey-flow-node-new.journey-flow-node-connection-error {
+  border: 2px dashed #ff4d4f !important;
+  background: #fff2f0 !important;
+}
+
+.journey-map-locked-mode .react-flow__node {
+  cursor: default !important;
+}
+
+.journey-map-locked-mode .journey-flow-edge-label {
+  cursor: default;
+}
+
+.journey-map-locked-mode .react-flow__edge {
+  pointer-events: none;
+}
