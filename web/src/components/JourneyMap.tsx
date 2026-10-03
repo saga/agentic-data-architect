@@ -1622,7 +1622,7 @@ export function JourneyMap({
             nodeTypes={nodeTypes}
             onInit={(instance) => {
               flowInstanceRef.current = instance;
-            }>
+            }}
             edgeTypes={edgeTypes}
             nodesDraggable={editing}
             nodesConnectable={editing}
