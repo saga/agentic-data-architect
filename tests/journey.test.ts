@@ -106,6 +106,52 @@ test('supports lightweight conditional routing for deterministic workflow nodes'
   assert.equal(state.currentNodeId, 'done');
 });
 
+test('deterministic nodes use an unconditional fallback when no condition matches', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> check',
+    '',
+    '## @task check',
+    'completion: deterministic',
+    'completeWhen: goal',
+    '- goal-path -> done if goal',
+    '- fallback -> stop',
+    '',
+    '## @end done',
+    '',
+    '## @stop stop',
+  ].join('\n'));
+
+  assert.equal(result.issues.length, 0);
+  assert.ok(result.definition);
+
+  const facts = { ...baseFacts, goal: '' };
+  const state = buildJourneyState(result.definition!, facts, initialJourneyExecution(result.definition!));
+  assert.equal(state.currentNodeId, 'stop');
+  assert.deepEqual(state.completedNodeIds, ['check']);
+});
+
+test('deterministic retry self-loop does not mark the node completed', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> check',
+    '',
+    '## @task check',
+    'completion: deterministic',
+    'completeWhen: goal',
+    '- retry -> check',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+  const state = buildJourneyState(
+    result.definition!,
+    baseFacts,
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(state.currentNodeId, 'check');
+  assert.deepEqual(state.completedNodeIds, []);
+});
+
 test('allows a retry cycle when the graph still has an exit to done', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
