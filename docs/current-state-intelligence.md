@@ -50,7 +50,7 @@ Coverage 是确定性事实，不是模型自己给出的置信度。
 
 ## Source-of-Truth Candidates
 
-系统可以根据名称、上下游结构、metadata、semantic context 和 evidence 给出候选。候选上的 `priorityScore` 只是调查顺序 heuristic，不是 source-of-truth 置信度；它不会单独推动 Workflow Gate。
+当多个物理 dataset 归到同一个命名键、确实存在选择问题时，系统才根据名称、上下游结构、metadata、semantic context 和 evidence 给出 Source-of-Truth candidate。候选上的 `priorityScore` 只是调查顺序 heuristic，不是 source-of-truth 置信度；它不会单独推动 Workflow Gate。
 
 candidate != confirmed source of truth。业务权威仍由用户确认；只有确认后的业务/架构结论才进入正式工作产物。
 
