@@ -145,8 +145,6 @@ async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeo
     mappingCount: 0,
     blockingValidationReady: 0,
     blockingValidationTotal: 0,
-    cutoverCriteriaDefined: false,
-    rollbackCriteriaDefined: false,
     findingCount: plan.findings.length, recommendationCount: plan.recommendations.length, roadmapItemCount: plan.roadmap.length,
   });
 }
