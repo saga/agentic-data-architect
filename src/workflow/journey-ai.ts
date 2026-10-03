@@ -17,7 +17,6 @@ import {
   applyJourneyWorkflowChanges,
   describeJourneyWorkflowChange,
   diffJourneyWorkflowDefinitions,
-  validateJourneyChangeScope,
   JourneyWorkflowChangesSchema,
   JourneyWorkflowChangeSchema,
   type JourneyWorkflowChange,
@@ -108,7 +107,7 @@ function buildSystemPrompt(workflowId: WorkflowId): string {
     '- route 可以写 condition，但只能使用已知 completeWhen 条件；',
     '- route condition 的 DSL 写法是“- success -> target if goal”，命中的条件出口优先；',
     '- visible、completion、actor、objective 等字段要完整填写；requires / produces 使用字符串数组。',
-    '- replace-definition 只允许在 generate 模式使用；modify 模式必须返回局部 changes。',
+    '- 如果用户要求大幅重做整张图，可以返回一个 replace-definition；普通修改优先使用局部 changes。',
     '',
     '修改已有地图时：',
     '- 尽量保留已有节点 ID，只有确实需要时才新增或删除；',
@@ -120,25 +119,23 @@ function buildSystemPrompt(workflowId: WorkflowId): string {
 }
 
 function buildPrompt(
-  mode: 'generate' | 'modify',
   userPrompt: string,
   goal: string,
   current: JourneyDefinition,
   history: JourneyAiConversationMessage[],
-  scope: 'workflow' | 'selection',
   selectedNodeId?: string,
 ): string {
   return [
-    mode === 'generate' ? '请重新设计当前工作地图。' : '请修改当前工作地图。',
+    '请根据用户要求修改当前工作地图。用户也可以直接要求重新设计整张图；此时可以返回 replace-definition。',
     '用户要求：',
     userPrompt.trim(),
     '',
     '这次 Investigation 的目标：',
     goal.trim() || '未填写目标，请根据当前工作地图保持合理结构。',
     '',
-    '修改范围：' + (scope === 'selection'
-      ? '只允许修改选中步骤及其直接相邻步骤/分支。选中节点：' + (selectedNodeId ?? '未提供')
-      : '可以修改整张 Workflow。'),
+    selectedNodeId
+      ? '用户当前选中的步骤只是关注上下文，不是修改范围限制：' + selectedNodeId
+      : '用户当前没有选中的步骤，可以根据要求调整整张工作地图。',
     '',
     '当前工作地图 JSON：',
     JSON.stringify(current, null, 2),
@@ -162,11 +159,9 @@ function buildPrompt(
 export async function generateJourneyFlow(
   name: string,
   workflowId: WorkflowId,
-  mode: 'generate' | 'modify',
   prompt: string,
   history: JourneyAiConversationMessage[] = [],
   baseDefinition?: JourneyDefinition,
-  scope: 'workflow' | 'selection' = 'workflow',
   selectedNodeId?: string,
 ): Promise<{
   definition: JourneyDefinition;
@@ -186,12 +181,10 @@ export async function generateJourneyFlow(
 
   const raw = await askCopilot({
     prompt: buildPrompt(
-      mode,
       prompt,
       context.goal || context.userPrompt,
       currentDefinition,
       history,
-      scope,
       selectedNodeId,
     ),
     systemPrompt: buildSystemPrompt(workflowId),
@@ -209,21 +202,6 @@ export async function generateJourneyFlow(
   }
 
   const changes = parsed.changes.map((change) => JourneyWorkflowChangeSchema.parse(change));
-
-  if (mode === 'generate') {
-    if (changes.length !== 1 || changes[0]?.type !== 'replace-definition') {
-      throw new Error('重新设计模式必须返回一个 replace-definition 修改。');
-    }
-  } else if (changes.some((change) => change.type === 'replace-definition')) {
-    throw new Error('修改模式只能返回局部 Workflow changes。');
-  }
-
-  if (scope === 'selection') {
-    const scopeIssues = validateJourneyChangeScope(currentDefinition, changes, selectedNodeId);
-    if (scopeIssues.length) {
-      throw new Error('AI 修改范围超出当前选中步骤：\n' + scopeIssues.join('\n'));
-    }
-  }
 
   let nextDefinition: JourneyDefinition;
   try {
