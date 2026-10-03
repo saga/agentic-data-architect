@@ -765,7 +765,7 @@ class LocalDuckDBEngine {
       investigationId: this.sessionName,
       discoveryRunId: 'local:' + runId,
       source: `duckdb:${dataset?.name ?? 'local-analysis'}`,
-      ...(dataset ? { dataset: dataset.relation } : {}),
+      ...(dataset ? { dataset: dataset.relation, sourceHash: dataset.sha256 } : {}),
       statement: originalSql,
       value: {
         dataset: dataset
