@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react';
 
 import {
+  applyWorkflowChanges,
   definitionFromGraph,
   graphFromDefinition,
   layoutFromNodes,
@@ -32,6 +33,7 @@ import type {
   FlowEdge,
   FlowNode,
   JourneyMapStage,
+  WorkflowChange,
   WorkflowDefinition,
   WorkflowNodeDefinition,
   WorkflowNodeType,
@@ -67,7 +69,11 @@ interface JourneyWorkflowEditorResult {
     mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-  ) => Promise<{ message: string } | undefined>;
+    scope?: 'workflow' | 'selection',
+  ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
+  pendingAiChange?: { message: string; changes: WorkflowChange[] };
+  applyAiChanges: () => Promise<void>;
+  discardAiChanges: () => void;
   resetWorkflow: () => void;
   autoLayout: () => Promise<void>;
   createStandaloneNode: () => Promise<void>;
@@ -105,6 +111,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [pendingAiChange, setPendingAiChange] = useState<{
+    message: string;
+    changes: WorkflowChange[];
+    definition: WorkflowDefinition;
+    baseDefinition: WorkflowDefinition;
+  }>();
   const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
@@ -221,6 +233,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       completion: selectedNode.data.completion,
       actor: selectedNode.data.actor,
       completeWhen: selectedNode.data.completeWhen,
+      requires: selectedNode.data.requires,
+      produces: selectedNode.data.produces,
     });
   }, [selectedNode]);
 
