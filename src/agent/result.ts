@@ -32,9 +32,15 @@ export const AgentAnswerSchema = z.object({
     .catch([])
     .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
   workflow: z.object({
-    nodeId: z.string().min(1),
-    outcome: z.string().min(1),
-  }).strict().optional(),
+    nodeId: z.string(),
+    outcome: z.string(),
+  }).strict().optional().transform((value) => {
+    if (!value?.nodeId.trim() || !value.outcome.trim()) return undefined;
+    return {
+      nodeId: value.nodeId.trim(),
+      outcome: value.outcome.trim(),
+    };
+  }),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
@@ -44,6 +50,26 @@ export type AgentAnswer = z.infer<typeof AgentAnswerSchema>;
 export interface ParsedAnswer extends AgentAnswer {
   warnings: string[];
   droppedEvidenceRefs: string[];
+}
+
+/** 当完整 AgentAnswer Schema 失败时，仍尽量取出模型已经生成的自然语言 answer，
+ * 避免把内部结构化 JSON 直接展示给用户。 */
+function extractAnswerFromRaw(raw: string): string | undefined {
+  try {
+    const parsed = JSON.parse(extractJson(raw)) as unknown;
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && 'answer' in parsed
+      && typeof parsed.answer === 'string'
+      && parsed.answer.trim()
+    ) {
+      return parsed.answer.trim();
+    }
+  } catch {
+    // 不是完整 JSON 时继续走原始文本 fallback。
+  }
+  return undefined;
 }
 
 /** 从模型回复中提取可能的 JSON；兼容 markdown fence 和前后夹杂解释文本。 */
@@ -65,7 +91,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     data = JSON.parse(extractJson(raw)) as unknown;
   } catch {
     return {
-      answer: raw.slice(0, 2000),
+      answer: extractAnswerFromRaw(raw) ?? raw.slice(0, 2000),
       claims: [],
       unknowns: ['模型没有返回合法 JSON，需要重问或收紧提示词'],
       followUpQuestions: [],
@@ -78,7 +104,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
   const parsed = AgentAnswerSchema.safeParse(data);
   if (!parsed.success) {
     return {
-      answer: raw.slice(0, 2000),
+      answer: extractAnswerFromRaw(raw) ?? raw.slice(0, 2000),
       claims: [],
       unknowns: ['模型返回的结构化结果不符合预期，需要重问或收紧提示词'],
       followUpQuestions: [],
