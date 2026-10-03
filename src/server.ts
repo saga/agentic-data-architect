@@ -289,6 +289,7 @@ app.post('/api/sessions', async (req, res) => {
       context.workflow,
       body.mode,
       body.prompt,
+      body.messages ?? [],
     );
     res.json(result);
   });
