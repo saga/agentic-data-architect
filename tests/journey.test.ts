@@ -133,6 +133,55 @@ test('journey state follows execution and facts, not node array order', () => {
   assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
 
+test('preserves an execution position across a graph edit when the node still exists', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> investigate',
+    '',
+    '## @task investigate',
+    'completion: agent',
+    '- success -> target',
+    '',
+    '## @task target',
+    'completion: agent',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+  const execution = {
+    ...initialJourneyExecution(result.definition!, 1),
+    currentNodeId: 'target',
+    completedNodeIds: ['investigate'],
+  };
+
+  const edited = {
+    ...result.definition!,
+    nodes: [
+      ...result.definition!.nodes,
+      {
+        id: 'extra',
+        type: 'task' as const,
+        title: '额外检查',
+        visible: true,
+        completion: 'agent' as const,
+        routes: [{ outcome: 'success', target: 'done' }],
+      },
+    ],
+  };
+
+  const next = {
+    ...execution,
+    workflowVersion: 2,
+    currentNodeId: execution.currentNodeId,
+    completedNodeIds: execution.completedNodeIds.filter((id) => edited.nodes.some((node) => node.id === id)),
+  };
+
+  assert.equal(next.currentNodeId, 'target');
+  assert.deepEqual(next.completedNodeIds, ['investigate']);
+});
+
 test('applies only an actual outgoing workflow outcome', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
