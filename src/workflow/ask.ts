@@ -124,7 +124,7 @@ const userMessage = saveConversationMessage({
   // 本轮只读取一个固定的 Discovery snapshot；后续 UI/Discovery 变化不应影响已经开始的模型请求。
 const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
   const ctx = buildQuestionContext({
-    question,
+    question: effectiveQuestion,
     lineage: snapshot?.lineage ?? null,
     profiles: snapshot?.profiles ?? [],
     findings: inv.findings,
@@ -134,7 +134,7 @@ const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
     inventory: snapshot?.inventory ?? null,
   });
   // 历史对话只作为 conversation context，不提升成 Evidence，避免旧模型回答污染当前事实来源。
-const priorConversation = searchConversation(investigationName, question, {
+const priorConversation = searchConversation(investigationName, effectiveQuestion, {
     limit: 6,
     beforeRowId: userMessage.rowId,
   });
