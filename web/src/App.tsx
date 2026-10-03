@@ -359,63 +359,6 @@ function AssistantActionBar(props: {
   );
 }
 
-function AgentRecommendationCard(props: {
-  routes: NonNullable<SessionContext['journeyPlan']>['routes'];
-  workflow: WorkflowId | null;
-  loading: boolean;
-  active: boolean;
-  onChooseRoute: (route: NonNullable<SessionContext['journeyPlan']>['routes'][number]) => void;
-  onOpenMap: () => void;
-  onUseDefault: () => void;
-}) {
-  const workflowLabel = workflowOptions.find((option) => option.value === (props.workflow ?? ''))?.label ?? '自主调查';
-  const hasRoutes = props.routes.length > 0;
-  return (
-    <Card className={'agent-recommendation-card' + (hasRoutes ? ' agent-recommendation-card-routes' : '')}>
-      <Flex justify="space-between" align="flex-start" gap={16} wrap>
-        <div className="agent-recommendation-head">
-          <div className="agent-recommendation-eyebrow">Agent 建议</div>
-          <Text strong className="agent-recommendation-title">
-            {hasRoutes ? '根据刚才的行动，下一步可以这样走' : '当前还没有锁定下一步，先给你一个可选起点'}
-          </Text>
-          <Text type="secondary" className="agent-recommendation-note">
-            {hasRoutes
-              ? '这些是导航建议，不是固定流程。你可以直接问别的问题，也可以让 Agent 随新证据重新规划。'
-              : props.workflow
-                ? '当前工作方式：' + workflowLabel + '。它提供一个参考骨架，不要求你按固定顺序执行。'
-                : '当前是自主调查，Agent 会根据你的目标、证据和新信息动态决定调查方向。'}
-          </Text>
-        </div>
-        <Button size="small" icon={<FullscreenOutlined />} onClick={props.onOpenMap} disabled={props.loading}>工作地图</Button>
-      </Flex>
-      {hasRoutes ? (
-        <div className="agent-recommendation-routes">
-          {props.routes.slice(0, 3).map((route, index) => (
-            <div className="agent-recommendation-route" key={route.id}>
-              <Flex justify="space-between" align="flex-start" gap={10}>
-                <div className="agent-recommendation-route-copy">
-                  <Text strong>{index + 1}. {route.title}</Text>
-                  <Text type="secondary">{route.reason}</Text>
-                </div>
-                <Button type="primary" ghost size="small" disabled={!props.active || props.loading} onClick={() => props.onChooseRoute(route)}>采用</Button>
-              </Flex>
-              <div className="agent-recommendation-route-steps">
-                {route.steps.slice(0, 4).map((step, stepIndex) => (
-                  <Text key={stepIndex} type="secondary">{stepIndex + 1}. {step}</Text>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <Flex gap={8} wrap className="agent-recommendation-actions">
-          <Button type="primary" ghost size="small" disabled={!props.active || props.loading} onClick={props.onUseDefault}>采用这个起点</Button>
-          <Text type="secondary">也可以直接在下面输入你真正想解决的问题。</Text>
-        </Flex>
-      )}
-    </Card>
-  );
-}
 function AppInner() {
   const routeInfo = () => {
     const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory|journey))?\/?$/);
@@ -512,7 +455,7 @@ function AppInner() {
     }
     const [result, journeyResult] = await Promise.all([
       getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
-      getJson<{ journey: JourneyStage[] | null }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
+      getJson<{ journey: JourneyState | null }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
@@ -530,7 +473,6 @@ function AppInner() {
     setAttachments(existing);
   };
 
-  const loadAssessment = async (key: string) => {
   useEffect(() => {
     const onPopState = () => {
       const routed = routeInfo();
@@ -787,8 +729,6 @@ function AppInner() {
 
       setCurrent((existing) => existing ? { ...existing, context: result.context } : existing);
       setJourney(undefined);
-      setModernizationPlan(undefined);
-      setAssessmentPlan(undefined);
       await loadSession(active);
       await reloadSessions(false);
       setWorkflowTarget(undefined);
@@ -1000,9 +940,6 @@ function AppInner() {
               <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
                 {loading ? turnStatus : '可以继续提问'}
               </Tag>
-              {current?.control ? <Tag bordered={false}>配置 v{current.control.version}</Tag> : null}
-              {current?.context.evidence.length ? <Tag bordered={false} color="blue">证据 {current.context.evidence.length}</Tag> : null}
-              {current?.context.findings.length ? <Tag bordered={false} color="gold">发现问题 {current.context.findings.length}</Tag> : null}
               <Button type="text" size="small" icon={<ToolOutlined />} onClick={() => navigatePage('trajectory')}>
                 Agent 轨迹
               </Button>
@@ -1033,15 +970,7 @@ function AppInner() {
         </Header>
 
         <Content className="chat-layout">
-          <div className="chat-main">
-            {current ? (
-              <AgentRecommendationCard
-                workflow={current.context.workflow}
-                loading={loading}
-                onOpenMap={() => navigatePage('journey')}
-              />
-            ) : null}
-            {bubbleItems.length ? (
+          <div className="chat-main">            {bubbleItems.length ? (
               <Bubble.List
                 role={{
                   assistant: { placement: 'start' },
@@ -1174,21 +1103,6 @@ function AppInner() {
                 </Tooltip>
               </div>
 
-              {current ? (
-                <section className="right-section right-work-mode">
-                  <div className="right-section-heading"><Text strong>工作方式</Text></div>
-                  <Tag color={current.context.workflow ? 'blue' : undefined} bordered={false}>
-                    {workflowOptions.find((option) => option.value === (current.context.workflow ?? ''))?.label ?? '自主调查'}
-                  </Tag>
-                  <Text type="secondary">
-                    工作方式进入调查后不在首页随手切换。需要改变时，到调查设置里的“工作方式”执行一次明确的调整。
-                  </Text>
-                  <Button type="link" size="small" onClick={() => navigatePage('config')}>
-                    打开工作方式设置
-                  </Button>
-                </section>
-              ) : null}
-
               {journey?.stages.length ? (
                 <section className="right-section right-journey">
                   <Flex className="right-section-heading" justify="space-between" align="center">
@@ -1246,18 +1160,7 @@ function AppInner() {
                       <span>数据来路 {current.currentState.coverage.datasetLineageCoverage == null ? '未统计' : Math.round(current.currentState.coverage.datasetLineageCoverage * 100) + '%'}</span>
                       <span>业务定义 {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}</span>
                       <span>待查 {current.context.unknowns.length}</span>
-                    </div>
-                    {modernizationPlan?.gaps.length ? (
-                      <div className="right-issues">
-                        {modernizationPlan.gaps.slice(0, 2).map((gap) => (
-                          <div key={gap.id} className="right-issue">
-                            <Text strong ellipsis={{ tooltip: gap.title }}>{gap.title}</Text>
-                            <Text type="secondary" ellipsis={{ tooltip: gap.recommendation }}>{gap.recommendation}</Text>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </>
+                    </div>                  </>
                 )}
               </section>
             </aside>
@@ -1265,131 +1168,6 @@ function AppInner() {
         </Content>
       </Layout>
 
-                  <Modal
-        className="modernization-modal"
-        title={current?.context.workflow === 'data-architecture-assessment' ? '架构评估结果' : '完整改造方案'}
-        open={modernizationOpen}
-        width={760}
-        centered
-        onCancel={() => setModernizationOpen(false)}
-        footer={<Button onClick={() => setModernizationOpen(false)}>关闭</Button>}
-      >
-        {current?.context.workflow === 'data-architecture-assessment' && assessmentPlan ? (
-          <div className="plain-plan">
-            <Text type="secondary">
-              这是基于当前调查证据整理出的评估草案。问题、建议和实施顺序仍需要负责人确认。
-            </Text>
-            <Card size="small" title="评估范围">
-              <div className="plain-summary">
-                <span>{assessmentPlan.goal || '尚未明确目标'}</span>
-                <span>数据集：<strong>{assessmentPlan.currentState.datasets}</strong></span>
-                <span>数据来路：<strong>{assessmentPlan.currentState.lineageCoverage == null ? '未统计' : Math.round(assessmentPlan.currentState.lineageCoverage * 100) + '%'}</strong></span>
-                <span>发现问题：<strong>{assessmentPlan.currentState.findings}</strong></span>
-              </div>
-            </Card>
-            <Card size="small" title="主要问题">
-              <div className="plan-stage-list">
-                {assessmentPlan.findings.slice(0, 12).map((finding) => (
-                  <div key={finding.id} className="plan-stage">
-                    <Text strong>{finding.title}</Text>
-                    <Text type="secondary">{finding.description}</Text>
-                    <Text type="secondary">建议：{finding.recommendation}</Text>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card size="small" title="建议">
-              <div className="plain-summary">
-                {assessmentPlan.recommendations.map((item) => <span key={item}>{item}</span>)}
-              </div>
-            </Card>
-            <Card size="small" title="实施顺序">
-              <div className="plan-stage-list">
-                {assessmentPlan.roadmap.map((item, index) => (
-                  <div key={item.id} className="plan-stage">
-                    <Text strong>{index + 1}. {item.title}</Text>
-                    <Text type="secondary">{item.objective}</Text>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        ) : modernizationPlan && current?.currentState ? (
-          <div className="plain-plan">
-            <Text type="secondary">
-              这里是详细方案。右侧已经显示当前卡点和直接操作，这里只看完整步骤和方案内容。
-            </Text>
-
-            <Card size="small" title="路线图">
-              <div className="plan-stage-list">
-                {(journey?.stages ?? modernizationPlan.journey?.stages ?? []).map((stage, index) => (
-                  <div key={stage.id} className="plan-stage">
-                    <Flex justify="space-between" gap={8}>
-                      <Text strong>{index + 1}. {stage.title}</Text>
-                      <Tag color={
-                        stage.status === 'completed'
-                          ? 'green'
-                          : stage.status === 'current'
-                            ? 'blue'
-                            : stage.status === 'future'
-                              ? 'default'
-                              : 'default'
-                      }>
-                        {stage.status === 'completed' ? '已完成' : stage.status === 'current' ? '现在' : stage.status === 'future' ? '下一步' : '未解锁'}
-                      </Tag>
-                    </Flex>
-                    <Text type="secondary">{stage.objective}</Text>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            <Card size="small" title="改造步骤">
-              <div className="plan-stage-list">
-                {modernizationPlan.migrationStages.map((stage, index) => (
-                  <div key={stage.id} className="plan-stage">
-                    <Text strong>{index + 1}. {stage.name}</Text>
-                    <Text type="secondary">{stage.objective}</Text>
-                    {stage.outputs.length ? (
-                      <Text type="secondary">会产出：{stage.outputs.join("、")}</Text>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            <Card size="small" title="新的方案">
-              <div className="plain-summary">
-                {modernizationPlan.targetArchitecture.principles.slice(0, 5).map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-              {modernizationPlan.targetArchitecture.openQuestions.length ? (
-                <div className="plan-open-questions">
-                  <Text strong>还需要确认</Text>
-                  {modernizationPlan.targetArchitecture.openQuestions.slice(0, 5).map((item) => (
-                    <Text key={item} type="secondary">· {item}</Text>
-                  ))}
-                </div>
-              ) : null}
-            </Card>
-
-            <Card size="small" title="后面还会做什么">
-              <div className="plain-summary">
-                <span>旧数据对应关系：<strong>{modernizationPlan.mappings.length}</strong> 条建议</span>
-                <span>改造前检查：<strong>{modernizationPlan.validationPlan.checks.length}</strong> 项</span>
-                <span>当前方案状态：<strong>草案</strong></span>
-              </div>
-            </Card>
-          </div>
-        ) : (
-          <div className="plain-plan-empty">
-            <Text strong>还不能查看完整方案</Text>
-            <Text type="secondary">先在右侧把现有系统查清楚，再回来查看完整改造方案。</Text>
-            <Button onClick={() => setModernizationOpen(false)}>回到调查</Button>
-          </div>
-        )}
-      </Modal>
       <Modal
         title="新建工作"
         open={newSessionOpen}
