@@ -159,6 +159,19 @@ export async function layoutWithElk(
  * Workflow 可能存在 retry / return 这种回到前面步骤的边。这样的边在视觉上允许向左，
  * 但不能参与主布局层级计算，否则一个回路线就会把整张图的 x 顺序拖乱。
  */
+function isLikelyBackwardRoute(edge: FlowEdge): boolean {
+  const outcome = String(edge.data?.outcome ?? '').trim().toLowerCase();
+  return /(^|[-_\s])(retry|return|rollback|back|previous|prev|reopen|again)([-_\s]|$)/i.test(outcome)
+    || /(重试|退回|回退|返回|回滚|重新)/.test(outcome);
+}
+
+/**
+ * 找布局主流程时，优先沿“正常前进”出口深入。
+ *
+ * Workflow 可能存在 retry / return 这种回到前面步骤的边。
+ * DFS 如果无视出口语义，很容易把一条普通分支误选成 cycle back-edge。
+ * 这里把明显的回退出口排到最后，让 cycle breaking 更贴近业务阅读顺序。
+ */
 function getForwardLayoutEdges(nodes: FlowNode[], edges: FlowEdge[]): FlowEdge[] {
   const nodeIds = new Set(nodes.map((node) => node.id));
   const adjacency = new Map<string, FlowEdge[]>();
@@ -173,6 +186,21 @@ function getForwardLayoutEdges(nodes: FlowNode[], edges: FlowEdge[]): FlowEdge[]
     }
 
     adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge]);
+  }
+
+  for (const [source, sourceEdges] of adjacency) {
+    sourceEdges.sort((a, b) => {
+      const backwardDelta = Number(isLikelyBackwardRoute(a)) - Number(isLikelyBackwardRoute(b));
+      if (backwardDelta !== 0) return backwardDelta;
+
+      const aPrimary = /^(success|done|pass|complete|completed|next)$/.test(String(a.data?.outcome ?? '').trim().toLowerCase());
+      const bPrimary = /^(success|done|pass|complete|completed|next)$/.test(String(b.data?.outcome ?? '').trim().toLowerCase());
+      const primaryDelta = Number(bPrimary) - Number(aPrimary);
+      if (primaryDelta !== 0) return primaryDelta;
+
+      return a.target.localeCompare(b.target);
+    });
+    adjacency.set(source, sourceEdges);
   }
 
   // 通过 DFS 识别回边。回边不参与“source 必须在 target 左侧”的层级约束。
