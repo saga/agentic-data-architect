@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Button,
   Empty,
@@ -57,6 +57,7 @@ export function JourneyMap(props: JourneyMapProps) {
  */
 function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
+  const flowWrapRef = useRef<HTMLDivElement>(null);
   const {
     snapshot,
     fetching,
@@ -118,7 +119,41 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [dirty, saveWorkflow]);
 
+  /**
+   * React Flow 的 viewport 依赖真实容器尺寸。
+   * 独立页面刚打开、右侧栏切换宽度、浏览器窗口变化时，第一次 fitView 可能发生得太早。
+   * 用 ResizeObserver 在“画布真的有尺寸”之后重新 fit，避免整张图缩成顶部一条。
+   */
+  useEffect(() => {
+    const container = flowWrapRef.current;
+    if (!container) return;
 
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const instance = flowInstanceRef.current;
+          if (!instance || !nodes.length) return;
+          instance.fitView({
+            padding: 0.14,
+            minZoom: 0.2,
+            maxZoom: 1.4,
+            duration: 160,
+          });
+        });
+      });
+    };
+
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    fit();
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [flowInstanceRef, nodes.length]);
 
   if (fetching) {
     return (
@@ -233,8 +268,6 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
         </Flex>
       </header>
 
-
-
       {snapshot.analysis?.length ? (
         <div className="journey-map-warning-panel">
           <Flex align="center" justify="space-between">
@@ -267,7 +300,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
       ) : null}
 
       <div className="journey-map-workspace">
-        <div className="journey-map-flow-wrap">
+        <div ref={flowWrapRef} className="journey-map-flow-wrap">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -275,6 +308,18 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             edgeTypes={{ [EDGE_TYPE]: JourneyFlowEdge }}
             onInit={(instance) => {
               flowInstanceRef.current = instance;
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  if (nodes.length) {
+                    instance.fitView({
+                      padding: 0.14,
+                      minZoom: 0.2,
+                      maxZoom: 1.4,
+                      duration: 0,
+                    });
+                  }
+                });
+              });
             }}
             nodesDraggable
             nodesConnectable
