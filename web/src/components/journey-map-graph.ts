@@ -11,6 +11,7 @@ import {
   type FlowNode,
   type HandleSpec,
   type JourneyMapStage,
+  type WorkflowChange,
   type WorkflowDefinition,
   type WorkflowLayout,
   type WorkflowNodeDefinition,
@@ -85,6 +86,89 @@ type JourneyRouteDefinitionLike = {
   target: string;
 };
 
+/**
+ * 浏览器侧应用语义 Patch。
+ *
+ * React Flow 只是画布适配层；AI 预览真正应用时也通过这里回到 Workflow Definition。
+ */
+export function applyWorkflowChanges(
+  definitionInput: WorkflowDefinition,
+  changes: WorkflowChange[],
+): WorkflowDefinition {
+  const definition: WorkflowDefinition = {
+    ...definitionInput,
+    nodes: definitionInput.nodes.map((node) => ({
+      ...node,
+      tools: node.tools ? [...node.tools] : undefined,
+      requires: node.requires ? [...node.requires] : undefined,
+      produces: node.produces ? [...node.produces] : undefined,
+      routes: node.routes.map((route) => ({ ...route })),
+    })),
+  };
+
+  for (const change of changes) {
+    switch (change.type) {
+      case 'replace-definition':
+        return change.definition;
+      case 'add-node':
+        if (definition.nodes.some((node) => node.id === change.node.id)) {
+          throw new Error('不能新增重复节点：' + change.node.id);
+        }
+        definition.nodes.push({
+          ...change.node,
+          tools: change.node.tools ? [...change.node.tools] : undefined,
+          requires: change.node.requires ? [...change.node.requires] : undefined,
+          produces: change.node.produces ? [...change.node.produces] : undefined,
+          routes: change.node.routes.map((route) => ({ ...route })),
+        });
+        break;
+      case 'update-node': {
+        const node = definition.nodes.find((item) => item.id === change.nodeId);
+        if (!node) throw new Error('找不到节点：' + change.nodeId);
+        Object.assign(node, change.patch);
+        break;
+      }
+      case 'remove-node':
+        if (change.nodeId === definition.start) {
+          throw new Error('不能删除 Workflow start 节点。');
+        }
+        definition.nodes = definition.nodes
+          .filter((node) => node.id !== change.nodeId)
+          .map((node) => ({
+            ...node,
+            routes: node.routes.filter((route) => route.target !== change.nodeId),
+          }));
+        break;
+      case 'add-route': {
+        const node = definition.nodes.find((item) => item.id === change.nodeId);
+        if (!node) throw new Error('找不到节点：' + change.nodeId);
+        node.routes.push({ ...change.route });
+        break;
+      }
+      case 'update-route': {
+        const node = definition.nodes.find((item) => item.id === change.nodeId);
+        if (!node) throw new Error('找不到节点：' + change.nodeId);
+        const route = node.routes.find(
+          (item) => item.outcome.toLowerCase() === change.outcome.toLowerCase(),
+        );
+        if (!route) throw new Error('找不到分支：' + change.nodeId + '/' + change.outcome);
+        Object.assign(route, change.patch);
+        break;
+      }
+      case 'remove-route': {
+        const node = definition.nodes.find((item) => item.id === change.nodeId);
+        if (!node) throw new Error('找不到节点：' + change.nodeId);
+        node.routes = node.routes.filter(
+          (route) => route.outcome.toLowerCase() !== change.outcome.toLowerCase(),
+        );
+        break;
+      }
+    }
+  }
+
+  return definition;
+}
+
 /** 保存 React Flow 节点位置。
  *
  * Workflow 语义仍然由 Markdown/Definition 保存；这里仅保存 Canvas layout。
@@ -147,6 +231,8 @@ export function definitionFromGraph(
         actor: node.data.actor,
         completeWhen: node.data.completeWhen,
         tools: source?.tools,
+        requires: node.data.requires ?? source?.requires,
+        produces: node.data.produces ?? source?.produces,
         routes: routeBySource.get(node.id) ?? [],
         line: source?.line,
       };
@@ -337,6 +423,8 @@ export function graphFromDefinition(
         completion: item.completion,
         actor: item.actor,
         completeWhen: item.completeWhen,
+        requires: item.requires,
+        produces: item.produces,
         visible: item.visible,
         isNew: newNodeIds.has(item.id),
         sourceHandles,
