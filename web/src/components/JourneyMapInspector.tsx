@@ -71,10 +71,8 @@ interface JourneyMapInspectorProps {
   selectedNodeId?: string;
   pendingAiChange?: { message: string; changes: WorkflowChange[] };
   aiEditFlow: (
-    mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-    scope?: 'workflow' | 'selection',
   ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
   applyAiChanges: () => Promise<void>;
   discardAiChanges: () => void;
