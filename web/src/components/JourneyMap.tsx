@@ -679,8 +679,8 @@ export function JourneyMap({
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<FlowEdge>([]);
   const nodesRef = useRef<FlowNode[]>([]);
   const edgesRef = useRef<FlowEdge[]>([]);
   const snapshotRef = useRef<WorkflowSnapshot>();
@@ -1132,6 +1132,55 @@ export function JourneyMap({
           && item.data?.outcome === oldEdge.data?.outcome,
       )?.id,
     );
+  };
+
+  const handleNodesChange = (
+    changes: Parameters<typeof onNodesChangeInternal>[0],
+  ) => {
+    const removed = changes.filter((change) => change.type === 'remove');
+    if (!editing || !removed.length) {
+      onNodesChangeInternal(changes);
+      return;
+    }
+
+    pushHistory();
+    const removedIds = new Set(removed.map((change) => change.id));
+    const nextNodes = nodesRef.current.filter((node) => !removedIds.has(node.id));
+    const nextEdges = edgesRef.current.filter(
+      (edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target),
+    );
+
+    for (const id of removedIds) {
+      if (id === snapshotRef.current?.definition.start) {
+        message.warning('不能删除 Workflow 的第一步。');
+        return;
+      }
+    }
+
+    const nextNewIds = new Set(newNodeIdsRef.current);
+    for (const id of removedIds) nextNewIds.delete(id);
+    newNodeIdsRef.current = nextNewIds;
+    setNewNodeIds(nextNewIds);
+
+    void rebuildStructuralGraph(nextNodes, nextEdges, nextNewIds);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+  };
+
+  const handleEdgesChange = (
+    changes: Parameters<typeof onEdgesChangeInternal>[0],
+  ) => {
+    const removed = changes.filter((change) => change.type === 'remove');
+    if (!editing || !removed.length) {
+      onEdgesChangeInternal(changes);
+      return;
+    }
+
+    pushHistory();
+    const removedIds = new Set(removed.map((change) => change.id));
+    const nextEdges = edgesRef.current.filter((edge) => !removedIds.has(edge.id));
+    void rebuildStructuralGraph(nodesRef.current, nextEdges);
+    setSelectedEdgeId(undefined);
   };
 
   const applyNodeDraft = async () => {
@@ -1640,8 +1689,8 @@ export function JourneyMap({
             edgesReconnectable={editing}
             connectionLineType="smoothstep"
             connectionRadius={28}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
             onNodeDragStart={() => {
               if (editing) pushHistory();
             }}
@@ -1805,7 +1854,10 @@ export function JourneyMap({
                     onClick={() => {
                       if (!selectedEdge) return;
                       pushHistory();
-                      setEdges((items) => items.filter((edge) => edge.id !== selectedEdge.id));
+                      void rebuildStructuralGraph(
+                        nodesRef.current,
+                        edgesRef.current.filter((edge) => edge.id !== selectedEdge.id),
+                      );
                       setSelectedEdgeId(undefined);
                     }}
                   >
