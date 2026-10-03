@@ -585,7 +585,7 @@ Workflow Editor APIs
 
 边
   ↓
-ORTHOGONAL routing
+SmoothStep rendering
 
 标签
   ↓
