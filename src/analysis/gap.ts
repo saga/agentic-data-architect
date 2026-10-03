@@ -85,11 +85,11 @@ export function buildModernizationGaps(args: {
       id: nextGapId('sot'),
       kind: 'source-of-truth',
       title: 'Source-of-Truth 仍是候选，不是确认事实',
-      description: `发现 ${currentState.sourceOfTruthCandidates.length} 组 source-of-truth candidates；这些候选需要业务/数据负责人确认。`,
+      description: `发现 ${currentState.sourceOfTruthCandidates.length} 组存在多个候选来源的业务键；需要业务/数据负责人确认哪个来源具有权威性。`,
       severity: 'high',
       affectedAssets: currentState.sourceOfTruthCandidates.flatMap((c) => c.candidateDatasetIds).slice(0, 30),
       evidenceIds: currentState.sourceOfTruthCandidates.flatMap((c) => c.evidenceIds).slice(0, 30),
-      recommendation: '建立 Analyst / SME review，把确认后的结果转成 approved business context 或 architecture decision。',
+      recommendation: '优先确认每组候选的业务 owner、时点语义和实际使用方式；确认后再转成 approved business context 或 architecture decision。',
     });
   }
 
