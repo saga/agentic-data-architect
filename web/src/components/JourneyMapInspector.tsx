@@ -84,7 +84,7 @@ export function JourneyMapInspector({
   aiEditFlow,
   applyAiChanges,
   discardAiChanges,
-}: JourneyMapInspectorProps {
+}: JourneyMapInspectorProps) {
   return (
     <div className="journey-map-inspector">
       <div className="journey-map-inspector-header">
