@@ -36,6 +36,7 @@ test('parses workflow branches and completion mode', () => {
     'objective: Define the goal.',
     'completeWhen: goal',
     'completion: deterministic',
+    'actor: system',
     '- success -> estate',
     '- needs-input -> intake',
     '',
@@ -94,7 +95,7 @@ test('supports lightweight conditional routing for deterministic workflow nodes'
     '## @end done',
     '',
     '## @stop stop',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
