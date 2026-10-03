@@ -432,7 +432,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setValidationIssues([]);
 
     requestAnimationFrame(() => {
-      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
+      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.25, maxZoom: 1.1 });
     });
   };
 
