@@ -443,8 +443,8 @@ export async function saveJourneyDefinition(
 
   await appendAuditEvent(name, {
     actor: 'user',
-    action: 'workflow.applied',
-    summary: 'Applied a validated Investigation Workflow version.',
+    action: 'workflow.saved',
+    summary: 'Saved a validated Investigation Workflow version.',
     details: {
       workflowId,
       version,
