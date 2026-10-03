@@ -606,3 +606,9 @@ React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 l
 - 也可以拖动右侧 source Handle 到目标节点左侧 target Handle。
 
 这些操作最后仍然只生成原来的 Markdown DSL；没有增加第二套图语法。
+
+### 15. 地图显示原则
+
+Workflow 的 `@end` / `@stop` 是真正的终点，不因为 DSL 中的 `visible:false` 就在工作地图里消失；否则最后一条边会视觉上像“断掉”。
+
+普通业务节点仍可按 `visible` 控制展示，而终点在地图中始终保留。这样地图展示的是完整 Workflow，而不是只展示当前正在操作的阶段。
