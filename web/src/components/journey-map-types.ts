@@ -66,7 +66,7 @@ export interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
   /** 布局算法版本。升级算法后故意改值，让旧布局自动重新计算。 */
-  engine?: 'elk' | 'elk-v2';
+  engine?: 'elk' | 'elk-v2' | 'elk-v3';
   viewport?: { x: number; y: number; zoom: number };
 }
 
