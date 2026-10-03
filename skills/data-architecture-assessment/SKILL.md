@@ -38,6 +38,7 @@ title: 明确评估目标
 objective: 先说清楚为什么做这次评估、评什么、谁使用结果、最终要交付什么。
 completeWhen: goal
 completion: deterministic
+- success -> current-state
 
 ## @task current-state
 
@@ -45,6 +46,7 @@ title: 查清当前架构
 objective: 看数据资产、系统、数据流、数据模型、主要使用方、技术栈和关键依赖；不要只看架构图。
 completeWhen: assessment-current-state
 completion: deterministic
+- success -> findings
 
 ## @task findings
 
@@ -52,6 +54,7 @@ title: 找出主要问题
 objective: 从 Evidence、Lineage、数据质量、业务定义、治理、安全、技术债和运行情况中找出真正影响业务的问题，并标明哪些仍然未知。
 completeWhen: assessment-findings
 completion: deterministic
+- success -> recommendation
 
 ## @task recommendation
 
@@ -59,6 +62,7 @@ title: 给出改进建议
 objective: 每条建议都说明解决什么问题、需要什么依据、影响什么范围，并区分事实、推断和建议。
 completeWhen: assessment-recommendation
 completion: deterministic
+- success -> roadmap
 
 ## @task roadmap
 
@@ -66,6 +70,7 @@ title: 排出实施顺序
 objective: 把建议按依赖、风险、业务影响和实施难度排成几个阶段，不把所有问题都列成同一级。
 completeWhen: assessment-roadmap
 completion: deterministic
+- success -> done
 
 ## @end done
 
