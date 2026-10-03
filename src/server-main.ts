@@ -4,7 +4,6 @@
  * src/server.ts 负责全部业务 API；本入口只负责 Vite middleware、
  * HTTP server 生命周期和进程退出清理。
  */
-import express from 'express';
 import { createServer as createHttpServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
