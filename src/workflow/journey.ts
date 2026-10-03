@@ -65,7 +65,6 @@ export interface JourneyFacts {
   roadmapItemCount?: number;
   currentState: {
     datasets: number;
-    lineageConnectionRate: number | null;
     semanticAssets: number;
     parseFailures: number;
   } | null;
