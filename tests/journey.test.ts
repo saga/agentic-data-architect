@@ -1,16 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyJourneyTransition,
   buildJourneyState,
-  parseJourneyMarkdown,
+  initialJourneyExecution,
   loadWorkflowJourney,
+  parseJourneyMarkdown,
+  validateJourneyDefinition,
   type JourneyFacts,
 } from '../src/workflow/journey.js';
 
-test('parses modernization markdown workflow and validates routes', () => {
+const baseFacts: JourneyFacts = {
+  goal: 'modernize proxy voting',
+  currentState: null,
+  unknowns: ['where is the source table?'],
+  highGapKinds: ['discovery'],
+  targetComponentCount: 0,
+  mappingCount: 0,
+  blockingValidationReady: 0,
+  blockingValidationTotal: 0,
+};
+
+test('parses workflow branches and completion mode', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
-    '',
     'start -> intake',
     '',
     '## @task start',
@@ -22,6 +35,13 @@ test('parses modernization markdown workflow and validates routes', () => {
     'title: Intake',
     'objective: Define the goal.',
     'completeWhen: goal',
+    'completion: deterministic',
+    '- success -> estate',
+    '- needs-input -> intake',
+    '',
+    '## @task estate',
+    'title: Estate',
+    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
@@ -30,145 +50,127 @@ test('parses modernization markdown workflow and validates routes', () => {
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
-  assert.equal(result.definition.id, 'demo');
-  assert.equal(result.definition.start, 'intake');
-  assert.equal(result.definition.nodes.length, 2);
-  assert.equal(result.definition.nodes[0]?.completeWhen, 'goal');
+  assert.equal(result.definition?.start, 'intake');
+  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
+  assert.deepEqual(
+    result.definition?.nodes.find((node) => node.id === 'intake')?.routes.map((route) => route.outcome),
+    ['success', 'needs-input'],
+  );
 });
 
-test('rejects routes pointing to a missing node', () => {
+test('rejects dangling nodes and dead-end nodes', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
     'start -> intake',
     '',
-    '## @task start',
-    'visible: false',
+    '## @task intake',
+    'completion: agent',
     '- success -> missing',
     '',
-    '## @task intake',
+    '## @task orphan',
+    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
-    'visible: false',
   ].join('\n'));
 
   assert.ok(result.issues.some((issue) => issue.includes('missing')));
+  assert.ok(result.issues.some((issue) => issue.includes('orphan')));
 });
 
-test('journey state uses facts rather than agent self-report', () => {
+test('allows a retry cycle when the graph still has an exit to done', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> check',
+    '',
+    '## @task check',
+    'completion: agent',
+    '- retry -> check',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.equal(result.issues.length, 0);
+  assert.ok(result.definition);
+  assert.equal(validateJourneyDefinition(result.definition!).length, 0);
+});
+
+test('journey state follows execution and facts, not node array order', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
     'start -> intake',
-    '',
-    '## @task start',
-    'visible: false',
-    '- success -> intake',
     '',
     '## @task intake',
     'title: 接到任务',
     'objective: 明确目标',
     'completeWhen: goal',
+    'completion: deterministic',
+    '- success -> investigate',
     '',
-    '## @task estate',
-    'title: 看清旧系统',
-    'objective: 建立地图',
-    'completeWhen: current-state',
+    '## @task investigate',
+    'title: 查关键问题',
+    'completion: agent',
+    '- success -> target',
+    '- needs-input -> investigate',
     '',
     '## @task target',
-    'title: 设计新方案',
-    'objective: 形成草案',
-    'completeWhen: target',
-  ].join('\n'));
-
-  assert.ok(result.definition);
-
-  const facts: JourneyFacts = {
-    goal: 'modernize proxy voting',
-    currentState: null,
-    unknowns: ['where is the source table?'],
-    highGapKinds: ['discovery'],
-    targetComponentCount: 0,
-    mappingCount: 0,
-    blockingValidationReady: 0,
-    blockingValidationTotal: 0,
-  };
-
-  const state = buildJourneyState(result.definition!, facts);
-  assert.deepEqual(state.completedNodeIds, ['intake']);
-  assert.equal(state.currentNodeId, 'estate');
-  assert.equal(state.stages.find((stage) => stage.id === 'estate')?.status, 'current');
-  assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
-});
-
-
-test('parses the financial AI-native architecture workflow', () => {
-  const result = parseJourneyMarkdown([
-    '## @flow financial-ai-native-architecture',
-    'start -> intake',
-    '',
-    '## @task intake',
-    'title: 明确业务目标',
-    'completeWhen: goal',
-    '- success -> requirements',
-    '- needs-input -> intake',
-    '',
-    '## @task requirements',
-    'title: 明确业务需求',
-    '- success -> data',
-    '- needs-input -> intake',
-    '',
-    '## @task data',
-    'title: 查数据',
-    '- success -> domain-model',
-    '- needs-input -> requirements',
-    '',
-    '## @task domain-model',
-    'title: 定义金融业务模型',
-    '- success -> architecture',
-    '',
-    '## @task architecture',
-    'title: 设计数据架构',
-    '- success -> semantic',
-    '- retry -> data',
-    '',
-    '## @task semantic',
-    'title: 设计业务语义',
-    '- success -> agent',
-    '',
-    '## @task agent',
-    'title: 设计 Agent',
-    '- success -> controls',
-    '',
-    '## @task controls',
-    'title: 设计安全和运行控制',
-    '- success -> evaluation',
-    '',
-    '## @task evaluation',
-    'title: 设计验证和评估',
-    '- success -> roadmap',
-    '',
-    '## @task roadmap',
-    'title: 形成实施路线',
+    'title: 设计方案',
+    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
     'visible: false',
   ].join('\n'));
 
-  assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
-  assert.equal(result.definition?.id, 'financial-ai-native-architecture');
-  assert.equal(result.definition?.start, 'intake');
-  assert.equal(result.definition?.nodes.length, 11);
+  const initial = initialJourneyExecution(result.definition!);
+  const state = buildJourneyState(result.definition!, baseFacts, initial);
+
+  assert.deepEqual(state.completedNodeIds, ['intake']);
+  assert.equal(state.currentNodeId, 'investigate');
+  assert.equal(state.stages.find((stage) => stage.id === 'investigate')?.status, 'current');
+  assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
 
+test('applies only an actual outgoing workflow outcome', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> investigate',
+    '',
+    '## @task investigate',
+    'completion: agent',
+    '- success -> target',
+    '- retry -> investigate',
+    '',
+    '## @task target',
+    'completion: agent',
+    '- success -> done',
+    '',
+    '## @end done',
+    'visible: false',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+  const initial = initialJourneyExecution(result.definition!);
+
+  assert.throws(
+    () => applyJourneyTransition(result.definition!, initial, 'investigate', 'invented'),
+    /outcome=invented/,
+  );
+
+  const retry = applyJourneyTransition(result.definition!, initial, 'investigate', 'retry');
+  assert.equal(retry.currentNodeId, 'investigate');
+  assert.deepEqual(retry.completedNodeIds, []);
+
+  const success = applyJourneyTransition(result.definition!, initial, 'investigate', 'success');
+  assert.equal(success.currentNodeId, 'target');
+  assert.deepEqual(success.completedNodeIds, ['investigate']);
+});
 
 test('loads the architecture assessment markdown workflow', async () => {
   const definition = await loadWorkflowJourney('data-architecture-assessment');
   assert.equal(definition.id, 'data-architecture-assessment');
   assert.equal(definition.start, 'intake');
-  assert.deepEqual(
-    definition.nodes.map((node) => node.id),
-    ['intake', 'current-state', 'findings', 'recommendation', 'roadmap', 'done'],
-  );
+  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
 });
