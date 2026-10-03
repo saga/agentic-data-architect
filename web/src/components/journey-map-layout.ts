@@ -26,6 +26,7 @@ const NODE_GAP = 160;
 const LAYER_GAP = 220;
 const EDGE_NODE_GAP = 80;
 const EDGE_EDGE_GAP = 60;
+const BRANCH_VERTICAL_GAP = 120;
 
 /** 给布局引擎提供真实/保守的节点尺寸。 */
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
@@ -146,6 +147,174 @@ export async function layoutWithElk(
 }
 
 /**
+ * 计算 Workflow 的左→右层级。
+ *
+ * 这不是第二套布局算法，而是对 ELK 结果增加 Workflow 语义约束：
+ * “前一步一定在后一步左边”。
+ * 有环时最多迭代 N 次，避免异常 Workflow 把 x 坐标无限推远。
+ */
+function calculateFlowRanks(nodes: FlowNode[], edges: FlowEdge[]): Map<string, number> {
+  const ranks = new Map(nodes.map((node) => [node.id, 0]));
+  const incoming = new Map<string, number>();
+
+  for (const edge of edges) {
+    incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
+  }
+
+  // 优先把真正的起点放到第 0 层；如果图没有显式 start，使用入度为 0 的节点。
+  const starts = nodes
+    .filter((node) => (incoming.get(node.id) ?? 0) === 0)
+    .sort((a, b) => a.position.x - b.position.x);
+
+  if (starts.length) {
+    for (const node of nodes) ranks.set(node.id, Number.POSITIVE_INFINITY);
+    ranks.set(starts[0].id, 0);
+
+    // 其它 disconnected source 仍然需要可布局，因此回填到 0。
+    for (const node of starts.slice(1)) ranks.set(node.id, 0);
+  }
+
+  for (let pass = 0; pass < nodes.length; pass += 1) {
+    let changed = false;
+
+    for (const edge of edges) {
+      const sourceRank = ranks.get(edge.source) ?? 0;
+      const targetRank = ranks.get(edge.target) ?? 0;
+      const nextRank = Math.min(nodes.length - 1, sourceRank + 1);
+
+      if (Number.isFinite(sourceRank) && nextRank > targetRank) {
+        ranks.set(edge.target, nextRank);
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  for (const node of nodes) {
+    if (!Number.isFinite(ranks.get(node.id))) ranks.set(node.id, 0);
+  }
+
+  return ranks;
+}
+
+/**
+ * 在 ELK 结果上增加工作地图自己的“阅读顺序”。
+ *
+ * 目标非常明确：
+ *
+ *   start ──> 主步骤 ──> 主步骤 ──> end
+ *                       │
+ *                       ├── 分支 A（右上）
+ *                       └── 分支 B（右下）
+ *
+ * 也就是说：
+ * - 起点尽量最左；
+ * - 后继步骤一定比前一步更靠右；
+ * - 一个节点产生多个出口时，它本身作为“主步骤”，分支目标放到右上/右下；
+ * - 分支目标围绕主步骤垂直展开，而不是把主步骤挤到最上面；
+ * - terminal 最终统一推到最右侧。
+ *
+ * ELK 仍然负责复杂图的 crossing minimization；这里负责的是产品层面的阅读习惯。
+ */
+function enforceWorkflowReadingOrder(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): FlowNode[] {
+  if (nodes.length <= 1) return nodes;
+
+  const ranks = calculateFlowRanks(nodes, edges);
+  const dimensions = new Map(nodes.map((node) => [node.id, nodeDimensions(node)]));
+  const outgoing = new Map<string, FlowEdge[]>();
+
+  for (const edge of edges) {
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]);
+  }
+
+  const rankWidth = new Map<number, number>();
+  for (const node of nodes) {
+    const rank = ranks.get(node.id) ?? 0;
+    rankWidth.set(rank, Math.max(rankWidth.get(rank) ?? 0, dimensions.get(node.id)?.width ?? FALLBACK_NODE_WIDTH));
+  }
+
+  const rankX = new Map<number, number>();
+  let x = 0;
+  const maxRank = Math.max(...Array.from(ranks.values()));
+  for (let rank = 0; rank <= maxRank; rank += 1) {
+    rankX.set(rank, x);
+    x += (rankWidth.get(rank) ?? FALLBACK_NODE_WIDTH) + LAYER_GAP;
+  }
+
+  const result = nodes.map((node) => ({
+    ...node,
+    position: {
+      x: rankX.get(ranks.get(node.id) ?? 0) ?? node.position.x,
+      y: node.position.y,
+    },
+  }));
+
+  const resultById = new Map(result.map((node) => [node.id, node]));
+
+  // 分支布局：以主步骤的 y 为中心，上下交替摆放出口目标。
+  for (const source of nodes) {
+    const branchEdges = outgoing.get(source.id) ?? [];
+    if (branchEdges.length < 2) continue;
+
+    const main = resultById.get(source.id);
+    if (!main) continue;
+
+    const sourceHeight = dimensions.get(source.id)?.height ?? FALLBACK_NODE_HEIGHT;
+    const orderedBranches = [...branchEdges].sort((a, b) => {
+      const aNode = resultById.get(a.target);
+      const bNode = resultById.get(b.target);
+      return (aNode?.position.y ?? 0) - (bNode?.position.y ?? 0);
+    });
+
+    const spacing = Math.max(
+      sourceHeight / 2 + BRANCH_VERTICAL_GAP,
+      FALLBACK_NODE_HEIGHT + NODE_GAP,
+    );
+    const center = (orderedBranches.length - 1) / 2;
+
+    orderedBranches.forEach((edge, index) => {
+      const target = resultById.get(edge.target);
+      if (!target) return;
+
+      const targetHeight = dimensions.get(edge.target)?.height ?? FALLBACK_NODE_HEIGHT;
+      const relative = index - center;
+
+      target.position = {
+        x: Math.max(target.position.x, main.position.x + (dimensions.get(source.id)?.width ?? FALLBACK_NODE_WIDTH) + LAYER_GAP),
+        y: main.position.y + relative * Math.max(spacing, targetHeight + NODE_GAP),
+      };
+    });
+  }
+
+  // 强制所有 terminal 在最右侧，避免某个分支提前结束导致 end 落在中间。
+  const terminalNodes = result.filter(
+    (node) => node.data.nodeType === 'end' || node.data.nodeType === 'stop',
+  );
+
+  if (terminalNodes.length) {
+    const maxNonTerminalX = Math.max(
+      ...result
+        .filter((node) => node.data.nodeType !== 'end' && node.data.nodeType !== 'stop')
+        .map((node) => node.position.x),
+    );
+    const terminalX = maxNonTerminalX + LAYER_GAP + FALLBACK_NODE_WIDTH;
+
+    terminalNodes.forEach((node) => {
+      node.position = {
+        x: Math.max(node.position.x, terminalX),
+        y: node.position.y,
+      };
+    });
+  }
+
+  return result;
+}
+
+/**
  * ELK 已经保证 graph layout 基本不重叠，但 Workflow Editor 的视觉卡片高度
  * 还包含 React Flow/Ant Design 的真实 CSS 内容。
  *
@@ -212,5 +381,6 @@ export async function autoLayoutJourney(
   edges: FlowEdge[],
 ): Promise<FlowNode[]> {
   const layouted = await layoutWithElk(nodes, edges);
-  return removeNodeCollisions(layouted);
+  const ordered = enforceWorkflowReadingOrder(layouted, edges);
+  return removeNodeCollisions(ordered);
 }
