@@ -56,7 +56,7 @@ export const JourneyLayoutSchema = z.object({
   version: z.literal(1),
   nodes: z.record(z.string(), JourneyLayoutNodeSchema),
   /** 当前使用的自动布局算法；旧 layout 可以没有这个字段。 */
-  engine: z.enum(['elk', 'elk-v2', 'elk-v3', 'elk-v4']).optional(),
+  engine: z.enum(['elk', 'elk-v2', 'elk-v3', 'elk-v4', 'elk-v5']).optional(),
   viewport: z.object({
     x: z.number().finite(),
     y: z.number().finite(),
