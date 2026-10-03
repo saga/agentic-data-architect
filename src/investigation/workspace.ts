@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
 import { migrateLegacyConversationInputs } from './conversation.js';
+import type { EvidenceRef } from '../evidence/types.js';
 import {
   SharedIndexSchema,
   WorkspaceContextSchema,
@@ -312,6 +313,21 @@ export async function setCopilotSessionId(name: string, sessionId: string): Prom
     context.copilotSessionId = sessionId;
     context.updatedAt = new Date().toISOString();
     await writeJsonAtomic(contextFile(name), context);
+  });
+}
+
+/** 在同一个 Investigation 的 context.json 中追加一条 Evidence，避免 Agent 工具直接改写状态文件。 */
+export async function appendInvestigationEvidence(
+  name: string,
+  evidence: EvidenceRef,
+): Promise<void> {
+  await withWorkspaceContextLock(name, async () => {
+    const context = await loadWorkspaceContext(name);
+    if (context.evidence.some((item) => item.id === evidence.id)) return;
+    context.evidence.push(evidence);
+    context.updatedAt = new Date().toISOString();
+    const validated = WorkspaceContextSchema.parse(context);
+    await writeJsonAtomic(contextFile(name), validated);
   });
 }
 
