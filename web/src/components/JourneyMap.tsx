@@ -537,7 +537,7 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           <span className="journey-flow-node-type">{NODE_TYPE_LABEL[data.nodeType]}</span>
           {data.connectionIssue ? (
             <Tooltip title={data.connectionIssueText}>
-              <span className="journey-flow-node-connection-warning">
+              <span className="journey-flow-node-connection-indicator">
                 {data.connectionIssue === 'error' ? '连接有问题' : '建议检查'}
               </span>
             </Tooltip>
