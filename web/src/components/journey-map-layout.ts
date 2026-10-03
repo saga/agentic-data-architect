@@ -297,7 +297,7 @@ function isPrimaryRoute(edge: FlowEdge): boolean {
  * - 其它分支目标放在主出口上方 / 下方，并且保持在右侧；
  * - terminal 统一放到最右边。
  */
-function enforceWorkflowReadingOrder(
+export function enforceWorkflowReadingOrder(
   nodes: FlowNode[],
   edges: FlowEdge[],
 ): FlowNode[] {
