@@ -1097,8 +1097,8 @@ function AppInner() {
             <aside className="context-panel">
               <div className="panel-header">
                 <div>
-                  <Text className="eyebrow">工作进展</Text>
-                  <Text strong>当前情况与下一步</Text>
+                  <Text className="eyebrow">调查进展</Text>
+                  <Text strong>当前阶段</Text>
                 </div>
                 <Tooltip title="调查设置">
                   <Button
@@ -1157,16 +1157,39 @@ function AppInner() {
               ) : null}
 
               <section className="right-section right-current-state">
-                <div className="right-section-heading"><Text strong>当前事实</Text></div>
+                <Flex className="right-section-heading" justify="space-between" align="center">
+                  <Text strong>当前事实</Text>
+                  {current?.context.unknowns.length ? (
+                    <Button type="link" size="small" onClick={() => setUnknownsOpen(true)}>
+                      查看待查
+                    </Button>
+                  ) : null}
+                </Flex>
                 {!current?.currentState ? (
                   <Text type="secondary">还没有形成完整的事实地图。主区会直接展示你和 Agent 的调查过程。</Text>
                 ) : (
                   <>
                     <div className="right-facts">
-                      <span>数据集 {current.currentState.coverage.datasets}</span>
-                      <span>已连上线的数据集 {current.currentState.coverage.connectedDatasets}/{current.currentState.coverage.datasets}</span>
-                      <span>业务定义 {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}</span>
-                      <span>待查 {current.context.unknowns.length}</span>
+                      <div className="right-fact">
+                        <span className="right-fact-label">数据集</span>
+                        <strong className="right-fact-value">{current.currentState.coverage.datasets}</strong>
+                      </div>
+                      <div className="right-fact">
+                        <span className="right-fact-label">已连上线</span>
+                        <strong className="right-fact-value">
+                          {current.currentState.coverage.connectedDatasets}/{current.currentState.coverage.datasets}
+                        </strong>
+                      </div>
+                      <div className="right-fact">
+                        <span className="right-fact-label">业务定义</span>
+                        <strong className="right-fact-value">
+                          {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}
+                        </strong>
+                      </div>
+                      <div className="right-fact">
+                        <span className="right-fact-label">待查</span>
+                        <strong className="right-fact-value">{current.context.unknowns.length}</strong>
+                      </div>
                     </div>
                   </>
                 )}
