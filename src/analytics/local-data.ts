@@ -215,8 +215,7 @@ export async function registerLocalDataset(
     && Number(existing.size_bytes) === file.sizeBytes
     && existing.updated_at === file.updatedAt;
 
-  const sha256 = unchanged ? existing.sha256 : await hashFile(file.absolute);
-  const now = new Date().toISOString();
+  const sha256 = unchanged ? existing!.sha256 : await hashFile(file.absolute);
   const id = existing?.id
     ?? 'ds-' + createHash('sha256').update(sessionName + '\0' + normalized).digest('hex').slice(0, 16);
   const name = displayName?.trim() || existing?.name || path.basename(normalized, path.extname(normalized));
@@ -237,7 +236,7 @@ export async function registerLocalDataset(
       sha256=excluded.sha256,
       size_bytes=excluded.size_bytes,
       updated_at=excluded.updated_at
-  `).run(id, sessionName, name, normalized, format, relation, version, sha256, file.sizeBytes, fileUpdatedAt);
+  `).run(id, sessionName, name, normalized, format, relation, version, sha256, file.sizeBytes, file.updatedAt);
 
   return datasetRowToModel(db.prepare(`
     SELECT id, session_name, name, relative_path, format, relation, version, sha256, size_bytes, updated_at
@@ -442,8 +441,26 @@ class LocalDuckDBEngine {
     return this.exclusive(async () => {
       await this.refreshViews();
       const dataset = getDataset(this.sessionName, datasetRef);
-      const sql = `DESCRIBE SELECT * FROM ${dataset.relation}`;
-      return this.runAndRecord('describe', sql, dataset, 200);
+      const started = Date.now();
+      const sql = "DESCRIBE SELECT * FROM " + dataset.relation;
+      const reader = await this.connection.runAndReadAll(sql);
+      const rows = reader.getRowObjectsJson() as Record<string, unknown>[];
+      return this.recordResult(
+        'describe',
+        sql,
+        dataset,
+        {
+          columns: reader.columnNames(),
+          rows: rows.slice(0, 200),
+          rowCount: rows.length,
+          truncated: rows.length > 200,
+          sql,
+          analysisRunId: '',
+          evidenceId: '',
+          dataset: { id: dataset.id, version: dataset.version, sha256: dataset.sha256 },
+        },
+        started,
+      );
     });
   }
 
