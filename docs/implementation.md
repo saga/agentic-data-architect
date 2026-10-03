@@ -13,7 +13,7 @@ Browser
                            ↘ Skills / Skill scripts
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges 渲染工作路线；当前主线采用确定性的横向 roadmap 布局，不依赖运行时自动布局。地图只展示 Workflow 骨架、当前/已完成路径和 Agent 的可选分支，不作为第二套 Workflow Engine。
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges；完整工作地图由 Workflow Definition 驱动，使用 ELK 做自动排版，并由浏览器实际测量节点尺寸后再次布局。地图不是第二套 Workflow Engine，Workflow 语义和执行状态仍由服务端负责。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
@@ -363,79 +363,6 @@ skills/financial-data-review/
   SKILL.md
   scripts/review.mjs
 ~~~
-
-
-### Schema 验证
-
-项目使用 Zod 4 作为运行时 Schema 层。持久化 JSON、HTTP 请求体、环境变量和 Agent 结构化输出都在进入业务逻辑前经过 Schema 校验；TypeScript 类型由 Zod Schema 推导，避免手写 interface 与验证逻辑长期漂移。
-
-当前已经从 Current-State Discovery 进入完整 modernization 工作包：
-
-1. **Current-State Intelligence**
-   - metadata / dataset / column
-   - SQL / ETL lineage
-   - profiling
-   - parse coverage
-   - source-of-truth candidates
-   - semantic context
-2. **Analyst Investigation**
-   - Analysis Case
-   - hypotheses / analysis steps
-   - Findings / Evidence / Unknowns
-3. **Target Architecture**
-   - provider-neutral target blueprint
-   - domain data
-   - transformation
-   - semantic layer
-   - serving / governance
-4. **Source-to-Target Mapping**
-   - dataset-level mapping skeleton
-   - transformation / business rule / validation rule
-   - mapping remains `proposed` until reviewed
-5. **Gap Analysis**
-   - discovery / lineage / semantic / quality / architecture / migration gaps
-6. **Validation Plan**
-   - coverage
-   - lineage
-   - semantic
-   - mapping
-   - reconciliation
-   - quality
-   - cutover / rollback
-7. **Migration Stages**
-   - baseline
-   - business semantics
-   - target architecture
-   - mapping
-   - validation
-   - migration waves / cutover
-
-这些对象通过 `modernization-plan.json` 持久化，UI 和 Agent 都可以继续基于它工作。自动生成结果一律视为 draft / proposed，不把模型推理当成最终业务事实。
-
-## V1.4：下一步
-
-- 把 Analysis Case 接到真正的 read-only query / reconciliation engine
-- 支持列级 Source-to-Target Mapping
-- 支持人工 review / approve / reject，并保留 review history
-- 增加 Target Schema / Data Model 编辑与版本化
-- 将 Validation Plan 变成可执行的 deterministic checks
-- 根据已批准 mapping 生成 migration wave 建议
-
-暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具。
-## Skill 边界
-
-核心代码负责安全和一致性：Evidence 校验、Claim 状态校正、SQL read-only、workspace/state persistence、lineage/profile 等确定性基础能力不交给模型。
-
-Skill 负责容易变化的领域知识、调查方法、问题清单和专业解释。需要精确计算或扫描时，Skill 自带 scripts，由 Agent 调用并读取生成 artifact。Skill 内容不是 Evidence，脚本结果仍必须回指原始 Evidence。
-
-当前金融 Skill 示例：
-
-~~~text
-skills/financial-data-review/
-  SKILL.md
-  scripts/review.mjs
-~~~
-
 
 ### Schema 验证
 
