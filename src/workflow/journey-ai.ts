@@ -233,6 +233,10 @@ export async function generateJourneyFlow(
     );
   }
 
+  if (nextDefinition.id !== workflowId) {
+    throw new Error('AI 不能把当前 Workflow 修改成另一个工作方式。');
+  }
+
   const issues = validateJourneyDefinition(nextDefinition);
   if (issues.length) {
     throw new Error('AI 生成的工作地图还不能使用：\n' + issues.join('\n'));
