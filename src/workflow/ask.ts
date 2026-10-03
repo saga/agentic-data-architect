@@ -164,8 +164,8 @@ const prompt = buildQuestionPrompt({
     // UI changes apply only to the next turn.
     // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
   // Workflow is a work mode, not a user-configurable capability. In the selected mode load only that workflow Skill; in autonomous mode load none.
-  // Capability Skills remain discoverable to Copilot; only the selected Workflow is eagerly preloaded.
-  const eagerSkills = inv.workflow ? [inv.workflow] : [];
+  // Capability Skills remain discoverable to Copilot. The selected Workflow is the
+  // only Workflow Skill left eligible, so the Agent does not mix routes.
   const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
   await appendAuditEvent(investigationName, {
     actor: 'system',
@@ -218,7 +218,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
       inv.copilotConfigurationVersion = control.version;
     },
     workingDirectory: workspaceRoot(inv.name),
-    eagerSkills,
+    ...(inv.workflow ? { workflowSkill: inv.workflow } : {}),
     platformCapabilities: control.agent.platformCapabilities,
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
