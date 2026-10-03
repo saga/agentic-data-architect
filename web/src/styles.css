@@ -1547,6 +1547,11 @@ body {
 }
 
 .journey-flow-edge-label {
+  /* EdgeLabelRenderer 的坐标通过 transform 直接写在元素上。
+     必须脱离普通行内布局，否则多个标签会互相累加横向静态位置。 */
+  position: absolute;
+  top: 0;
+  left: 0;
   z-index: 10;
   display: inline-flex;
   align-items: center;
