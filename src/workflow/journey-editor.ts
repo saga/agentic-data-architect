@@ -38,8 +38,6 @@ const ACTIVE_FILE = 'journey.md';
 const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
-const DRAFT_DEF_FILE = 'journey-draft.md';
-const DRAFT_LAYOUT_FILE = 'journey-draft-layout.json';
 
 export const JourneyLayoutNodeSchema = z.object({
   x: z.number().finite(),
@@ -288,7 +286,7 @@ export async function loadActiveJourney(
   };
 }
 
-/** 读取和版本绑定的执行状态。 */
+/** 读取和当前 Workflow version 绑定的执行状态。 */
 export async function loadJourneyExecution(
   name: string,
   definition: JourneyDefinition,
@@ -371,62 +369,6 @@ export async function saveJourneyDefinition(
   definitionInput: JourneyDefinition,
   layoutInput: JourneyLayout,
 ): Promise<{ version: number; snapshot: JourneySnapshot }> {
-  return applyJourneyDefinition(name, workflowId, definitionInput, layoutInput);
-}
-
-/**
- * 保存编辑草稿：只验证、不改变 active Workflow。
- * 有语义问题也照存（返回 issues 让编辑器标红），刷新页面不会丢改动；
- * 真正生效必须走 applyJourneyDefinition。
- */
-export async function saveJourneyDraft(
-  name: string,
-  workflowId: WorkflowId,
-  definitionInput: JourneyDefinition,
-  layoutInput: JourneyLayout,
-): Promise<{ issues: string[] }> {
-  const definition = JourneyDefinitionSchema.safeParse(definitionInput);
-  const layout = JourneyLayoutSchema.safeParse(layoutInput);
-  const issues: string[] = [];
-  if (!definition.success) {
-    issues.push('Workflow 结构读不懂，先修正后再存草稿。');
-  }
-  if (!layout.success) {
-    issues.push('画布布局读不懂，先修正后再存草稿。');
-  }
-  if (!definition.success || !layout.success) {
-    return { issues };
-  }
-  if (definition.data.id !== workflowId) {
-    issues.push('Workflow id 不能修改为另一个工作方式。');
-  } else {
-    issues.push(...validateJourneyEdit(definition.data, layout.data).issues);
-  }
-
-  await withWorkspaceContextLock(name, async () => {
-    await ensureWorkspace(name);
-    await fs.mkdir(journeyDir(name), { recursive: true });
-    await fs.writeFile(
-      journeyFile(name, DRAFT_DEF_FILE),
-      serializeJourneyMarkdown(definition.data),
-      'utf8',
-    );
-    await writeJsonAtomic(journeyFile(name, DRAFT_LAYOUT_FILE), layout.data);
-  });
-
-  return { issues: [...new Set(issues)] };
-}
-
-/**
- * 应用草稿（或编辑器当前内容）：服务端再次完整验证，通过后创建新 Workflow version。
- * 有问题直接抛错，由路由转成 400 返回。
- */
-export async function applyJourneyDefinition(
-  name: string,
-  workflowId: WorkflowId,
-  definitionInput: JourneyDefinition,
-  layoutInput: JourneyLayout,
-): Promise<{ version: number; snapshot: JourneySnapshot }> {
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const layout = JourneyLayoutSchema.parse(layoutInput);
 
@@ -436,7 +378,7 @@ export async function applyJourneyDefinition(
 
   const validation = validateJourneyEdit(definition, layout);
   if (validation.issues.length) {
-    throw new Error('Workflow 验证失败：\n' + validation.issues.join('\n'));
+    throw new Error('Workflow 验证失败：\\n' + validation.issues.join('\\n'));
   }
 
   const version = await withWorkspaceContextLock(name, async () => {
@@ -484,6 +426,7 @@ export async function applyJourneyDefinition(
       migratedExecution,
     );
 
+    // Workflow 版本变化后，普通调查 Copilot Session 不能继续携带旧 Workflow 上下文。
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.copilotSessionId;
