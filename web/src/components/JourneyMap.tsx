@@ -165,6 +165,8 @@ interface FlowNodeData extends Record<string, unknown> {
   isNew?: boolean;
   sourceHandles: Array<{ id: string; label: string }>;
   targetHandles: Array<{ id: string; label: string }>;
+  connectionIssue?: 'error' | 'warning';
+  connectionIssueText?: string;
   onSelect?: (id: string) => void;
   onAddStep?: (id: string) => void;
   onAddBranch?: (id: string) => void;
@@ -250,12 +252,18 @@ function graphFromDefinition(
   onSelectEdge?: (id: string) => void,
   newNodeIds: Set<string> = new Set(),
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const nodeMap = new Map(definition.nodes.map((node) => [node.id, node]));
   const incoming = new Map<string, Array<{ source: string; outcome: string; id: string }>>();
   const outgoing = new Map<string, Array<{ target: string; outcome: string; id: string }>>();
+  const incomingCount = new Map<string, number>();
+  const outgoingCount = new Map<string, number>();
 
   for (const node of definition.nodes) {
-    node.routes.forEach((route, index) => {
-      const id = node.id + ':' + route.outcome + ':' + route.target + ':' + String(index);
+    const validOutgoing = node.routes.filter((route) => nodeMap.has(route.target));
+    outgoingCount.set(node.id, node.routes.length);
+
+    validOutgoing.forEach((route, validIndex) => {
+      const id = node.id + ':' + route.outcome + ':' + route.target + ':' + String(validIndex);
       outgoing.set(node.id, [
         ...(outgoing.get(node.id) ?? []),
         { target: route.target, outcome: route.outcome, id },
@@ -264,30 +272,64 @@ function graphFromDefinition(
         ...(incoming.get(route.target) ?? []),
         { source: node.id, outcome: route.outcome, id },
       ]);
+      incomingCount.set(route.target, (incomingCount.get(route.target) ?? 0) + 1);
     });
   }
+
+  const getConnectionIssue = (
+    item: WorkflowNodeDefinition,
+  ): { severity: 'error' | 'warning'; text: string } | undefined => {
+    const isStart = definition.start === item.id;
+    const terminal = item.type === 'end' || item.type === 'stop';
+    const incoming = incomingCount.get(item.id) ?? 0;
+    const outgoing = outgoingCount.get(item.id) ?? 0;
+
+    if (item.routes.some((route) => !nodeMap.has(route.target))) {
+      return {
+        severity: 'error',
+        text: '存在断开的出口，目标步骤不存在。',
+      };
+    }
+    if (!isStart && incoming === 0) {
+      return {
+        severity: 'error',
+        text: '没有入口连接，这一步无法从当前 Workflow 进入。',
+      };
+    }
+    if (!terminal && outgoing === 0) {
+      return {
+        severity: 'error',
+        text: '没有出口连接，这一步完成后无法继续。',
+      };
+    }
+
+    return undefined;
+  };
 
   const nodes: FlowNode[] = definition.nodes.map((item) => {
     const status = stageStatus(snapshot, item.id);
     const position = layout.nodes[item.id] ?? { x: 0, y: 0 };
-    const sourceHandles: HandleSpec[] = (outgoing.get(item.id) ?? []).map((route, index) => ({
+    const sourceRoutes = outgoing.get(item.id) ?? [];
+    const targetRoutes = incoming.get(item.id) ?? [];
+    const sourceHandles: HandleSpec[] = sourceRoutes.map((route, index) => ({
       id: sourceHandleId(item.id, index),
       label: route.outcome,
     }));
-    const targetHandles: HandleSpec[] = (incoming.get(item.id) ?? []).map((route, index) => ({
+    const targetHandles: HandleSpec[] = targetRoutes.map((route, index) => ({
       id: targetHandleId(item.id, index),
       label: route.outcome,
     }));
 
-    // A node with no incoming/outgoing route still needs one usable handle in edit mode.
+    // 即使锁定模式也显示连接点，用户能一眼看出完整路线；只是 React Flow 交互被关闭。
     if (!sourceHandles.length && item.type !== 'end' && item.type !== 'stop') {
-      sourceHandles.push({ id: sourceHandleId(item.id, 0), label: '新分支' });
+      sourceHandles.push({ id: sourceHandleId(item.id, 0), label: '新增出口' });
     }
     if (!targetHandles.length) {
       targetHandles.push({ id: targetHandleId(item.id, 0), label: '入口' });
     }
 
     const terminal = item.type === 'end' || item.type === 'stop';
+    const connectionIssue = getConnectionIssue(item);
 
     return {
       id: item.id,
@@ -309,57 +351,60 @@ function graphFromDefinition(
         isNew: newNodeIds.has(item.id),
         sourceHandles,
         targetHandles,
-        onSelect: onSelectNode,
-        onAddStep,
-        onAddBranch,
-        onDelete,
+        ...(connectionIssue
+          ? {
+              connectionIssue: connectionIssue.severity,
+              connectionIssueText: connectionIssue.text,
+            }
+          : {}),
+        onSelect: editing ? onSelectNode : undefined,
+        onAddStep: editing ? onAddStep : undefined,
+        onAddBranch: editing ? onAddBranch : undefined,
+        onDelete: editing ? onDelete : undefined,
       },
-      // 终点即使 DSL 标成 visible:false，在地图里也保留，避免流程看起来像“断在最后一步”。
-      hidden: !editing && !item.visible && !terminal,
+      // 不再用 hidden 裁掉 visible:false 节点；两个模式必须看到同一张完整 Workflow 图。
       className:
         'journey-flow-node journey-flow-node-stage '
         + STATUS_CLASS[status]
+        + (!item.visible ? ' journey-flow-node-deemphasized' : '')
+        + (connectionIssue ? ' journey-flow-node-connection-' + connectionIssue.severity : '')
         + (newNodeIds.has(item.id) ? ' journey-flow-node-new' : ''),
       style: {
-        width: item.type === 'end' || item.type === 'stop' ? 178 : 236,
+        width: terminal ? 178 : 236,
       },
     };
   });
 
-  const visibleIds = new Set(
-    nodes.filter((node) => !node.hidden).map((node) => node.id),
-  );
   const edges: FlowEdge[] = [];
-
   for (const node of definition.nodes) {
-    for (const [index, route] of node.routes.entries()) {
-      if (!editing && (!visibleIds.has(node.id) || !visibleIds.has(route.target))) continue;
+    const validRoutes = node.routes.filter((route) => nodeMap.has(route.target));
 
+    for (const [routeIndex, route] of validRoutes.entries()) {
       const sourceCompleted = snapshot.state.completedNodeIds.includes(node.id);
       const isCurrent = snapshot.state.currentNodeId === node.id;
       const targetIncoming = incoming.get(route.target) ?? [];
-      const incomingIndex = targetIncoming.findIndex(
-        (edge) => edge.id === node.id + ':' + route.outcome + ':' + route.target + ':' + String(index),
-      );
+      const edgeId = node.id + ':' + route.outcome + ':' + route.target + ':' + String(routeIndex);
+      const incomingIndex = targetIncoming.findIndex((edge) => edge.id === edgeId);
 
       edges.push({
-        id: node.id + ':' + route.outcome + ':' + route.target + ':' + String(index),
+        id: edgeId,
         source: node.id,
         target: route.target,
-        sourceHandle: sourceHandleId(node.id, index),
+        sourceHandle: sourceHandleId(node.id, routeIndex),
         targetHandle: targetHandleId(route.target, Math.max(0, incomingIndex)),
         type: EDGE_TYPE,
         markerEnd: { type: MarkerType.ArrowClosed },
         animated: isCurrent,
         className:
           'journey-flow-edge'
-          + (sourceCompleted ? ' journey-flow-edge-traversed' : ''),
+          + (sourceCompleted ? ' journey-flow-edge-traversed' : '')
+          + (isCurrent ? ' journey-flow-edge-current' : ''),
         data: {
           outcome: route.outcome,
           labelOffsetY:
-            (index - (node.routes.length - 1) / 2) * 18
+            (routeIndex - (validRoutes.length - 1) / 2) * 18
             + (Math.max(0, incomingIndex) - (Math.max(0, targetIncoming.length) - 1) / 2) * 8,
-          onSelect: onSelectEdge,
+          onSelect: editing ? onSelectEdge : undefined,
         },
       });
     }
@@ -367,6 +412,7 @@ function graphFromDefinition(
 
   return { nodes, edges };
 }
+
 
 /**
  * ELK 的 layered 布局比固定 x/y 更适合当前 Workflow：
@@ -387,10 +433,11 @@ async function layoutWithElk(
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
       'elk.edgeRouting': 'ORTHOGONAL',
-      'elk.spacing.nodeNode': '60',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '90',
-      'elk.layered.spacing.edgeNodeBetweenLayers': '45',
-      'elk.layered.spacing.edgeEdgeBetweenLayers': '30',
+      // 留出足够白空间，尤其是编辑模式节点会展开完成方式/提示等内容。
+      'elk.spacing.nodeNode': '120',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '180',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '75',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '55',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
@@ -398,7 +445,7 @@ async function layoutWithElk(
     children: nodes.map((node) => ({
       id: node.id,
       width: Number(node.style?.width ?? 236),
-      height: node.data.nodeType === 'end' || node.data.nodeType === 'stop' ? 90 : 128,
+      height: node.data.nodeType === 'end' || node.data.nodeType === 'stop' ? 96 : 176,
       ports: [
         ...node.data.targetHandles.map((handle) => ({
           id: handle.id,
@@ -454,7 +501,7 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           type="target"
           position={Position.Left}
           id={handle.id}
-          className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+          className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle journey-flow-handle-readonly'}
           style={handleStyle(index, targetHandles.length)}
           key={handle.id}
         />
@@ -488,13 +535,29 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           {meta.icon}
           <span>{meta.label}</span>
           <span className="journey-flow-node-type">{NODE_TYPE_LABEL[data.nodeType]}</span>
+          {data.connectionIssue ? (
+            <Tooltip title={data.connectionIssueText}>
+              <span className="journey-flow-node-connection-warning">
+                {data.connectionIssue === 'error' ? '连接有问题' : '建议检查'}
+              </span>
+            </Tooltip>
+          ) : null}
         </div>
         <div className="journey-flow-node-title">{data.title}</div>
         <div className="journey-flow-node-subtitle">
           {data.objective || '未设置步骤目标'}
         </div>
 
-        {data.isNew ? (
+        {data.connectionIssue ? (
+          <Tag
+            color={data.connectionIssue === 'error' ? 'error' : 'warning'}
+            className="journey-flow-node-connection-tag"
+          >
+            {data.connectionIssue === 'error' ? '需要修正连接' : '建议检查连接'}
+          </Tag>
+        ) : null}
+
+                {data.isNew ? (
           <Tag color="warning" className="journey-flow-node-new-tag">
             新建步骤
           </Tag>
@@ -521,7 +584,7 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
             type="source"
             position={Position.Right}
             id={handle.id}
-            className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+            className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle journey-flow-handle-readonly'}
             style={handleStyle(index, sourceHandles.length)}
             key={handle.id}
           />
@@ -729,27 +792,26 @@ export function JourneyMap({
       const data = await response.json() as WorkflowSnapshot;
       setSnapshot(data);
 
-      if (!editing) {
-        const graph = graphFromDefinition(
-          data.definition,
-          data.layout,
-          data,
-          false,
-          setSelectedNodeId,
-          undefined,
-          undefined,
-          undefined,
-          setSelectedEdgeId,
-        );
+      const graph = graphFromDefinition(
+        data.definition,
+        data.layout,
+        data,
+        editing,
+        setSelectedNodeId,
+        undefined,
+        undefined,
+        undefined,
+        editing ? setSelectedEdgeId : undefined,
+        newNodeIdsRef.current,
+      );
 
-        const shouldUpgradeLayout = data.layout.engine !== 'elk';
-        const laidOutNodes = shouldUpgradeLayout
-          ? await layoutWithElk(graph.nodes, graph.edges)
-          : graph.nodes;
+      const shouldUpgradeLayout = data.layout.engine !== 'elk';
+      const laidOutNodes = shouldUpgradeLayout
+        ? await layoutWithElk(graph.nodes, graph.edges)
+        : graph.nodes;
 
-        setNodes(laidOutNodes);
-        setEdges(graph.edges);
-      }
+      setNodes(laidOutNodes);
+      setEdges(graph.edges);
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1632,7 +1694,7 @@ export function JourneyMap({
           <div className="journey-map-heading-subtitle">
             {editing
               ? '正在编辑 Workflow 草稿。拖动节点、连线、添加分支；验证通过后才会真正改变执行路线。'
-              : '这是当前 Workflow 的实际路线。Agent 会在当前节点内工作，完成后只能沿已有出口继续。'}
+              : '这是当前 Workflow 的完整路线。锁定模式只能查看，不能拖动、连线或修改；断开的步骤会直接标红。'}
           </div>
         </div>
         <Flex align="center" gap={8} wrap>
