@@ -34,6 +34,8 @@ import type {
   JourneyMapStage,
   WorkflowDefinition,
   WorkflowNodeDefinition,
+  WorkflowNodeType,
+  CompletionMode,
   WorkflowSnapshot,
 } from './journey-map-types.js';
 
@@ -580,7 +582,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const nextNewIds = new Set(newNodeIdsRef.current);
     for (const id of removedIds) nextNewIds.delete(id);
     newNodeIdsRef.current = nextNewIds;
-    setNewNodeIds(nextNewIds);
 
     void rebuildStructuralGraph(nextNodes, nextEdges, nextNewIds);
     setSelectedNodeId(undefined);
