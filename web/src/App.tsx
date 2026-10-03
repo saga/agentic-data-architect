@@ -84,7 +84,6 @@ interface InvestigationControl {
       version: number;
       content: string;
     };
-    skills: Array<{ name: string; version: number }>;
     mcpServers: Array<{
       name: string;
       version: number;
@@ -176,11 +175,6 @@ interface SessionData {
     highValueAssets: string[];
   } | null;
   semanticAssets?: unknown[];
-}
-
-interface SkillOption {
-  name: string;
-  description: string;
 }
 
 interface ModernizationGap {
@@ -558,7 +552,6 @@ function AppInner() {
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
-  const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [modernizationOpen, setModernizationOpen] = useState(false);
   const [modernizationLoading, setModernizationLoading] = useState(false);
   const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
@@ -690,16 +683,6 @@ function AppInner() {
       ].join('\n'),
     );
   };
-  const loadSkills = async () => {
-    try {
-      const result = await getJson<{ skills: SkillOption[] }>('/api/skills');
-      const workflowNames = new Set<string>(workflowOptions.map((option) => option.value).filter(Boolean));
-      setSkillOptions(result.skills.filter((skill) => !workflowNames.has(skill.name)));
-    } catch {
-      // Skill discovery should not block the investigation UI.
-    }
-  };
-
   useEffect(() => {
     const onPopState = () => {
       const routed = routeInfo();
@@ -710,7 +693,6 @@ function AppInner() {
     };
     window.addEventListener('popstate', onPopState);
     reloadSessions().catch((e) => setError(e.message));
-    loadSkills().catch(() => undefined);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
@@ -1084,7 +1066,6 @@ function AppInner() {
         <InvestigationConfigPage
           sessionName={active}
           control={current.control}
-          skills={skillOptions}
           workflow={current.context.workflow ?? ''}
           onBack={() => navigatePage('chat')}
           onWorkflowChange={async (workflow) => {
