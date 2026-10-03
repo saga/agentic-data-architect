@@ -247,7 +247,7 @@ test('applies only an actual outgoing workflow outcome', () => {
 });
 
 test('human review starts in waiting state', () => {
-  const result = parseJourneyMarkdown(['## @flow demo','start -> review','','## @review review','actor: human','- approved -> done','','## @end done'].join('\\n'));
+  const result = parseJourneyMarkdown(['## @flow demo','start -> review','','## @review review','actor: human','- approved -> done','','## @end done'].join('\n'));
   assert.ok(result.definition);
   const execution = initialJourneyExecution(result.definition!, 1);
   assert.equal(execution.status, 'waiting');
