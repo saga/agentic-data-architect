@@ -336,6 +336,7 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
         semanticAssets: 0,
         parseFailures: 0,
       },
+      highGapKinds: [],
     },
     initialJourneyExecution(result.definition!),
   );
