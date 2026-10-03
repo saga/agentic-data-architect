@@ -66,10 +66,8 @@ interface JourneyWorkflowEditorResult {
   completedCount: number;
   saveWorkflow: () => Promise<void>;
   aiEditFlow: (
-    mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-    scope?: 'workflow' | 'selection',
   ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
   pendingAiChange?: { message: string; changes: WorkflowChange[] };
   applyAiChanges: () => Promise<void>;
@@ -1036,18 +1034,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   /** AI 只提出 Patch；先预览，用户确认后再应用。 */
   const aiEditFlow = async (
-    mode: 'generate' | 'modify',
     prompt: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
-    scope: 'workflow' | 'selection' = 'workflow',
   ) => {
     const name = sessionNameFromUrl();
     const currentSnapshot = snapshotRef.current;
     if (!name || !prompt.trim() || !currentSnapshot) return undefined;
-    if (scope === 'selection' && !selectedNodeId) {
-      message.warning('请先选中一个步骤。');
-      return undefined;
-    }
 
     const currentCanvasDefinition = definitionFromGraph(
       nodesRef.current,
@@ -1062,11 +1054,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            mode,
             prompt: prompt.trim(),
             messages: history.slice(-12),
             definition: currentCanvasDefinition,
-            scope,
             ...(selectedNodeId ? { selectedNodeId } : {}),
           }),
         },
