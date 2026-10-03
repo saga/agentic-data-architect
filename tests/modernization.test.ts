@@ -44,7 +44,38 @@ describe('Modernization workbench', () => {
     assert.ok(gaps.some((gap) => gap.kind === 'discovery'));
     assert.ok(gaps.some((gap) => gap.kind === 'lineage'));
     assert.ok(gaps.some((gap) => gap.kind === 'semantic'));
-    assert.ok(gaps.some((gap) => gap.title.includes('Source-of-Truth')));
+    const sourceTruthGap = gaps.find((gap) => gap.kind === 'source-of-truth');
+    assert.ok(sourceTruthGap);
+    assert.equal(sourceTruthGap?.severity, 'high');
+  });
+
+  it('treats any disconnected dataset as a lineage gap without an arbitrary 80% cutoff', () => {
+    const gaps = buildModernizationGaps({
+      currentState: {
+        generatedAt: new Date().toISOString(),
+        coverage: {
+          filesScanned: 1,
+          sqlFiles: 1,
+          sqlParsedStatements: 1,
+          sqlParseFailures: 0,
+          datasets: 20,
+          connectedDatasets: 19,
+          datasetLineageConnectionRate: 0.95,
+          columnLineageEdges: 0,
+          semanticAssets: 1,
+          profiledDatasets: 1,
+        },
+        sourceOfTruthCandidates: [],
+        semanticCandidates: [],
+        semanticAssets: [],
+        highValueAssets: [],
+      },
+      estate: null,
+      findings: [],
+    });
+    const lineageGap = gaps.find((gap) => gap.kind === 'lineage');
+    assert.ok(lineageGap);
+    assert.equal(lineageGap?.severity, 'high');
   });
 
   it('keeps modernization work products runtime validated', () => {
