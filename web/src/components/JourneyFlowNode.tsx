@@ -67,16 +67,12 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           type="target"
           position={Position.Left}
           id={handle.id}
-          className={
-            data.editing
-              ? 'journey-flow-handle journey-flow-handle-edit'
-              : 'journey-flow-handle journey-flow-handle-readonly'
-          }
+          className="journey-flow-handle journey-flow-handle-edit"
           style={handleStyle(index, data.targetHandles.length)}
         />
       ))}
 
-      {data.editing && selected ? (
+      {selected ? (
         <NodeToolbar
           isVisible
           position={Position.Top}
@@ -161,8 +157,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           </Tag>
         ) : null}
 
-        {data.editing ? (
-          <div className="journey-flow-node-config">
+        {          <div className="journey-flow-node-config">
             <Tag bordered={false}>
               {data.completion === 'deterministic' ? '确定性完成' : 'Agent 判断'}
             </Tag>
@@ -185,11 +180,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               type="source"
               position={Position.Right}
               id={handle.id}
-              className={
-                data.editing
-                  ? 'journey-flow-handle journey-flow-handle-edit'
-                  : 'journey-flow-handle journey-flow-handle-readonly'
-              }
+          className="journey-flow-handle journey-flow-handle-edit"
               style={handleStyle(index, data.sourceHandles.length)}
             />
           ))
