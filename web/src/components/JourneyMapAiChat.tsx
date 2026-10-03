@@ -25,7 +25,7 @@ export interface JourneyMapAiChatProps {
  * 这里不做普通 Chat，而是一个“边看图、边改图”的设计助手：
  * - 每一轮都把当前画布作为真实状态；
  * - 同时带上最近几轮对话，让用户可以连续说“再加一个人工确认”“把这个判断点提前”；
- * - AI 只返回新的 Workflow Definition，真正保存仍由页面顶部“保存”完成。
+ * - AI 只返回 typed Workflow Patch，先预览、确认后才进入当前画布。
  */
 function changeLabel(change: WorkflowChange): string {
   switch (change.type) {
@@ -134,7 +134,11 @@ export function JourneyMapAiChat({
           <Segmented
             size="small"
             value={mode}
-            onChange={(next) => setMode(next as 'modify' | 'generate')}
+            onChange={(next) => {
+              const nextMode = next as 'modify' | 'generate';
+              setMode(nextMode);
+              if (nextMode === 'generate') setScope('workflow');
+            }}
             options={[
               { value: 'modify', label: '修改' },
               { value: 'generate', label: '重设计' },
@@ -145,7 +149,7 @@ export function JourneyMapAiChat({
             value={scope}
             onChange={(next) => setScope(next as 'workflow' | 'selection')}
             options={[
-              { value: 'selection', label: '选中步骤' },
+              { value: 'selection', label: '选中步骤', disabled: mode === 'generate' },
               { value: 'workflow', label: '整张图' },
             ]}
           />
