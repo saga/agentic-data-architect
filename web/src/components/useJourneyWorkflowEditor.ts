@@ -860,6 +860,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   })();
 
   useEffect(() => {
+    // 每次真正切换 active/draft/edit 状态时，都允许 React Flow 的实测尺寸
+    // 触发一次最终自动排版；否则相同节点数量的 Workflow 切换后不会重新计算。
+    lastMeasuredNodeCountRef.current = 0;
+
     // 依赖里只放 graphKey：snapshot 对象换了但内容没换（保存草稿）时不该重画。
     const current = snapshotRef.current;
     if (!current) {
