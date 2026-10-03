@@ -125,7 +125,6 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
     routeOptions: parsed.data.routeOptions,
-    workflow: parsed.data.workflow,
     warnings,
     droppedEvidenceRefs,
   };
