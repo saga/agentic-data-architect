@@ -308,6 +308,8 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
         (check) => check.blocking && ['ready', 'passed'].includes(check.status),
       ).length,
       blockingValidationTotal: plan.validationPlan.checks.filter((check) => check.blocking).length,
+      cutoverCriteriaDefined: plan.validationPlan.cutoverCriteria.length > 0,
+      rollbackCriteriaDefined: plan.validationPlan.rollbackCriteria.length > 0,
     });
 
     return { ...plan, journey };
