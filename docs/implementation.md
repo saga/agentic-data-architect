@@ -208,14 +208,13 @@ Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量
 
 ### Modernization Journey
 
-工作地图是导航视图，不是编辑器。当前实现：
-- 主线节点来自 `GET /api/sessions/:name/journey` 的确定性 Journey 状态。
-- Agent 动态路线来自 `context.journeyPlan.routes`，每轮回答后重新生成并持久化。
-- 主对话区用 Agent recommendation card 展示动态路线；右侧只保留紧凑 Journey / 当前事实。
-- 全屏地图使用 `@xyflow/react` custom node 展示状态、阶段类型和 Agent 分支；当前节点通过 `NodeToolbar` 支持“围绕此阶段继续”。
-- 地图节点不可拖拽、连接或编辑；选择路线只是向 Agent 传递用户意图。
-- Unknowns 也可以从顶部状态标签打开，选择某一项后直接要求 Agent 继续调查。
-
+工作地图现在既是导航视图，也是 Investigation Workflow 的编辑入口。当前实现：
+- 主对话区继续使用 `context.journeyPlan.routes` 作为 Agent 的临时调查建议；这些建议不直接改变 Workflow 状态。
+- 完整工作地图使用 `@xyflow/react` 展示 Workflow Definition、执行状态、分支和结构问题。
+- 工作地图可以直接拖拽节点、添加步骤、连接/重新连接分支、编辑节点和分支属性，并通过 AI 提出 Workflow Patch。
+- 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换，避免属性表单与 AI 对话同时挤占空间。
+- 编辑结果先留在当前画布；只有点击“保存”后，服务端验证通过才创建新的 Investigation Workflow version。
+- Unknowns 和 Agent 动态路线仍属于调查导航，不会绕过正式 Workflow 的执行控制。
 
 路线定义在：
 
