@@ -18,9 +18,10 @@ test('journey editor serialization round-trips semantic graph', () => {
         objective: '确认范围',
         visible: true,
         completion: 'deterministic' as const,
+        actor: 'system' as const,
         completeWhen: 'goal',
         routes: [
-          { outcome: 'success', target: 'review' },
+          { outcome: 'success', target: 'review', condition: 'goal' },
           { outcome: 'needs-input', target: 'intake' },
         ],
       },
@@ -30,6 +31,7 @@ test('journey editor serialization round-trips semantic graph', () => {
         title: '人工确认',
         visible: true,
         completion: 'agent' as const,
+        actor: 'human' as const,
         routes: [{ outcome: 'success', target: 'done' }],
       },
       {
@@ -38,6 +40,7 @@ test('journey editor serialization round-trips semantic graph', () => {
         title: '完成',
         visible: false,
         completion: 'agent' as const,
+        actor: 'system' as const,
         routes: [],
       },
     ],
@@ -49,10 +52,11 @@ test('journey editor serialization round-trips semantic graph', () => {
   assert.equal(parsed.issues.length, 0);
   assert.ok(parsed.definition);
   assert.equal(parsed.definition?.nodes[0]?.completion, 'deterministic');
+  assert.equal(parsed.definition?.nodes[0]?.actor, 'system');
   assert.deepEqual(
     parsed.definition?.nodes[0]?.routes.map(({ outcome, target }) => ({ outcome, target })),
     [
-      { outcome: 'success', target: 'review' },
+      { outcome: 'success', target: 'review', condition: 'goal' },
       { outcome: 'needs-input', target: 'intake' },
     ],
   );
