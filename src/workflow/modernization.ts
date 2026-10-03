@@ -246,7 +246,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     scope: inv.scope,
     currentState: {
       datasets: current?.coverage.datasets ?? snapshot?.lineage?.tables.filter((t) => !t.startsWith('file:')).length ?? 0,
-      lineageConnectionRate: current?.coverage.datasetLineageConnectionRate ?? null,
+      lineageCoverage: current?.coverage.datasetLineageConnectionRate ?? null,
       parseFailures: current?.coverage.sqlParseFailures ?? snapshot?.lineage?.parseFailures.length ?? 0,
       semanticAssets: current?.coverage.semanticAssets ?? snapshot?.semanticAssets?.length ?? 0,
       findings: inv.findings.length,
