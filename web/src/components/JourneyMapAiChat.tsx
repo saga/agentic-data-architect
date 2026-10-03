@@ -27,6 +27,18 @@ export interface JourneyMapAiChatProps {
  * - 同时带上最近几轮对话，让用户可以连续说“再加一个人工确认”“把这个判断点提前”；
  * - AI 只返回新的 Workflow Definition，真正保存仍由页面顶部“保存”完成。
  */
+function changeLabel(change: WorkflowChange): string {
+  switch (change.type) {
+    case 'replace-definition': return '重新设计整张工作地图';
+    case 'add-node': return '新增步骤：' + change.node.title;
+    case 'update-node': return '修改步骤：' + change.nodeId;
+    case 'remove-node': return '删除步骤：' + change.nodeId;
+    case 'add-route': return '新增分支：' + change.nodeId + ' → ' + change.route.target;
+    case 'update-route': return '修改分支：' + change.nodeId + ' / ' + change.outcome;
+    case 'remove-route': return '删除分支：' + change.nodeId + ' / ' + change.outcome;
+  }
+}
+
 export function JourneyMapAiChat({
   currentDefinition,
   selectedNodeId,
@@ -116,15 +128,26 @@ export function JourneyMapAiChat({
           </Typography.Text>
         </div>
 
-        <Segmented
-          size="small"
-          value={mode}
-          onChange={(next) => setMode(next as 'modify' | 'generate')}
-          options={[
-            { value: 'modify', label: '修改' },
-            { value: 'generate', label: '重设计' },
-          ]}
-        />
+        <Flex vertical align="end" gap={6}>
+          <Segmented
+            size="small"
+            value={mode}
+            onChange={(next) => setMode(next as 'modify' | 'generate')}
+            options={[
+              { value: 'modify', label: '修改' },
+              { value: 'generate', label: '重设计' },
+            ]}
+          />
+          <Segmented
+            size="small"
+            value={scope}
+            onChange={(next) => setScope(next as 'workflow' | 'selection')}
+            options={[
+              { value: 'selection', label: '选中步骤' },
+              { value: 'workflow', label: '整张图' },
+            ]}
+          />
+        </Flex>>
       </div>
 
       <div className="journey-map-ai-chat-body">
@@ -141,6 +164,38 @@ export function JourneyMapAiChat({
           }))}
         />
       </div>
+
+      {pendingAiChange ? (
+        <div className="journey-map-ai-preview">
+          <Flex align="center" justify="space-between" gap={8}>
+            <Typography.Text strong>AI 修改预览</Typography.Text>
+            <Tag color="blue">{pendingAiChange.changes.length} 项修改</Tag>
+          </Flex>
+          <Typography.Text type="secondary">
+            {pendingAiChange.message}
+          </Typography.Text>
+          <div className="journey-map-ai-preview-list">
+            {pendingAiChange.changes.slice(0, 8).map((change, index) => (
+              <Typography.Text key={index} className="journey-map-ai-preview-item">
+                {changeLabel(change)}
+              </Typography.Text>
+            ))}
+            {pendingAiChange.changes.length > 8 ? (
+              <Typography.Text type="secondary">
+                还有 {pendingAiChange.changes.length - 8} 项修改。
+              </Typography.Text>
+            ) : null}
+          </div>
+          <Flex gap={8}>
+            <Button type="primary" size="small" onClick={() => void applyAiChanges()}>
+              应用修改
+            </Button>
+            <Button size="small" onClick={discardAiChanges}>
+              取消
+            </Button>
+          </Flex>
+        </div>
+      ) : null}
 
       <Sender
         value={value}
