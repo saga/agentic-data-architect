@@ -147,7 +147,7 @@ useEdgesState
 ReactFlow
 ~~~
 
-官方文档建议用 useNodesState / useEdgesState 管理受控节点和边，并通过 onConnect + addEdge 增加连接。当前实现还支持 onReconnect + reconnectEdge 修改已有分支的目标。边上的 outcome 使用 EdgeLabelRenderer，因此可以直接点击分支标签编辑。当前编辑器还为每条 incoming/outgoing route 分配独立 Handle，并使用 ELK layered layout 与 orthogonal edge routing 减少线路交叉。React Flow 官方的 ELK multiple-handles 示例明确使用独立 ports 和 FIXED_ORDER 来降低 edge crossings。
+官方文档建议用 useNodesState / useEdgesState 管理受控节点和边，并通过 onConnect + addEdge 增加连接。当前实现还支持 onReconnect + reconnectEdge 修改已有分支的目标。边上的 outcome 使用 EdgeLabelRenderer，因此可以直接点击分支标签编辑。当前编辑器还为每条 incoming/outgoing route 分配独立 Handle，并使用 ELK layered layout 与较宽松的节点间距减少线路交叉。布局在 React Flow 完成节点实测尺寸后会再跑一次，并增加最后一道碰撞保护，避免自定义节点实际高度超过布局估算后互相重叠。React Flow 官方的 ELK multiple-handles 示例明确使用独立 ports 和 FIXED_ORDER 来降低 edge crossings。
 
 参考：
 
