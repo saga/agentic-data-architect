@@ -15,7 +15,6 @@ import {
   Select,
   Space,
   Tag,
-  Tabs,
   Tooltip,
   Typography,
 } from 'antd';
@@ -23,13 +22,10 @@ import type { UploadFile } from 'antd';
 import {
   FolderOpenOutlined,
   FullscreenOutlined,
-  GithubOutlined,
-  HistoryOutlined,
   LoadingOutlined,
   InfoCircleOutlined,
   PaperClipOutlined,
   PlusOutlined,
-  ReloadOutlined,
   SettingOutlined,
   SendOutlined,
   ToolOutlined,
@@ -175,17 +171,6 @@ interface SessionData {
     highValueAssets: string[];
   } | null;
   semanticAssets?: unknown[];
-}
-
-interface ModernizationGap {
-  id: string;
-  kind: string;
-  title: string;
-  description: string;
-  severity: string;
-  affectedAssets: string[];
-  evidenceIds: string[];
-  recommendation: string;
 }
 
 interface JourneyStage {
@@ -428,61 +413,57 @@ function ChatMarkdown({ content }: { content: string }) {
   );
 }
 
-function FollowUpCard(props: {
-  questions: string[];
-  value: string;
+function AssistantActionBar(props: {
+  routeOptions: NonNullable<SessionContext['journeyPlan']>['routes'];
+  followUpQuestions: string[];
   loading: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
+  onSelectRoute: (routeId: string) => void;
+  onAsk: (question: string) => void;
 }) {
-  const primaryQuestion = props.questions[0];
-  const suggestions = props.questions.slice(1, 3);
+  const routes = props.routeOptions.slice(0, 3);
+  const questions = props.followUpQuestions.slice(0, 3);
+  if (!routes.length && !questions.length) return null;
 
   return (
-    <Card size="small" className="agent-guidance-card">
-      <Flex vertical gap={8}>
-        <Text strong className="agent-guidance-title">下一步</Text>
-        <Text type="secondary" className="agent-guidance-question">{primaryQuestion}</Text>
-        <Input.TextArea
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
-          onPressEnter={(event) => {
-            if (!event.shiftKey) {
-              event.preventDefault();
-              props.onSubmit();
-            }
-          }}
-          autoSize={{ minRows: 2, maxRows: 5 }}
-          placeholder="把需要补充的信息写在这里，例如代码库地址、目录、文件名或业务定义。"
-          disabled={props.loading}
-        />
-        <Flex justify="space-between" align="center" gap={8} wrap>
-          <Space size={4} wrap>
-            {suggestions.map((question) => (
+    <div className="assistant-action-bar">
+      {routes.length ? (
+        <>
+          <Text type="secondary" className="assistant-action-label">下一步</Text>
+          <Flex wrap gap={6}>
+            {routes.map((route) => (
+              <Button
+                key={route.id}
+                size="small"
+                className="assistant-action-button"
+                disabled={props.loading}
+                onClick={() => props.onSelectRoute(route.id)}
+              >
+                {route.title}
+              </Button>
+            ))}
+          </Flex>
+        </>
+      ) : null}
+      {questions.length ? (
+        <>
+          <Text type="secondary" className="assistant-action-label">需要确认</Text>
+          <Flex wrap gap={6}>
+            {questions.map((question) => (
               <Button
                 key={question}
-                type="link"
                 size="small"
-                className="agent-guidance-suggestion"
-                onClick={() => props.onChange(question)}
+                type="link"
+                className="assistant-action-question"
                 disabled={props.loading}
+                onClick={() => props.onAsk(question)}
               >
                 {question}
               </Button>
             ))}
-          </Space>
-          <Button
-            type="primary"
-            size="small"
-            icon={<SendOutlined />}
-            onClick={props.onSubmit}
-            disabled={!props.value.trim() || props.loading}
-          >
-            继续
-          </Button>
-        </Flex>
-      </Flex>
-    </Card>
+          </Flex>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -582,7 +563,7 @@ function AppInner() {
   const [loading, setLoading] = useState(false);
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
-  const [nextGuidance, setNextGuidance] = useState<{ questions: string[]; value: string }>();
+  const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
@@ -593,10 +574,6 @@ function AppInner() {
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
-  const [modernizationOpen, setModernizationOpen] = useState(false);
-  const [modernizationLoading, setModernizationLoading] = useState(false);
-  const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
-  const [assessmentPlan, setAssessmentPlan] = useState<ArchitectureAssessmentPlan>();
   const [journey, setJourney] = useState<ModernizationPlan['journey']>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
@@ -637,23 +614,17 @@ function AppInner() {
     if (clearFirst) {
       setCurrent(undefined);
       setValue('');
-      setNextGuidance(undefined);
-      setModernizationPlan(undefined);
-      setAssessmentPlan(undefined);
+      setNextGuidance([]);
       setJourney(undefined);
       setAttachmentsOpen(false);
     }
-    const [result, modernization, assessment, journeyResult] = await Promise.all([
+    const [result, journeyResult] = await Promise.all([
       getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
-      getJson<{ plan: ModernizationPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/modernization`),
-      getJson<{ plan: ArchitectureAssessmentPlan | null }>(`/api/sessions/${encodeURIComponent(key)}/assessment`),
-      getJson<{ journey: ModernizationPlan['journey'] }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
+      getJson<{ journey: JourneyStage[] | null }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
-    setModernizationPlan(modernization.plan ?? undefined);
-    setAssessmentPlan(assessment.plan ?? undefined);
-    setJourney(journeyResult.journey ?? modernization.plan?.journey ?? assessment.plan?.journey);
+    setJourney(journeyResult.journey ?? undefined);
 
     const existing = result.context.inputs
       .filter((input) => input.kind === 'document')
@@ -668,60 +639,6 @@ function AppInner() {
   };
 
   const loadAssessment = async (key: string) => {
-    setModernizationLoading(true);
-    try {
-      const result = await getJson<{ plan: ArchitectureAssessmentPlan }>(
-        `/api/sessions/${encodeURIComponent(key)}/assessment?rebuild=true`,
-      );
-      setAssessmentPlan(result.plan);
-      setJourney(result.plan.journey);
-      setModernizationOpen(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '无法生成架构评估');
-    } finally {
-      setModernizationLoading(false);
-    }
-  };
-
-  const loadModernization = async (key: string) => {
-    setModernizationLoading(true);
-    try {
-      const result = await getJson<{ plan: ModernizationPlan }>(
-        `/api/sessions/${encodeURIComponent(key)}/modernization?rebuild=true`,
-      );
-      setModernizationPlan(result.plan);
-      setJourney(result.plan.journey);
-      setModernizationOpen(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '无法生成改造计划');
-    } finally {
-      setModernizationLoading(false);
-    }
-  };
-
-  const handleModernizationAction = (gap?: ModernizationGap) => {
-    setModernizationOpen(false);
-
-    if (!gap) {
-      void send(
-        '先帮我查清楚这个系统现在的数据架构。重点查数据集、主要数据流、来源、SQL/ETL 转换和已有业务定义。先告诉我查到了什么、哪里还不知道，不要先设计新架构。',
-      );
-      return;
-    }
-
-    void send(
-      [
-        '先处理这个问题：',
-        gap.title,
-        '',
-        gap.description,
-        '',
-        '建议先做：' + gap.recommendation,
-        '',
-        '请先做能自动完成的检查；需要我或业务人员确认的地方明确告诉我。完成后告诉我查到了什么、还缺什么，以及下一步做什么。',
-      ].join('\n'),
-    );
-  };
   useEffect(() => {
     const onPopState = () => {
       const routed = routeInfo();
@@ -737,9 +654,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
-    setNextGuidance(undefined);
-    setModernizationPlan(undefined);
-    setAssessmentPlan(undefined);
+    setNextGuidance([]);
     setJourney(undefined);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
@@ -785,18 +700,13 @@ function AppInner() {
           message.role === 'assistant' ? (
             <div className="assistant-message-content">
               <ChatMarkdown content={message.content} />
-              {guidance?.questions.length ? (
-                <FollowUpCard
-                  questions={guidance.questions}
-                  value={guidance.value}
+              {guidance?.length || current?.context.journeyPlan?.routes.length ? (
+                <AssistantActionBar
+                  routeOptions={current?.context.journeyPlan?.routes ?? []}
+                  followUpQuestions={guidance ?? []}
                   loading={loading}
-                  onChange={(value) => setNextGuidance((currentGuidance) => currentGuidance
-                    ? { ...currentGuidance, value }
-                    : currentGuidance)}
-                  onSubmit={() => {
-                    const nextValue = guidance.value.trim();
-                    if (nextValue) void send(nextValue);
-                  }}
+                  onSelectRoute={(routeId) => void send(undefined, routeId)}
+                  onAsk={(question) => void send(question)}
                 />
               ) : null}
             </div>
@@ -822,7 +732,7 @@ function AppInner() {
       });
     }
     return items;
-  }, [active, current?.messages, loading, nextGuidance, streamingAnswer]);
+  }, [active, current?.context.journeyPlan?.routes, current?.messages, loading, nextGuidance, streamingAnswer]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
@@ -837,12 +747,19 @@ function AppInner() {
     activeTurn.controller.abort();
   };
 
-  const send = async (text?: string) => {
-    const message = (text ?? value).trim();
+  const send = async (text?: string, routeId?: string) => {
+    const selectedRoute = routeId
+      ? current?.context.journeyPlan?.routes.find((route) => route.id === routeId)
+      : undefined;
+    const message = routeId
+      ? selectedRoute
+        ? '选择下一步：' + selectedRoute.title
+        : ''
+      : (text ?? value).trim();
     if (!message || loading) return;
 
     setValue('');
-    setNextGuidance(undefined);
+    setNextGuidance([]);
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
@@ -872,7 +789,9 @@ function AppInner() {
           {
             id: `${turnId}:user`,
             role: 'user',
-            content: message,
+            content: routeId
+              ? '选择下一步：' + (selectedRoute?.title ?? routeId)
+              : message,
             capturedAt: new Date().toISOString(),
           },
         ],
@@ -881,7 +800,7 @@ function AppInner() {
       const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, turnId }),
+        body: JSON.stringify(routeId ? { routeId, turnId } : { message, turnId }),
         signal: controller.signal,
       });
 
@@ -940,9 +859,7 @@ function AppInner() {
           .filter(Boolean)
           .slice(0, 3)
         : [];
-      if (questions.length) {
-        setNextGuidance({ questions, value: '' });
-      }
+      setNextGuidance(questions);
 
       if (result.warnings.length) {
         setError(result.warnings.join('; '));
@@ -1003,19 +920,6 @@ function AppInner() {
         '请把它当成当前调查中的一个明确待办事项：先判断最有价值的下一步，能自动检索或检查的直接执行，不要只给我建议；把查到的证据纳入当前调查，明确哪些已经查清、哪些仍然未知，并根据结果重新给出下一步导引。',
       ].join('\n'),
     );
-  };
-
-  const chooseRoute = (route: NonNullable<SessionContext['journeyPlan']>['routes'][number]) => {
-    if (!active || loading) return;
-    const message = [
-      `我选择这条路线：“${route.title}”。`,
-      route.reason,
-      '',
-      `建议方向：${route.steps.join(' → ')}`,
-      '',
-      '请按这个方向推进，但把它当成导航建议而不是固定流程；如果新证据或我的后续动作表明另一条路更合适，请重新规划。',
-    ].join('\n');
-    void send(message);
   };
 
   const createSession = async () => {
@@ -1240,13 +1144,9 @@ function AppInner() {
           <div className="chat-main">
             {current ? (
               <AgentRecommendationCard
-                routes={current.context.journeyPlan?.routes ?? []}
                 workflow={current.context.workflow}
                 loading={loading}
-                active={Boolean(active)}
-                onChooseRoute={chooseRoute}
                 onOpenMap={() => navigatePage('journey')}
-                onUseDefault={() => void send('请先帮我快速建立当前问题需要的事实基础，再根据查到的证据决定下一步；不要假定必须按照固定顺序执行。')}
               />
             ) : null}
             {bubbleItems.length ? (
