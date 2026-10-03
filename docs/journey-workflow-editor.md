@@ -177,25 +177,7 @@ AI 生成工作地图
 AI 修改当前工作地图
 保存
 恢复内置 Workflow
-~~~text
-拖动节点
-添加步骤
-添加分支
-从一个节点连接到另一个节点
-重新连接已有分支
-删除节点
-删除分支
-编辑节点属性
-编辑分支 outcome
-修改分支目标
-撤销 / 重做
-自动排版
-保存草稿
-验证
-应用
-恢复内置 Workflow
 ~~~
-
 Node Toolbar 只在选中节点时出现，避免整张地图被按钮污染。
 
 工作地图现在是独立路由 `/investigations/:name/journey`，不再使用全屏 Modal；页面打开后直接可以拖动、连线和修改属性。
@@ -509,7 +491,6 @@ JourneyState
 负责：
 
 ~~~text
-draft
 active custom Workflow
 layout
 version
@@ -572,7 +553,7 @@ Workflow Editor APIs
 
 之前的默认布局只是按图深度分列。对于简单线性流程还能工作，但一个节点存在多个 outcome 后，所有边从同一个右侧连接点出发，线路和标签很容易叠在一起。
 
-现在使用 ELK layered layout。React Flow 官方把 Dagre 作为简单方案，把 ELK 作为更可配置的方案；官方的 multiple-handles 示例还展示了通过 ports + FIXED_ORDER 降低 edge crossings 的做法。当前地图把“查看”和“编辑”视为同一张图：锁定模式不隐藏节点或边，只关闭拖动、连线、删除和属性修改，因此不会出现查看时断线、编辑时又连上的两套视觉结果。（参考 React Flow 官方 Auto Layout / ELK 文档与 Multiple Handles 示例）
+现在使用 ELK layered layout。React Flow 官方把 Dagre 作为简单方案，把 ELK 作为更可配置的方案；官方的 multiple-handles 示例还展示了通过 ports + FIXED_ORDER 降低 edge crossings 的做法。当前地图始终使用同一套节点、边、Handle 和布局；不存在单独的只读画布。（参考 React Flow 官方 Auto Layout / ELK 文档与 Multiple Handles 示例）
 
 本项目选择 ELK 的原因不是为了做复杂 BPMN，而只是解决当前编辑器最明显的两个问题：
 
