@@ -1908,6 +1908,130 @@ body {
   margin-bottom: 14px;
 }
 
+/* 属性面板同时承载节点/连线属性和 Workflow 专用 AI 对话。 */
+.journey-map-ai-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e9edf3;
+}
+
+.journey-map-ai-chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.journey-map-ai-chat-header .ant-typography {
+  font-size: 11px;
+}
+
+.journey-map-ai-chat-body {
+  height: 250px;
+  min-height: 180px;
+  overflow: auto;
+  padding: 2px 0;
+}
+
+.journey-map-ai-chat .ant-bubble {
+  font-size: 12px;
+}
+
+.journey-map-ai-chat .ant-sender {
+  border-radius: 10px;
+}
+
+.journey-flow-node-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #6c7789;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.journey-flow-node-actor-human {
+  border: 1px solid #d6e4ff;
+}
+
+.journey-flow-node-actor-system {
+  border: 1px solid #d9f7be;
+}
+
+.journey-flow-node-actor-agent {
+  border: 1px solid #e6eaf0;
+}
+
+.journey-flow-node-type-review {
+  border-width: 2px;
+}
+
+.journey-flow-node-type-gate {
+  border-style: dashed;
+  background: #fffef7;
+}
+
+.journey-flow-node-type-end,
+.journey-flow-node-type-stop {
+  min-height: 126px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.journey-flow-node-type-end {
+  border: 4px double #52c41a;
+  background: #f6ffed;
+}
+
+.journey-flow-node-type-stop {
+  border: 4px double #ff4d4f;
+  background: #fff2f0;
+}
+
+.journey-flow-terminal-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+  text-align: center;
+}
+
+.journey-flow-event-symbol {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.journey-flow-node-type-end .journey-flow-event-symbol {
+  color: #389e0d;
+}
+
+.journey-flow-node-type-stop .journey-flow-event-symbol {
+  color: #cf1322;
+}
+
+.journey-flow-edge-condition {
+  color: #1677ff;
+  font-size: 10px;
+}
+
+
 .journey-map-inspector-title {
   font-size: 14px;
   font-weight: 650;
@@ -2356,8 +2480,7 @@ body {
 }
 
 .journey-map-ai-bar {
-  display: grid;
-  grid-template-columns: auto auto minmax(260px, 1fr) auto;
+  display: none;
   align-items: center;
   gap: 10px;
   padding: 10px 18px;
@@ -2382,7 +2505,7 @@ body {
 
 .journey-map-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   min-height: 0;
   flex: 1 1 auto;
 }
@@ -2441,6 +2564,14 @@ body {
   .journey-map-workspace {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(420px, 1fr) auto;
+  }
+
+  .journey-map-inspector {
+    max-height: 52vh;
+  }
+
+  .journey-map-ai-chat-body {
+    height: 220px;
   }
 
   .journey-map-workspace .journey-map-flow-wrap {
