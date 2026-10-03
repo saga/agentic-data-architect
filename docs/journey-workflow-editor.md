@@ -61,7 +61,7 @@ skills/<workflow>/SKILL.md
 
 没有自定义 Workflow 时，直接读取 Skill 内置 Markdown；版本为 0。
 
-用户点击“应用修改”后创建新的 Investigation Workflow version，并清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。
+用户点击“应用修改”后创建新的 Investigation Workflow version，并清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。若当前执行节点仍存在于新 Workflow，会保留当前节点和仍然存在的已完成节点；只有当前节点被删除时才回到新 Workflow 的 start。
 
 ## 3. DSL：保持小，不建立 BPMN
 
