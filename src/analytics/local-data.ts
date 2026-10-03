@@ -162,7 +162,7 @@ function datasetRowToModel(row: DatasetRow): LocalDataset {
 }
 
 function normalizeRelativePath(value: string): string {
-  const normalized = path.posix.normalize(value.replaceAll('\\\\', '/'));
+  const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
   if (
     normalized === '.' ||
     normalized.startsWith('../') ||
@@ -245,7 +245,7 @@ export async function registerLocalDataset(
       sha256=excluded.sha256,
       size_bytes=excluded.size_bytes,
       updated_at=excluded.updated_at
-  `).run(id, sessionName, name, normalized, format, relation, version, sha256, file.sizeBytes, now);
+  `).run(id, sessionName, name, normalized, format, relation, version, sha256, file.sizeBytes, fileUpdatedAt);
 
   return datasetRowToModel(db.prepare(`
     SELECT id, session_name, name, relative_path, format, relation, version, sha256, size_bytes, updated_at
