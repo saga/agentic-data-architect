@@ -12,7 +12,7 @@ V1.1 优先完成（本节是对照清单，做完即勾）：
 
 V1.2 增加 Current-State Intelligence：canonical asset types、parse coverage、source-of-truth candidates、semantic candidates，以及 provider-neutral Semantic Context。
 
-V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization Workbench：增加 Analysis Case、Target Architecture、Source-to-Target Mapping、Architecture Decision、Gap Analysis 和 Modernization Plan。它们先作为轻量、可验证的工作产物存在，不引入重量级 workflow engine。
+V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization Workbench：增加 Analysis Case、Target Architecture、Source-to-Target Mapping、Architecture Decision、Gap Analysis 和 Modernization Plan。它们先作为轻量、可验证的工作产物存在，不引入重量级 workflow engine。生成这些对象时不预填未经调查的架构决定、Mapping 或目标组件；真实工作产物必须由证据和明确的业务/架构判断形成。
 
 V1.4 增加 Structural Analysis：Graphify 作为平台级 structural-analysis capability 运行，平台能力配置随 Control version 固定并进入 audit；Graphify graph.json 记录运行时 hash/version，source_file Evidence 把 Graphify 的结构导航结果重新接回本 Investigation 的 deterministic provenance。Graphify 不直接产生 Claim Evidence，supported 仍要求独立来源。
 
@@ -255,7 +255,7 @@ Data Architecture Assessment
     → 排出实施顺序
 ~~~
 
-三条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；每轮还可以根据用户动作和最新证据生成 0～3 条动态路线。用户可以选其中一条、跳到别的问题、组合路线，或者完全不按地图走。
+三条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；必要时给出 0～3 个下一步候选。用户点击候选后，前端发送结构化 routeId，服务端从当前候选中解析并执行；也可以完全忽略候选，直接输入自己的问题。
 
 当前 UI 不提供首页上的普通 Workflow 下拉切换。工作方式属于 Investigation 的重要持久化状态：只有在“调查配置 → 工作方式”的明确调整区选择目标、输入确认语句后才执行切换。这样可以保持工作方式灵活，但避免一次误点击就改变本次调查的导航语义。
 
@@ -292,7 +292,7 @@ skills/data-architecture-assessment/SKILL.md
 
 运行时位于 `src/workflow/assessment.ts`。它复用已有 Current-State、Finding、Gap Analysis 和 Evidence，不重新做一套 discovery engine；生成的评估结果保存为 `reports/architecture-assessment.json`。
 
-右侧工作区用紧凑 Journey 导引展示 Assessment 路线；主对话区承载 Agent 动态建议；用户需要查看完整路线时打开全屏 React Flow 工作地图。评估结果里展示当前范围、主要问题、建议和实施顺序。
+右侧工作区只保留紧凑 Journey 导引和当前事实；下一步候选直接出现在最近一条 Agent 回答下面。需要查看或编辑完整路线时打开全屏 React Flow 工作地图。
 
 ## Legacy Modernization Workflow
 
@@ -321,7 +321,7 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 - Agent：根据当前证据决定具体调查动作，并解释结果。
 - 人：确认业务定义、范围和不能自动判断的例外。
 
-Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；deterministic 节点只根据当前 Investigation 状态推进，而需要判断的 agent 节点必须返回当前节点实际存在的 outcome，服务端才会推进。
+Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。空白/草案 Target Architecture、未经证据支持的 Mapping 和未确认的 Architecture Decision 都不会被当成真实工作产物；deterministic 节点只根据当前 Investigation 状态推进，而需要判断的 agent 节点必须返回当前节点实际存在的 outcome，服务端才会推进。
 
 右侧工作区继续展示当前地图相关信息，Agent 动态建议优先显示在主对话区。全屏工作地图现在就是 Workflow 编辑器：用户可以拖动节点、添加步骤、增加分支、修改 outcome/目标、删除节点或分支。编辑结果只留在当前画布；服务端验证通过后，点击“保存”才创建新的 Workflow version，并尽量保留当前执行位置；只有当前节点被删除时才回到新 Workflow 的 start。
 
