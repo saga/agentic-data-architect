@@ -592,7 +592,7 @@ ORTHOGONAL routing
 按分支序号做轻微垂直偏移
 ~~~
 
-因此新增分支后不再要求用户自己一点点挪节点躲线。
+因此新增分支后不再要求用户自己一点点挪节点躲线。自动布局同时为节点保留更大的安全间隔，并按新的 ELK-v2 layout 标记自动升级旧的布局数据。
 
 React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 label 设置 pointer-events: all，并使用 nodrag / nopan，让用户可以直接点击 outcome 编辑。（参考 React Flow 官方 EdgeLabelRenderer 文档）
 
