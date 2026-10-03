@@ -31,6 +31,7 @@ import {
   loadArchitectureAssessmentJourneyState,
 } from './workflow/assessment.js';
 import { config } from './config.js';
+import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
   appendContextInput,
   ensureWorkspace,
@@ -175,6 +176,7 @@ app.post('/api/sessions', async (req, res) => {
     res.json({
       context,
       control: await loadInvestigationControl(name),
+      localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
       messages: listConversationMessages(name, 200),
       conversationCount: conversation.count,
@@ -253,6 +255,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     await fs.writeFile(target, req.file.buffer);
 
     const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+    let dataset;
+    try {
+      dataset = await registerLocalDataset(name, relativePath, req.file.originalname);
+    } catch {
+      // 非分析文件继续按普通文档处理；CSV/JSON/JSONL/Parquet 会自动进入 Dataset Registry。
+    }
+
     const input = await appendContextInput(name, {
       kind: 'document',
       title: req.file.originalname,
@@ -275,6 +284,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         sizeBytes: req.file.size,
         mimeType: req.file.mimetype || 'application/octet-stream',
         sha256,
+        ...(dataset ? { dataset } : {}),
       },
     });
 
@@ -286,6 +296,22 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         path: relativePath,
         size: req.file.size,
         mimeType: req.file.mimetype || 'application/octet-stream',
+        ...(dataset ? { dataset } : {}),
+      },
+    });
+  });
+
+  app.get('/api/sessions/:name/datasets', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const refresh = req.query.refresh === 'true';
+    const datasets = refresh
+      ? await discoverLocalDatasets(name)
+      : listLocalDatasets(name);
+    res.json({
+      datasets,
+      engine: {
+        type: 'duckdb',
+        databaseFile: path.relative(workspaceRoot(name), path.join(workspaceRoot(name), 'analysis.duckdb')),
       },
     });
   });
@@ -521,6 +547,7 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     server.close();
     await vite?.close();
+    closeLocalAnalytics();
     closeConversationStore();
     await stopClient();
   };
