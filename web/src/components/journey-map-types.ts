@@ -53,7 +53,7 @@ export type WorkflowChange =
   | { type: 'update-node'; nodeId: string; patch: Partial<Omit<WorkflowNodeDefinition, 'id' | 'routes' | 'line'>> }
   | { type: 'remove-node'; nodeId: string }
   | { type: 'add-route'; nodeId: string; route: { outcome: string; target: string; condition?: string } }
-  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string; condition?: string } }
+  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string; condition?: string | null } }
   | { type: 'remove-route'; nodeId: string; outcome: string };
 
 export interface WorkflowDefinition {
