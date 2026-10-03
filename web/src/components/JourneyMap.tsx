@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Button,
   Empty,
@@ -302,11 +301,7 @@ export function JourneyMap({
             connectionRadius={28}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onNodeDragStart={() => {
-              if (editing) {
-                // Undo 历史记录在 drag start 时保存一次，而不是 drag move 每帧保存。
-              }
-            }}
+            onNodeDragStart={editor.beginNodeDrag}
             onConnect={onConnect}
             onReconnect={onReconnect}
             onNodeClick={(_, node) => {
