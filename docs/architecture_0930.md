@@ -2873,7 +2873,7 @@ Agent Turn
 核心边界保持很小：
 
 - Skill 中的内置 SKILL.md 不被 UI 直接修改。
-- 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。
+- 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。React Flow 只编辑这份 Investigation 草稿，不修改内置 Skill。
 - Markdown 保存流程语义，React Flow layout 单独保存，execution 单独保存。
 - Apply 前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
 - Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
@@ -2957,3 +2957,25 @@ GET  /api/sessions/:name/workflow/instruction
 这样 Workflow、Canvas 和运行状态分别可读、可恢复、可校验，也不需要额外引入 Workflow Registry。
 
 完整设计见 docs/journey-workflow-editor.md。
+### V1.7 Editor 交互
+
+工作地图编辑器使用 React Flow controlled flow。节点拖动、连线、重新连接、节点属性编辑和边 outcome 编辑都直接作用于当前 draft。
+
+布局不再使用简单的固定 x/y 分层，而采用 ELK layered layout：
+
+- elk.direction = RIGHT
+- elk.edgeRouting = ORTHOGONAL
+- elk.layered.crossingMinimization.strategy = LAYER_SWEEP
+- 每个 incoming / outgoing route 使用独立 port，并固定 port order。
+
+React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。citeturn836866search5turn836866search9
+
+新建节点使用明显的橙色虚线样式，并提供两种连接方式：
+
+~~~text
+拖 source Handle → target Handle
+或
+属性面板 → 连接到现有步骤
+~~~
+
+“添加下一步”在存在主 success 路线时会插入节点，避免产生 success-1 / success-2 之类难以理解的 outcome。
