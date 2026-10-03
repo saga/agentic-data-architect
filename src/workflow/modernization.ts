@@ -337,38 +337,6 @@ function buildInitialDecisions(): ArchitectureDecision[] {
  * 只计算当前调查走到哪一关，不要求已经生成完整 Modernization Plan。
  * 因此新建调查也可以立即显示路线图。
  */
-export async function loadModernizationJourneyState(name: string) {
-  const inv = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-  const current = snapshot?.currentState ?? null;
-  const existing = await loadModernizationPlanIfPresent(name);
-  const gaps = buildModernizationGaps({
-    currentState: current,
-    estate: snapshot?.estate,
-    findings: inv.findings,
-  });
-
-  return buildJourneyState(await loadModernizationJourney(), {
-    goal: inv.goal || inv.userPrompt,
-    currentState: current ? {
-      datasets: current.coverage.datasets,
-      lineageCoverage: current.coverage.datasetLineageCoverage,
-      semanticAssets: current.coverage.semanticAssets,
-      parseFailures: current.coverage.sqlParseFailures,
-    } : null,
-    unknowns: inv.unknowns,
-    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    targetComponentCount: existing?.targetArchitecture.status === 'draft'
-      ? 0
-      : existing?.targetArchitecture.components.length ?? 0,
-    mappingCount: existing?.mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length ?? 0,
-    blockingValidationReady: existing?.validationPlan.checks.filter(
-      (check) => check.blocking && ['ready', 'passed'].includes(check.status),
-    ).length ?? 0,
-    blockingValidationTotal: existing?.validationPlan.checks.filter((check) => check.blocking).length ?? 0,
-  });
-}
-
 async function loadModernizationPlanIfPresent(name: string): Promise<ModernizationPlan | null> {
   try {
     const raw = JSON.parse(
