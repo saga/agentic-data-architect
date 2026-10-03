@@ -618,3 +618,35 @@ React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 l
 Workflow 的 `@end` / `@stop` 是真正的终点，不因为 DSL 中的 `visible:false` 就在工作地图里消失；否则最后一条边会视觉上像“断掉”。
 
 普通业务节点仍可按 `visible` 控制展示，而终点在地图中始终保留。这样地图展示的是完整 Workflow，而不是只展示当前正在操作的阶段。
+
+### 16. Journey Map 前端代码结构
+
+为了避免 `JourneyMap.tsx` 再次变成“大组件”，前端现在按职责拆成：
+
+```text
+JourneyMap.tsx
+  └── 页面组合与 React Flow 容器
+
+useJourneyWorkflowEditor.ts
+  └── 编辑状态、Undo/Redo、Graph mutation、Draft/Apply
+
+journey-map-types.ts
+  └── Workflow / React Flow shared types
+
+journey-map-graph.ts
+  └── Definition ↔ React Flow graph、Handle、连接诊断
+
+journey-map-layout.ts
+  └── ELK 自动布局 + measured size + collision guard
+
+JourneyFlowNode.tsx
+  └── 节点渲染 / Handle / toolbar
+
+JourneyFlowEdge.tsx
+  └── Edge / self-loop / outcome label
+
+JourneyMapInspector.tsx
+  └── 节点与分支属性编辑
+```
+
+其中自动布局使用 React Flow 完成节点尺寸测量后再执行最终布局；这和 React Flow 官方 `useNodesInitialized` 的推荐使用方式一致。ELK multiple-handles 方案也要求为 port 使用稳定 ID、正确 side 和 `FIXED_ORDER`，当前实现按这个模式处理分支连接点。（参考 React Flow 官方 useNodesInitialized、ELK Multiple Handles 文档）
