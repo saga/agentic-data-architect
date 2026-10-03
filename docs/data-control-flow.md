@@ -1,7 +1,7 @@
 
 # Agentic Data Architect：数据流、控制流与并发模型
 
-> 2026-09-30
+> 2026-10-03
 > 本文以当前 main 实现为准，重点检查一次 Investigation 从浏览器发起问题，到 Copilot 执行、状态持久化、SSE 返回、取消、重启恢复的完整链路，以及文件状态和配置状态的竞争问题。
 
 ## 1. 结论
@@ -11,8 +11,8 @@
 | 状态 | 存储 | 作用 | 权威性 |
 |---|---|---|---|
 | Investigation State | .workspace/<session>/context.json | goal、scope、evidence、claims、findings、inputs、Copilot session reference | Investigation 当前状态 |
-| Conversation State | .workspace/conversations.db | user/assistant 消息、turn 状态 | 对话与执行生命周期 |
-| Control State | .workspace/<session>/control.json | Research、Skill、Prompt、MCP、平台能力、版本历史 | Agent 执行配置 |
+| Conversation / Local Registry | .workspace/conversations.db | user/assistant 消息、turn、Dataset Registry、local analysis run | 对话与本地分析元数据 |
+| Control State | .workspace/<session>/control.json | Research、guidance、MCP、平台能力、版本历史 | Agent 执行配置 |
 
 Copilot session 本身不作为业务状态源，而是由 context.json 保存的可恢复引用。
 
@@ -45,6 +45,8 @@ flowchart LR
     Copilot[GitHub Copilot SDK]
     Session[(Copilot Session)]
     Workspace[Investigation Workspace]
+    DuckDB[(analysis.duckdb)]
+    Dataset[(SQLite local_datasets)]
 
     Browser -->|POST /messages/stream<br/>message + turnId| API
     Browser -->|POST /messages/abort<br/>turnId| API
@@ -54,6 +56,8 @@ flowchart LR
     API --> Control
     API --> Audit
     API --> Copilot
+    Copilot --> DuckDB
+    DuckDB --> Dataset
     Copilot --> Session
 
     Context -.->|sessionId + configVersion| API
@@ -638,7 +642,7 @@ completed
 后续如果继续增加功能，尽量不要让新的状态绕开 turn、context、conversation DB、control version 这四个边界。
 
 
-## 17. 当前 Agent / Skill 运行边界
+## 17. 当前 Agent / Skill / Local Data 运行边界
 
 当前 session 不再注册 `lead-data-agent` custom agent。每个 Investigation 直接使用 Copilot SDK default agent：
 
@@ -656,17 +660,45 @@ configured MCP
 explicit built-in tool allowlist
 ```
 
-Skill 选择保存在 `control.json`，并固定到该 turn 的 configuration version。没有被选择的 Skill 会在 Copilot session 中通过 `disabledSkills` 显式关闭。
+Capability Skill 不再保存为 Investigation 的“启用清单”。Copilot 通过 skillDirectories 自动发现 capability；只有用户选中的 Workflow Skill 保持可用，其它 Workflow Skill 通过 disabledSkills 关闭，避免路线混用。
 
-Skill version 的 source hash 覆盖整个 Skill 目录，而不只是 `SKILL.md`；因此脚本或 reference 变化也会产生新的 Skill version。
+Copilot 使用 mode: "copilot-cli"，因为当前产品是个人本机 Agent，需要保留 Copilot CLI 的 ambient skills、工具和内置 MCP。
 
-Copilot 使用 `mode: "empty"`，只显式开启本 Workbench 需要的 built-in tools 和配置的 MCP，避免继承 Copilot CLI 的其它宿主能力。
+本地数据工具由应用显式注册。它们通过 Dataset Registry 和 DuckDB 查询当前 workspace 数据，并把分析结果写成 Evidence；Agent 没有直接打开 analysis.duckdb 或任意本地文件的工具。
 
 HTTP MCP 的 headers 与 URL 一样从配置中解析环境变量后传入 runtime；secret 本身不写入 `control.json`。
 
 
 
-## 18. Schema 与边界验证（当前实现）
+
+## 18. Local Data 分析数据流
+
+本地数据不经过外部数据库 adapter。文件先进入当前 Investigation workspace，再由 Dataset Registry 登记，DuckDB 建立 raw view。
+
+~~~text
+CSV / JSON / JSONL / Parquet
+            ↓
+     Dataset Registry
+       SQLite metadata
+            ↓
+        DuckDB raw view
+            ↓
+local_describe / sample / profile / query
+            ↓
+      Analysis Run
+            ↓
+         Evidence
+            ↓
+      Claim / Finding
+~~~
+
+每个 Investigation 一个 analysis.duckdb；同一进程内的操作在单个 connection 上串行化。大数据不复制进 SQLite，query 结果只返回受控行数。
+
+local_query 只允许 SELECT / WITH，禁止多语句、ATTACH、COPY、INSTALL、LOAD、文件读取函数、网络和其它数据库 scanner。
+
+Dataset Registry 与 conversation store 当前共用同一 SQLite 文件，后续可以自然迁移成统一 app.sqlite，但不需要因为这个目标提前重写现有 Conversation API。
+
+## 19. Schema 与边界验证（当前实现）
 
 运行时数据不再只靠 TypeScript interface 约束。当前代码使用 Zod 作为 JSON / API 边界的运行时 Schema：
 
