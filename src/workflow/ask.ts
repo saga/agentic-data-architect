@@ -206,7 +206,6 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
         : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
       knowledgeText,
       buildResearchConfigPrompt(control),
-      control.agent.systemPrompt.content.trim(),
     ].filter(Boolean).join('\n\n'),
     ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId
       ? { sessionId: inv.copilotSessionId }
