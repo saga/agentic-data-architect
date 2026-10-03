@@ -12,7 +12,6 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   DeleteOutlined,
-  EditOutlined,
   LockOutlined,
   PlusOutlined,
   RobotOutlined,
@@ -88,14 +87,6 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           className="journey-node-editor-toolbar"
         >
           <Space size={4}>
-            <Tooltip title="编辑节点属性">
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => data.onSelect?.(id)}
-              />
-            </Tooltip>
-
             {!terminal ? (
               <>
                 <Tooltip title="在当前 success 出口后插入一步">
