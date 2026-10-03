@@ -19,7 +19,7 @@ export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 export interface JourneyRoute {
   outcome: string;
   target: string;
-  line?: number;
+  line?: number | undefined;
 }
 
 export interface JourneyNode {
