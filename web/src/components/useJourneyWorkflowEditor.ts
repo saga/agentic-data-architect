@@ -1038,6 +1038,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             mode,
             prompt: prompt.trim(),
             messages: history.slice(-12),
+            definition: currentCanvasDefinition,
           }),
         },
       );
@@ -1052,6 +1053,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
       const currentSnapshot = snapshotRef.current;
       if (!currentSnapshot) return undefined;
+      const currentCanvasDefinition = definitionFromGraph(
+        nodesRef.current,
+        edgesRef.current,
+        currentSnapshot.definition,
+      );
 
       pushHistory();
       const graph = graphFromDefinition(
@@ -1142,7 +1148,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     connectTargetId,
     connectOutcome,
     validationIssues,
-    currentDefinition: activeDefinition,
+    currentDefinition,
     currentStage,
     completedCount,
     saveWorkflow,
