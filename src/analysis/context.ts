@@ -197,7 +197,7 @@ export function buildQuestionContext(args: {
       '，parsed=' + currentState.coverage.sqlParsedStatements +
       '，parse failures=' + currentState.coverage.sqlParseFailures +
       '，dataset lineage=' +
-      (currentState.coverage.datasetLineageCoverage === null ? 'n/a' : (currentState.coverage.datasetLineageCoverage * 100).toFixed(0) + '%') +
+      (currentState.coverage.datasetLineageConnectionRate === null ? 'n/a' : (currentState.coverage.datasetLineageConnectionRate * 100).toFixed(0) + '%') +
       '，semantic assets=' + currentState.coverage.semanticAssets +
       '，profiled=' + currentState.coverage.profiledDatasets + '。',
     );
