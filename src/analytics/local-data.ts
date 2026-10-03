@@ -739,7 +739,12 @@ class LocalDuckDBEngine {
       evidenceId: '',
       ...(dataset ? { dataset: { id: dataset.id, version: dataset.version, sha256: dataset.sha256 } } : {}),
     };
-    return this.recordResult(operation, sql, dataset, result, started);
+    const referencedDatasets = dataset
+      ? [dataset]
+      : listLocalDatasets(this.sessionName).filter((item) => sql.includes(item.relation));
+    const evidenceDataset = referencedDatasets.length === 1 ? referencedDatasets[0] : undefined;
+
+    return this.recordResult(operation, sql, evidenceDataset, result, started);
   }
 
   private async recordResult(
