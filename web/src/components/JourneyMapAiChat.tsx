@@ -10,10 +10,8 @@ export interface JourneyMapAiChatProps {
   selectedNodeId?: string;
   pendingAiChange?: { message: string; changes: WorkflowChange[] };
   aiEditFlow: (
-    mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-    scope?: 'workflow' | 'selection',
   ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
   applyAiChanges: () => Promise<void>;
   discardAiChanges: () => void;
@@ -94,10 +92,8 @@ export function JourneyMapAiChat({
     setValue('');
     setLoading(true);
     try {
-      // UI 不再要求用户选择模式；Agent 以当前画布为上下文解释自然语言。
-      // 有选中节点时默认聚焦该节点，没有选中节点时按整张图处理。
-      const scope = selectedNodeId ? 'selection' : 'workflow';
-      const result = await aiEditFlow('modify', prompt, history, scope);
+      // 选中节点只是上下文，AI 仍可按用户的自然语言调整整张图。
+      const result = await aiEditFlow(prompt, history);
       setMessages((items) => [
         ...items,
         {
