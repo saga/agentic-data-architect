@@ -38,7 +38,7 @@ export interface LocalDataset {
 export interface LocalAnalysisRun {
   id: string;
   sessionName: string;
-  operation: 'catalog' | 'describe' | 'sample' | 'profile' | 'query';
+  operation: 'catalog' | 'describe' | 'sample' | 'profile' | 'query' | 'transform' | 'export';
   datasetId?: string;
   sql: string;
   sqlHash: string;
@@ -61,6 +61,16 @@ export interface LocalQueryResult {
     version: number;
     sha256: string;
   };
+}
+
+export interface LocalTransformResult {
+  schema: 'analysis' | 'scratch';
+  name: string;
+  relation: string;
+  rowCount: number;
+  replaced: boolean;
+  analysisRunId: string;
+  evidenceId: string;
 }
 
 interface DatasetRow {
@@ -121,7 +131,7 @@ function getRegistryDatabase(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS local_analysis_runs (
       id TEXT PRIMARY KEY,
       session_name TEXT NOT NULL,
-      operation TEXT NOT NULL CHECK (operation IN ('catalog','describe','sample','profile','query')),
+      operation TEXT NOT NULL CHECK (operation IN ('catalog','describe','sample','profile','query','transform','export')),
       dataset_id TEXT,
       sql TEXT NOT NULL,
       sql_hash TEXT NOT NULL,
@@ -334,6 +344,21 @@ function viewSql(dataset: LocalDataset): string {
   }
 }
 
+function validObjectName(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
+function outputRelativePath(value: string): string {
+  const normalized = normalizeRelativePath(value);
+  if (!(normalized.startsWith('exports/') || normalized.startsWith('parquet/'))) {
+    throw new Error('Parquet 输出文件必须放在当前 Investigation 的 exports/ 或 parquet/ 目录中。');
+  }
+  if (path.posix.extname(normalized).toLowerCase() !== '.parquet') {
+    throw new Error('Parquet 输出文件必须使用 .parquet 扩展名。');
+  }
+  return normalized;
+}
+
 function escapeIdentifier(value: string): string {
   return '"' + value.replaceAll('"', '""') + '"';
 }
@@ -539,6 +564,140 @@ class LocalDuckDBEngine {
     });
   }
 
+  async transform(
+    schema: 'analysis' | 'scratch',
+    table: string,
+    sql: string,
+    replace = true,
+  ): Promise<LocalTransformResult> {
+    return this.exclusive(async () => {
+      await this.refreshViews();
+      const safeSql = validateLocalReadOnlySql(sql);
+      if (!validObjectName(table)) {
+        throw new Error('分析表名称只能使用字母、数字和下划线，并且不能数字开头。');
+      }
+
+      const relation = schema + '.' + escapeIdentifier(table);
+      const statement = (replace ? 'CREATE OR REPLACE TABLE ' : 'CREATE TABLE ') + relation + ' AS ' + safeSql;
+      const started = Date.now();
+      await this.connection.run(statement);
+
+      const countReader = await this.connection.runAndReadAll('SELECT count(*) AS row_count FROM ' + relation);
+      const row = (countReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {};
+      const rowCount = Number(row.row_count ?? 0);
+
+      const runId = nextId('analysis');
+      const evidenceId = nextId('ev');
+      const sqlHash = createHash('sha256').update(safeSql).digest('hex');
+      const referencedDatasets = listLocalDatasets(this.sessionName)
+      .filter((item) => originalSql.includes(item.relation));
+
+    const evidence: EvidenceRef = {
+        id: evidenceId,
+        type: 'metadata',
+        investigationId: this.sessionName,
+        discoveryRunId: 'local:' + runId,
+        source: 'duckdb:derived',
+        statement: safeSql,
+        value: {
+          target: relation,
+          schema,
+          table,
+          rowCount,
+          replaced: replace,
+        },
+        collectedAt: new Date().toISOString(),
+      };
+      await appendInvestigationEvidence(this.sessionName, evidence);
+
+      getRegistryDatabase().prepare(
+        "INSERT INTO local_analysis_runs " +
+        "(id, session_name, operation, dataset_id, sql, sql_hash, row_count, duration_ms, evidence_id, created_at) " +
+        "VALUES (?, ?, 'transform', NULL, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        runId,
+        this.sessionName,
+        safeSql,
+        sqlHash,
+        rowCount,
+        Date.now() - started,
+        evidenceId,
+        new Date().toISOString(),
+      );
+
+      return {
+        schema,
+        name: table,
+        relation,
+        rowCount,
+        replaced: replace,
+        analysisRunId: runId,
+        evidenceId,
+      };
+    });
+  }
+
+  async exportParquet(sql: string, relativePath: string): Promise<LocalDataset> {
+    return this.exclusive(async () => {
+      await this.refreshViews();
+      const safeSql = validateLocalReadOnlySql(sql);
+      const output = outputRelativePath(relativePath);
+      const absolute = absoluteDatasetPath(this.sessionName, output);
+      await fs.mkdir(path.dirname(absolute), { recursive: true });
+
+      const started = Date.now();
+      const outputSql = sqlLiteral(absolute);
+      await this.connection.run(
+        "COPY (" + safeSql + ") TO " + outputSql + " (FORMAT PARQUET, COMPRESSION ZSTD)",
+      );
+
+      const dataset = await registerLocalDataset(
+        this.sessionName,
+        output,
+        path.basename(output, '.parquet'),
+      );
+
+      const runId = nextId('analysis');
+      const evidenceId = nextId('ev');
+      const sqlHash = createHash('sha256').update(safeSql).digest('hex');
+      const evidence: EvidenceRef = {
+        id: evidenceId,
+        type: 'metadata',
+        investigationId: this.sessionName,
+        discoveryRunId: 'local:' + runId,
+        source: 'duckdb:export',
+        dataset: dataset.relation,
+        statement: safeSql,
+        sourceHash: dataset.sha256,
+        value: {
+          outputPath: output,
+          datasetId: dataset.id,
+          datasetVersion: dataset.version,
+          sizeBytes: dataset.sizeBytes,
+        },
+        collectedAt: new Date().toISOString(),
+      };
+      await appendInvestigationEvidence(this.sessionName, evidence);
+
+      getRegistryDatabase().prepare(
+        "INSERT INTO local_analysis_runs " +
+        "(id, session_name, operation, dataset_id, sql, sql_hash, row_count, duration_ms, evidence_id, created_at) " +
+        "VALUES (?, ?, 'export', ?, ?, ?, NULL, ?, ?, ?)"
+      ).run(
+        runId,
+        this.sessionName,
+        dataset.id,
+        safeSql,
+        sqlHash,
+        Date.now() - started,
+        evidenceId,
+        new Date().toISOString(),
+      );
+
+      return dataset;
+    });
+  }
+
   async query(sql: string, limit: number): Promise<LocalQueryResult> {
     return this.exclusive(async () => {
       await this.refreshViews();
@@ -650,6 +809,24 @@ export async function localSample(sessionName: string, dataset: string, limit = 
 
 export async function localProfile(sessionName: string, dataset: string): Promise<LocalQueryResult> {
   return (await ensureEngine(sessionName)).profile(dataset);
+}
+
+export async function localTransform(
+  sessionName: string,
+  schema: 'analysis' | 'scratch',
+  table: string,
+  sql: string,
+  replace = true,
+): Promise<LocalTransformResult> {
+  return (await ensureEngine(sessionName)).transform(schema, table, sql, replace);
+}
+
+export async function localExportParquet(
+  sessionName: string,
+  sql: string,
+  relativePath: string,
+): Promise<LocalDataset> {
+  return (await ensureEngine(sessionName)).exportParquet(sql, relativePath);
 }
 
 export async function localQuery(sessionName: string, sql: string, limit = 1000): Promise<LocalQueryResult> {
