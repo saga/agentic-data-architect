@@ -576,10 +576,18 @@ export async function applyAgentWorkflowTransition(
     );
 
     await withWorkspaceContextLock(name, async () => {
+      const latestActive = await loadActiveJourney(name, workflowId);
+      if (
+        latestActive.source !== active.source
+        || latestActive.version !== active.version
+      ) {
+        throw new Error('Workflow 在 Agent 执行期间发生变化，本次 transition 不再适用。');
+      }
+
       const latest = await loadJourneyExecution(
         name,
-        active.definition,
-        active.version,
+        latestActive.definition,
+        latestActive.version,
       );
 
       if (
