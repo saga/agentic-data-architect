@@ -603,6 +603,64 @@ function extractWorkflowTransition(
     : null;
 }
 
+/**
+ * transition 成功后记录最小运行事件；详细 trace 仍交给 Agent runtime / OTel。
+ */
+async function appendJourneyTransitionEvents(
+  name: string,
+  execution: JourneyExecution,
+  nodeId: string,
+  outcome: string,
+  next: JourneyExecution,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const currentEvent: JourneyRunEvent = {
+    id: crypto.randomUUID(),
+    runId: execution.runId,
+    workflowId: execution.workflowId,
+    workflowVersion: execution.workflowVersion,
+    type: 'node-completed',
+    timestamp: now,
+    nodeId,
+    outcome,
+    data: { nextNodeId: next.currentNodeId },
+  };
+  await appendJourneyRunEvent(name, currentEvent);
+
+  if (next.status === 'waiting' && next.pendingInteraction) {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'node-waiting',
+      timestamp: new Date().toISOString(),
+      nodeId: next.pendingInteraction.nodeId,
+      data: next.pendingInteraction,
+    });
+  } else if (next.status === 'completed') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'workflow-completed',
+      timestamp: new Date().toISOString(),
+      nodeId: next.currentNodeId,
+    });
+  } else if (next.status === 'stopped') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'workflow-stopped',
+      timestamp: new Date().toISOString(),
+      nodeId: next.currentNodeId,
+    });
+  }
+}
+
 /** 将 Agent 返回的合法 outcome 写入 durable Workflow execution。 */
 export async function applyAgentWorkflowTransition(
   name: string,
@@ -621,6 +679,10 @@ export async function applyAgentWorkflowTransition(
       active.definition,
       active.version,
     );
+    const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
+    if (execution.status === 'waiting' || currentNode?.actor === 'human') {
+      throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
     const next = applyJourneyTransition(
       active.definition,
       execution,
@@ -654,6 +716,14 @@ export async function applyAgentWorkflowTransition(
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
     });
 
+    await appendJourneyTransitionEvents(
+      name,
+      execution,
+      transition.nodeId,
+      transition.outcome,
+      next,
+    );
+
     await appendAuditEvent(name, {
       actor: 'system',
       action: 'workflow.transition',
@@ -671,6 +741,18 @@ export async function applyAgentWorkflowTransition(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: workflowId + '-rejected',
+      workflowId,
+      workflowVersion: 0,
+      type: 'transition-rejected',
+      timestamp: new Date().toISOString(),
+      nodeId: transition.nodeId,
+      outcome: transition.outcome,
+      error: message,
+    });
+
     await appendAuditEvent(name, {
       actor: 'system',
       action: 'workflow.transition.rejected',
@@ -686,6 +768,76 @@ export async function applyAgentWorkflowTransition(
     return { applied: false, error: message };
   }
 }
+
+/** 人工推进 waiting 节点；沿用同一条 transition / version 检查路径。 */
+export async function applyHumanWorkflowTransition(
+  name: string,
+  workflowId: WorkflowId,
+  nodeId: string,
+  outcome: string,
+): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
+  try {
+    const active = await loadActiveJourney(name, workflowId);
+    const execution = await loadJourneyExecution(name, active.definition, active.version);
+    if (execution.status !== 'waiting') {
+      throw new Error('当前 Workflow 并未等待人工处理。');
+    }
+
+    const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
+    if (!currentNode || currentNode.actor !== 'human') {
+      throw new Error('当前 Workflow 节点不是人工步骤。');
+    }
+    if (currentNode.id !== nodeId) {
+      throw new Error('提交的人工节点不是当前 waiting 节点。');
+    }
+
+    const next = applyJourneyTransition(
+      active.definition,
+      execution,
+      nodeId,
+      outcome,
+    );
+
+    await withWorkspaceContextLock(name, async () => {
+      const latestActive = await loadActiveJourney(name, workflowId);
+      if (latestActive.source !== active.source || latestActive.version !== active.version) {
+        throw new Error('Workflow 在人工处理期间发生变化，本次 transition 不再适用。');
+      }
+
+      const latest = await loadJourneyExecution(name, latestActive.definition, latestActive.version);
+      if (
+        latest.currentNodeId !== execution.currentNodeId
+        || latest.workflowVersion !== execution.workflowVersion
+        || latest.status !== execution.status
+      ) {
+        throw new Error('Workflow 执行状态已变化，请刷新后重新处理。');
+      }
+
+      await fs.mkdir(journeyDir(name), { recursive: true });
+      await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
+    });
+
+    await appendJourneyTransitionEvents(name, execution, nodeId, outcome, next);
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'workflow.human.transition',
+      summary: 'Applied human Workflow outcome.',
+      details: {
+        workflowId,
+        workflowVersion: active.version,
+        nodeId,
+        outcome,
+        target: next.currentNodeId,
+      },
+    });
+
+    return { applied: true, execution: next };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { applied: false, error: message };
+  }
+}
+
 
 /** 给 Agent 的低 token Workflow 控制说明，只注入当前节点及其合法出口。 */
 export async function buildJourneyAgentInstruction(
