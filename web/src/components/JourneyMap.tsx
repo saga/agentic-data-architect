@@ -631,19 +631,17 @@ function normalizeConnection(
     'branch',
   );
 
-  const sourceHandle = sourceNode.data.sourceHandles[
-    Math.min(outgoing.length, Math.max(0, sourceNode.data.sourceHandles.length - 1))
-  ]?.id;
-  const targetHandle = targetNode.data.targetHandles[
-    Math.min(incoming.length, Math.max(0, targetNode.data.targetHandles.length - 1))
-  ]?.id;
+  // 直接按“新增后的索引”生成 port id；下一次 rebuild 会按新的边集合渲染这些 handles。
+  // 不复用最后一个 handle，否则多个分支会重新叠到同一个连接点。
+  const sourceHandle = sourceHandleId(connection.source, outgoing.length);
+  const targetHandle = targetHandleId(connection.target, incoming.length);
 
   return {
     id: connection.source + ':' + outcome + ':' + connection.target + ':' + String(outgoing.length),
     source: connection.source,
     target: connection.target,
-    ...(sourceHandle ? { sourceHandle } : {}),
-    ...(targetHandle ? { targetHandle } : {}),
+    sourceHandle,
+    targetHandle,
     type: EDGE_TYPE,
     markerEnd: { type: MarkerType.ArrowClosed },
     data: {
