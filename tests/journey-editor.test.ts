@@ -4,6 +4,10 @@ import {
   defaultJourneyLayout,
   serializeJourneyMarkdown,
 } from '../src/workflow/journey-editor.js';
+import {
+  applyJourneyWorkflowChanges,
+  validateJourneyChangeScope,
+} from '../src/workflow/journey-edit.js';
 import { parseJourneyMarkdown } from '../src/workflow/journey.js';
 
 test('journey editor serialization round-trips semantic graph', () => {
@@ -77,4 +81,73 @@ test('default layout gives every node a stable position', () => {
   assert.ok(layout.nodes.a);
   assert.ok(layout.nodes.b);
   assert.ok(layout.nodes.done);
+});
+
+
+test('selection-scoped Workflow AI cannot connect a new node to an unrelated node', () => {
+  const definition = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> intake',
+    '',
+    '## @task intake',
+    'completion: agent',
+    '- success -> review',
+    '',
+    '## @task review',
+    'completion: agent',
+    '- success -> done',
+    '',
+    '## @task unrelated',
+    'completion: agent',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n')).definition!;
+
+  const changes = [
+    {
+      type: 'add-node' as const,
+      node: {
+        id: 'new-step',
+        type: 'task' as const,
+        title: '新步骤',
+        visible: true,
+        completion: 'agent' as const,
+        actor: 'agent' as const,
+        routes: [{ outcome: 'success', target: 'unrelated' }],
+      },
+    },
+  ];
+
+  const issues = validateJourneyChangeScope(definition, changes, 'review');
+  assert.ok(issues.some((issue) => issue.includes('new-step') && issue.includes('unrelated')));
+});
+
+test('Workflow patch preserves and validates dependency declarations', () => {
+  const definition = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> intake',
+    '',
+    '## @task intake',
+    'completion: agent',
+    'produces: evidence',
+    '- success -> target',
+    '',
+    '## @task target',
+    'completion: agent',
+    'requires: evidence',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n')).definition!;
+
+  const next = applyJourneyWorkflowChanges(definition, [{
+    type: 'update-node',
+    nodeId: 'target',
+    patch: {
+      requires: ['evidence', 'mapping'],
+    },
+  }]);
+
+  assert.deepEqual(next.nodes.find((node) => node.id === 'target')?.requires, ['evidence', 'mapping']);
 });
