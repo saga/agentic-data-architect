@@ -285,6 +285,8 @@ function graphFromDefinition(
       targetHandles.push({ id: targetHandleId(item.id, 0), label: '入口' });
     }
 
+    const terminal = item.type === 'end' || item.type === 'stop';
+
     return {
       id: item.id,
       type: 'journey',
@@ -310,7 +312,8 @@ function graphFromDefinition(
         onAddBranch,
         onDelete,
       },
-      hidden: !editing && !item.visible,
+      // 终点即使 DSL 标成 visible:false，在地图里也保留，避免流程看起来像“断在最后一步”。
+      hidden: !editing && !item.visible && !terminal,
       className:
         'journey-flow-node journey-flow-node-stage '
         + STATUS_CLASS[status]
