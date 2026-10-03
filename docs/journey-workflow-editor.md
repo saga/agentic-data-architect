@@ -432,34 +432,38 @@ B -> A
 
 没有出口到终点，就会被验证拒绝。
 
-## 9. 动态 Route Plan 不等于 Workflow
+## 9. 下一步候选不等于 Workflow
 
-已有的 Agent routeOptions 继续保留，但它们和 Workflow 是两种不同东西：
+Agent 可以根据当前问题和证据给出 0～3 个下一步候选。它们不是第二套 Workflow：
 
 ~~~text
 Workflow
   = 当前 Investigation 的正式工作方式
   = 有状态
   = 可编辑
-  = 会真正影响 Agent execution
+  = 真正影响 Workflow execution
 
-routeOptions
-  = Agent 临时建议
-  = 没有持久化控制权
-  = 可以有，也可以没有
-  = 不能绕过 Workflow
+下一步候选
+  = 本轮调查的可选动作
+  = 不改变 Workflow
+  = 用户点击后通过 routeId 选择
+  = 服务端只接受当前调查中仍然存在的候选
+  = 可以没有
 ~~~
 
-因此 UI 仍然可以显示：
+UI 直接在最近一条 Agent 回答下面显示少量按钮：
 
 ~~~text
-Agent 临时建议
-  ├─ 先查血缘
-  ├─ 先确认业务定义
-  └─ 先做数据 profiling
+下一步
+  [先追 Position 数据血缘] [先确认业务定义]
+
+需要确认
+  [确认 EOD 的 Position 定义]
 ~~~
 
-但这些建议不等于 Workflow 分支。
+用户点击后，前端发送结构化 routeId；服务端重新读取当前候选，把对应的标题、原因和步骤作为结构化上下文交给 Agent。不会在浏览器里拼接一大段“我选择这条路线……”的自然语言提示。候选过期时直接要求根据最新回答重新选择。
+
+它和 Workflow 分支的区别仍然很重要：点击候选只决定“这次先做什么”，不会修改 Workflow，也不会绕过 Workflow 的状态控制。
 
 ## 10. React Flow 为什么放在 UI，Markdown 为什么留在后端
 
