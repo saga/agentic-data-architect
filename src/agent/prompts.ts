@@ -37,6 +37,7 @@ export function buildQuestionPrompt(args: {
   scope: string[];
   question: string;
   contextText: string;
+  selectedRoute?: { id: string; title: string; reason: string; steps: string[] };
   evidenceIds: string[];
   unknowns: string[];
 }): string {
@@ -50,6 +51,14 @@ export function buildQuestionPrompt(args: {
     ``,
     `当前未知项：`,
     args.unknowns.map((u) => `- ${u}`).join('\n') || '（无）',
+    ...(args.selectedRoute
+      ? [
+          '用户刚刚从界面选择了一个下一步调查动作。它已经是用户确认的选择，不要把它当成普通建议：',
+          JSON.stringify(args.selectedRoute),
+          '请执行这个选择；如果其中某一步在当前证据下无法继续，说明阻塞原因并选择实际可执行的下一步。',
+          '',
+        ]
+      : []),
     ``,
     `用户问题：${args.question}`,
     ``,
