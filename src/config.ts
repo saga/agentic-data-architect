@@ -13,7 +13,6 @@ const EnvSchema = z.object({
   DATA_DIR: z.string().default('.data'),
   SKILLS_DIR: z.string().default('skills'),
   KNOWLEDGE_DIR: z.string().default('knowledge'),
-  COPILOT_SKILLS: z.string().default('investigation-session,financial-data-review,structural-analysis,search-github,search-confluence,search-leanix,working-directory'),
   GITHUB_TOKEN: z.string().optional(),
   COPILOT_MODEL: z.string().default('gpt-5-mini'),
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
@@ -26,8 +25,6 @@ const EnvSchema = z.object({
 
 // 这里是整个服务的唯一运行时配置输入源，后续模块不直接读取 process.env。
 const envConfig = EnvSchema.parse(process.env);
-const copilotSkills = envConfig.COPILOT_SKILLS.split(',').map((skill) => skill.trim()).filter(Boolean);
-
 /** 全局不可变运行配置。业务代码只消费这里的解析结果，不自行解析环境变量。 */
 export const config = {
   workspaceDir: path.resolve(envConfig.WORKSPACE_DIR),
@@ -35,7 +32,6 @@ export const config = {
   legacyDataDir: path.resolve(envConfig.DATA_DIR),
   skillsDir: path.resolve(envConfig.SKILLS_DIR),
   knowledgeDir: path.resolve(envConfig.KNOWLEDGE_DIR),
-  copilotSkills,
   githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
   model: envConfig.COPILOT_MODEL,
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
