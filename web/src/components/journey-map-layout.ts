@@ -12,7 +12,7 @@ const elk = new ELK();
  * React Flow 真正渲染后卡片变高，最终彼此压住。
  */
 const FALLBACK_NODE_WIDTH = 236;
-const FALLBACK_NODE_HEIGHT = 220;
+const FALLBACK_NODE_HEIGHT = 180;
 const TERMINAL_NODE_WIDTH = 190;
 const TERMINAL_NODE_HEIGHT = 96;
 
@@ -22,11 +22,11 @@ const TERMINAL_NODE_HEIGHT = 96;
  * ELK 的 node-node spacing 是最小安全距离，不是视觉上的“宽松程度”。
  * 对当前 230px 左右的卡片，140px 左右的额外留白比较合适。
  */
-const NODE_GAP = 160;
-const LAYER_GAP = 220;
-const EDGE_NODE_GAP = 80;
-const EDGE_EDGE_GAP = 60;
-const BRANCH_VERTICAL_GAP = 120;
+const NODE_GAP = 64;
+const LAYER_GAP = 96;
+const EDGE_NODE_GAP = 48;
+const EDGE_EDGE_GAP = 40;
+const BRANCH_VERTICAL_GAP = 72;
 
 /** 给布局引擎提供真实/保守的节点尺寸。 */
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
@@ -140,9 +140,21 @@ export async function layoutWithElk(
     ]),
   );
 
+  // 自动排版最终以“主流程居中、分支轻量展开”为目标。
+  // 先记录 ELK 的结果，再统一消掉整体 Y 偏移，避免保存/恢复后整张图漂在视口顶部或底部。
+  const ys = children.map((child) => child.y ?? 0);
+  const minY = ys.length ? Math.min(...ys) : 0;
+  const normalizeY = minY;
+
   return nodes.map((node) => ({
     ...node,
-    position: positions.get(node.id) ?? node.position,
+    position: (() => {
+      const position = positions.get(node.id) ?? node.position;
+      return {
+        x: position.x,
+        y: position.y - normalizeY,
+      };
+    })(),
   }));
 }
 
