@@ -193,11 +193,10 @@ export function buildQuestionContext(args: {
 
     out.push('');
     out.push(
-      '当前发现覆盖率：SQL files=' + currentState.coverage.sqlFiles +
+      '当前发现：SQL files=' + currentState.coverage.sqlFiles +
       '，parsed=' + currentState.coverage.sqlParsedStatements +
       '，parse failures=' + currentState.coverage.sqlParseFailures +
-      '，dataset lineage=' +
-      (currentState.coverage.datasetLineageConnectionRate === null ? 'n/a' : (currentState.coverage.datasetLineageConnectionRate * 100).toFixed(0) + '%') +
+      '，已连上线的数据集=' + currentState.coverage.connectedDatasets + '/' + currentState.coverage.datasets +
       '，semantic assets=' + currentState.coverage.semanticAssets +
       '，profiled=' + currentState.coverage.profiledDatasets + '。',
     );
