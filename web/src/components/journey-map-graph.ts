@@ -186,7 +186,7 @@ export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
 
   return {
     version: 1,
-    engine: 'elk-v2',
+    engine: 'elk-v3',
     nodes: result,
   };
 }
