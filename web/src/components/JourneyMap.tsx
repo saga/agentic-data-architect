@@ -23,6 +23,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 
 import { JourneyFlowEdge } from './JourneyFlowEdge.js';
@@ -49,6 +50,26 @@ export type {
 };
 
 /**
+ * 工作地图的入口，只做一件事：把 React Flow 的 Provider 放到画布外面。
+ *
+ * React Flow 的 hook（useNodesState / useNodesInitialized …）读的是
+ * ReactFlowProvider 提供的 store。Provider 必须包在**调用这些 hook 的组件外面**，
+ * 因为 <ReactFlow> 只是给它的子节点提供 store，管不到自己所在的组件。
+ *
+ * 之前 useJourneyWorkflowEditor 就写在渲染 <ReactFlow> 的这个组件里，
+ * 等于在 Provider 外面调 hook，一打开工作地图就抛
+ * “Seems like you have not used ReactFlowProvider as an ancestor”，
+ * React 直接卸载整棵树 → 整个页面白屏。所以这里必须拆成两层。
+ */
+export function JourneyMap(props: JourneyMapProps) {
+  return (
+    <ReactFlowProvider>
+      <JourneyMapCanvas {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+/**
  * 工作地图只负责“页面”：
  *
  * - React Flow 画布
@@ -59,7 +80,7 @@ export type {
  * 所有编辑状态、Graph 变换、HTTP 持久化和 Undo/Redo 都已经放到
  * useJourneyWorkflowEditor，避免一个组件同时承担太多职责。
  */
-export function JourneyMap({
+function JourneyMapCanvas({
   journey,
   routes = [],
   loading = false,
@@ -311,12 +332,6 @@ export function JourneyMap({
               if (editing) onEdgeClick(edge.id);
             }}
             onPaneClick={clearSelection}
-            fitView
-            fitViewOptions={{
-              padding: 0.12,
-              minZoom: 0.4,
-              maxZoom: 1.05,
-            }}
             colorMode="light"
             proOptions={{ hideAttribution: true }}
           >

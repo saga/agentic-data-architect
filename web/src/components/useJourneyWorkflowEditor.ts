@@ -123,6 +123,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
   const lastMeasuredNodeCountRef = useRef(0);
   const layoutRequestRef = useRef(0);
+  /** 下一次节点落地后要不要把视角对准整张图。见下面那个 fitView effect。 */
+  const pendingFitRef = useRef(false);
 
   // React Flow 会在首次渲染和新增节点后重新测量真实 DOM 尺寸。
   // 自动布局必须在“测量完成”后再跑一次，否则 ELK 只能使用估算高度。
@@ -860,12 +862,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     );
     const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
     if (!laidOutNodes) return;
+    pendingFitRef.current = true;
     setNodes(laidOutNodes);
     setValidationIssues([]);
-
-    requestAnimationFrame(() => {
-      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
-    });
   };
 
   /** 画布的唯一重建入口：锁定模式画已应用版本，编辑模式优先画草稿。
@@ -873,17 +872,26 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    * graphKey 决定"什么时候该重画"——来源（已应用 / 草稿）、版本、编辑模式，
    * 再加一份内容签名，因为"恢复内置"不一定改版本号。
    * 保存草稿不会改 key，所以画布不会重建，撤销栈、选中状态和当前视角都留得住。
+   *
+   * 签名必须排序：服务端保存后返回的 definition 里节点顺序和画布上的顺序不一样，
+   * 不排序的话"保存草稿"会被当成内容变了，画布重建、视角被重置，
+   * 用户正看着的那一块会突然跳走。
    */
   const graphKey = (() => {
     if (!snapshot) return 'none';
     const useDraft = editing && usingDraft && Boolean(snapshot.draft);
     const source = useDraft && snapshot.draft ? snapshot.draft.definition : snapshot.definition;
+    const signature = source.nodes
+      .map((node) => node.id + ':' + String(node.routes.length))
+      .sort()
+      .join('|');
+
     return [
       snapshot.source,
       String(snapshot.version),
       editing ? 'edit' : 'lock',
       useDraft ? 'draft' : 'active',
-      source.nodes.map((node) => node.id + ':' + String(node.routes.length)).join('|'),
+      signature,
     ].join('#');
   })();
 
@@ -929,21 +937,13 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         : await autoLayoutJourney(graph.nodes, graph.edges);
 
       if (cancelled) return;
-
+      pendingFitRef.current = true;
       setNodes(layoutedNodes);
       setEdges(graph.edges);
       setSelectedNodeId(undefined);
       setSelectedEdgeId(undefined);
       setPast([]);
       setFuture([]);
-
-      requestAnimationFrame(() => {
-        flowInstanceRef.current?.fitView({
-          padding: 0.18,
-          minZoom: 0.45,
-          maxZoom: 1.1,
-        });
-      });
     };
 
     void initializeGraph();
@@ -959,6 +959,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    * 这一步解决了一个很隐蔽的问题：自定义节点在编辑模式和锁定模式的内容高度
    * 并不完全等于固定值。ELK 如果只拿估算尺寸排版，视觉上仍可能出现“节点贴住”
    * 的情况。React Flow 官方提供 useNodesInitialized 来判断尺寸测量是否完成。
+   *
+   * 依赖里放 nodes 而不是 editing：切换编辑模式的那一次渲染里，nodes 还是**上一次**
+   * 的那一批。如果这里跟着 editing 一起触发，它会拿着一批旧节点去排版，结果回来得比
+   * 重建画布还晚，把刚建好的草稿（14 个节点）盖回旧的 13 个。
+   * 放在 nodes 上就天然是"等新节点真的落到画布之后"才重排。
    */
   useEffect(() => {
     if (!editing || !nodesInitialized || !nodes.length) return;
@@ -971,6 +976,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const relayoutAfterMeasure = async () => {
       const layouted = await layoutWithLatest(nodesRef.current, edgesRef.current);
       if (!cancelled && layouted) {
+        // 实测重排会再挪一次节点，视角要跟着重算，所以这里重新申请一次对准。
+        pendingFitRef.current = true;
         setNodes(layouted);
       }
     };
@@ -980,7 +987,30 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     return () => {
       cancelled = true;
     };
-  }, [editing, nodesInitialized, nodes.length]);
+    // editing 故意不放进来：它一变就会在这一批 nodes 还是旧的时候触发，
+    // 正是上面说的那个覆盖问题。editing 只在函数体里当开关用。
+  }, [nodes, nodesInitialized]);
+
+  /**
+   * 把视角对准整张图。
+   *
+   * 关键是不能在 setNodes 之后立刻调 fitView：那一刻 React 还没把新节点提交给
+   * React Flow，fitView 量到的是一张空画布，算出来的缩放会被 maxZoom 卡住，
+   * 13 个节点里只有一两个露在屏幕上——看上去就跟白屏一样。
+   *
+   * 所以改成：需要对准时只置一个标记，等 React Flow 把节点尺寸量完
+   * （nodesInitialized）并且新节点真的提交进画布（nodes 变了）之后，再对准。
+   * 实测重排会在之后把节点再挪一次，它也会重新置标记，于是最终落点仍然正确。
+   */
+  useEffect(() => {
+    if (!pendingFitRef.current || !nodesInitialized || !nodes.length) return;
+    pendingFitRef.current = false;
+    flowInstanceRef.current?.fitView({
+      padding: 0.18,
+      minZoom: 0.45,
+      maxZoom: 1.1,
+    });
+  }, [nodes, nodesInitialized]);
 
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
