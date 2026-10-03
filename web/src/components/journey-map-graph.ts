@@ -390,16 +390,24 @@ export function graphFromDefinition(
       label: route.outcome,
     }));
 
-    // 没有真实 route 的节点仍然保留一个“可连接”的虚拟 Handle。
-    // 编辑模式可以直接从这里连出去；锁定模式同样显示它，但禁止拖动。
-    if (!sourceHandles.length && item.type !== 'end' && item.type !== 'stop') {
+    const hasSelfLoop = item.routes.some((route) => route.target === item.id);
+
+    // 只有真的没有出口时才显示“新增出口”。
+    // 如果原 Workflow 只有 self-loop，这里不再制造一个看起来像 self-loop 残留的连接点。
+    if (
+      !sourceHandles.length
+      && !hasSelfLoop
+      && item.type !== 'end'
+      && item.type !== 'stop'
+    ) {
       sourceHandles.push({
         id: sourceHandleId(item.id, 0),
         label: '新增出口',
       });
     }
 
-    if (!targetHandles.length) {
+    // 同理：只有完全没有已声明的自环/入口时，才显示一个新的入口点。
+    if (!targetHandles.length && !hasSelfLoop) {
       targetHandles.push({
         id: targetHandleId(item.id, 0),
         label: '入口',
