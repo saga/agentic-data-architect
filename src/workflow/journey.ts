@@ -348,7 +348,7 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
     case 'goal':
       return Boolean(facts.goal.trim());
     case 'current-state':
-      return Boolean(facts.currentState);
+      return Boolean(facts.currentState && facts.currentState.datasets > 0);
     case 'data-truth':
       return Boolean(
         facts.currentState
