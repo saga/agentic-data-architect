@@ -1,7 +1,7 @@
 /**
  * Copilot Agent 运行时封装。
  *
- * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、Skills/MCP/工具配置、流式事件和取消。
+ * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
 import { CopilotClient, ToolSet } from '@github/copilot-sdk';
@@ -40,7 +40,10 @@ export async function getClient(): Promise<CopilotClient> {
     await fs.mkdir(copilotBaseDirectory, { recursive: true });
 
     const c = new CopilotClient({
-      mode: 'empty',
+      // This app is intentionally a single-user local productivity tool, so use
+      // the CLI-like runtime and its ambient Copilot skills/MCPs. Do not reuse
+      // this mode unchanged for a shared multi-user server.
+      mode: 'copilot-cli',
       baseDirectory: copilotBaseDirectory,
       ...(config.githubToken ? { gitHubToken: config.githubToken, useLoggedInUser: false } : { useLoggedInUser: true }),
     });
@@ -90,7 +93,8 @@ export interface AskInput {
   sessionId?: string;
   workingDirectory?: string;
   model?: string;
-  skills?: string[];
+  /** Skills that must be eagerly preloaded because they represent the selected Workflow. */
+  eagerSkills?: string[];
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
@@ -182,26 +186,6 @@ function statusFromIntent(intent: string): string {
 }
 
 /** 扫描 Skills 目录并读取 Skill 名称；无效 Skill 目录直接忽略。 */
-async function listSkillNames(): Promise<string[]> {
-  try {
-    const entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
-    const names: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      try {
-        const skillFile = await fs.readFile(path.join(config.skillsDir, entry.name, 'SKILL.md'), 'utf8');
-        const name = /^name:\s*(.+)$/m.exec(skillFile)?.[1]?.trim() || entry.name;
-        if (name) names.push(name);
-      } catch {
-        // Ignore invalid skill directories; the SDK will not load them either.
-      }
-    }
-    return [...new Set(names)];
-  } catch {
-    return [];
-  }
-}
-
 /** 判断指定 turn 是否仍绑定运行中的 Copilot Session。 */
 export function hasActiveCopilotTurn(turnId: string): boolean {
   return activeSessions.has(turnId);
@@ -226,10 +210,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // This application intentionally uses Copilot's default agent. The project
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
-  const availableSkillNames = await listSkillNames();
-  const selectedSkillNames = new Set(input.skills ?? config.copilotSkills);
-  const disabledSkills = availableSkillNames.filter((name) => !selectedSkillNames.has(name));
-
   const workingDirectory = input.workingDirectory ?? process.cwd();
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
   const graphifyEnabled = config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
@@ -245,7 +225,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     workingDirectory,
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
-    disabledSkills,
+    ...(input.eagerSkills?.length ? { skills: input.eagerSkills } : {}),
     availableTools: WORKBENCH_TOOLS,
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
