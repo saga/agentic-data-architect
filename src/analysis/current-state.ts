@@ -54,7 +54,7 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
       const upstream = edges.filter((edge) => edge.target.toLowerCase() === lower).length;
       const downstream = edges.filter((edge) => edge.source.toLowerCase() === lower).length;
       const metadataSignals = Object.keys(dataset.attributes).length;
-      const score = downstream * 3 - upstream + Math.min(metadataSignals, 3);
+      const priorityScore = downstream * 3 - upstream + Math.min(metadataSignals, 3);
 
       const reasons: string[] = [];
       if (downstream > 0) reasons.push('下游有 ' + downstream + ' 条已发现依赖');
@@ -68,7 +68,7 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
         })
         .flatMap((edge) => edge.evidenceIds);
 
-      return { dataset, score, reasons, evidenceIds };
+      return { dataset, priorityScore, reasons, evidenceIds };
     }).sort((a, b) => b.score - a.score);
 
     const top = scored.slice(0, 5);
@@ -76,13 +76,15 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
       key,
       candidateDatasetIds: top.map((item) => item.dataset.id),
       candidateDatasets: top.map((item) => item.dataset.name),
-      score: top[0]?.score || 0,
+      priorityScore: top[0]?.priorityScore ?? 0,
       reasons: top[0]?.reasons || [],
       evidenceIds: [...new Set(top.flatMap((item) => item.evidenceIds))],
     });
   }
 
-  return result.filter((item) => item.candidateDatasets.length > 0).sort((a, b) => b.score - a.score);
+  return result
+    .filter((item) => item.candidateDatasets.length > 0)
+    .sort((a, b) => b.priorityScore - a.priorityScore);
 }
 
 function buildSemanticCandidates(estate: DataEstate, semanticAssets: SemanticAsset[]): SemanticCandidate[] {
@@ -169,7 +171,7 @@ export function buildCurrentStateIntelligence(args: {
     sqlParseFailures: args.lineage?.parseFailures.length || 0,
     datasets: datasets.length,
     connectedDatasets: connected.size,
-    datasetLineageCoverage: datasets.length === 0
+    datasetLineageConnectionRate: datasets.length === 0
       ? null
       : Math.min(connected.size, datasets.length) / datasets.length,
     columnLineageEdges: args.lineage?.columns.length || 0,
