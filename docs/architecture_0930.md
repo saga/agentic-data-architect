@@ -77,13 +77,13 @@ Filesystem
 
 ~~~text
 .workspace/<investigation>/
-  ├── analysis.duckdb
+  ├── local.duckdb
   ├── uploads/
   ├── reports/
   └── artifacts/
 ~~~
 
-analysis.duckdb 只服务当前 Investigation。不会把所有 Investigation 共用一份 DuckDB 写库，也不会把 DuckDB 当作整个 App 的 system of record。
+local.duckdb 只服务当前 Investigation。不会把所有 Investigation 共用一份 DuckDB 写库，也不会把 DuckDB 当作整个 App 的 system of record。
 
 DuckDB 内部固定创建四个轻量 schema：
 
