@@ -12,6 +12,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
@@ -198,8 +199,13 @@ async function statDatasetFile(sessionName: string, relativePath: string) {
 }
 
 async function hashFile(file: string): Promise<string> {
-  const raw = await fs.readFile(file);
-  return createHash('sha256').update(raw).digest('hex');
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = fsSync.createReadStream(file);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
+  });
 }
 
 /** 登记一个本地数据文件；只有第一次或文件确实变了才重新计算完整 SHA-256。 */
