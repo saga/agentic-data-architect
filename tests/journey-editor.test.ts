@@ -58,7 +58,11 @@ test('journey editor serialization round-trips semantic graph', () => {
   assert.equal(parsed.definition?.nodes[0]?.completion, 'deterministic');
   assert.equal(parsed.definition?.nodes[0]?.actor, 'system');
   assert.deepEqual(
-    parsed.definition?.nodes[0]?.routes.map(({ outcome, target, condition }) => ({ outcome, target, condition })),
+    parsed.definition?.nodes[0]?.routes.map(({ outcome, target, condition }) => ({
+      outcome,
+      target,
+      ...(condition !== undefined ? { condition } : {}),
+    })),
     [
       { outcome: 'success', target: 'review', condition: 'goal' },
       { outcome: 'needs-input', target: 'intake' },
@@ -123,7 +127,7 @@ test('selection-scoped Workflow AI cannot connect a new node to an unrelated nod
   assert.ok(issues.some((issue) => issue.includes('new-step') && issue.includes('unrelated')));
 });
 
-test('Workflow patch preserves and validates dependency declarations', () => {
+test('Workflow patch preserves dependency declarations', () => {
   const definition = parseJourneyMarkdown([
     '## @flow demo',
     'start -> intake',
