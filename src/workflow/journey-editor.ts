@@ -322,6 +322,26 @@ export async function getJourneySnapshot(
   const facts = await buildJourneyFacts(name);
   const state = buildJourneyState(active.definition, facts, execution);
 
+  // Deterministic completion may move the current node without an Agent transition.
+  // Persist that state so the next turn cannot observe an older current node.
+  if (
+    state.execution.currentNodeId !== execution.currentNodeId
+    || state.execution.status !== execution.status
+    || state.execution.completedNodeIds.length !== execution.completedNodeIds.length
+    || state.execution.completedNodeIds.some((id) => !execution.completedNodeIds.includes(id))
+  ) {
+    await withWorkspaceContextLock(name, async () => {
+      const latest = await loadJourneyExecution(name, active.definition, active.version);
+      if (
+        latest.currentNodeId === execution.currentNodeId
+        && latest.workflowVersion === execution.workflowVersion
+      ) {
+        await fs.mkdir(journeyDir(name), { recursive: true });
+        await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), state.execution);
+      }
+    });
+  }
+
   const draftMarkdown = await readTextOrNull(journeyFile(name, DRAFT_FILE));
   let draft: JourneySnapshot['draft'] = null;
 
