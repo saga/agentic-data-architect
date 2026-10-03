@@ -1893,35 +1893,81 @@ body {
   border-right: 1px solid #e9edf3;
 }
 
+/* 工作地图右栏：属性和 AI 共用一个空间，通过 Tabs 切换。 */
 .journey-map-inspector {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  overflow: auto;
-  padding: 14px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
   background: #fff;
 }
 
-.journey-map-inspector-header {
+.journey-map-inspector-tabs {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
 }
 
-/* 属性面板同时承载节点/连线属性和 Workflow 专用 AI 对话。 */
+.journey-map-inspector-tabs .ant-tabs-nav {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 14px;
+}
+
+.journey-map-inspector-tabs .ant-tabs-content-holder {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.journey-map-inspector-tabs .ant-tabs-content {
+  height: 100%;
+}
+
+.journey-map-inspector-tabs .ant-tabs-tabpane {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 14px;
+}
+
+.journey-map-inspector-section {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.journey-map-inspector-properties {
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.journey-map-inspector-ai {
+  overflow: hidden;
+}
+
 .journey-map-ai-chat {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #e9edf3;
+  height: 100%;
+  min-height: 0;
+  gap: 10px;
 }
 
 .journey-map-ai-chat-header {
   display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 8px;
 }
 
@@ -1929,11 +1975,16 @@ body {
   font-size: 11px;
 }
 
+.journey-map-ai-chat-header > .ant-flex:last-child {
+  width: 100%;
+}
+
 .journey-map-ai-chat-body {
-  height: 250px;
-  min-height: 180px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 120px;
   overflow: auto;
-  padding: 2px 0;
+  padding: 2px 2px 2px 0;
 }
 
 .journey-map-ai-chat .ant-bubble {
@@ -2642,20 +2693,13 @@ body {
     grid-template-rows: minmax(420px, 1fr) auto;
   }
 
-  .journey-map-inspector {
-    max-height: 52vh;
-  }
-
-  .journey-map-ai-chat-body {
-    height: 220px;
-  }
-
   .journey-map-workspace .journey-map-flow-wrap {
     border-right: 0;
     border-bottom: 1px solid #e9edf3;
   }
 
   .journey-map-workspace .journey-map-inspector {
+    height: 42vh;
     max-height: 42vh;
   }
 }
@@ -2672,118 +2716,5 @@ body {
   .journey-map-page-footer {
     align-items: flex-start;
     flex-direction: column;
-  }
-}
-
-
-/* Journey Workflow Editor: tabs keep the inspector single-purpose and vertically uncluttered. */
-.journey-map-inspector {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  background: #fff;
-}
-
-.journey-map-inspector-tabs {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-}
-
-.journey-map-inspector-tabs .ant-tabs-nav {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0 14px;
-}
-
-.journey-map-inspector-tabs .ant-tabs-content-holder,
-.journey-map-inspector-tabs .ant-tabs-content,
-.journey-map-inspector-tabs .ant-tabs-tabpane {
-  min-width: 0;
-  min-height: 0;
-}
-
-.journey-map-inspector-tabs .ant-tabs-content-holder {
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.journey-map-inspector-tabs .ant-tabs-content {
-  height: 100%;
-}
-
-.journey-map-inspector-tabs .ant-tabs-tabpane {
-  height: 100%;
-  overflow: hidden;
-  box-sizing: border-box;
-  padding: 14px;
-}
-
-.journey-map-inspector-section {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  box-sizing: border-box;
-}
-
-.journey-map-inspector-properties {
-  overflow: auto;
-  padding-right: 3px;
-}
-
-.journey-map-inspector-ai {
-  overflow: hidden;
-}
-
-.journey-map-ai-chat {
-  height: 100%;
-  min-height: 0;
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-  gap: 10px;
-}
-
-.journey-map-ai-chat-header {
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.journey-map-ai-chat-header > .ant-flex:last-child {
-  width: 100%;
-}
-
-.journey-map-ai-chat-body {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 120px;
-  overflow: auto;
-  padding: 2px 2px 2px 0;
-}
-
-@media (max-width: 1100px) {
-  .journey-map-workspace {
-    grid-template-columns: minmax(0, 1fr) 360px;
-  }
-}
-
-@media (max-width: 900px) {
-  .journey-map-inspector-tabs .ant-tabs-nav {
-    padding-inline: 10px;
-  }
-
-  .journey-map-inspector-tabs .ant-tabs-tabpane {
-    padding: 12px 10px;
-  }
-
-  .journey-map-ai-chat-body {
-    min-height: 100px;
   }
 }
