@@ -454,62 +454,6 @@ export function enforceWorkflowReadingOrder(
 }
 
 /**
- * ELK 已经保证 graph layout 基本不重叠，但 Workflow Editor 的视觉卡片高度
- * 还包含 React Flow/Ant Design 的真实 CSS 内容。
- *
- * 这里再做一次非常保守的“只向下推”的碰撞消除：
- * - 不改变 ELK 给出的 layer/x；
- * - 只处理同一区域里实际碰撞的节点；
- * - 每个节点至少保留 NODE_GAP 的纵向呼吸空间。
- *
- * 它不是第二个布局算法，而是最后一道安全保险。
- */
-export function removeNodeCollisions(nodes: FlowNode[]): FlowNode[] {
-  const ordered = [...nodes].sort(
-    (a, b) => a.position.x - b.position.x || a.position.y - b.position.y,
-  );
-
-  const placed: Array<{ node: FlowNode; width: number; height: number }> = [];
-
-  for (const node of ordered) {
-    const dimensions = nodeDimensions(node);
-    let y = node.position.y;
-
-    for (const previous of placed) {
-      const xOverlaps =
-        node.position.x < previous.node.position.x + previous.width + NODE_GAP
-        && node.position.x + dimensions.width + NODE_GAP > previous.node.position.x;
-
-      if (!xOverlaps) continue;
-
-      const minY = previous.node.position.y + previous.height + NODE_GAP;
-
-      if (y < minY && y + dimensions.height > previous.node.position.y - NODE_GAP) {
-        y = minY;
-      }
-    }
-
-    const adjusted = {
-      ...node,
-      position: {
-        x: node.position.x,
-        y,
-      },
-    };
-
-    placed.push({
-      node: adjusted,
-      width: dimensions.width,
-      height: dimensions.height,
-    });
-  }
-
-  return ordered.map(
-    (node) => placed.find((item) => item.node.id === node.id)?.node ?? node,
-  );
-}
-
-/**
  * 对外唯一入口。
  *
  * 自动排版按钮、创建节点后的重排、连接变化后的重排都必须走这里，
