@@ -52,6 +52,7 @@ test('parses workflow branches and completion mode', () => {
   assert.ok(result.definition);
   assert.equal(result.definition?.start, 'intake');
   assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
+  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.actor, 'system');
   assert.deepEqual(
     result.definition?.nodes.find((node) => node.id === 'intake')?.routes.map((route) => route.outcome),
     ['success', 'needs-input'],
@@ -76,6 +77,32 @@ test('rejects dangling nodes and dead-end nodes', () => {
 
   assert.ok(result.issues.some((issue) => issue.includes('missing')));
   assert.ok(result.issues.some((issue) => issue.includes('orphan')));
+});
+
+test('supports lightweight conditional routing for deterministic workflow nodes', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> check',
+    '',
+    '## @task check',
+    'completion: deterministic',
+    'completeWhen: goal',
+    'actor: system',
+    '- goal-path -> done if goal',
+    '- success -> stop',
+    '',
+    '## @end done',
+    '',
+    '## @stop stop',
+  ].join('\\n'));
+
+  assert.equal(result.issues.length, 0);
+  assert.ok(result.definition);
+  const check = result.definition!.nodes.find((node) => node.id === 'check')!;
+  assert.equal(check.routes[0]?.condition, 'goal');
+  const execution = initialJourneyExecution(result.definition!);
+  const state = buildJourneyState(result.definition!, baseFacts, execution);
+  assert.equal(state.currentNodeId, 'done');
 });
 
 test('allows a retry cycle when the graph still has an exit to done', () => {
@@ -166,6 +193,7 @@ test('preserves an execution position across a graph edit when the node still ex
         title: '额外检查',
         visible: true,
         completion: 'agent' as const,
+        actor: 'agent' as const,
         routes: [{ outcome: 'success', target: 'done' }],
       },
     ],
