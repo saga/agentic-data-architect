@@ -29,7 +29,7 @@ function now(): string {
 /** 把真正迁移前要检查的事情列出来，避免到了最后才发现没法验证。 */
 function buildValidationPlan(
   current: DiscoverySnapshot['currentState'] | null,
-  mappings: SourceToTargetMapping[],
+  mappings: ModernizationPlan['mappings'],
   gaps: ReturnType<typeof buildModernizationGaps>,
   evidenceIds: string[],
   scope: string[],
@@ -179,7 +179,7 @@ function buildTargetArchitecture(
     createdAt: timestamp,
     updatedAt: timestamp,
     evidenceIds: [],
-    findingIds: gaps.map((gap) => gap.id),
+    findingIds: [],
     decisionIds: [],
     principles: [],
     components: [],
@@ -226,7 +226,6 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   ].filter((id, index, ids) => ids.indexOf(id) === index);
 
   const analysisCase = buildInitialAnalysisCase(inv.goal || inv.userPrompt, inv.scope, evidenceIds.slice(0, 100));
-  const sourceAssets = current?.highValueAssets ?? [];
   const targetArchitecture = buildTargetArchitecture(inv.goal || inv.userPrompt, gaps);
   const decisions: ModernizationPlan['decisions'] = [];
   const mappings: ModernizationPlan['mappings'] = [];
