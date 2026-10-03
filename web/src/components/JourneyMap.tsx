@@ -676,6 +676,8 @@ export function JourneyMap({
   const nodesRef = useRef<FlowNode[]>([]);
   const edgesRef = useRef<FlowEdge[]>([]);
   const snapshotRef = useRef<WorkflowSnapshot>();
+  const newNodeIdsRef = useRef<Set<string>>(new Set());
+  const flowInstanceRef = useRef<{ fitView: (options?: unknown) => void } | null>(null);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -814,103 +816,284 @@ export function JourneyMap({
     await loadWorkflow();
   };
 
-  const addNodeAfter = (sourceId: string, branch: boolean) => {
-    if (!snapshot) return;
-    const source = nodes.find((node) => node.id === sourceId);
+  const addNodeAfter = async (sourceId: string, branch: boolean) => {
+    const currentSnapshot = snapshotRef.current;
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    if (!currentSnapshot) return;
+
+    const source = currentNodes.find((node) => node.id === sourceId);
     if (!source) return;
 
-    const id = nextId('step', new Set(nodes.map((node) => node.id)));
-    const type: WorkflowNodeType = 'task';
-    const title = branch ? '新的分支' : '新的步骤';
+    const id = nextId('step', new Set(currentNodes.map((node) => node.id)));
+    const oldSuccess = currentEdges.find(
+      (edge) => edge.source === sourceId
+        && String(edge.data?.outcome ?? '').toLowerCase() === 'success',
+    );
+    const oldSingle = currentEdges.length
+      ? currentEdges.filter((edge) => edge.source === sourceId)
+      : [];
+
     const node: FlowNode = {
       id,
       type: 'journey',
       position: {
-        x: source.position.x + 310,
-        y: source.position.y + (branch ? 170 : 0),
+        x: source.position.x + 360,
+        y: source.position.y + (branch ? 190 : 0),
       },
       draggable: true,
       selectable: true,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
       data: {
-        title,
-        objective: '请填写这一步要解决的问题。',
-        nodeType: type,
+        title: branch ? '新的分支步骤' : '新的下一步',
+        objective: '填写这一步要解决的问题。',
+        nodeType: 'task',
         status: 'future',
         completion: 'agent',
         visible: true,
         editing: true,
+        isNew: true,
+        sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
+        targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
         onSelect: setSelectedNodeId,
-        onAddStep: (value) => addNodeAfter(value, false),
-        onAddBranch: (value) => addNodeAfter(value, true),
+        onAddStep: (value) => { void addNodeAfter(value, false); },
+        onAddBranch: (value) => { void addNodeAfter(value, true); },
         onDelete: (value) => deleteNode(value),
       },
-      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future',
+      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future journey-flow-node-new',
       style: { width: 236 },
     };
 
-    const outcome = nextOutcome(
-      edges.filter((edge) => edge.source === sourceId).map((edge) => ({
-        outcome: edge.data?.outcome || 'branch',
-        target: edge.target,
-      })),
-      branch ? 'branch' : 'success',
-    );
-    const edge: FlowEdge = {
-      id: sourceId + ':' + outcome + ':' + id,
-      source: sourceId,
-      target: id,
-      type: EDGE_TYPE,
-      markerEnd: { type: MarkerType.ArrowClosed },
-      data: { outcome, onSelect: setSelectedEdgeId },
-    };
+    let nextNodes = [...currentNodes, node];
+    let nextEdges = [...currentEdges];
+
+    if (!branch && oldSuccess) {
+      // “添加下一步”不是再造一条 success-1，而是把新节点插到现有 success 路线上。
+      nextEdges = nextEdges
+        .filter((edge) => edge.id !== oldSuccess.id)
+        .concat([
+          {
+            ...oldSuccess,
+            target: id,
+            targetHandle: targetHandleId(id, 0),
+            id: oldSuccess.id + ':insert:' + id,
+          },
+          {
+            id: id + ':success:' + oldSuccess.target,
+            source: id,
+            target: oldSuccess.target,
+            sourceHandle: sourceHandleId(id, 0),
+            targetHandle: oldSuccess.targetHandle,
+            type: EDGE_TYPE,
+            markerEnd: { type: MarkerType.ArrowClosed },
+            data: { outcome: oldSuccess.data?.outcome ?? 'success' },
+          },
+        ]);
+    } else if (!branch && oldSingle.length === 1) {
+      // 只有一条非 success 出口时，也按“插入一步”处理，保留原 outcome。
+      const old = oldSingle[0];
+      nextEdges = nextEdges
+        .filter((edge) => edge.id !== old.id)
+        .concat([
+          {
+            ...old,
+            target: id,
+            targetHandle: targetHandleId(id, 0),
+            id: old.id + ':insert:' + id,
+          },
+          {
+            id: id + ':pass:' + old.target,
+            source: id,
+            target: old.target,
+            sourceHandle: sourceHandleId(id, 0),
+            targetHandle: old.targetHandle,
+            type: EDGE_TYPE,
+            markerEnd: { type: MarkerType.ArrowClosed },
+            data: { outcome: 'success' },
+          },
+        ]);
+    } else {
+      const outcome = nextOutcome(
+        currentEdges
+          .filter((edge) => edge.source === sourceId)
+          .map((edge) => ({
+            outcome: edge.data?.outcome || 'branch',
+            target: edge.target,
+          })),
+        branch ? 'branch' : 'success',
+      );
+
+      nextEdges = [
+        ...nextEdges,
+        {
+          id: sourceId + ':' + outcome + ':' + id,
+          source: sourceId,
+          target: id,
+          type: EDGE_TYPE,
+          markerEnd: { type: MarkerType.ArrowClosed },
+          data: { outcome },
+        },
+      ];
+    }
 
     pushHistory();
-    setNodes((items) => [...items, node]);
-    setEdges((items) => [...items, edge]);
+    const nextNewIds = new Set(newNodeIdsRef.current);
+    nextNewIds.add(id);
+    newNodeIdsRef.current = nextNewIds;
+    setNewNodeIds(nextNewIds);
+
+    const semanticBase = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const definition = definitionFromGraph(nextNodes, nextEdges, semanticBase);
+    const graph = graphFromDefinition(
+      definition,
+      layoutFromNodes(nextNodes),
+      currentSnapshot,
+      true,
+      setSelectedNodeId,
+      (value) => { void addNodeAfter(value, false); },
+      (value) => { void addNodeAfter(value, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      nextNewIds,
+    );
+    const laidOutNodes = await layoutWithElk(graph.nodes, graph.edges);
+
+    setNodes(laidOutNodes);
+    setEdges(graph.edges);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
+
+    requestAnimationFrame(() => {
+      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
+    });
   };
 
   const deleteNode = (id: string) => {
-    if (!snapshot) return;
-    if (id === snapshot.definition.start) {
-      message.warning('不能删除当前 Workflow 的 start 节点。可以把它连接到新的第一步。');
+    const currentSnapshot = snapshotRef.current;
+    if (!currentSnapshot) return;
+
+    if (id === currentSnapshot.definition.start) {
+      message.warning('不能删除当前 Workflow 的第一步。可以修改它，或把它重新连接到其他步骤。');
       return;
     }
 
     Modal.confirm({
       title: '删除这个步骤？',
-      content: '与这个步骤相连的分支也会一并删除。',
+      content: '与这个步骤相连的分支也会一并删除；应用前可以继续撤销。',
       okText: '删除',
       cancelText: '取消',
       okButtonProps: { danger: true },
-      onOk: () => {
+      onOk: async () => {
+        const currentNodes = nodesRef.current;
+        const currentEdges = edgesRef.current;
         pushHistory();
-        setNodes((items) => items.filter((node) => node.id !== id));
-        setEdges((items) => items.filter((edge) => edge.source !== id && edge.target !== id));
+
+        const nextNodes = currentNodes.filter((node) => node.id !== id);
+        const nextEdges = currentEdges.filter(
+          (edge) => edge.source !== id && edge.target !== id,
+        );
+
+        const nextNewIds = new Set(newNodeIdsRef.current);
+        nextNewIds.delete(id);
+        newNodeIdsRef.current = nextNewIds;
+        setNewNodeIds(nextNewIds);
+
+        const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+        const definition = definitionFromGraph(nextNodes, nextEdges, base);
+        const graph = graphFromDefinition(
+          definition,
+          layoutFromNodes(nextNodes),
+          currentSnapshot,
+          true,
+          setSelectedNodeId,
+          (value) => { void addNodeAfter(value, false); },
+          (value) => { void addNodeAfter(value, true); },
+          deleteNode,
+          setSelectedEdgeId,
+          nextNewIds,
+        );
+        setNodes(await layoutWithElk(graph.nodes, graph.edges));
+        setEdges(graph.edges);
         setSelectedNodeId(undefined);
         setSelectedEdgeId(undefined);
+        setValidationIssues([]);
       },
     });
   };
 
-  const onConnect = (connection: Connection) => {
-    if (!editing) return;
-    const edge = normalizeConnection(connection, nodes, edges);
-    if (!edge) return;
-    pushHistory();
-    setEdges((items) => addEdge(edge, items));
+  const rebuildStructuralGraph = async (
+    nextNodes: FlowNode[],
+    nextEdges: FlowEdge[],
+    nextNewIds = new Set(newNodeIdsRef.current),
+  ) => {
+    const currentSnapshot = snapshotRef.current;
+    if (!currentSnapshot) return;
+
+    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const definition = definitionFromGraph(nextNodes, nextEdges, base);
+    const graph = graphFromDefinition(
+      definition,
+      layoutFromNodes(nextNodes),
+      currentSnapshot,
+      true,
+      setSelectedNodeId,
+      (value) => { void addNodeAfter(value, false); },
+      (value) => { void addNodeAfter(value, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      nextNewIds,
+    );
+
+    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    setEdges(graph.edges);
     setValidationIssues([]);
+    requestAnimationFrame(() => {
+      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
+    });
   };
 
-  const onReconnect = (oldEdge: FlowEdge, connection: Connection) => {
-    if (!editing || !connection.source || !connection.target || connection.source === connection.target) return;
+  const onConnect = async (connection: Connection) => {
+    if (!editing) return;
+
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    const edge = normalizeConnection(connection, currentNodes, currentEdges);
+    if (!edge) return;
+
+    // Duplicate source + target 连接没有意义；用户可以通过 edge inspector 改 outcome。
+    if (currentEdges.some(
+      (item) => item.source === edge.source && item.target === edge.target,
+    )) {
+      message.info('这两个步骤已经有连接了；点击已有连线标签可以修改 outcome。');
+      return;
+    }
+
     pushHistory();
-    setEdges((items) => reconnectEdge(oldEdge, connection, items));
-    setValidationIssues([]);
+    await rebuildStructuralGraph(
+      [...currentNodes],
+      addEdge(edge, currentEdges),
+    );
+    setSelectedEdgeId(edge.id);
+  };
+
+  const onReconnect = async (oldEdge: FlowEdge, connection: Connection) => {
+    if (!editing || !connection.source || !connection.target || connection.source === connection.target) return;
+
+    pushHistory();
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    const nextConnection = {
+      ...connection,
+      sourceHandle: connection.sourceHandle ?? oldEdge.sourceHandle,
+      targetHandle: connection.targetHandle,
+    };
+    await rebuildStructuralGraph(
+      [...currentNodes],
+      reconnectEdge(oldEdge, nextConnection, currentEdges),
+    );
+    setSelectedEdgeId(oldEdge.id);
   };
 
   const applyNodeDraft = () => {
