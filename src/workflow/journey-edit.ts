@@ -107,8 +107,6 @@ function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
       visible: node.visible,
       completion: node.completion,
       actor: node.actor,
-      body: node.body,
-      attrs: { ...node.attrs },
       routes: node.routes.map((route) => ({
         outcome: route.outcome,
         target: route.target,
@@ -158,8 +156,6 @@ export function applyJourneyWorkflowChanges(
           visible: node.visible,
           completion: node.completion,
           actor: node.actor,
-          body: node.body,
-          attrs: { ...node.attrs },
           routes: node.routes.map((route) => ({
             outcome: route.outcome,
             target: route.target,
