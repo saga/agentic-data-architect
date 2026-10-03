@@ -907,3 +907,34 @@ Agent 已经可以判断
 **“把自然语言已经能解决的事情做成按钮”**、**“把 heuristic 包装成确定事实”**、**“为了让 Workflow 往前走而人为制造完成条件”**。
 
 这三类目前就是这个项目最明显的“聪明过头”来源。
+
+---
+
+# 2026-10-03 后续修改结果
+
+本文件提出的主要剩余问题已处理：
+
+| 项目 | 状态 |
+|---|---|
+| data-truth >= 80% | 已移除；Gate 不再依赖任意 lineage 百分比 |
+| unknowns <= 3 | 已移除；改为关键 discovery / lineage / source-of-truth 缺口判断 |
+| current-state = snapshot exists | 已收紧；需要存在实际数据集且不能有关键阻塞缺口 |
+| assessment-findings | 已移除“有 Current-State 就算完成”的条件 |
+| cutover = validation | 已拆开；还要求切换条件、回退条件已明确 |
+| Source-of-Truth score | 已改名 priorityScore，明确只是调查排序 heuristic |
+| Semantic Candidate | 明确只是候选，不自动升级为已确认业务定义 |
+| datasetLineageCoverage | 已改为 datasetLineageConnectionRate；UI 改为显示“已连上线的数据集 X/Y” |
+| Modernization UI | 已从主工作区移除；后端工作包能力保留 |
+| Evidence-driven work products | Target Architecture / Mapping / Architecture Decision 不再自动伪造正式结果 |
+
+当前原则统一为：
+
+```text
+指标 = 事实描述
+候选 = 调查辅助
+Gap = 未解决问题
+Gate = 判断是否已经有足够事实进入下一阶段
+Work Product = 真实证据 + 明确判断后的结果
+```
+
+不要让“有一个数字”“生成了一个对象”“Agent 说完成了”直接等同于业务工作已经完成。
