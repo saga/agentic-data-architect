@@ -103,7 +103,7 @@ function getRegistryDatabase(): DatabaseSync {
   if (registryDb && registryPath === file) return registryDb;
 
   registryDb?.close();
-  fsSyncMkdir(path.dirname(file));
+  fsSync.mkdirSync(path.dirname(file), { recursive: true });
   registryDb = new DatabaseSync(file);
   registryPath = file;
   registryDb.exec(`
@@ -251,7 +251,7 @@ export async function registerLocalDataset(
   return datasetRowToModel(db.prepare(`
     SELECT id, session_name, name, relative_path, format, relation, version, sha256, size_bytes, updated_at
     FROM local_datasets WHERE id = ?
-  `).get(id) as DatasetRow);
+  `).get(id) as unknown as DatasetRow);
 }
 
 /** 扫描当前 Investigation workspace，自动发现可分析文件并更新 Dataset Registry。 */
@@ -414,7 +414,7 @@ class LocalDuckDBEngine {
     readonly sessionName: string,
     readonly dbFile: string,
     private readonly instance: DuckDBInstance,
-    private readonly connection: DuckDBConnection,
+    readonly connection: DuckDBConnection,
   ) {}
 
   static async create(sessionName: string): Promise<LocalDuckDBEngine> {
@@ -590,7 +590,7 @@ class LocalDuckDBEngine {
       const evidenceId = nextId('ev');
       const sqlHash = createHash('sha256').update(safeSql).digest('hex');
       const referencedDatasets = listLocalDatasets(this.sessionName)
-      .filter((item) => originalSql.includes(item.relation));
+        .filter((item) => safeSql.includes(item.relation));
 
     const evidence: EvidenceRef = {
         id: evidenceId,
@@ -605,6 +605,12 @@ class LocalDuckDBEngine {
           table,
           rowCount,
           replaced: replace,
+          datasets: referencedDatasets.map((item) => ({
+            id: item.id,
+            version: item.version,
+            sha256: item.sha256,
+            relation: item.relation,
+          })),
         },
         collectedAt: new Date().toISOString(),
       };
