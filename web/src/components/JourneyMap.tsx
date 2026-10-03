@@ -824,6 +824,12 @@ export function JourneyMap({
     snapshotRef.current = snapshot;
   }, [nodes, edges, snapshot]);
 
+  /** 只负责把服务端快照取回来。
+   *
+   * 画布统一由下面那个 graphKey effect 重建——它知道当前该画"草稿"还是"已应用版本"。
+   * 这里千万别顺手建图：带 await fetch 的这条总会后跑完，把草稿覆盖成已应用版本，
+   * 结果就是顶部提示"已载入草稿"、校验面板列出问题，画布却还是旧的那张图。
+   */
   const loadWorkflow = useCallback(async () => {
     const name = sessionNameFromUrl();
     if (!name) return;
@@ -838,42 +844,18 @@ export function JourneyMap({
       if (!response.ok) {
         if (response.status === 409) {
           setSnapshot(undefined);
-          setNodes([]);
-          setEdges([]);
           return;
         }
         throw new Error(await response.text());
       }
 
-      const data = await response.json() as WorkflowSnapshot;
-      setSnapshot(data);
-
-      const graph = graphFromDefinition(
-        data.definition,
-        data.layout,
-        data,
-        editing,
-        setSelectedNodeId,
-        undefined,
-        undefined,
-        undefined,
-        editing ? setSelectedEdgeId : undefined,
-        newNodeIdsRef.current,
-      );
-
-      const shouldUpgradeLayout = data.layout.engine !== 'elk-v2';
-      const laidOutNodes = shouldUpgradeLayout
-        ? await layoutWithElk(graph.nodes, graph.edges)
-        : graph.nodes;
-
-      setNodes(laidOutNodes);
-      setEdges(graph.edges);
+      setSnapshot(await response.json() as WorkflowSnapshot);
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
       setFetching(false);
     }
-  }, [editing, message, setEdges, setNodes]);
+  }, [message]);
 
   useEffect(() => {
     void loadWorkflow();
@@ -1542,23 +1524,50 @@ export function JourneyMap({
     });
   };
 
+  /** 画布的唯一重建入口：锁定模式画已应用版本，编辑模式优先画草稿。
+   *
+   * graphKey 决定"什么时候该重画"——来源（已应用 / 草稿）、版本、编辑模式，
+   * 再加一份内容签名，因为"恢复内置"不一定改版本号。
+   * 保存草稿不会改 key，所以画布不会重建，撤销栈、选中状态和当前视角都留得住。
+   */
+  const graphKey = (() => {
+    if (!snapshot) return 'none';
+    const useDraft = editing && usingDraft && Boolean(snapshot.draft);
+    const source = useDraft && snapshot.draft ? snapshot.draft.definition : snapshot.definition;
+    return [
+      snapshot.source,
+      String(snapshot.version),
+      editing ? 'edit' : 'lock',
+      useDraft ? 'draft' : 'active',
+      source.nodes.map((node) => node.id + ':' + String(node.routes.length)).join('|'),
+    ].join('#');
+  })();
+
   useEffect(() => {
-    if (!editing || !snapshot) return;
+    // 依赖里只放 graphKey：snapshot 对象换了但内容没换（保存草稿）时不该重画。
+    const current = snapshotRef.current;
+    if (!current) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+
+    const useDraft = editing && usingDraft && Boolean(current.draft);
+    const sourceDefinition = useDraft && current.draft
+      ? current.draft.definition
+      : current.definition;
+    const sourceLayout = useDraft && current.draft
+      ? current.draft.layout
+      : current.layout;
 
     let cancelled = false;
-    const sourceDefinition = usingDraft && snapshot.draft
-      ? snapshot.draft.definition
-      : snapshot.definition;
-    const sourceLayout = usingDraft && snapshot.draft
-      ? snapshot.draft.layout
-      : snapshot.layout;
 
     const initializeGraph = async () => {
       const graph = graphFromDefinition(
         sourceDefinition,
         sourceLayout,
-        snapshot,
-        true,
+        current,
+        editing,
         setSelectedNodeId,
         (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
@@ -1594,7 +1603,7 @@ export function JourneyMap({
     return () => {
       cancelled = true;
     };
-  }, [editing, usingDraft, snapshot?.version]);
+  }, [graphKey]);
 
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
