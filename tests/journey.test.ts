@@ -114,7 +114,7 @@ test('deterministic nodes use an unconditional fallback when no condition matche
     '## @task check',
     'completion: deterministic',
     'completeWhen: goal',
-    '- goal-path -> done if goal',
+    '- validation-path -> done if validation',
     '- fallback -> stop',
     '',
     '## @end done',
@@ -125,7 +125,7 @@ test('deterministic nodes use an unconditional fallback when no condition matche
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
 
-  const facts = { ...baseFacts, goal: '' };
+  const facts = { ...baseFacts, goal: 'modernize proxy voting' };
   const state = buildJourneyState(result.definition!, facts, initialJourneyExecution(result.definition!));
   assert.equal(state.currentNodeId, 'stop');
   assert.deepEqual(state.completedNodeIds, ['check']);
