@@ -33,7 +33,7 @@ export function targetHandleId(nodeId: string, index: number): string {
 }
 
 /** 多 Handle 时把连接点平均分布在节点上下，而不是全部挤在正中间。 */
-export function handleStyle(index: number, total: number): React.CSSProperties {
+export function handleStyle(index: number, total: number): CSSProperties {
   const top = ((index + 1) / (total + 1)) * 100;
   return { top: String(top) + '%' };
 }
