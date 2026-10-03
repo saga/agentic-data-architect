@@ -167,10 +167,14 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     if (node.objective) lines.push('objective: ' + node.objective);
     lines.push('visible: ' + String(node.visible));
     lines.push('completion: ' + node.completion);
+    lines.push('actor: ' + node.actor);
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
     if (node.tools?.length) lines.push('tools: ' + node.tools.join(', '));
     for (const route of node.routes) {
-      lines.push('- ' + route.outcome + ' -> ' + route.target);
+      lines.push(
+        '- ' + route.outcome + ' -> ' + route.target
+        + (route.condition ? ' if ' + route.condition : ''),
+      );
     }
     lines.push('');
   }
