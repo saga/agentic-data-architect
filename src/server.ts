@@ -19,6 +19,7 @@ import {
   UpdateConfigBodySchema,
   UpdateWorkflowBodySchema,
   JourneyAiRequestSchema,
+  JourneyTransitionBodySchema,
   parseRequest,
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
@@ -31,6 +32,7 @@ import {
   resetJourneyCustomization,
   saveJourneyDefinition,
   validateJourneyEdit,
+  applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
 import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
@@ -262,6 +264,7 @@ app.post('/api/sessions', async (req, res) => {
       res.status(400).json({
         error: '工作地图还不能保存，请先修正这些问题。',
         issues: validation.issues,
+        warnings: validation.warnings,
       });
       return;
     }
@@ -301,7 +304,32 @@ app.post('/api/sessions', async (req, res) => {
       body.prompt,
       body.messages ?? [],
       currentDefinition,
+      body.scope,
+      body.selectedNodeId,
     );
+    res.json(result);
+  });
+
+  /** 人工完成 waiting 节点；与 Agent transition 共用 Workflow version 检查。 */
+  app.post('/api/sessions/:name/workflow/transition', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (!context.workflow) {
+      res.status(409).json({ error: '这个调查还没有选择工作方式，无法推进 Workflow。' });
+      return;
+    }
+
+    const body = parseRequest(JourneyTransitionBodySchema, req.body);
+    const result = await applyHumanWorkflowTransition(
+      name,
+      context.workflow,
+      body.nodeId,
+      body.outcome,
+    );
+    if (!result.applied) {
+      res.status(409).json({ error: result.error || 'Workflow 没有推进。' });
+      return;
+    }
     res.json(result);
   });
 
