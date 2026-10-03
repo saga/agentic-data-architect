@@ -518,16 +518,6 @@ export function JourneyMap({
     void loadWorkflow();
   }, [loadWorkflow]);
 
-  useEffect(() => {
-    if (!editing) return;
-    setNodes(initialGraph.nodes);
-    setEdges(initialGraph.edges);
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setPast([]);
-    setFuture([]);
-  }, [initialGraph, editing, setEdges, setNodes]);
-
   const currentDefinition = useMemo(() => {
     if (!snapshot) return undefined;
     const base = editing && usingDraft && snapshot.draft
@@ -815,6 +805,36 @@ export function JourneyMap({
     setPast([]);
     setFuture([]);
   }, [editing, usingDraft, snapshot?.version, snapshot?.draft]);
+
+  useEffect(() => {
+    if (!editing || !snapshot) return;
+
+    const sourceDefinition = usingDraft && snapshot.draft
+      ? snapshot.draft.definition
+      : snapshot.definition;
+    const sourceLayout = usingDraft && snapshot.draft
+      ? snapshot.draft.layout
+      : snapshot.layout;
+
+    const graph = graphFromDefinition(
+      sourceDefinition,
+      sourceLayout,
+      snapshot,
+      true,
+      setSelectedNodeId,
+      (id) => addNodeAfter(id, false),
+      (id) => addNodeAfter(id, true),
+      deleteNode,
+      setSelectedEdgeId,
+    );
+
+    setNodes(graph.nodes);
+    setEdges(graph.edges);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+    setPast([]);
+    setFuture([]);
+  }, [editing, usingDraft, snapshot]);
 
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
@@ -1140,7 +1160,21 @@ export function JourneyMap({
                     onChange={(value) => setEdgeDraft({ ...edgeDraft, target: value })}
                   />
                 </div>
-                <Button type="primary" icon={<SaveOutlined />} onClick={applyEdgeDraft}>应用分支属性</Button>
+                <Flex gap={8}>
+                  <Button type="primary" icon={<SaveOutlined />} onClick={applyEdgeDraft}>应用分支属性</Button>
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      if (!selectedEdge) return;
+                      pushHistory();
+                      setEdges((items) => items.filter((edge) => edge.id !== selectedEdge.id));
+                      setSelectedEdgeId(undefined);
+                    }}
+                  >
+                    删除分支
+                  </Button>
+                </Flex>
               </Flex>
             ) : (
               <div className="journey-map-inspector-empty">
