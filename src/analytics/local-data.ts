@@ -137,14 +137,6 @@ function getRegistryDatabase(): DatabaseSync {
   return registryDb;
 }
 
-function fsSyncMkdir(directory: string): void {
-  const fsSync = requireNodeFsSync();
-  fsSync.mkdirSync(directory, { recursive: true });
-}
-
-function requireNodeFsSync(): typeof import('node:fs') {
-  return require('node:fs') as typeof import('node:fs');
-}
 
 function datasetRowToModel(row: DatasetRow): LocalDataset {
   return {
@@ -349,9 +341,8 @@ function escapeIdentifier(value: string): string {
 
 /** 只允许 SELECT/WITH，且严禁 Agent 绕过 Dataset Registry 直接读文件、网络或其它数据库。 */
 export function validateLocalReadOnlySql(sql: string): string {
-  const sanitized = sql
-    .replace(/--[^\n]*(?:\n|$)/g, ' ')
-    .replace(/\\*[\\s\\S]*?\\*/g, ' ')
+  const sanitized = sql.replace(/--[^\n]*(?:\n|$)/g, ' ')
+    .replace(/\*[\s\S]*?\*\//g, ' ')
     .replace(/'(?:''|[^'])*'/g, ' ')
     .trim();
 
@@ -362,14 +353,14 @@ export function validateLocalReadOnlySql(sql: string): string {
   const dangerous = /\b(insert|update|delete|merge|alter|drop|create|truncate|grant|revoke|copy|attach|detach|install|load|export|import|call|execute|pragma|set|vacuum)\b/i;
   if (
     dangerous.test(sanitized)
-    || /\\bFOR\\s+(UPDATE|SHARE)\\b/i.test(sanitized)
-    || /^\\s*SELECT\\b[\\s\\S]*\\bINTO\\s+/i.test(sanitized)
+    || /\bFOR\s+(UPDATE|SHARE)\b/i.test(sanitized)
+    || /^\s*SELECT\b[\s\S]*\bINTO\s+/i.test(sanitized)
   ) {
     throw new Error('本地分析查询包含不允许的写入、文件或扩展操作。');
   }
 
   if (
-    /\\b(read_csv_auto|read_csv|read_parquet|read_json_auto|read_json|read_text|read_blob|read_csv_objects|parquet_scan|glob|httpfs|sqlite_scan|postgres_scan)\\s*\\(/i.test(sanitized)
+    /\b(read_csv_auto|read_csv|read_parquet|read_json_auto|read_json|read_text|read_blob|read_csv_objects|parquet_scan|glob|httpfs|sqlite_scan|postgres_scan)\s*\(/i.test(sanitized)
     || /https?:\/\//i.test(sanitized)
   ) {
     throw new Error('本地分析查询必须使用已经登记的数据集，不能自己读取文件、网络或其它数据库。');
