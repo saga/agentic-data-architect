@@ -122,7 +122,7 @@ export function InvestigationConfigPage(props:{
             <label>请求头（JSON）<Input.TextArea autoSize={{minRows:3,maxRows:8}} value={JSON.stringify(server.headers??{},null,2)} onChange={e=>{try{const parsed=JSON.parse(e.target.value) as unknown;if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed)) mutateMcp(index,{headers:parsed as Record<string,string>});}catch{/* invalid JSON is corrected before save */}}}/></label>
           </Card>)}
           {!draft.agent.mcpServers.length?<Empty description='还没有添加额外的 MCP Server。Copilot 自带服务已经可以直接使用。'/>:null}
-        </div>
+        </div>}
         {tab==='workflow'&&<div className='settings-page'>
           <Title level={4}>工作方式</Title><Paragraph type='secondary'>工作方式是导航骨架，不是普通筛选项。真正改变它必须是一次明确、可追溯的动作。</Paragraph>
           <Card className='workflow-danger-zone' title='危险区域'><Alert type='warning' showIcon message='不要为了试试看而切换' description='只有真实目标或工作方法发生明确变化时才调整。'/>
