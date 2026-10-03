@@ -13,6 +13,8 @@ import {
   localProfile,
   localQuery,
   localSample,
+  localTransform,
+  localExportParquet,
   registerLocalDataset,
 } from '../analytics/local-data.js';
 
@@ -65,6 +67,26 @@ export function createLocalDataTools(sessionName: string) {
       }),
       skipPermission: true,
       handler: async ({ dataset }) => localProfile(sessionName, dataset),
+    }),
+    defineTool('local_transform', {
+      description: '在当前 Investigation 专属的 DuckDB 中生成分析表。只能由 SELECT 或 WITH 生成，目标只能是 analysis 或 scratch。',
+      parameters: z.object({
+        schema: z.enum(['analysis', 'scratch']),
+        table: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+        sql: z.string().min(1),
+        replace: z.boolean().optional(),
+      }),
+      skipPermission: true,
+      handler: async ({ schema, table, sql, replace }) =>
+        localTransform(sessionName, schema, table, sql, replace ?? true),
+    }),
+    defineTool('local_export_parquet', {
+      description: '把一条只读 DuckDB 查询导出成 Parquet。输出只能写入当前 Investigation 的 exports/ 或 parquet/ 目录。',
+      parameters: z.object({
+        sql: z.string().min(1),
+        path: z.string().min(1).regex(/^(exports|parquet)\//),
+      }),
+      handler: async ({ sql, path }) => localExportParquet(sessionName, sql, path),
     }),
     defineTool('local_query', {
       description: '在已经登记的数据集上执行一条只读 DuckDB SELECT 或 WITH 查询。结果最多返回 1000 行并保存为 Evidence。',
