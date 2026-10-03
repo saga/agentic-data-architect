@@ -120,19 +120,28 @@ export function JourneyMapInspector({
 
   const propertiesContent = (
     <div className="journey-map-inspector-section journey-map-inspector-properties">
-      <div className="journey-map-inspector-head">
-        <Flex align="center" gap={7}>
-          <SettingOutlined />
-          <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '属性'}</Text>
-          {selectedNode && nodeDraft?.type ? (
-            <Tag bordered={false}>{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
-          ) : null}
-          {selectedEdge && edgeDraft ? (
-            <Tag bordered={false}>{edgeDraft.outcome || '分支'}</Tag>
+      <div className="journey-map-inspector-context">
+        <Flex align="center" justify="space-between" gap={8}>
+          <Flex align="center" gap={7} style={{ minWidth: 0 }}>
+            <SettingOutlined />
+            <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '属性'}</Text>
+            {selectedNode && nodeDraft?.type ? (
+              <Tag bordered={false}>{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
+            ) : null}
+            {selectedEdge && edgeDraft ? (
+              <Tag bordered={false}>{edgeDraft.outcome || '分支'}</Tag>
+            ) : null}
+          </Flex>
+          {selectedNode ? (
+            <Text type="secondary" className="journey-map-inspector-id" ellipsis={{ tooltip: selectedNode.id }}>
+              {selectedNode.id}
+            </Text>
           ) : null}
         </Flex>
         <Text type="secondary" className="journey-map-inspector-desc">
-          {selectedNode || selectedEdge ? '改完点底部按钮应用到画布上。' : '在画布上点一个节点或分支。'}
+          {selectedNode || selectedEdge
+            ? '修改字段后点击底部“应用”，改动才会进入当前画布。'
+            : '在画布上点击节点或分支开始编辑。'}
         </Text>
       </div>
 
@@ -471,20 +480,21 @@ export function JourneyMapInspector({
         onChange={(key) => setActiveTab(key as 'properties' | 'ai')}
         size="middle"
         animated={false}
-        tabBarGutter={24}
+        tabBarGutter={26}
         items={[
           {
             key: 'properties',
             label: tabLabel(<SettingOutlined />, '属性', false),
-            children: propertiesContent,
           },
           {
             key: 'ai',
             label: tabLabel(<RobotOutlined />, 'AI', Boolean(pendingAiChange)),
-            children: aiContent,
           },
         ]}
       />
+      <div className="journey-map-inspector-content">
+        {activeTab === 'properties' ? propertiesContent : aiContent}
+      </div>
     </aside>
   );
 }
