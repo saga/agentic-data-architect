@@ -289,7 +289,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         status: 'future',
         completion: 'agent',
         visible: true,
-        editing: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
         targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
@@ -751,7 +750,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         status: 'future',
         completion: 'agent',
         visible: true,
-        editing: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
         targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
@@ -919,10 +917,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    * 并不完全等于固定值。ELK 如果只拿估算尺寸排版，视觉上仍可能出现“节点贴住”
    * 的情况。React Flow 官方提供 useNodesInitialized 来判断尺寸测量是否完成。
    *
-   * 依赖里放 nodes 而不是 editing：切换编辑模式的那一次渲染里，nodes 还是**上一次**
-   * 的那一批。如果这里跟着 editing 一起触发，它会拿着一批旧节点去排版，结果回来得比
-   * 重建画布还晚，把刚建好的草稿（14 个节点）盖回旧的 13 个。
-   * 放在 nodes 上就天然是"等新节点真的落到画布之后"才重排。
    */
   useEffect(() => {
     if (!nodesInitialized || !nodes.length) return;
@@ -946,8 +940,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     return () => {
       cancelled = true;
     };
-    // editing 故意不放进来：它一变就会在这一批 nodes 还是旧的时候触发，
-    // 正是上面说的那个覆盖问题。editing 只在函数体里当开关用。
   }, [nodes, nodesInitialized]);
 
   /**
