@@ -34,6 +34,8 @@ metadata:
 - 不要直接打开 analysis.duckdb。
 - 不要通过 Bash、Python 或 SQL 自己读取 workspace 外的文件、网络 URL 或其它数据库。
 - local_query 只允许使用已经登记的数据集 relation，并且只允许单条 SELECT / WITH。
+- local_transform 只能在当前 Investigation 的 analysis / scratch schema 中生成派生表，不会修改原始数据或外部数据库。
+- local_export_parquet 只能把查询结果写到当前 Investigation 的 exports/ 或 parquet/ 目录。
 - describe、sample、profile、query 的结果会自动保存为当前 Investigation 的 Evidence。
 - 数据事实和 Agent 的业务解释必须分开。
 
