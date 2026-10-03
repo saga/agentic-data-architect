@@ -173,7 +173,7 @@ npm run flow:lint
 
 ## Workflow Editor
 
-完整设计见 `docs/journey-workflow-editor.md`。核心规则：
+完整设计见 `docs/journey-workflow-editor.md`。编辑器使用 React Flow controlled flow + ELK layered layout；每条 route 使用独立 Handle，尽量减少线路交叉和重叠。核心规则：
 
 ~~~text
 内置 SKILL.md
