@@ -110,7 +110,7 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
     id: 'assessment-' + Date.now().toString(36),
     title: '架构评估结果', status: 'draft', version: 1, createdAt: timestamp, updatedAt: timestamp,
     goal: inv.goal || inv.userPrompt, scope: inv.scope,
-    currentState: { datasets: current?.coverage.datasets ?? 0, lineageCoverage: current?.coverage.datasetLineageCoverage ?? null, semanticAssets: current?.coverage.semanticAssets ?? 0, findings: findings.length, unknowns: inv.unknowns.length },
+    currentState: { datasets: current?.coverage.datasets ?? 0, lineageCoverage: current?.coverage.datasetLineageConnectionRate ?? null, semanticAssets: current?.coverage.semanticAssets ?? 0, findings: findings.length, unknowns: inv.unknowns.length },
     findings, recommendations, roadmap, evidenceIds: dedupe(findings.flatMap((finding) => finding.evidenceIds)),
   });
   plan.journey = await buildAssessmentJourneyStateFromPlan(inv, current, plan);
@@ -137,7 +137,7 @@ async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeo
     currentState: current ? { datasets: current.coverage.datasets, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
     unknowns: inv.unknowns,
     highGapKinds: buildModernizationGaps({
-      currentState,
+      currentState: current ?? undefined,
       estate: null,
       findings: inv.findings,
     }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
