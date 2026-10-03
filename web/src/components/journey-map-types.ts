@@ -109,7 +109,6 @@ export interface FlowNodeData extends Record<string, unknown> {
   completion: CompletionMode;
   completeWhen?: string;
   visible: boolean;
-  editing: boolean;
   isNew?: boolean;
   sourceHandles: HandleSpec[];
   targetHandles: HandleSpec[];
