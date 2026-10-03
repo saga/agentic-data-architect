@@ -258,10 +258,13 @@ function findConnectionIssues(
   const reachable = new Set<string>();
 
   for (const node of definition.nodes) {
-    outgoing.set(node.id, node.routes.length);
+    outgoing.set(
+      node.id,
+      node.routes.filter((route) => route.target !== node.id).length,
+    );
 
     for (const route of node.routes) {
-      if (!nodeMap.has(route.target)) {
+      if (!nodeMap.has(route.target) || route.target === node.id) {
         continue;
       }
 
@@ -353,9 +356,8 @@ export function graphFromDefinition(
 
   for (const node of definition.nodes) {
     node.routes.forEach((route, index) => {
-      // 即使目标不存在，也不创建一条无效 React Flow edge。
-      // 但它会通过 findConnectionIssues 显示在节点上。
-      if (!nodeMap.has(route.target)) return;
+      // Self-loop 不属于工作地图的可视连接，也不能占用 Handle。
+      if (!nodeMap.has(route.target) || route.target === node.id) return;
 
       const id = node.id + ':' + route.outcome + ':' + route.target + ':' + String(index);
 
