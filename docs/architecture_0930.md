@@ -20,11 +20,43 @@ V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工
 
 后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
 
+
+## 2026-10-03：本项目明确采用“个人本机 Agent”模型
+
+这里的默认部署方式是**单人、本机使用的个人生产力工具**。用户给出目标后，Copilot 应自己判断下一步要查什么、需要哪些工具、是否需要某个 Skill；用户不应该在每次 Investigation 开始前先配置一套“Agent 能力清单”。
+
+运行时边界固定为：
+
+```text
+平台固定规则
+  ↓
+本次 Investigation 的研究范围
+  ↓
+可选的“本次调查说明”
+  ↓
+Copilot 默认 Agent
+  ├─ 自带工具 / 自带 Skill / 自带 MCP
+  ├─ skills/*/SKILL.md → Agent 按任务自动发现 capability Skill
+  └─ 当前 Workflow Skill → 用户明确选择后预加载
+  ↓
+Evidence / State / Findings
+```
+
+因此：
+
+- capability Skill 是“随时可以用的能力”，不进入 `control.json`，也不提供“已启用技能”选择器。
+- Workflow Skill 是“用户选择的工作路线”。它继续由 Investigation 的 `workflow` 状态决定，并可以在当前路线下预加载。
+- “本次调查说明”是用户对本轮调查增加的补充要求。它会作为追加系统指令发送给 Copilot，但不能覆盖平台固定规则。
+- MCP 分成两类：Copilot CLI 自带 MCP 不需要用户配置；用户主动接入的额外 MCP 才进入 Investigation Control。
+- 由于这是本机单用户模型，Copilot SDK 使用 `mode: "copilot-cli"`。以后若改成多人共享服务，必须重新采用 `mode: "empty"` 和显式的工具 / MCP / Skill / workspace allowlist。
+
+这个决定也意味着：**配置页是“调整这次调查的输入”，不是“手工组装一个 Agent”**。
+
 ### Structural Analysis 控制边界
 
 ```text
 Control version
-  ├─ user-configurable Skills / MCP / Prompt
+  ├─ user-configurable investigation guidance / custom MCP
   └─ platform capability: graphify-structural-analysis
         ↓
 Graphify MCP
@@ -197,7 +229,7 @@ UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查�
 - 工作方式
 - 版本历史
 
-Skill 可以保存本次 Investigation 的运行参数。MCP 可以配置连接方式、URL / command、args、允许使用的 tools 和 headers。MCP 工具每次真正执行时的 input 仍由 Agent 根据任务决定，不作为静态配置。
+“本次调查说明”可以补充本次 Investigation 的背景、关注点和输出要求；它只是追加到平台系统指令后的用户说明。Capability Skill 由 Copilot 自动发现，不再保存到本次 Investigation 的 Control。MCP 只配置用户主动添加的额外服务；Copilot 自带 MCP 不需要在这里重复配置。
 
 工作方式属于危险操作：目标路线可以选择，但只有明确输入确认语句后才真正切换。
 
@@ -1915,20 +1947,22 @@ Skill 统一用 SKILL.md 打包，但运行语义只保留两类：
 
 ```text
 capability
-  一个明确能力，Agent 自己决定什么时候调用、怎么和其它能力组合。
+  一个明确能力，提供给 Agent 在相关任务中随时使用。
+  Copilot 根据 prompt 和 Skill description 自动判断是否需要加载。
   例如：search-confluence、search-github、financial-data-review。
 
 workflow
   一条有明确阶段、顺序、Gate 和完成条件的工作路线。
+  用户明确选择工作方式后，由当前 Investigation 预加载。
   例如：legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
 ```
 
-类型写在 frontmatter 的 metadata.kind。复杂程度不是分类标准；只有需要 Journey 约束阶段、顺序和完成条件时，才使用 workflow。
+类型写在 frontmatter 的 metadata.kind。只有需要 Journey 约束阶段、顺序和完成条件时，才使用 workflow。
 
-- src/skills/catalog.ts：统一解析并用 Zod 校验 Skill manifest。
-- src/workflow/journey.ts：只允许 kind: workflow 的 Skill 进入 Journey。
-- src/workflow/lint.ts：所有 Skill 都必须有合法 kind，capability 不得定义 @flow。
-- Copilot SDK：二者仍按普通 Skill 目录加载，不再额外做一套 Skill runtime。
+- `src/skills/catalog.ts`：统一解析并用 Zod 校验 Skill manifest。
+- `src/workflow/journey.ts`：只允许 kind: workflow 的 Skill 进入 Journey。
+- `src/workflow/lint.ts`：所有 Skill 都必须有合法 kind，capability 不得定义 @flow。
+- Copilot SDK：通过 `skillDirectories` 暴露 Skill 目录；capability 不由本项目手工做一层启用名单。
 
 # 二十九、Agent 与 Skill 的边界
 
@@ -1968,7 +2002,7 @@ architecture decisions
 
 ## Skill
 
-Skill 是平级、可复用、可按 Investigation 配置启用的能力模块：
+Skill 是平级、可复用的能力模块；capability 不按 Investigation 手工启用：
 
 ```text
 skills/
@@ -1982,7 +2016,7 @@ skills/
 
 每个 Skill 通过 `SKILL.md` 描述能力；需要确定性计算时，可以带 `scripts/`。
 
-一次 Investigation 的 `control.json` 固定本轮可用 Skill。没有选择的 Skill 在 Copilot session 中显式禁用。
+一次 Investigation 的 `control.json` 不保存 capability Skill 清单。Copilot 会看到技能目录及其描述，并在任务相关时加载对应 SKILL.md；只有当前 Workflow 作为用户明确选择的工作方式被预加载。
 
 ## 为什么现在不使用 Custom Agent
 
@@ -2065,7 +2099,7 @@ Investigation state / Evidence
    ↓
 Copilot default agent
    ↓
-Selected Skills + MCP
+Auto-discovered Skills + MCP
    ↓
 Structured result
    ↓
