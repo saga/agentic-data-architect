@@ -164,15 +164,8 @@ const prompt = buildQuestionPrompt({
     // UI changes apply only to the next turn.
     // 到这里才进入概率性的模型执行阶段；前面的状态和配置已经全部确定。
   // Workflow is a work mode, not a user-configurable capability. In the selected mode load only that workflow Skill; in autonomous mode load none.
-  const selectedSkills = [...new Set([
-    ...control.agent.skills.map((item) => item.name),
-    ...(inv.workflow ? [inv.workflow] : []),
-  ])];
-  const skillParameters = control.agent.skills
-    .filter((item) => Object.keys(item.parameters ?? {}).length > 0)
-    .map((item) => `- ${item.name}: ${JSON.stringify(item.parameters)}`)
-    .join('\n');
-
+  // Capability Skills remain discoverable to Copilot; only the selected Workflow is eagerly preloaded.
+  const eagerSkills = inv.workflow ? [inv.workflow] : [];
   const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
   await appendAuditEvent(investigationName, {
     actor: 'system',
@@ -208,7 +201,6 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
     prompt,
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
-      skillParameters ? '本次已配置的技能运行参数（只在对应 Skill 明确使用时生效）：\n' + skillParameters : '',
       inv.workflow
         ? '当前工作方式：' + inv.workflow + '。把其中的 Markdown Workflow 当作参考地图，不是强制顺序。用户可以跳过阶段、改查别的问题或改变方向；当新证据或用户动作改变最有价值的路线时重新规划。'
         : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
@@ -226,7 +218,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
       inv.copilotConfigurationVersion = control.version;
     },
     workingDirectory: workspaceRoot(inv.name),
-    skills: selectedSkills,
+    eagerSkills,
     platformCapabilities: control.agent.platformCapabilities,
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
