@@ -173,14 +173,14 @@ Workflow 现在不是只读的路线图。打开“编辑工作地图”后，�
 编辑采用：
 
 ~~~text
-编辑
-  → 保存草稿
+当前画布
   → 服务端验证
-  → 应用修改
-  → 新 Workflow version
+  → 保存为新的 Workflow version
   → 尽量保留当前执行位置
   → Agent 下一轮按修改后的 Workflow 执行
 ~~~
+
+编辑阶段不会单独持久化 draft 文件；只有点击“保存”后，当前 Definition、画布布局和执行状态才会写入 Investigation 的 workflow/ 目录。
 
 内置 Skill 的 SKILL.md 不会被直接改写。自定义 Workflow 保存在当前 Investigation 的 workflow/ 目录，并把 Markdown DSL、画布布局和执行状态分开保存。
 
