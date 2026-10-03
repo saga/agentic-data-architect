@@ -44,13 +44,13 @@ Estate 现在已经支持 system/application、data store、dataset、column、j
 
 ## Coverage
 
-至少记录 files scanned、SQL files、parsed statements、parse failures、datasets、已连上线的数据集、column lineage、semantic assets 和 profiled datasets。`datasetLineageConnectionRate` 只是“已连上线的数据集 / 数据集总数”，用于描述发现范围，不表示数据真相已经确认。
+至少记录 files scanned、SQL files、parsed statements、parse failures、datasets、已连上线的数据集、column lineage、semantic assets 和 profiled datasets。`datasetLineageConnectionRate` 只是“已连上线的数据集 / 数据集总数”，用于描述发现范围；缺少连接会产生提醒，但不会仅凭这个比例把调查判定为关键阻塞。
 
 Coverage 是确定性事实，不是模型自己给出的置信度。
 
 ## Source-of-Truth Candidates
 
-当多个物理 dataset 归到同一个命名键、确实存在选择问题时，系统才根据名称、上下游结构、metadata、semantic context 和 evidence 给出 Source-of-Truth candidate。候选上的 `priorityScore` 只是调查顺序 heuristic，不是 source-of-truth 置信度；它不会单独推动 Workflow Gate。
+当多个物理 dataset 归到同一个命名键、确实存在选择问题时，系统才根据名称、上下游结构、metadata、semantic context 和 evidence 给出 Source-of-Truth candidate。候选上的 `priorityScore` 只是调查顺序 heuristic，不是 source-of-truth 置信度；没有形成歧义时不生成 candidate，也不会单独推动 Workflow Gate。
 
 candidate != confirmed source of truth。业务权威仍由用户确认；只有确认后的业务/架构结论才进入正式工作产物。
 
