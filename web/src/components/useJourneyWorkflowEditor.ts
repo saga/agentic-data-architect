@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { App as AntApp, Modal } from 'antd';
 import {
   addEdge,
@@ -67,10 +67,10 @@ interface JourneyWorkflowEditorResult {
   applyNodeDraft: () => Promise<void>;
   applyEdgeDraft: () => Promise<void>;
   connectSelectedNode: () => Promise<void>;
-  setNodeDraft: React.Dispatch<React.SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
-  setEdgeDraft: React.Dispatch<React.SetStateAction<{ outcome: string; target: string } | undefined>>;
-  setConnectTargetId: React.Dispatch<React.SetStateAction<string | undefined>>;
-  setConnectOutcome: React.Dispatch<React.SetStateAction<string>>;
+  setNodeDraft: Dispatch<SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
+  setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string } | undefined>>;
+  setConnectTargetId: Dispatch<SetStateAction<string | undefined>>;
+  setConnectOutcome: Dispatch<SetStateAction<string>>;
   handleNodesChange: (changes: Parameters<ReturnType<typeof useNodesState<FlowNode>>[2]>[0]) => void;
   handleEdgesChange: (changes: Parameters<ReturnType<typeof useEdgesState<FlowEdge>>[2]>[0]) => void;
   onConnect: (connection: Connection) => Promise<void>;
@@ -79,10 +79,11 @@ interface JourneyWorkflowEditorResult {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  flowInstanceRef: React.MutableRefObject<ReactFlowInstance<FlowNode, FlowEdge> | null>;
+  flowInstanceRef: MutableRefObject<ReactFlowInstance<FlowNode, FlowEdge> | null>;
   onNodeClick: (id: string) => void;
   onEdgeClick: (id: string) => void;
   clearSelection: () => void;
+  deleteSelectedEdge: () => void;
 }
 
 export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
@@ -1076,6 +1077,17 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     onEdgeClick: (id) => setSelectedEdgeId(id),
     clearSelection: () => {
       setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
+    },
+    deleteSelectedEdge: () => {
+      const edgeId = selectedEdgeId;
+      if (!edgeId) return;
+
+      pushHistory();
+      void rebuildStructuralGraph(
+        nodesRef.current,
+        edgesRef.current.filter((edge) => edge.id !== edgeId),
+      );
       setSelectedEdgeId(undefined);
     },
   };
