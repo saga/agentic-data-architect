@@ -7,11 +7,13 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import * as z from 'zod';
 import { config } from '../config.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { parseSkillManifest } from '../skills/catalog.js';
 
 export type JourneyNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
+export type JourneyCompletionMode = 'deterministic' | 'agent';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 
 export interface JourneyRoute {
@@ -26,7 +28,10 @@ export interface JourneyNode {
   title: string;
   objective?: string;
   visible: boolean;
+  /** deterministic 有明确 completeWhen；agent 由 Agent 选择 outcome。 */
+  completion: JourneyCompletionMode;
   completeWhen?: string;
+  tools?: string[];
   routes: JourneyRoute[];
   line: number;
 }
@@ -71,12 +76,21 @@ export interface JourneyStage {
   unlocked: boolean;
 }
 
+export interface JourneyExecution {
+  workflowId: string;
+  workflowVersion: number;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  status: 'active' | 'completed' | 'stopped';
+}
+
 export interface JourneyState {
   workflowId: string;
   currentNodeId: string;
   completedNodeIds: string[];
   unlockedNodeIds: string[];
   stages: JourneyStage[];
+  execution: JourneyExecution;
 }
 
 /**
@@ -111,7 +125,15 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       title: current.attrs.title || current.title,
       objective: current.attrs.objective,
       visible: current.attrs.visible !== 'false',
+      completion: current.attrs.completion === 'agent' || current.attrs.completion === 'deterministic'
+        ? current.attrs.completion
+        : current.attrs.completeWhen
+          ? 'deterministic'
+          : 'agent',
       completeWhen: current.attrs.completeWhen,
+      tools: current.attrs.tools
+        ? current.attrs.tools.split(',').map((item) => item.trim()).filter(Boolean)
+        : undefined,
       routes: current.routes,
       line: current.line,
     });
@@ -203,19 +225,18 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     }
   }
 
-  if (flowId && issues.length === 0 && startTarget) {
-    return {
-      definition: {
-        id: flowId,
-        start: startTarget,
-        nodes: nodes.filter((node) => node.id !== 'start'),
-      },
-      issues,
-    };
-  }
+  if (!flowId || !startTarget) return { issues };
 
-  return { issues };
-}
+  const definition: JourneyDefinition = {
+    id: flowId,
+    start: startTarget,
+    nodes: nodes.filter((node) => node.id !== 'start'),
+  };
+  issues.push(...validateJourneyDefinition(definition));
+  return {
+    definition,
+    issues: [...new Set(issues)],
+  };
 
 /** 根据 Session workflow 加载对应的 Markdown 路线。 */
 export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<JourneyDefinition> {
@@ -302,50 +323,315 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
   }
 }
 
+
+/** 当前版本已支持的 deterministic completion 条件。 */
+export const KNOWN_COMPLETION_CONDITIONS = [
+  'goal',
+  'current-state',
+  'data-truth',
+  'investigation',
+  'current-state-ready',
+  'target',
+  'mapping',
+  'validation',
+  'cutover',
+  'assessment-current-state',
+  'assessment-findings',
+  'assessment-recommendation',
+  'assessment-roadmap',
+] as const;
+
+function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
+  switch (condition) {
+    case 'goal':
+      return Boolean(facts.goal.trim());
+    case 'current-state':
+      return Boolean(facts.currentState);
+    case 'data-truth':
+      return Boolean(
+        facts.currentState
+        && facts.currentState.datasets > 0
+        && facts.currentState.parseFailures === 0
+        && (facts.currentState.lineageCoverage ?? 0) >= 0.8
+        && (facts.currentState.semanticAssets > 0 || !facts.highGapKinds.includes('semantic')),
+      );
+    case 'investigation':
+      return Boolean(
+        facts.currentState
+        && facts.unknowns.length <= 3
+        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
+      );
+    case 'current-state-ready':
+      return Boolean(
+        facts.currentState
+        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
+      );
+    case 'target':
+      return facts.targetComponentCount > 0;
+    case 'mapping':
+      return facts.mappingCount > 0;
+    case 'validation':
+      return facts.blockingValidationTotal > 0
+        && facts.blockingValidationReady >= facts.blockingValidationTotal;
+    case 'cutover':
+      return conditionPassed('validation', facts);
+    case 'assessment-current-state':
+      return Boolean(facts.currentState);
+    case 'assessment-findings':
+      return (facts.findingCount ?? 0) > 0 || Boolean(facts.currentState);
+    case 'assessment-recommendation':
+      return (facts.recommendationCount ?? 0) > 0;
+    case 'assessment-roadmap':
+      return (facts.roadmapItemCount ?? 0) > 0;
+    default:
+      return false;
+  }
+}
+
+/** 校验 Workflow 图；允许 retry/rollback 环，但所有节点必须最终可到达终点。 */
+export function validateJourneyDefinition(definition: JourneyDefinition): string[] {
+  const issues: string[] = [];
+  const nodeMap = new Map<string, JourneyNode>();
+
+  if (!/^[A-Za-z0-9._:-]+$/.test(definition.id)) {
+    issues.push('Workflow id 只能包含字母、数字、.、_、:、-。');
+  }
+  if (!/^[A-Za-z0-9._:-]+$/.test(definition.start)) {
+    issues.push('Workflow start 节点 ID 不合法：' + definition.start);
+  }
+
+  for (const node of definition.nodes) {
+    if (nodeMap.has(node.id)) issues.push('重复的 workflow node：' + node.id);
+    nodeMap.set(node.id, node);
+
+    if (node.completion === 'deterministic' && !node.completeWhen && node.type !== 'end' && node.type !== 'stop') {
+      issues.push(node.id + ' 使用 deterministic completion，但没有 completeWhen。');
+    }
+    if (node.completeWhen && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(node.completeWhen)) {
+      issues.push(node.id + ' 使用了未知 completeWhen：' + node.completeWhen);
+    }
+    if ((node.type === 'end' || node.type === 'stop') && node.completeWhen) {
+      issues.push(node.id + ' 是终点节点，不需要 completeWhen。');
+    }
+  }
+
+  if (!nodeMap.has(definition.start)) {
+    issues.push('start 指向不存在的节点：' + definition.start);
+  }
+
+  const outgoing = new Map<string, JourneyRoute[]>();
+  const incoming = new Map<string, string[]>();
+  for (const node of definition.nodes) {
+    const outcomes = new Set<string>();
+    for (const route of node.routes) {
+      if (!nodeMap.has(route.target)) {
+        issues.push(node.id + ' 第 ' + route.line + ' 行指向不存在的节点：' + route.target);
+      }
+      const normalizedOutcome = route.outcome.toLowerCase();
+      if (outcomes.has(normalizedOutcome)) {
+        issues.push(node.id + ' 重复使用 outcome：' + route.outcome);
+      }
+      outcomes.add(normalizedOutcome);
+      outgoing.set(node.id, [...(outgoing.get(node.id) ?? []), route]);
+      incoming.set(route.target, [...(incoming.get(route.target) ?? []), node.id]);
+    }
+
+    if (node.type === 'end' || node.type === 'stop') {
+      if (node.routes.length) issues.push(node.id + ' 是终点节点，不能继续连出分支。');
+    } else if (!node.routes.length) {
+      issues.push(node.id + ' 没有任何出口。请至少连接一个 outcome。');
+    }
+  }
+
+  const reachable = new Set<string>();
+  if (nodeMap.has(definition.start)) {
+    const queue = [definition.start];
+    while (queue.length) {
+      const current = queue.shift() as string;
+      if (reachable.has(current)) continue;
+      reachable.add(current);
+      for (const route of outgoing.get(current) ?? []) {
+        if (nodeMap.has(route.target)) queue.push(route.target);
+      }
+    }
+  }
+  for (const node of definition.nodes) {
+    if (!reachable.has(node.id)) issues.push('从 start 无法到达节点：' + node.id);
+  }
+
+  const terminals = definition.nodes
+    .filter((node) => node.type === 'end' || node.type === 'stop')
+    .map((node) => node.id);
+  if (!terminals.length) issues.push('Workflow 至少需要一个 @end 或 @stop 终点。');
+
+  const canReachTerminal = new Set(terminals);
+  const reverseQueue = [...terminals];
+  while (reverseQueue.length) {
+    const current = reverseQueue.shift() as string;
+    for (const source of incoming.get(current) ?? []) {
+      if (canReachTerminal.has(source)) continue;
+      canReachTerminal.add(source);
+      reverseQueue.push(source);
+    }
+  }
+  for (const node of definition.nodes) {
+    if (!canReachTerminal.has(node.id)) {
+      issues.push('节点无法沿任何路径到达 @end / @stop：' + node.id);
+    }
+  }
+
+  return [...new Set(issues)];
+}
+
+/** 为 Workflow 版本建立执行状态。 */
+export function initialJourneyExecution(
+  definition: JourneyDefinition,
+  workflowVersion = 0,
+): JourneyExecution {
+  return {
+    workflowId: definition.id,
+    workflowVersion,
+    currentNodeId: definition.start,
+    completedNodeIds: [],
+    status: 'active',
+  };
+}
+
+/** 从当前节点选择 outcome；不存在的 outcome 永远不能推进状态机。 */
+export function applyJourneyTransition(
+  definition: JourneyDefinition,
+  execution: JourneyExecution,
+  nodeId: string,
+  outcome: string,
+): JourneyExecution {
+  if (execution.currentNodeId !== nodeId) {
+    throw new Error(
+      'Workflow 当前节点是 ' + execution.currentNodeId + '，不能从 ' + nodeId + ' 推进。',
+    );
+  }
+
+  const node = definition.nodes.find((item) => item.id === nodeId);
+  if (!node) throw new Error('Workflow 当前节点不存在：' + nodeId);
+
+  const route = node.routes.find(
+    (item) => item.outcome.toLowerCase() === outcome.toLowerCase(),
+  );
+  if (!route) {
+    throw new Error(
+      'Workflow 节点 ' + nodeId + ' 没有 outcome=' + outcome + ' 的出口。',
+    );
+  }
+
+  const target = definition.nodes.find((item) => item.id === route.target);
+  if (!target) throw new Error('Workflow target 不存在：' + route.target);
+
+  const completed = new Set(execution.completedNodeIds);
+  if (target.id !== nodeId) completed.add(nodeId);
+
+  return {
+    ...execution,
+    currentNodeId: target.id,
+    completedNodeIds: [...completed],
+    status: target.type === 'end'
+      ? 'completed'
+      : target.type === 'stop'
+        ? 'stopped'
+        : 'active',
+  };
+}
+
+function advanceDeterministicJourney(
+  definition: JourneyDefinition,
+  execution: JourneyExecution,
+  facts: JourneyFacts,
+): JourneyExecution {
+  const completed = new Set(execution.completedNodeIds);
+  let currentNodeId = execution.currentNodeId;
+  let status = execution.status;
+
+  for (let guard = 0; guard < definition.nodes.length + 1; guard += 1) {
+    const node = definition.nodes.find((item) => item.id === currentNodeId);
+    if (!node) break;
+    if (node.type === 'end') {
+      status = 'completed';
+      break;
+    }
+    if (node.type === 'stop') {
+      status = 'stopped';
+      break;
+    }
+    if (node.completion !== 'deterministic' || !conditionPassed(node.completeWhen, facts)) break;
+
+    completed.add(node.id);
+    const route = node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome))
+      ?? (node.routes.length === 1 ? node.routes[0] : undefined);
+    if (!route || route.target === node.id) break;
+    currentNodeId = route.target;
+  }
+
+  return {
+    ...execution,
+    currentNodeId,
+    completedNodeIds: [...completed],
+    status,
+  };
+}
+
+function reachableFromCurrent(
+  start: string,
+  definition: JourneyDefinition,
+): Set<string> {
+  const seen = new Set<string>();
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift() as string;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const node = definition.nodes.find((item) => item.id === current);
+    for (const route of node?.routes ?? []) queue.push(route.target);
+  }
+  return seen;
+}
+
 /**
- * 根据确定性状态计算当前关卡。
- *
- * Agent 可以建议下一步，但不能靠“我已经完成了”推进地图。
- * 只有 Investigation / discovery / modernization artifacts 真正变化，路线才推进。
+ * 根据真实图关系计算 JourneyState。
+ * execution 存在时优先使用它；deterministic 节点再根据 facts 自动推进。
  */
 export function buildJourneyState(
   definition: JourneyDefinition,
   facts: JourneyFacts,
+  execution?: JourneyExecution,
 ): JourneyState {
+  const baseExecution = execution && execution.workflowId === definition.id
+    ? execution
+    : initialJourneyExecution(definition);
+
+  const advanced = advanceDeterministicJourney(definition, baseExecution, facts);
+  const completed = new Set(advanced.completedNodeIds);
   const visibleNodes = definition.nodes.filter(
     (node) => node.visible && node.type !== 'stop',
   );
 
-  const completedNodeIds = visibleNodes
-    .filter((node) => conditionPassed(node.completeWhen, facts))
-    .map((node) => node.id);
+  let displayCurrentId = advanced.currentNodeId;
+  if (!visibleNodes.some((node) => node.id === displayCurrentId)) {
+    const reachable = reachableFromCurrent(advanced.currentNodeId, definition);
+    displayCurrentId = visibleNodes.find((node) => reachable.has(node.id))?.id
+      ?? [...visibleNodes].reverse().find((node) => completed.has(node.id))?.id
+      ?? visibleNodes.at(-1)?.id
+      ?? advanced.currentNodeId;
+  }
 
-  const currentIndex = visibleNodes.findIndex(
-    (node) => !completedNodeIds.includes(node.id),
-  );
-
-  const currentNodeId = currentIndex >= 0
-    ? visibleNodes[currentIndex].id
-    : visibleNodes.at(-1)?.id ?? definition.start;
-
-  const unlockedNodeIds = visibleNodes
-    .slice(
-      0,
-      Math.max(
-        currentIndex + 2,
-        completedNodeIds.length === visibleNodes.length ? visibleNodes.length : 1,
-      ),
-    )
-    .map((node) => node.id);
-
-  const stages = visibleNodes.map((node, index) => {
-    const completed = completedNodeIds.includes(node.id);
-    const current = node.id === currentNodeId;
-    let status: JourneyStatus = 'locked';
-
-    if (completed) status = 'completed';
-    else if (current) status = 'current';
-    else if (index <= currentIndex + 1) status = 'future';
+  const reachable = reachableFromCurrent(advanced.currentNodeId, definition);
+  const stages = visibleNodes.map((node) => {
+    const done = completed.has(node.id);
+    const current = node.id === displayCurrentId && !done;
+    const status: JourneyStatus = done
+      ? 'completed'
+      : current
+        ? 'current'
+        : reachable.has(node.id)
+          ? 'future'
+          : 'locked';
 
     return {
       id: node.id,
@@ -359,9 +645,54 @@ export function buildJourneyState(
 
   return {
     workflowId: definition.id,
-    currentNodeId,
-    completedNodeIds,
-    unlockedNodeIds,
+    currentNodeId: advanced.currentNodeId,
+    completedNodeIds: [...completed],
+    unlockedNodeIds: [...new Set([...completed, ...reachable])],
     stages,
+    execution: advanced,
   };
 }
+
+/** 给 Agent 的当前节点和合法出口摘要。 */
+export function describeJourneyCurrentNode(
+  definition: JourneyDefinition,
+  execution: JourneyExecution,
+) {
+  const node = definition.nodes.find((item) => item.id === execution.currentNodeId);
+  if (!node) throw new Error('Workflow 当前节点不存在：' + execution.currentNodeId);
+
+  return {
+    nodeId: node.id,
+    type: node.type,
+    title: node.title,
+    objective: node.objective || node.title,
+    completion: node.completion,
+    ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
+    outcomes: node.routes.map((route) => ({
+      outcome: route.outcome,
+      target: route.target,
+    })),
+  };
+}
+
+/** 编辑器和运行时共用的结构 schema。 */
+export const JourneyDefinitionSchema = z.object({
+  id: z.string().min(1),
+  start: z.string().min(1),
+  nodes: z.array(z.object({
+    id: z.string().min(1),
+    type: z.enum(['task', 'gate', 'review', 'end', 'stop']),
+    title: z.string().min(1),
+    objective: z.string().optional(),
+    visible: z.boolean(),
+    completion: z.enum(['deterministic', 'agent']),
+    completeWhen: z.string().optional(),
+    tools: z.array(z.string()).optional(),
+    routes: z.array(z.object({
+      outcome: z.string().min(1),
+      target: z.string().min(1),
+      line: z.number().int().positive().optional(),
+    })),
+    line: z.number().int().positive().optional(),
+  }).strict()).min(1),
+}).strict();
