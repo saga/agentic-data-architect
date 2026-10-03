@@ -517,7 +517,7 @@ POST /api/sessions/:name/workflow/reset
 - /workflow/ai：工作地图专用多轮 AI；请求可带最近 12 条对话和当前未保存 Definition。
 - /workflow/transition：人工推进当前 waiting 节点；服务端检查节点、outcome、Workflow version 和执行状态。
 - /workflow/reset：恢复内置 Skill。
-- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要；这是唯一仍放在 `src/server-main.ts` 的 Workflow 路由。
+- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要。
 ## 12. 与现有代码的边界
 
 ### src/workflow/journey.ts
@@ -575,13 +575,15 @@ POST /workflow/reset
 
 ### src/server-main.ts
 
-只保留：
+只负责：
 
 ~~~text
-GET /workflow/instruction
+Vite middleware
+HTTP server lifecycle
+process shutdown / resource cleanup
 ~~~
 
-它只是把当前 Workflow 控制摘要接到普通 Agent 请求链路；工作地图编辑 API 不在这里维护，避免出现两套 Workflow API。
+所有业务 API（包括 `/journey` 和 `/workflow/*`）都由 `src/server.ts` 注册，避免入口文件和业务 API 各维护一套路由。
 
 ## 13. 后续可以做，但当前不要做
 
