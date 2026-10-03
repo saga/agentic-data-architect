@@ -32,6 +32,18 @@ test('journey map AI request accepts bounded multi-turn history', () => {
       { role: 'user', content: '先保留当前路线。' },
       { role: 'assistant', content: '好的，保持现有结构。' },
     ],
+    definition: {
+      id: 'demo',
+      start: 'intake',
+      nodes: [{
+        id: 'intake',
+        type: 'task',
+        title: '明确目标',
+        visible: true,
+        completion: 'agent',
+        routes: [{ outcome: 'success', target: 'done' }],
+      }],
+    },
   });
   assert.equal(parsed.messages?.length, 2);
   assert.throws(() => JourneyAiRequestSchema.parse({
