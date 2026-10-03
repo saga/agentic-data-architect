@@ -72,6 +72,7 @@ function registerJourneyRoutes(app: express.Express): void {
         res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
         return;
       }
+
       const body = parseRequest(JourneyEditBodySchema, req.body);
       res.json(validateJourneyEdit(body.definition, body.layout));
     } catch (error) {
