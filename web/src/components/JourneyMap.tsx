@@ -166,7 +166,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
               {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
             </Flex>
             <Text type="secondary">
-              直接拖动节点和连线；也可以告诉 AI 怎么改，检查后点击保存。
+              直接拖动节点和连线；右侧属性面板提供连续的 Workflow AI 对话，检查后点击保存。
             </Text>
           </div>
         </div>
