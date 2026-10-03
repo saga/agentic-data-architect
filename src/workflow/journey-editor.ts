@@ -214,10 +214,12 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
   return lines.join('\n').trimEnd() + '\n';
 }
 
+type JourneyExecutionInput = Omit<JourneyExecution, 'runId'> & { runId?: string };
+
 function normalizeExecution(
   definition: JourneyDefinition,
   version: number,
-  execution: JourneyExecution | null,
+  execution: JourneyExecutionInput | null,
 ): JourneyExecution {
   if (
     !execution
@@ -466,8 +468,7 @@ export async function saveJourneyDefinition(
       : definition.start;
     const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
     const preservedTargetNode = definition.nodes.find((node) => node.id === preservedCurrent);
-    const migratedExecution: JourneyExecution = {
-      ...oldExecution,
+    const migratedExecutionBase: JourneyExecution = {
       workflowId: definition.id,
       workflowVersion: nextVersion,
       runId: definition.id + '-v' + String(nextVersion),
@@ -480,17 +481,18 @@ export async function saveJourneyDefinition(
           : preservedTargetNode?.actor === 'human'
             ? 'waiting'
             : 'active',
-      ...(preservedTargetNode?.actor === 'human'
-        ? {
-            pendingInteraction: {
-              id: 'pending-' + definition.id + '-' + String(nextVersion),
-              nodeId: preservedTargetNode.id,
-              reason: '等待人工完成“' + preservedTargetNode.title + '”。',
-              requestedAt: new Date().toISOString(),
-            },
-          }
-        : { pendingInteraction: undefined }),
     };
+    const migratedExecution: JourneyExecution = preservedTargetNode?.actor === 'human'
+      ? {
+          ...migratedExecutionBase,
+          pendingInteraction: {
+            id: 'pending-' + definition.id + '-' + String(nextVersion),
+            nodeId: preservedTargetNode.id,
+            reason: '等待人工完成“' + preservedTargetNode.title + '”。',
+            requestedAt: new Date().toISOString(),
+          },
+        }
+      : migratedExecutionBase;
 
     await fs.mkdir(journeyDir(name), { recursive: true });
     await fs.writeFile(
