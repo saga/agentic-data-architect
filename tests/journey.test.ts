@@ -310,6 +310,50 @@ test('loads the architecture assessment markdown workflow', async () => {
 });
 
 
+test('current-state gate requires an actual discovered dataset', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> current',
+    '',
+    '## @task current',
+    'completion: deterministic',
+    'completeWhen: current-state',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+
+  const empty = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 0,
+        semanticAssets: 0,
+        parseFailures: 0,
+      },
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(empty.currentNodeId, 'current');
+
+  const discovered = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 1,
+        semanticAssets: 0,
+        parseFailures: 0,
+      },
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(discovered.currentNodeId, 'done');
+});
+
 test('data-truth does not use an arbitrary lineage percentage', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
