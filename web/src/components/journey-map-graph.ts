@@ -205,6 +205,8 @@ export function definitionFromGraph(
   const routeBySource = new Map<string, JourneyRouteDefinitionLike[]>();
 
   for (const edge of edges) {
+    if (edge.source === edge.target) continue;
+
     const routes = routeBySource.get(edge.source) ?? [];
 
     routes.push({
@@ -470,7 +472,9 @@ export function graphFromDefinition(
   const edges: FlowEdge[] = [];
 
   for (const node of definition.nodes) {
-    const validRoutes = node.routes.filter((route) => nodeMap.has(route.target));
+    const validRoutes = node.routes.filter(
+      (route) => nodeMap.has(route.target) && route.target !== node.id,
+    );
 
     validRoutes.forEach((route, routeIndex) => {
       const edgeId =
