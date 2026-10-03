@@ -8,19 +8,19 @@ describe('Current-State Intelligence', () => {
     const estate = emptyEstate();
 
     estate.nodes.push(
-      { id: nodeId('dataset', 'prod.ibor_position'), type: 'dataset', name: 'prod.ibor_position', attributes: { adapter: 'snowflake' } },
-      { id: nodeId('dataset', 'prod.position_snapshot'), type: 'dataset', name: 'prod.position_snapshot', attributes: { adapter: 'snowflake' } },
-      { id: nodeId('column', 'prod.ibor_position.security_id'), type: 'column', name: 'prod.ibor_position.security_id', attributes: {} },
-      { id: nodeId('column', 'prod.ibor_position.position_qty'), type: 'column', name: 'prod.ibor_position.position_qty', attributes: {} },
-      { id: nodeId('column', 'prod.ibor_position.as_of_date'), type: 'column', name: 'prod.ibor_position.as_of_date', attributes: {} },
+      { id: nodeId('dataset', 'stg_position'), type: 'dataset', name: 'stg_position', attributes: { adapter: 'snowflake' } },
+      { id: nodeId('dataset', 'raw_position'), type: 'dataset', name: 'raw_position', attributes: { adapter: 'snowflake' } },
+      { id: nodeId('column', 'stg_position.security_id'), type: 'column', name: 'stg_position.security_id', attributes: {} },
+      { id: nodeId('column', 'stg_position.position_qty'), type: 'column', name: 'stg_position.position_qty', attributes: {} },
+      { id: nodeId('column', 'stg_position.as_of_date'), type: 'column', name: 'stg_position.as_of_date', attributes: {} },
     );
 
     const lineage = {
       edges: [
-        { source: 'prod.ibor_position', target: 'prod.portfolio_position', viaFile: 'a.sql', evidenceId: 'ev-1' },
-        { source: 'prod.position_snapshot', target: 'prod.report', viaFile: 'b.sql', evidenceId: 'ev-2' },
+        { source: 'stg_position', target: 'prod.portfolio_position', viaFile: 'a.sql', evidenceId: 'ev-1' },
+        { source: 'raw_position', target: 'prod.report', viaFile: 'b.sql', evidenceId: 'ev-2' },
       ],
-      tables: ['prod.ibor_position', 'prod.portfolio_position', 'prod.position_snapshot', 'prod.report'],
+      tables: ['stg_position', 'prod.portfolio_position', 'raw_position', 'prod.report'],
       columns: [],
       statements: [],
       parseFailures: [],
@@ -46,7 +46,7 @@ describe('Current-State Intelligence', () => {
 
     assert.equal(result.coverage.sqlParseFailures, 0);
     assert.equal(result.coverage.datasetLineageConnectionRate, 1);
-    assert.ok(result.sourceOfTruthCandidates.some((item) => item.key === 'ibor_position'));
+    assert.ok(result.sourceOfTruthCandidates.some((item) => item.key === 'position'));
     assert.ok(result.semanticCandidates.some((item) => item.key === 'position' && item.semanticAssets.includes('sv:position')));
   });
 });
