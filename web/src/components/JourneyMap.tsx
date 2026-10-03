@@ -781,33 +781,6 @@ export function JourneyMap({
 
   useEffect(() => {
     if (!editing || !snapshot) return;
-    const sourceDefinition = usingDraft && snapshot.draft
-      ? snapshot.draft.definition
-      : snapshot.definition;
-    const sourceLayout = usingDraft && snapshot.draft
-      ? snapshot.draft.layout
-      : snapshot.layout;
-    const graph = graphFromDefinition(
-      sourceDefinition,
-      sourceLayout,
-      snapshot,
-      true,
-      setSelectedNodeId,
-      (id) => addNodeAfter(id, false),
-      (id) => addNodeAfter(id, true),
-      deleteNode,
-      setSelectedEdgeId,
-    );
-    setNodes(graph.nodes);
-    setEdges(graph.edges);
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setPast([]);
-    setFuture([]);
-  }, [editing, usingDraft, snapshot?.version, snapshot?.draft]);
-
-  useEffect(() => {
-    if (!editing || !snapshot) return;
 
     const sourceDefinition = usingDraft && snapshot.draft
       ? snapshot.draft.definition
