@@ -169,6 +169,7 @@ interface FlowNodeData extends Record<string, unknown> {
 
 interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
+  labelOffsetY?: number;
   onSelect?: (id: string) => void;
 }
 
@@ -429,15 +430,14 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
   return (
     <>
       {targetHandles.map((handle, index) => (
-        <Tooltip title={data.editing ? '把其他步骤连到这里' : undefined} key={handle.id}>
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={handle.id}
-            className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
-            style={handleStyle(index, targetHandles.length)}
-          />
-        </Tooltip>
+        <Handle
+          type="target"
+          position={Position.Left}
+          id={handle.id}
+          className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+          style={handleStyle(index, targetHandles.length)}
+          key={handle.id}
+        />
       ))}
 
       {data.editing ? (
@@ -497,15 +497,14 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
 
       {!terminal ? (
         sourceHandles.map((handle, index) => (
-          <Tooltip title={data.editing ? '从这里拖线到其他步骤' : undefined} key={handle.id}>
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={handle.id}
-              className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
-              style={handleStyle(index, sourceHandles.length)}
-            />
-          </Tooltip>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={handle.id}
+            className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+            style={handleStyle(index, sourceHandles.length)}
+            key={handle.id}
+          />
         ))
       ) : null}
     </>
@@ -530,7 +529,12 @@ function JourneyFlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
         <div
           className="journey-flow-edge-label nodrag nopan"
           style={{
-            transform: 'translate(-50%, -50%) translate(' + labelX + 'px,' + labelY + 'px)',
+            transform:
+              'translate(-50%, -50%) translate('
+              + labelX
+              + 'px,'
+              + (labelY + Number(data?.labelOffsetY ?? 0))
+              + 'px)',
             pointerEvents: 'all',
           }}
           onClick={() => data?.onSelect?.(id)}
@@ -568,7 +572,7 @@ function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   for (const node of nodes) {
     result[node.id] = { x: node.position.x, y: node.position.y };
   }
-  return { version: 1, nodes: result };
+  return { version: 1, engine: 'elk', nodes: result };
 }
 
 function definitionFromGraph(nodes: FlowNode[], edges: FlowEdge[], base: WorkflowDefinition): WorkflowDefinition {
@@ -609,22 +613,40 @@ function normalizeConnection(
   edges: FlowEdge[],
 ): FlowEdge | null {
   if (!connection.source || !connection.target || connection.source === connection.target) return null;
+
   const sourceNode = nodes.find((node) => node.id === connection.source);
-  if (!sourceNode) return null;
+  const targetNode = nodes.find((node) => node.id === connection.target);
+  if (!sourceNode || !targetNode) return null;
+
+  const outgoing = edges.filter((edge) => edge.source === connection.source);
+  const incoming = edges.filter((edge) => edge.target === connection.target);
   const outcome = nextOutcome(
-    edges.filter((edge) => edge.source === connection.source).map((edge) => ({
+    outgoing.map((edge) => ({
       outcome: edge.data?.outcome || 'branch',
       target: edge.target,
     })),
     'branch',
   );
+
+  const sourceHandle = sourceNode.data.sourceHandles[
+    Math.min(outgoing.length, Math.max(0, sourceNode.data.sourceHandles.length - 1))
+  ]?.id;
+  const targetHandle = targetNode.data.targetHandles[
+    Math.min(incoming.length, Math.max(0, targetNode.data.targetHandles.length - 1))
+  ]?.id;
+
   return {
-    id: connection.source + ':' + outcome + ':' + connection.target,
+    id: connection.source + ':' + outcome + ':' + connection.target + ':' + String(Date.now()),
     source: connection.source,
     target: connection.target,
+    ...(sourceHandle ? { sourceHandle } : {}),
+    ...(targetHandle ? { targetHandle } : {}),
     type: EDGE_TYPE,
     markerEnd: { type: MarkerType.ArrowClosed },
-    data: { outcome },
+    data: {
+      outcome,
+      labelOffsetY: (outgoing.length - Math.floor(outgoing.length / 2)) * 8,
+    },
   };
 }
 
