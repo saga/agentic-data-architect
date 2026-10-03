@@ -373,7 +373,9 @@ async function layoutWithElk(
   nodes: FlowNode[],
   edges: FlowEdge[],
 ): Promise<FlowNode[]> {
-  const layouted = await elk.layout({
+  // ELK 的 TS 类型没有把全部 JSON 扩展属性暴露出来，但这些 properties
+  // 正是官方 React Flow multiple-handles 示例用于声明 port side / order 的字段。
+  const graph = {
     id: 'journey-root',
     layoutOptions: {
       'elk.algorithm': 'layered',
@@ -410,7 +412,10 @@ async function layoutWithElk(
       sources: [edge.sourceHandle ?? edge.source],
       targets: [edge.targetHandle ?? edge.target],
     })),
-  }).then((result) => result.children ?? []);
+  } as unknown as Parameters<typeof elk.layout>[0];
+
+  const result = await elk.layout(graph);
+  const layouted = result.children ?? [];
 
   const positions = new Map(layouted.map((node) => [node.id, {
     x: node.x ?? 0,
