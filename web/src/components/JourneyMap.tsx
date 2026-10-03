@@ -1,25 +1,56 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  App as AntApp,
+  Button,
+  Empty,
+  Flex,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import {
   AimOutlined,
   ArrowRightOutlined,
   BranchesOutlined,
   CheckCircleFilled,
   ClockCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  HolderOutlined,
   LockOutlined,
+  PlusOutlined,
+  RedoOutlined,
+  ReloadOutlined,
+  SaveOutlined,
+  SettingOutlined,
+  UndoOutlined,
+  UploadOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons';
-import { Button, Empty, Flex, Tag, Typography } from 'antd';
 import {
+  addEdge,
   Background,
   BackgroundVariant,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   Handle,
+  MarkerType,
   MiniMap,
   NodeToolbar,
-  Panel,
   Position,
   ReactFlow,
-  MarkerType,
+  reconnectEdge,
+  useEdgesState,
+  useNodesState,
+  type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from '@xyflow/react';
@@ -42,61 +73,105 @@ export interface JourneyMapRoute {
   steps: string[];
 }
 
+type WorkflowNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
+type CompletionMode = 'deterministic' | 'agent';
+
+interface JourneyRouteDefinition {
+  outcome: string;
+  target: string;
+  line?: number;
+}
+
+interface WorkflowNodeDefinition {
+  id: string;
+  type: WorkflowNodeType;
+  title: string;
+  objective?: string;
+  visible: boolean;
+  completion: CompletionMode;
+  completeWhen?: string;
+  tools?: string[];
+  routes: JourneyRouteDefinition[];
+  line?: number;
+}
+
+interface WorkflowDefinition {
+  id: string;
+  start: string;
+  nodes: WorkflowNodeDefinition[];
+}
+
+interface WorkflowLayout {
+  version: 1;
+  nodes: Record<string, { x: number; y: number }>;
+  viewport?: { x: number; y: number; zoom: number };
+}
+
+interface WorkflowExecution {
+  workflowId: string;
+  workflowVersion: number;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  status: 'active' | 'completed' | 'stopped';
+}
+
+interface WorkflowState {
+  workflowId: string;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  unlockedNodeIds: string[];
+  stages: JourneyMapStage[];
+  execution: WorkflowExecution;
+}
+
+interface WorkflowSnapshot {
+  workflowId: string;
+  source: 'base' | 'custom';
+  baseWorkflowId: string;
+  version: number;
+  definition: WorkflowDefinition;
+  layout: WorkflowLayout;
+  execution: WorkflowExecution;
+  state: WorkflowState;
+  draft: {
+    definition: WorkflowDefinition;
+    layout: WorkflowLayout;
+    issues: string[];
+  } | null;
+}
+
 interface JourneyMapProps {
-  journey?: {
-    stages: JourneyMapStage[];
-  };
+  journey?: { stages: JourneyMapStage[] };
   routes?: JourneyMapRoute[];
   loading?: boolean;
   onChooseRoute?: (route: JourneyMapRoute) => void;
   onAskStage?: (stage: JourneyMapStage) => void;
 }
 
-type JourneyFlowNodeData = {
+interface FlowNodeData extends Record<string, unknown> {
   title: string;
-  subtitle?: string;
-  status?: JourneyMapStage['status'];
-  statusLabel?: string;
-  kind: 'stage' | 'route';
-  nodeType?: string;
-  route?: JourneyMapRoute;
-  stage?: JourneyMapStage;
-  action?: React.ReactNode;
-};
+  objective?: string;
+  nodeType: WorkflowNodeType;
+  status: JourneyMapStage['status'];
+  completion: CompletionMode;
+  completeWhen?: string;
+  visible: boolean;
+  editing: boolean;
+  onSelect?: (id: string) => void;
+  onAddStep?: (id: string) => void;
+  onAddBranch?: (id: string) => void;
+  onDelete?: (id: string) => void;
+}
 
-type JourneyFlowNode = Node<JourneyFlowNodeData>;
+interface FlowEdgeData extends Record<string, unknown> {
+  outcome: string;
+  onSelect?: (id: string) => void;
+}
 
-const NODE_GAP = 34;
-const STAGE_WIDTH = 204;
-const CURRENT_STAGE_WIDTH = 250;
-const ROUTE_WIDTH = 292;
+type FlowNode = Node<FlowNodeData>;
+type FlowEdge = Edge<FlowEdgeData>;
 
-const STATUS_META: Record<
-  JourneyMapStage['status'],
-  {
-    label: string;
-    icon: React.ReactNode;
-  }
-> = {
-  completed: {
-    label: '已完成',
-    icon: <CheckCircleFilled />,
-  },
-  current: {
-    label: '现在进行中',
-    icon: <AimOutlined />,
-  },
-  future: {
-    label: '下一阶段',
-    icon: <ClockCircleOutlined />,
-  },
-  locked: {
-    label: '暂不可走',
-    icon: <LockOutlined />,
-  },
-};
-
-const NODE_TYPE_LABEL: Record<string, string> = {
+const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
   task: '任务',
   gate: '判断点',
   review: '评审',
@@ -104,276 +179,268 @@ const NODE_TYPE_LABEL: Record<string, string> = {
   stop: '停止',
 };
 
-function stageWidth(stage: JourneyMapStage) {
-  return stage.status === 'current' ? CURRENT_STAGE_WIDTH : STAGE_WIDTH;
+const STATUS_META: Record<JourneyMapStage['status'], { label: string; icon: React.ReactNode }> = {
+  completed: { label: '已完成', icon: <CheckCircleFilled /> },
+  current: { label: '当前', icon: <AimOutlined /> },
+  future: { label: '待进入', icon: <ClockCircleOutlined /> },
+  locked: { label: '暂不可走', icon: <LockOutlined /> },
+};
+
+const STATUS_CLASS: Record<JourneyMapStage['status'], string> = {
+  completed: 'journey-flow-node-completed',
+  current: 'journey-flow-node-current',
+  future: 'journey-flow-node-future',
+  locked: 'journey-flow-node-locked',
+};
+
+const EDGE_TYPE = 'journey';
+
+function sessionNameFromUrl(): string | undefined {
+  const match = window.location.pathname.match(/^\/investigations\/([^/]+)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
 }
 
-function routeHeight(route: JourneyMapRoute) {
-  return Math.min(188, 116 + Math.min(route.steps.length, 3) * 22);
+function stageStatus(snapshot: WorkflowSnapshot, id: string): JourneyMapStage['status'] {
+  if (snapshot.state.completedNodeIds.includes(id)) return 'completed';
+  if (snapshot.state.currentNodeId === id) return 'current';
+  if (snapshot.state.unlockedNodeIds.includes(id)) return 'future';
+  return 'locked';
 }
 
-function stageNode(stage: JourneyMapStage, onAskStage?: JourneyMapProps['onAskStage']): JourneyFlowNode {
-  const meta = STATUS_META[stage.status];
-  const canContinue = stage.status === 'current' || (stage.status === 'future' && stage.unlocked);
-
-  return {
-    id: `stage:${stage.id}`,
-    position: { x: 0, y: 0 },
-    draggable: false,
-    selectable: false,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-    data: {
-      kind: 'stage',
-      stage,
-      status: stage.status,
-      title: stage.title,
-      subtitle: stage.objective,
-      statusLabel: meta.label,
-      nodeType: stage.nodeType,
-      action: canContinue && onAskStage ? (
-        <Button
-          type="primary"
-          size="small"
-          icon={<ArrowRightOutlined />}
-          className="journey-node-toolbar-button nodrag nopan"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={() => onAskStage(stage)}
-        >
-          围绕此阶段继续
-        </Button>
-      ) : undefined,
-    },
-    style: {
-      width: stageWidth(stage),
-      minHeight: stage.status === 'current' ? 132 : 104,
-    },
-    className: `journey-flow-node journey-flow-node-stage journey-flow-node-${stage.status}`,
-  };
-}
-
-function routeNode(
-  route: JourneyMapRoute,
-  index: number,
-  onChooseRoute?: JourneyMapProps['onChooseRoute'],
-): JourneyFlowNode {
-  return {
-    id: `route:${route.id}`,
-    position: { x: 0, y: 0 },
-    draggable: false,
-    selectable: false,
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-    data: {
-      kind: 'route',
-      route,
-      title: route.title,
-      subtitle: route.reason,
-      statusLabel: `Agent 建议 ${index + 1}`,
-      action: onChooseRoute ? (
-        <Button
-          type="primary"
-          size="small"
-          icon={<ArrowRightOutlined />}
-          className="journey-route-action nodrag nopan"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={() => onChooseRoute(route)}
-        >
-          采用这条路线
-        </Button>
-      ) : undefined,
-    },
-    style: {
-      width: ROUTE_WIDTH,
-      minHeight: routeHeight(route),
-    },
-    className: 'journey-flow-node journey-flow-node-route',
-  };
-}
-
-function buildGraph(
-  journey: JourneyMapProps['journey'],
-  routes: JourneyMapRoute[],
-  onChooseRoute?: JourneyMapProps['onChooseRoute'],
-  onAskStage?: JourneyMapProps['onAskStage'],
-) {
-  const stages = journey?.stages ?? [];
-  const nodes: JourneyFlowNode[] = stages.map((stage) => stageNode(stage, onAskStage));
-  const edges: Edge[] = [];
-
-  if (!stages.length && routes.length) {
-    const fallbackStage: JourneyMapStage = {
-      id: 'current',
-      title: '当前调查',
-      objective: '没有固定 Workflow，路线由当前目标、证据和用户动作决定。',
-      status: 'current',
-      nodeType: 'task',
-      unlocked: true,
+function graphFromDefinition(
+  definition: WorkflowDefinition,
+  layout: WorkflowLayout,
+  snapshot: WorkflowSnapshot,
+  editing: boolean,
+  onSelectNode?: (id: string) => void,
+  onAddStep?: (id: string) => void,
+  onAddBranch?: (id: string) => void,
+  onDelete?: (id: string) => void,
+  onSelectEdge?: (id: string) => void,
+): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const nodes: FlowNode[] = definition.nodes.map((item) => {
+    const status = stageStatus(snapshot, item.id);
+    const position = layout.nodes[item.id] ?? { x: 0, y: 0 };
+    return {
+      id: item.id,
+      type: 'journey',
+      position,
+      draggable: editing,
+      selectable: editing,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      data: {
+        title: item.title,
+        objective: item.objective,
+        nodeType: item.type,
+        status,
+        completion: item.completion,
+        completeWhen: item.completeWhen,
+        visible: item.visible,
+        editing,
+        onSelect: onSelectNode,
+        onAddStep,
+        onAddBranch,
+        onDelete,
+      },
+      hidden: !editing && !item.visible,
+      className: 'journey-flow-node journey-flow-node-stage ' + STATUS_CLASS[status],
+      style: { width: item.type === 'end' || item.type === 'stop' ? 178 : 236 },
     };
-    nodes.push(stageNode(fallbackStage, onAskStage));
-  }
-
-  const visibleStages = stages.length
-    ? stages
-    : [{
-      id: 'current',
-      title: '当前调查',
-      objective: '没有固定 Workflow，路线由当前目标、证据和用户动作决定。',
-      status: 'current' as const,
-      nodeType: 'task',
-      unlocked: true,
-    }];
-
-  visibleStages.forEach((stage, index) => {
-    if (index === 0) return;
-
-    const previous = visibleStages[index - 1];
-    const traversed = previous.status === 'completed' || stage.status === 'completed';
-    const currentTransition = previous.status === 'current' || stage.status === 'current';
-
-    edges.push({
-      id: `stage-edge:${previous.id}:${stage.id}`,
-      source: `stage:${previous.id}`,
-      target: `stage:${stage.id}`,
-      type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed },
-      animated: currentTransition,
-      className: [
-        'journey-flow-edge',
-        traversed ? 'journey-flow-edge-traversed' : '',
-        currentTransition && !traversed ? 'journey-flow-edge-current' : '',
-      ].filter(Boolean).join(' '),
-    });
   });
 
-  const anchorStage =
-    visibleStages.find((stage) => stage.status === 'current') ??
-    [...visibleStages].reverse().find((stage) => stage.status === 'completed') ??
-    visibleStages[0];
+  const visibleIds = new Set(nodes.filter((node) => !node.hidden).map((node) => node.id));
+  const edges: FlowEdge[] = [];
 
-  const anchorIndex = Math.max(0, visibleStages.findIndex((stage) => stage.id === anchorStage.id));
-
-  routes.slice(0, 3).forEach((route, routeIndex) => {
-    const node = routeNode(route, routeIndex, onChooseRoute);
-    const centeredOffset = (routeIndex - (Math.min(routes.length, 3) - 1) / 2) * (ROUTE_WIDTH + 24);
-    node.position = {
-      x: centeredOffset,
-      y: 220,
-    };
-    nodes.push(node);
-
-    edges.push({
-      id: `route-anchor:${route.id}`,
-      source: `stage:${anchorStage.id}`,
-      target: node.id,
-      type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed },
-      animated: true,
-      className: 'journey-flow-edge journey-flow-edge-suggested',
-    });
-  });
-
-  // The backbone is deterministic; route suggestions branch from the actual current point.
-  let x = 0;
-  for (const node of nodes) {
-    if (node.data.kind !== 'stage') continue;
-    const stage = node.data.stage;
-    if (!stage) continue;
-    node.position = {
-      x,
-      y: 40,
-    };
-    x += stageWidth(stage) + NODE_GAP;
+  for (const node of definition.nodes) {
+    for (const [index, route] of node.routes.entries()) {
+      if (!editing && (!visibleIds.has(node.id) || !visibleIds.has(route.target))) continue;
+      const sourceCompleted = snapshot.state.completedNodeIds.includes(node.id);
+      const isCurrent = snapshot.state.currentNodeId === node.id;
+      edges.push({
+        id: node.id + ':' + route.outcome + ':' + route.target + ':' + String(index),
+        source: node.id,
+        target: route.target,
+        type: EDGE_TYPE,
+        markerEnd: { type: MarkerType.ArrowClosed },
+        animated: isCurrent,
+        className: 'journey-flow-edge' + (sourceCompleted ? ' journey-flow-edge-traversed' : ''),
+        data: {
+          outcome: route.outcome,
+          onSelect: onSelectEdge,
+        },
+      });
+    }
   }
 
-  // Re-anchor suggestion cards after the main line has been positioned.
-  const actualAnchorX = Math.max(
-    0,
-    visibleStages.slice(0, anchorIndex).reduce(
-      (sum, stage) => sum + stageWidth(stage) + NODE_GAP,
-      0,
-    ),
-  ) + stageWidth(anchorStage) / 2;
-
-  nodes
-    .filter((node) => node.data.kind === 'route')
-    .forEach((node, index, routeNodes) => {
-      const offset = (index - (routeNodes.length - 1) / 2) * (ROUTE_WIDTH + 24);
-      node.position = {
-        x: actualAnchorX - ROUTE_WIDTH / 2 + offset,
-        y: 222,
-      };
-    });
-
-  return { nodes, edges, currentStage: anchorStage };
+  return { nodes, edges };
 }
 
-function JourneyNode({ data }: NodeProps) {
-  const nodeData = data as JourneyFlowNodeData;
-
-  if (nodeData.kind === 'route') {
-    const route = nodeData.route;
-    return (
-      <>
-        <Handle type="target" position={Position.Top} className="journey-flow-handle" />
-        <div className="journey-flow-node-content journey-flow-route-content">
-          <div className="journey-flow-node-kicker journey-flow-node-kicker-route">
-            <BranchesOutlined />
-            <span>{nodeData.statusLabel}</span>
-          </div>
-          <div className="journey-flow-node-title journey-flow-route-title">{nodeData.title}</div>
-          <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div>
-          {route?.steps.length ? (
-            <div className="journey-route-steps">
-              {route.steps.slice(0, 3).map((step, index) => (
-                <div className="journey-route-step" key={`${route.id}-${index}`}>
-                  <span className="journey-route-step-index">{index + 1}</span>
-                  <span>{step}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <div className="journey-flow-route-footer">
-            <Text type="secondary">新证据出现后，Agent 可能重新规划</Text>
-            {nodeData.action}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  const status = nodeData.status ?? 'future';
-  const meta = STATUS_META[status];
+function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
+  const meta = STATUS_META[data.status];
+  const terminal = data.nodeType === 'end' || data.nodeType === 'stop';
 
   return (
     <>
-      {status === 'current' ? (
-        <NodeToolbar isVisible position={Position.Top} offset={12} className="journey-node-toolbar">
-          {nodeData.action}
+      <Handle type="target" position={Position.Left} className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'} />
+      {data.editing ? (
+        <NodeToolbar isVisible={selected} position={Position.Top} offset={10} className="journey-node-editor-toolbar">
+          <Space size={4}>
+            <Tooltip title="编辑节点">
+              <Button size="small" icon={<EditOutlined />} onClick={() => data.onSelect?.(id)} />
+            </Tooltip>
+            {!terminal ? (
+              <>
+                <Tooltip title="添加下一步">
+                  <Button size="small" icon={<PlusOutlined />} onClick={() => data.onAddStep?.(id)} />
+                </Tooltip>
+                <Tooltip title="添加分支">
+                  <Button size="small" icon={<BranchesOutlined />} onClick={() => data.onAddBranch?.(id)} />
+                </Tooltip>
+              </>
+            ) : null}
+            <Tooltip title="删除节点">
+              <Button danger size="small" icon={<DeleteOutlined />} onClick={() => data.onDelete?.(id)} />
+            </Tooltip>
+          </Space>
         </NodeToolbar>
       ) : null}
-      <Handle type="target" position={Position.Left} className="journey-flow-handle" />
+
       <div className="journey-flow-node-content journey-flow-stage-content">
-        <div className={`journey-flow-node-kicker journey-flow-node-kicker-${status}`}>
+        <div className={'journey-flow-node-kicker journey-flow-node-kicker-' + data.status}>
           {meta.icon}
           <span>{meta.label}</span>
-          {nodeData.nodeType ? <span className="journey-flow-node-type">{NODE_TYPE_LABEL[nodeData.nodeType] ?? nodeData.nodeType}</span> : null}
+          <span className="journey-flow-node-type">{NODE_TYPE_LABEL[data.nodeType]}</span>
         </div>
-        <div className="journey-flow-node-title">{nodeData.title}</div>
-        {status === 'current' ? (
-          <div className="journey-flow-node-subtitle journey-flow-node-subtitle-current">{nodeData.subtitle}</div>
-        ) : (
-          <div className="journey-flow-node-subtitle">{nodeData.subtitle}</div>
-        )}
+        <div className="journey-flow-node-title">{data.title}</div>
+        <div className="journey-flow-node-subtitle">{data.objective || '未设置步骤目标'}</div>
+        {data.editing ? (
+          <div className="journey-flow-node-config">
+            <Tag bordered={false}>{data.completion === 'deterministic' ? '确定性完成' : 'Agent 判断'}</Tag>
+            {data.completeWhen ? <Text type="secondary">条件：{data.completeWhen}</Text> : null}
+          </div>
+        ) : null}
       </div>
-      <Handle type="source" position={Position.Right} className="journey-flow-handle" />
+
+      {data.editing || !terminal ? (
+        <Handle type="source" position={Position.Right} className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'} />
+      ) : null}
     </>
   );
 }
 
-const nodeTypes = {
-  default: JourneyNode,
-};
+function JourneyFlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps<FlowEdge>) {
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 12,
+  });
+
+  return (
+    <>
+      <BaseEdge id={id} path={path} markerEnd={MarkerType.ArrowClosed as never} />
+      <EdgeLabelRenderer>
+        <div
+          className="journey-flow-edge-label"
+          style={{ transform: 'translate(-50%, -50%) translate(' + labelX + 'px,' + labelY + 'px)' }}
+          onClick={() => data?.onSelect?.(id)}
+        >
+          {data?.outcome}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const nodeTypes = { journey: JourneyFlowNode };
+const edgeTypes = { journey: JourneyFlowEdge };
+
+function nextId(prefix: string, existing: Set<string>): string {
+  let index = existing.size + 1;
+  let id = prefix + '-' + index;
+  while (existing.has(id)) {
+    index += 1;
+    id = prefix + '-' + index;
+  }
+  return id;
+}
+
+function nextOutcome(routes: JourneyRouteDefinition[], base: string): string {
+  const used = new Set(routes.map((route) => route.outcome.toLowerCase()));
+  if (!used.has(base.toLowerCase())) return base;
+  let index = 1;
+  while (used.has(base.toLowerCase() + '-' + String(index))) index += 1;
+  return base + '-' + String(index);
+}
+
+function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
+  const result: Record<string, { x: number; y: number }> = {};
+  for (const node of nodes) {
+    result[node.id] = { x: node.position.x, y: node.position.y };
+  }
+  return { version: 1, nodes: result };
+}
+
+function definitionFromGraph(nodes: FlowNode[], edges: FlowEdge[], base: WorkflowDefinition): WorkflowDefinition {
+  const routeBySource = new Map<string, JourneyRouteDefinition[]>();
+
+  for (const edge of edges) {
+    const routes = routeBySource.get(edge.source) ?? [];
+    routes.push({
+      outcome: edge.data?.outcome || 'success',
+      target: edge.target,
+    });
+    routeBySource.set(edge.source, routes);
+  }
+
+  return {
+    ...base,
+    nodes: nodes.map((node) => {
+      const source = base.nodes.find((item) => item.id === node.id);
+      return {
+        id: node.id,
+        type: node.data.nodeType,
+        title: node.data.title,
+        objective: node.data.objective,
+        visible: node.data.visible,
+        completion: node.data.completion,
+        completeWhen: node.data.completeWhen,
+        tools: source?.tools,
+        routes: routeBySource.get(node.id) ?? [],
+        line: source?.line,
+      };
+    }),
+  };
+}
+
+function normalizeConnection(
+  connection: Connection,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): FlowEdge | null {
+  if (!connection.source || !connection.target || connection.source === connection.target) return null;
+  const sourceNode = nodes.find((node) => node.id === connection.source);
+  if (!sourceNode) return null;
+  const outcome = nextOutcome(
+    edges.filter((edge) => edge.source === connection.source).map((edge) => ({
+      outcome: edge.data?.outcome || 'branch',
+      target: edge.target,
+    })),
+    'branch',
+  );
+  return {
+    id: connection.source + ':' + outcome + ':' + connection.target,
+    source: connection.source,
+    target: connection.target,
+    type: EDGE_TYPE,
+    markerEnd: { type: MarkerType.ArrowClosed },
+    data: { outcome },
+  };
+}
 
 export function JourneyMap({
   journey,
@@ -382,103 +449,739 @@ export function JourneyMap({
   onChooseRoute,
   onAskStage,
 }: JourneyMapProps) {
-  const graph = useMemo(
-    () => buildGraph(journey, routes, onChooseRoute, onAskStage),
-    [journey, routes, onChooseRoute, onAskStage],
-  );
-  const [nodes, setNodes] = useState<JourneyFlowNode[]>(graph.nodes);
+  const { message } = AntApp.useApp();
+  const [snapshot, setSnapshot] = useState<WorkflowSnapshot>();
+  const [fetching, setFetching] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [usingDraft, setUsingDraft] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>();
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
+  const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
+  const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
+  const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
+  const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
+
+  const initialGraph = useMemo(() => {
+    if (!snapshot) return { nodes: [], edges: [] };
+    const sourceDefinition = editing && usingDraft && snapshot.draft
+      ? snapshot.draft.definition
+      : snapshot.definition;
+    const sourceLayout = editing && usingDraft && snapshot.draft
+      ? snapshot.draft.layout
+      : snapshot.layout;
+    return graphFromDefinition(
+      sourceDefinition,
+      sourceLayout,
+      snapshot,
+      editing,
+      setSelectedNodeId,
+      undefined,
+      undefined,
+      undefined,
+      setSelectedEdgeId,
+    );
+  }, [snapshot, editing, usingDraft]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
+
+  const loadWorkflow = useCallback(async () => {
+    const name = sessionNameFromUrl();
+    if (!name) return;
+
+    setFetching(true);
+    try {
+      const response = await fetch('/api/sessions/' + encodeURIComponent(name) + '/workflow');
+      if (!response.ok) {
+        if (response.status === 409) {
+          setSnapshot(undefined);
+          return;
+        }
+        throw new Error(await response.text());
+      }
+      const data = await response.json() as WorkflowSnapshot;
+      setSnapshot(data);
+      if (!editing) {
+        setNodes(graphFromDefinition(
+          data.definition,
+          data.layout,
+          data,
+          false,
+          setSelectedNodeId,
+          undefined,
+          undefined,
+          undefined,
+          setSelectedEdgeId,
+        ).nodes);
+        setEdges(graphFromDefinition(
+          data.definition,
+          data.layout,
+          data,
+          false,
+          setSelectedNodeId,
+          undefined,
+          undefined,
+          undefined,
+          setSelectedEdgeId,
+        ).edges);
+      }
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setFetching(false);
+    }
+  }, [editing, message, setEdges, setNodes]);
 
   useEffect(() => {
-    setNodes(graph.nodes);
-  }, [graph]);
+    void loadWorkflow();
+  }, [loadWorkflow]);
 
-  if (!graph.nodes.length || loading) {
+  useEffect(() => {
+    if (!editing) return;
+    setNodes(initialGraph.nodes);
+    setEdges(initialGraph.edges);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+    setPast([]);
+    setFuture([]);
+  }, [initialGraph, editing, setEdges, setNodes]);
+
+  const currentDefinition = useMemo(() => {
+    if (!snapshot) return undefined;
+    const base = editing && usingDraft && snapshot.draft
+      ? snapshot.draft.definition
+      : snapshot.definition;
+    return definitionFromGraph(nodes, edges, base);
+  }, [snapshot, editing, usingDraft, nodes, edges]);
+
+  const selectedNode = selectedNodeId
+    ? nodes.find((node) => node.id === selectedNodeId)
+    : undefined;
+  const selectedEdge = selectedEdgeId
+    ? edges.find((edge) => edge.id === selectedEdgeId)
+    : undefined;
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setNodeDraft(undefined);
+      return;
+    }
+    setNodeDraft({
+      id: selectedNode.id,
+      type: selectedNode.data.nodeType,
+      title: selectedNode.data.title,
+      objective: selectedNode.data.objective,
+      visible: selectedNode.data.visible,
+      completion: selectedNode.data.completion,
+      completeWhen: selectedNode.data.completeWhen,
+    });
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (!selectedEdge) {
+      setEdgeDraft(undefined);
+      return;
+    }
+    setEdgeDraft({
+      outcome: selectedEdge.data?.outcome || 'success',
+      target: selectedEdge.target,
+    });
+  }, [selectedEdge]);
+
+  const snapshotNow = (): { nodes: FlowNode[]; edges: FlowEdge[] } => ({
+    nodes: nodes.map((node) => ({ ...node, data: { ...node.data }, position: { ...node.position } })),
+    edges: edges.map((edge) => ({ ...edge, data: edge.data ? { ...edge.data } : undefined })),
+  });
+
+  const pushHistory = () => {
+    setPast((items) => [...items.slice(-30), snapshotNow()]);
+    setFuture([]);
+  };
+
+  const enterEdit = () => {
+    if (!snapshot) return;
+    setUsingDraft(Boolean(snapshot.draft));
+    setEditing(true);
+    setValidationIssues(snapshot.draft?.issues ?? []);
+  };
+
+  const cancelEdit = async () => {
+    setEditing(false);
+    setUsingDraft(false);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+    setValidationIssues([]);
+    await loadWorkflow();
+  };
+
+  const mutateNodes = (mutator: (items: FlowNode[]) => FlowNode[]) => {
+    pushHistory();
+    setNodes(mutator(nodes));
+  };
+
+  const addNodeAfter = (sourceId: string, branch: boolean) => {
+    if (!snapshot) return;
+    const source = nodes.find((node) => node.id === sourceId);
+    if (!source) return;
+
+    const id = nextId('step', new Set(nodes.map((node) => node.id)));
+    const type: WorkflowNodeType = 'task';
+    const title = branch ? '新的分支' : '新的步骤';
+    const node: FlowNode = {
+      id,
+      type: 'journey',
+      position: {
+        x: source.position.x + 310,
+        y: source.position.y + (branch ? 170 : 0),
+      },
+      draggable: true,
+      selectable: true,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      data: {
+        title,
+        objective: '请填写这一步要解决的问题。',
+        nodeType: type,
+        status: 'future',
+        completion: 'agent',
+        visible: true,
+        editing: true,
+        onSelect: setSelectedNodeId,
+        onAddStep: (value) => addNodeAfter(value, false),
+        onAddBranch: (value) => addNodeAfter(value, true),
+        onDelete: (value) => deleteNode(value),
+      },
+      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future',
+      style: { width: 236 },
+    };
+
+    const outcome = nextOutcome(
+      edges.filter((edge) => edge.source === sourceId).map((edge) => ({
+        outcome: edge.data?.outcome || 'branch',
+        target: edge.target,
+      })),
+      branch ? 'branch' : 'success',
+    );
+    const edge: FlowEdge = {
+      id: sourceId + ':' + outcome + ':' + id,
+      source: sourceId,
+      target: id,
+      type: EDGE_TYPE,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      data: { outcome, onSelect: setSelectedEdgeId },
+    };
+
+    pushHistory();
+    setNodes((items) => [...items, node]);
+    setEdges((items) => [...items, edge]);
+    setSelectedNodeId(id);
+    setSelectedEdgeId(undefined);
+    setValidationIssues([]);
+  };
+
+  const deleteNode = (id: string) => {
+    if (!snapshot) return;
+    if (id === snapshot.definition.start) {
+      message.warning('不能删除当前 Workflow 的 start 节点。可以把它连接到新的第一步。');
+      return;
+    }
+
+    Modal.confirm({
+      title: '删除这个步骤？',
+      content: '与这个步骤相连的分支也会一并删除。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        pushHistory();
+        setNodes((items) => items.filter((node) => node.id !== id));
+        setEdges((items) => items.filter((edge) => edge.source !== id && edge.target !== id));
+        setSelectedNodeId(undefined);
+        setSelectedEdgeId(undefined);
+      },
+    });
+  };
+
+  const onConnect = (connection: Connection) => {
+    if (!editing) return;
+    const edge = normalizeConnection(connection, nodes, edges);
+    if (!edge) return;
+    pushHistory();
+    setEdges((items) => addEdge(edge, items));
+    setValidationIssues([]);
+  };
+
+  const onReconnect = (oldEdge: FlowEdge, connection: Connection) => {
+    if (!editing) return;
+    const next = normalizeConnection(connection, nodes, edges);
+    if (!next) return;
+    pushHistory();
+    setEdges((items) => reconnectEdge({ ...oldEdge, ...next, id: oldEdge.id }, items));
+    setValidationIssues([]);
+  };
+
+  const applyNodeDraft = () => {
+    if (!selectedNode || !nodeDraft) return;
+    pushHistory();
+    setNodes((items) => items.map((node) => (
+      node.id === selectedNode.id
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              title: String(nodeDraft.title || node.data.title),
+              objective: nodeDraft.objective ? String(nodeDraft.objective) : undefined,
+              nodeType: (nodeDraft.type as WorkflowNodeType) || node.data.nodeType,
+              visible: nodeDraft.visible !== false,
+              completion: (nodeDraft.completion as CompletionMode) || node.data.completion,
+              completeWhen: nodeDraft.completeWhen ? String(nodeDraft.completeWhen).trim() : undefined,
+            },
+          }
+        : node
+    )));
+    setValidationIssues([]);
+  };
+
+  const applyEdgeDraft = () => {
+    if (!selectedEdge || !edgeDraft) return;
+    const outcome = edgeDraft.outcome.trim();
+    if (!outcome) {
+      message.warning('分支结果不能是空的。');
+      return;
+    }
+    pushHistory();
+    setEdges((items) => items.map((edge) => (
+      edge.id === selectedEdge.id
+        ? { ...edge, target: edgeDraft.target, data: { ...(edge.data ?? {}), outcome } }
+        : edge
+    )));
+    setValidationIssues([]);
+  };
+
+  const undo = () => {
+    const previous = past.at(-1);
+    if (!previous) return;
+    const current = snapshotNow();
+    setFuture((items) => [...items, current]);
+    setPast((items) => items.slice(0, -1));
+    setNodes(previous.nodes);
+    setEdges(previous.edges);
+  };
+
+  const redo = () => {
+    const next = future.at(-1);
+    if (!next) return;
+    const current = snapshotNow();
+    setPast((items) => [...items, current]);
+    setFuture((items) => items.slice(0, -1));
+    setNodes(next.nodes);
+    setEdges(next.edges);
+  };
+
+  const autoLayout = () => {
+    if (!currentDefinition) return;
+
+    const depth = new Map<string, number>([[currentDefinition.start, 0]]);
+    const queue = [currentDefinition.start];
+    const levels = new Map<number, string[]>();
+
+    while (queue.length) {
+      const current = queue.shift() as string;
+      const node = currentDefinition.nodes.find((item) => item.id === current);
+      if (!node) continue;
+      const level = depth.get(current) ?? 0;
+      levels.set(level, [...(levels.get(level) ?? []), current]);
+      for (const route of node.routes) {
+        if (!depth.has(route.target)) {
+          depth.set(route.target, level + 1);
+          queue.push(route.target);
+        }
+      }
+    }
+
+    pushHistory();
+    setNodes((items) => items.map((node) => {
+      const level = depth.get(node.id) ?? 0;
+      const siblings = levels.get(level) ?? [node.id];
+      const index = siblings.indexOf(node.id);
+      return {
+        ...node,
+        position: {
+          x: level * 310,
+          y: (index - (siblings.length - 1) / 2) * 175,
+        },
+      };
+    }));
+  };
+
+  const definitionPayload = currentDefinition;
+  const layoutPayload = layoutFromNodes(nodes);
+
+  const validate = async (): Promise<string[]> => {
+    const name = sessionNameFromUrl();
+    if (!name || !definitionPayload) return ['没有当前 Workflow。'];
+
+    const response = await fetch(
+      '/api/sessions/' + encodeURIComponent(name) + '/workflow/validate',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
+      },
+    );
+    const body = await response.json() as { issues?: string[]; error?: string };
+    if (!response.ok) throw new Error(body.error || response.statusText);
+    const issues = body.issues ?? [];
+    setValidationIssues(issues);
+    return issues;
+  };
+
+  const saveDraft = async () => {
+    const name = sessionNameFromUrl();
+    if (!name || !definitionPayload) return;
+
+    try {
+      const response = await fetch(
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow/draft',
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
+        },
+      );
+      const body = await response.json() as { issues?: string[]; error?: string };
+      if (!response.ok) throw new Error(body.error || response.statusText);
+      setValidationIssues(body.issues ?? []);
+      setUsingDraft(true);
+      message.success(body.issues?.length ? '草稿已保存，但还有校验问题。' : 'Workflow 草稿已保存。');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const applyWorkflow = async () => {
+    const issues = await validate();
+    if (issues.length) {
+      message.error('验证未通过，先修正工作地图中的问题。');
+      return;
+    }
+
+    const name = sessionNameFromUrl();
+    if (!name || !definitionPayload) return;
+
+    try {
+      const response = await fetch(
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow/apply',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
+        },
+      );
+      const body = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(body.error || response.statusText);
+
+      message.success('Workflow 已应用，新版本会从修改后的 start 重新执行。');
+      setEditing(false);
+      setUsingDraft(false);
+      setValidationIssues([]);
+      await loadWorkflow();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const resetWorkflow = () => {
+    const name = sessionNameFromUrl();
+    if (!name) return;
+
+    Modal.confirm({
+      title: '恢复内置 Workflow？',
+      content: '当前 Investigation 的自定义 Workflow、草稿、布局和执行位置都会恢复到 Skill 内置版本。',
+      okText: '恢复',
+      cancelText: '取消',
+      onOk: async () => {
+        const response = await fetch(
+          '/api/sessions/' + encodeURIComponent(name) + '/workflow/reset',
+          { method: 'POST' },
+        );
+        if (!response.ok) {
+          message.error(await response.text());
+          return;
+        }
+        message.success('已恢复内置 Workflow。');
+        setEditing(false);
+        setUsingDraft(false);
+        await loadWorkflow();
+      },
+    });
+  };
+
+  if (loading || fetching) {
     return (
       <div className="journey-map-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={loading ? '正在整理工作地图…' : '还没有足够的信息生成工作地图。'}
-        />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="正在整理工作地图…" />
       </div>
     );
   }
 
-  const totalStages = graph.currentStage ? (journey?.stages.length ?? 1) : 0;
-  const completedStages = journey?.stages.filter((stage) => stage.status === 'completed').length ?? 0;
-  const routeCount = Math.min(routes.length, 3);
+  if (!snapshot) {
+    if (!journey?.stages.length && !routes.length) {
+      return (
+        <div className="journey-map-empty">
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前是自主调查，没有固定 Workflow。"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="journey-map-empty">
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="工作地图加载失败。请关闭后重新打开。" />
+      </div>
+    );
+  }
+
+  const activeDefinition = editing && usingDraft && snapshot.draft
+    ? snapshot.draft.definition
+    : snapshot.definition;
+  const currentStage = snapshot.state.stages.find((stage) => stage.id === snapshot.state.currentNodeId)
+    ?? snapshot.state.stages.find((stage) => stage.status === 'current')
+    ?? snapshot.state.stages.find((stage) => stage.status === 'future')
+    ?? snapshot.state.stages.at(-1);
+  const completedCount = snapshot.state.completedNodeIds.filter((id) => activeDefinition.nodes.some((node) => node.id === id)).length;
 
   return (
-    <div className="journey-map-canvas">
-      <ReactFlow
-        nodes={nodes}
-        edges={graph.edges}
-        nodeTypes={nodeTypes}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        colorMode="light"
-        fitView
-        fitViewOptions={{ padding: 0.12, minZoom: 0.72, maxZoom: 1.18 }}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background
-          gap={22}
-          size={1}
-          variant={BackgroundVariant.Dots}
-          color="#dfe5ee"
-        />
+    <div className={'journey-map-canvas journey-map-editor-shell' + (editing ? ' journey-map-editor-mode' : '')}>
+      <div className="journey-map-editor-header">
+        <div>
+          <div className="journey-map-heading-title">工作地图</div>
+          <div className="journey-map-heading-subtitle">
+            {editing
+              ? '正在编辑 Workflow 草稿。拖动节点、连线、添加分支；验证通过后才会真正改变执行路线。'
+              : '这是当前 Workflow 的实际路线。Agent 会在当前节点内工作，完成后只能沿已有出口继续。'}
+          </div>
+        </div>
+        <Flex align="center" gap={8} wrap>
+          <Tag color={snapshot.source === 'custom' ? 'blue' : undefined}>
+            {snapshot.source === 'custom' ? '自定义 v' + String(snapshot.version) : '内置 Workflow'}
+          </Tag>
+          {editing ? (
+            <>
+              <Button size="small" icon={<UndoOutlined />} disabled={!past.length} onClick={undo}>撤销</Button>
+              <Button size="small" icon={<RedoOutlined />} disabled={!future.length} onClick={redo}>重做</Button>
+              <Button size="small" icon={<NodeIndexOutlined />} onClick={autoLayout}>自动排版</Button>
+              <Button size="small" icon={<SaveOutlined />} onClick={() => void saveDraft()}>保存草稿</Button>
+              <Button size="small" onClick={() => void validate()}>验证</Button>
+              <Button size="small" onClick={resetWorkflow}>恢复内置</Button>
+              <Button size="small" onClick={() => void cancelEdit()}>取消</Button>
+              <Button type="primary" size="small" icon={<UploadOutlined />} onClick={() => void applyWorkflow()}>
+                应用修改
+              </Button>
+            </>
+          ) : (
+            <Button type="primary" ghost size="small" icon={<EditOutlined />} onClick={enterEdit}>
+              编辑工作地图
+            </Button>
+          )}
+        </Flex>
+      </div>
 
-        <Panel position="top-left" className="journey-map-heading-panel">
-          <div className="journey-map-heading">
-            <div className="journey-map-heading-icon">
-              <BranchesOutlined />
-            </div>
-            <div>
-              <div className="journey-map-heading-title">调查主线</div>
-              <div className="journey-map-heading-subtitle">
-                主线是当前 Workflow 的骨架；下面的分支是 Agent 针对当前证据给出的临时路线。
+      {editing && snapshot.draft ? (
+        <div className="journey-map-draft-banner">
+          <Text>已载入之前保存的草稿。当前执行位置仍属于 active Workflow，直到你点击“应用修改”。</Text>
+        </div>
+      ) : null}
+
+      {editing && validationIssues.length ? (
+        <div className="journey-map-validation-panel">
+          <div className="journey-map-validation-title">
+            <Text strong>验证问题 {validationIssues.length}</Text>
+            <Text type="secondary">这些问题修正后才能应用。</Text>
+          </div>
+          <div className="journey-map-validation-items">
+            {validationIssues.slice(0, 8).map((issue, index) => (
+              <Text type="danger" key={index}>• {issue}</Text>
+            ))}
+            {validationIssues.length > 8 ? <Text type="secondary">还有 {validationIssues.length - 8} 个问题…</Text> : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="journey-map-editor-body">
+        <div className="journey-map-flow-wrap">
+          <ReactFlow
+            nodes={nodes.length ? nodes : initialGraph.nodes}
+            edges={edges.length ? edges : initialGraph.edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            nodesDraggable={editing}
+            nodesConnectable={editing}
+            elementsSelectable={editing}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onReconnect={onReconnect}
+            onNodeClick={(_, node) => editing && setSelectedNodeId(node.id)}
+            onEdgeClick={(_, edge) => editing && setSelectedEdgeId(edge.id)}
+            onPaneClick={() => {
+              if (!editing) return;
+              setSelectedNodeId(undefined);
+              setSelectedEdgeId(undefined);
+            }}
+            fitView
+            fitViewOptions={{ padding: 0.18, minZoom: 0.55, maxZoom: 1.2 }}
+            colorMode="light"
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={22} size={1} variant={BackgroundVariant.Dots} color="#dfe5ee" />
+            <Controls showInteractive={editing} />
+            <MiniMap
+              pannable
+              zoomable
+              position="bottom-right"
+              nodeColor={(node) => {
+                const data = node.data as FlowNodeData;
+                if (data.status === 'completed') return '#52c41a';
+                if (data.status === 'current') return '#1677ff';
+                if (data.status === 'locked') return '#d9d9d9';
+                return '#b5c0cf';
+              }}
+              nodeStrokeWidth={3}
+              maskColor="rgba(247,249,252,.76)"
+            />
+          </ReactFlow>
+        </div>
+
+        {editing ? (
+          <div className="journey-map-inspector">
+            <div className="journey-map-inspector-header">
+              <div>
+                <div className="journey-map-inspector-title">属性</div>
+                <Text type="secondary">
+                  {selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '先选一个节点或分支'}
+                </Text>
               </div>
+              <SettingOutlined />
             </div>
-          </div>
-        </Panel>
 
-        <Panel position="top-right" className="journey-map-summary-panel">
-          <div className="journey-map-summary">
-            <div className="journey-map-summary-eyebrow">当前进度</div>
-            <div className="journey-map-summary-title">{graph.currentStage?.title ?? '当前调查'}</div>
-            <Flex gap={6} wrap>
-              <Tag bordered={false}>{completedStages}/{Math.max(totalStages, 1)} 已完成</Tag>
-              {routeCount ? <Tag bordered={false} color="blue">{routeCount} 条 Agent 建议</Tag> : null}
+            {selectedNode && nodeDraft ? (
+              <Flex vertical gap={12}>
+                <div>
+                  <Text type="secondary">ID</Text>
+                  <Input value={selectedNode.id} disabled />
+                </div>
+                <div>
+                  <Text type="secondary">名称</Text>
+                  <Input
+                    value={String(nodeDraft.title ?? '')}
+                    onChange={(event) => setNodeDraft({ ...nodeDraft, title: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <Text type="secondary">目标</Text>
+                  <Input.TextArea
+                    value={String(nodeDraft.objective ?? '')}
+                    onChange={(event) => setNodeDraft({ ...nodeDraft, objective: event.target.value })}
+                    autoSize={{ minRows: 2, maxRows: 5 }}
+                  />
+                </div>
+                <div>
+                  <Text type="secondary">节点类型</Text>
+                  <Select
+                    value={nodeDraft.type}
+                    style={{ width: '100%' }}
+                    options={Object.entries(NODE_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+                    onChange={(value) => setNodeDraft({ ...nodeDraft, type: value as WorkflowNodeType })}
+                  />
+                </div>
+                <div>
+                  <Text type="secondary">完成方式</Text>
+                  <Select
+                    value={nodeDraft.completion}
+                    style={{ width: '100%' }}
+                    options={[
+                      { value: 'agent', label: 'Agent 判断结果' },
+                      { value: 'deterministic', label: '确定性条件' },
+                    ]}
+                    onChange={(value) => setNodeDraft({ ...nodeDraft, completion: value as CompletionMode })}
+                  />
+                </div>
+                {nodeDraft.completion === 'deterministic' ? (
+                  <div>
+                    <Text type="secondary">completeWhen</Text>
+                    <Input
+                      value={String(nodeDraft.completeWhen ?? '')}
+                      placeholder="例如 goal / current-state / validation"
+                      onChange={(event) => setNodeDraft({ ...nodeDraft, completeWhen: event.target.value })}
+                    />
+                  </div>
+                ) : null}
+                <Button type="primary" icon={<SaveOutlined />} onClick={applyNodeDraft}>应用节点属性</Button>
+              </Flex>
+            ) : selectedEdge && edgeDraft ? (
+              <Flex vertical gap={12}>
+                <div>
+                  <Text type="secondary">分支结果</Text>
+                  <Input
+                    value={edgeDraft.outcome}
+                    placeholder="success / needs-input / retry"
+                    onChange={(event) => setEdgeDraft({ ...edgeDraft, outcome: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <Text type="secondary">目标</Text>
+                  <Select
+                    value={edgeDraft.target}
+                    style={{ width: '100%' }}
+                    options={nodes.map((node) => ({ value: node.id, label: node.id + ' · ' + node.data.title }))}
+                    onChange={(value) => setEdgeDraft({ ...edgeDraft, target: value })}
+                  />
+                </div>
+                <Button type="primary" icon={<SaveOutlined />} onClick={applyEdgeDraft}>应用分支属性</Button>
+              </Flex>
+            ) : (
+              <div className="journey-map-inspector-empty">
+                <HolderOutlined />
+                <Text type="secondary">点击节点编辑属性；点击连线标签修改分支结果或目标。</Text>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {!editing ? (
+        <>
+          <div className="journey-map-summary-row">
+            <Flex gap={8} align="center" wrap>
+              <Text strong>{currentStage?.title ?? '当前调查'}</Text>
+              <Tag bordered={false}>{completedCount}/{Math.max(activeDefinition.nodes.filter((node) => node.visible).length, 1)} 已完成</Tag>
+              <Tag bordered={false}>{snapshot.state.currentNodeId}</Tag>
             </Flex>
+            {currentStage && onAskStage ? (
+              <Button size="small" type="primary" ghost icon={<ArrowRightOutlined />} onClick={() => onAskStage(currentStage)}>
+                围绕当前阶段继续
+              </Button>
+            ) : null}
           </div>
-        </Panel>
 
-        <Panel position="bottom-left" className="journey-map-legend">
-          <Flex gap={10} wrap>
-            <span className="journey-map-legend-item journey-map-legend-completed"><span />已完成</span>
-            <span className="journey-map-legend-item journey-map-legend-current"><span />当前</span>
-            <span className="journey-map-legend-item journey-map-legend-future"><span />待进入</span>
-            <span className="journey-map-legend-item journey-map-legend-suggested"><span />Agent 建议</span>
-          </Flex>
-        </Panel>
-
-        <MiniMap
-          pannable
-          zoomable
-          position="bottom-right"
-          nodeColor={(node) => {
-            const nodeData = node.data as JourneyFlowNodeData;
-            if (nodeData.kind === 'route') return '#1677ff';
-            if (nodeData.status === 'completed') return '#52c41a';
-            if (nodeData.status === 'current') return '#1677ff';
-            if (nodeData.status === 'locked') return '#d9d9d9';
-            return '#b5c0cf';
-          }}
-          nodeStrokeWidth={3}
-          maskColor="rgba(247, 249, 252, 0.76)"
-        />
-        <Controls showInteractive={false} position="bottom-left" />
-      </ReactFlow>
+          {routes.length ? (
+            <div className="journey-map-route-list">
+              <div className="journey-map-route-list-title">
+                <BranchesOutlined /> Agent 临时建议
+              </div>
+              <Flex gap={8} wrap>
+                {routes.slice(0, 3).map((route) => (
+                  <Button key={route.id} size="small" onClick={() => onChooseRoute?.(route)}>
+                    {route.title}
+                  </Button>
+                ))}
+              </Flex>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
