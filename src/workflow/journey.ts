@@ -352,7 +352,7 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
         && facts.currentState.datasets > 0
         && facts.currentState.parseFailures === 0
         && !facts.highGapKinds.some((kind) =>
-          ['discovery', 'lineage', 'source-of-truth'].includes(kind)),
+          ['discovery', 'source-of-truth'].includes(kind)),
       );
     case 'investigation':
       return Boolean(
