@@ -77,6 +77,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     pendingAiChange,
     applyAiChanges,
     discardAiChanges,
+    applyHumanWorkflowTransition,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
@@ -342,6 +343,11 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
           aiEditFlow={aiEditFlow}
           applyAiChanges={applyAiChanges}
           discardAiChanges={discardAiChanges}
+          humanWaiting={
+            snapshot.execution.status === 'waiting'
+            && snapshot.execution.currentNodeId === selectedNode?.id
+          }
+          applyHumanWorkflowTransition={applyHumanWorkflowTransition}
         />
       </div>
 
