@@ -153,7 +153,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [flowInstanceRef, nodes.length]);
+  }, [nodes.length]);
 
   if (fetching) {
     return (
@@ -181,26 +181,27 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   }
 
   return (
-    <div className="journey-map-page">
+    <div
+      className="journey-map-page"
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'auto auto minmax(0, 1fr) auto',
+        width: '100%',
+        height: '100dvh',
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
+    >
       <header className="journey-map-page-header">
         <div className="journey-map-page-header-main">
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={onBack}
-            aria-label="返回调查"
-          >
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} aria-label="返回调查">
             返回调查
           </Button>
           <div className="journey-map-page-title-group">
             <Flex align="center" gap={8}>
-              <Typography.Title level={4} style={{ margin: 0 }}>
-                工作地图
-              </Typography.Title>
+              <Typography.Title level={4} style={{ margin: 0 }}>工作地图</Typography.Title>
               <Tag color={snapshot.source === 'custom' ? 'blue' : undefined}>
-                {snapshot.source === 'custom'
-                  ? '自定义 v' + String(snapshot.version)
-                  : '内置路线'}
+                {snapshot.source === 'custom' ? '自定义 v' + String(snapshot.version) : '内置路线'}
               </Tag>
               {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
               <Tag color={snapshot.execution.status === 'waiting' ? 'blue' : undefined}>
@@ -213,58 +214,17 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
                       : '运行中'}
               </Tag>
             </Flex>
-            <Text type="secondary">
-              直接拖动节点和连线；右侧切换“属性 / AI”，调整后检查并保存。
-            </Text>
+            <Text type="secondary">直接拖动节点和连线；右侧切换“属性 / AI”，调整后检查并保存。</Text>
           </div>
         </div>
 
         <Flex align="center" gap={8} wrap>
-          <Button
-            size="small"
-            icon={<UndoOutlined />}
-            disabled={!canUndo}
-            onClick={undo}
-          >
-            撤销
-          </Button>
-          <Button
-            size="small"
-            icon={<RedoOutlined />}
-            disabled={!canRedo}
-            onClick={redo}
-          >
-            重做
-          </Button>
-          <Button
-            size="small"
-            icon={<NodeIndexOutlined />}
-            onClick={() => void autoLayout()}
-          >
-            自动排版
-          </Button>
-          <Button
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={() => void createStandaloneNode()}
-          >
-            新建步骤
-          </Button>
-          <Button
-            size="small"
-            onClick={resetWorkflow}
-          >
-            恢复内置
-          </Button>
-          <Button
-            type="primary"
-            size="small"
-            icon={<SaveOutlined />}
-            disabled={!dirty}
-            onClick={() => void saveWorkflow()}
-          >
-            保存
-          </Button>
+          <Button size="small" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo}>撤销</Button>
+          <Button size="small" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo}>重做</Button>
+          <Button size="small" icon={<NodeIndexOutlined />} onClick={() => void autoLayout()}>自动排版</Button>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => void createStandaloneNode()}>新建步骤</Button>
+          <Button size="small" onClick={resetWorkflow}>恢复内置</Button>
+          <Button type="primary" size="small" icon={<SaveOutlined />} disabled={!dirty} onClick={() => void saveWorkflow()}>保存</Button>
         </Flex>
       </header>
 
@@ -275,9 +235,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             <Tag color="warning">{snapshot.analysis.length} 个提醒</Tag>
           </Flex>
           <div className="journey-map-validation-items">
-            {snapshot.analysis.slice(0, 6).map((item, index) => (
-              <Text type="warning" key={index}>{item.message}</Text>
-            ))}
+            {snapshot.analysis.slice(0, 6).map((item, index) => <Text type="warning" key={index}>{item.message}</Text>)}
           </div>
         </div>
       ) : null}
@@ -289,18 +247,36 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             <Text type="secondary">当前画布仍然可以继续编辑。</Text>
           </div>
           <div className="journey-map-validation-items">
-            {validationIssues.slice(0, 8).map((issue, index) => (
-              <Text type="danger" key={index}>{issue}</Text>
-            ))}
-            {validationIssues.length > 8 ? (
-              <Text type="secondary">还有 {validationIssues.length - 8} 个问题。</Text>
-            ) : null}
+            {validationIssues.slice(0, 8).map((issue, index) => <Text type="danger" key={index}>{issue}</Text>)}
+            {validationIssues.length > 8 ? <Text type="secondary">还有 {validationIssues.length - 8} 个问题。</Text> : null}
           </div>
         </div>
       ) : null}
 
-      <div className="journey-map-workspace">
-        <div ref={flowWrapRef} className="journey-map-flow-wrap">
+      <div
+        className="journey-map-workspace"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 420px)',
+          width: '100%',
+          height: '100%',
+          minWidth: 0,
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          ref={flowWrapRef}
+          className="journey-map-flow-wrap"
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            minWidth: 0,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -311,12 +287,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   if (nodes.length) {
-                    instance.fitView({
-                      padding: 0.14,
-                      minZoom: 0.2,
-                      maxZoom: 1.4,
-                      duration: 0,
-                    });
+                    instance.fitView({ padding: 0.14, minZoom: 0.2, maxZoom: 1.4, duration: 0 });
                   }
                 });
               });
@@ -337,16 +308,10 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             onPaneClick={clearSelection}
             colorMode="light"
             proOptions={{ hideAttribution: true }}
+            style={{ width: '100%', height: '100%' }}
           >
-            <Background
-              gap={22}
-              size={1}
-              variant={BackgroundVariant.Dots}
-              color="#dfe5ee"
-            />
-
+            <Background gap={22} size={1} variant={BackgroundVariant.Dots} color="#dfe5ee" />
             <Controls showInteractive />
-
             <MiniMap
               pannable
               zoomable
@@ -388,10 +353,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
           aiEditFlow={aiEditFlow}
           applyAiChanges={applyAiChanges}
           discardAiChanges={discardAiChanges}
-          humanWaiting={
-            snapshot.execution.status === 'waiting'
-            && snapshot.execution.currentNodeId === selectedNode?.id
-          }
+          humanWaiting={snapshot.execution.status === 'waiting' && snapshot.execution.currentNodeId === selectedNode?.id}
           applyHumanWorkflowTransition={applyHumanWorkflowTransition}
         />
       </div>
@@ -399,17 +361,11 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
       <footer className="journey-map-page-footer">
         <Flex align="center" gap={8} wrap>
           <Text strong>{currentStage?.title ?? '当前步骤'}</Text>
-          <Tag bordered={false}>
-            {completedCount}/{Math.max(currentDefinition?.nodes.filter((node) => node.visible).length ?? 0, 1)} 已完成
-          </Tag>
-          <Text type="secondary">
-            当前执行位置：{snapshot.state.currentNodeId}
-          </Text>
+          <Tag bordered={false}>{completedCount}/{Math.max(currentDefinition?.nodes.filter((node) => node.visible).length ?? 0, 1)} 已完成</Tag>
+          <Text type="secondary">当前执行位置：{snapshot.state.currentNodeId}</Text>
         </Flex>
         <Space size={12}>
-          <Text type="secondary">
-            Cmd/Ctrl + S 保存
-          </Text>
+          <Text type="secondary">Cmd/Ctrl + S 保存</Text>
           {snapshot.execution.status === 'completed' ? (
             <Tag color="green" bordered={false}>这条路线已经走完</Tag>
           ) : snapshot.execution.status === 'stopped' ? (
