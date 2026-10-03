@@ -1156,6 +1156,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const name = sessionNameFromUrl();
     const currentSnapshot = snapshotRef.current;
     if (!name || !currentSnapshot) return;
+    if (dirty) {
+      message.warning('当前画布有未保存修改，请先保存，再推进人工步骤。');
+      return;
+    }
 
     try {
       const response = await fetch(
