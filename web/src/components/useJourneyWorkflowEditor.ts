@@ -6,7 +6,7 @@ import {
   Position,
   reconnectEdge,
   useEdgesState,
-  useNodesState,
+  useNodesInitialized,
   type Connection,
   type ReactFlowInstance,
 } from '@xyflow/react';
@@ -84,6 +84,7 @@ interface JourneyWorkflowEditorResult {
   onEdgeClick: (id: string) => void;
   clearSelection: () => void;
   deleteSelectedEdge: () => void;
+  beginNodeDrag: () => void;
 }
 
 export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
@@ -100,6 +101,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
   const [connectOutcome, setConnectOutcome] = useState('success');
+  // ---- 编辑器状态 ---------------------------------------------------------
+  // nodes / edges 是 React Flow 的运行时草稿；保存时再转换回 Workflow Definition。
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
@@ -111,6 +114,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const snapshotRef = useRef<WorkflowSnapshot | undefined>(undefined);
   const newNodeIdsRef = useRef<Set<string>>(new Set());
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
+  const lastMeasuredNodeCountRef = useRef(0);
+
+  // React Flow 会在首次渲染和新增节点后重新测量真实 DOM 尺寸。
+  // 自动布局必须在“测量完成”后再跑一次，否则 ELK 只能使用估算高度。
+  const nodesInitialized = useNodesInitialized({ includeHiddenNodes: true });
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -118,6 +126,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     snapshotRef.current = snapshot;
   }, [nodes, edges, snapshot]);
 
+  // ---- 服务端 Workflow 生命周期 -----------------------------------------
   /** 只负责把服务端快照取回来。
    *
    * 画布统一由下面那个 graphKey effect 重建——它知道当前该画"草稿"还是"已应用版本"。
@@ -232,6 +241,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     await loadWorkflow();
   };
 
+  // ---- Graph 编辑动作 ----------------------------------------------------
+  /**
+   * 在一个现有步骤后添加“下一步”或“分支步骤”。
+   * 结构变更完成后统一重新走 ELK，保证节点位置与 Handle 数量同步。
+   */
   const addNodeAfter = async (sourceId: string, branch: boolean) => {
     const currentSnapshot = snapshotRef.current;
     const currentNodes = nodesRef.current;
@@ -773,6 +787,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setValidationIssues([]);
   };
 
+  /**
+   * 拖动一个节点是一个完整编辑动作，而不是几十/几百次 mousemove。
+   * 因此只在 drag start 保存一次 Undo snapshot。
+   */
+  const beginNodeDrag = () => {
+    if (editing) pushHistory();
+  };
+
   const undo = () => {
     const previous = past.at(-1);
     if (!previous) return;
@@ -899,9 +921,43 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     };
   }, [graphKey]);
 
+  /**
+   * 用 React Flow 实际测量的节点尺寸做一次最终布局。
+   *
+   * 这一步解决了一个很隐蔽的问题：自定义节点在编辑模式和锁定模式的内容高度
+   * 并不完全等于固定值。ELK 如果只拿估算尺寸排版，视觉上仍可能出现“节点贴住”
+   * 的情况。React Flow 官方提供 useNodesInitialized 来判断尺寸测量是否完成。
+   */
+  useEffect(() => {
+    if (!editing || !nodesInitialized || !nodes.length) return;
+
+    if (lastMeasuredNodeCountRef.current === nodes.length) return;
+    lastMeasuredNodeCountRef.current = nodes.length;
+
+    let cancelled = false;
+
+    const relayoutAfterMeasure = async () => {
+      const layouted = await autoLayoutJourney(nodesRef.current, edgesRef.current);
+      if (!cancelled) {
+        setNodes(layouted);
+      }
+    };
+
+    void relayoutAfterMeasure();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editing, nodesInitialized, nodes.length]);
+
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
 
+  // ---- Draft / Validate / Apply -----------------------------------------
+  /**
+   * 所有发送给服务端的 definition/layout 都来自当前 React Flow graph，
+   * 浏览器端的 validation 只做体验优化，最终规则仍以服务端结果为准。
+   */
   const validate = async (): Promise<string[]> => {
     const name = sessionNameFromUrl();
     if (!name || !definitionPayload) return ['没有当前 Workflow。'];
@@ -1090,5 +1146,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       );
       setSelectedEdgeId(undefined);
     },
+    beginNodeDrag,
   };
 }
