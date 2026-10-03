@@ -183,9 +183,6 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               <Text type="secondary">条件：{data.completeWhen}</Text>
             ) : null}
 
-            <Text type="secondary" className="journey-flow-connect-hint">
-              拖右侧连接点到另一个步骤左侧连接点即可连线
-            </Text>
           </div>
         </div>
       )}
