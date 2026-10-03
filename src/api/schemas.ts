@@ -61,14 +61,18 @@ export const JourneyAiMessageSchema = z.object({
 
 /** 工作地图 AI 请求。AI 只处理工作流图，不参与数据分析。 */
 export const JourneyAiRequestSchema = z.object({
-  mode: z.enum(['generate', 'modify']),
   prompt: z.string().trim().min(1).max(4000),
   messages: z.array(JourneyAiMessageSchema).max(12).optional(),
   /** 当前画布的未保存 Definition；服务端仍会重新用 Workflow schema 校验。 */
   definition: z.unknown().optional(),
-  /** AI 修改范围；selection 只允许修改选中节点及其直接相邻结构。 */
-  scope: z.enum(['workflow', 'selection']).default('workflow'),
+  /** 当前选中的步骤只作为上下文，不限制 AI 可以修改的范围。 */
   selectedNodeId: z.string().trim().min(1).optional(),
+}).strict();
+
+/** 用户从 Agent 给出的下一步候选中选择一项；服务端根据 routeId 读取真实候选。 */
+export const RouteSelectionBodySchema = z.object({
+  routeId: z.string().trim().min(1).max(80),
+  turnId: z.string().trim().min(1).optional(),
 }).strict();
 
 
