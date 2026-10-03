@@ -42,7 +42,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     route: z.object({
       outcome: z.string().min(1),
       target: z.string().min(1),
-      condition: z.string().min(1).optional(),
+      condition: z.string().min(1).nullable().optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -151,6 +151,7 @@ export function applyJourneyWorkflowChanges(
         const index = node.routes.findIndex((route) => normalize(route.outcome) === normalize(change.outcome));
         if (index < 0) throw new Error(node.id + ' 不存在 outcome=' + change.outcome);
         node.routes[index] = { ...node.routes[index], ...change.patch };
+        if (change.patch.condition === null) delete node.routes[index]!.condition;
         break;
       }
 
@@ -242,7 +243,7 @@ export function diffJourneyWorkflowDefinitions(
           outcome: oldRoute.outcome,
           patch: {
             target: newRoute.target,
-            ...(newRoute.condition ? { condition: newRoute.condition } : {}),
+            condition: newRoute.condition ?? null,
           },
         });
       }
