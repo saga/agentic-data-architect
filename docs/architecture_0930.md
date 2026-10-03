@@ -2959,6 +2959,11 @@ GET  /api/sessions/:name/workflow/instruction
 完整设计见 docs/journey-workflow-editor.md。
 ### V1.7 Editor 交互
 
+- 查看模式与编辑模式使用同一份完整 Workflow graph；锁定模式仅关闭 node/edge 编辑事件，不再通过 hidden 过滤节点或 edge。
+- 布局采用 ELK-v2：增加 node/node 与 layer 间距，并考虑编辑态节点高度，避免自动排版后节点视觉贴合。
+- 节点连接问题直接由图结构计算并显示：非 start 节点无入口、非 terminal 节点无出口、route 指向不存在节点时标红；正常的 start 无入口、terminal 无出口不报错。
+- connection Handle 在锁定模式也可见，但设置为不可交互；这样用户看到的线和编辑模式一致。
+
 工作地图编辑器使用 React Flow controlled flow。节点拖动、连线、重新连接、节点属性编辑和边 outcome 编辑都直接作用于当前 draft。
 
 布局不再使用简单的固定 x/y 分层，而采用 ELK layered layout：
