@@ -24,7 +24,6 @@ import {
   LockOutlined,
   PlusOutlined,
   RedoOutlined,
-  ReloadOutlined,
   SaveOutlined,
   SettingOutlined,
   UndoOutlined,
@@ -342,11 +341,14 @@ function JourneyFlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
 
   return (
     <>
-      <BaseEdge id={id} path={path} markerEnd={MarkerType.ArrowClosed as never} />
+      <BaseEdge id={id} path={path} markerEnd={{ type: MarkerType.ArrowClosed }} />
       <EdgeLabelRenderer>
         <div
-          className="journey-flow-edge-label"
-          style={{ transform: 'translate(-50%, -50%) translate(' + labelX + 'px,' + labelY + 'px)' }}
+          className="journey-flow-edge-label nodrag nopan"
+          style={{
+            transform: 'translate(-50%, -50%) translate(' + labelX + 'px,' + labelY + 'px)',
+            pointerEvents: 'all',
+          }}
           onClick={() => data?.onSelect?.(id)}
         >
           {data?.outcome}
@@ -461,27 +463,6 @@ export function JourneyMap({
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
-
-  const initialGraph = useMemo(() => {
-    if (!snapshot) return { nodes: [], edges: [] };
-    const sourceDefinition = editing && usingDraft && snapshot.draft
-      ? snapshot.draft.definition
-      : snapshot.definition;
-    const sourceLayout = editing && usingDraft && snapshot.draft
-      ? snapshot.draft.layout
-      : snapshot.layout;
-    return graphFromDefinition(
-      sourceDefinition,
-      sourceLayout,
-      snapshot,
-      editing,
-      setSelectedNodeId,
-      undefined,
-      undefined,
-      undefined,
-      setSelectedEdgeId,
-    );
-  }, [snapshot, editing, usingDraft]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
@@ -615,11 +596,6 @@ export function JourneyMap({
     await loadWorkflow();
   };
 
-  const mutateNodes = (mutator: (items: FlowNode[]) => FlowNode[]) => {
-    pushHistory();
-    setNodes(mutator(nodes));
-  };
-
   const addNodeAfter = (sourceId: string, branch: boolean) => {
     if (!snapshot) return;
     const source = nodes.find((node) => node.id === sourceId);
@@ -713,11 +689,9 @@ export function JourneyMap({
   };
 
   const onReconnect = (oldEdge: FlowEdge, connection: Connection) => {
-    if (!editing) return;
-    const next = normalizeConnection(connection, nodes, edges);
-    if (!next) return;
+    if (!editing || !connection.source || !connection.target || connection.source === connection.target) return;
     pushHistory();
-    setEdges((items) => reconnectEdge({ ...oldEdge, ...next, id: oldEdge.id }, items));
+    setEdges((items) => reconnectEdge(oldEdge, connection, items));
     setValidationIssues([]);
   };
 
@@ -814,6 +788,33 @@ export function JourneyMap({
       };
     }));
   };
+
+  useEffect(() => {
+    if (!editing || !snapshot) return;
+    const sourceDefinition = usingDraft && snapshot.draft
+      ? snapshot.draft.definition
+      : snapshot.definition;
+    const sourceLayout = usingDraft && snapshot.draft
+      ? snapshot.draft.layout
+      : snapshot.layout;
+    const graph = graphFromDefinition(
+      sourceDefinition,
+      sourceLayout,
+      snapshot,
+      true,
+      setSelectedNodeId,
+      (id) => addNodeAfter(id, false),
+      (id) => addNodeAfter(id, true),
+      deleteNode,
+      setSelectedEdgeId,
+    );
+    setNodes(graph.nodes);
+    setEdges(graph.edges);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+    setPast([]);
+    setFuture([]);
+  }, [editing, usingDraft, snapshot?.version, snapshot?.draft]);
 
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
@@ -1012,8 +1013,8 @@ export function JourneyMap({
       <div className="journey-map-editor-body">
         <div className="journey-map-flow-wrap">
           <ReactFlow
-            nodes={nodes.length ? nodes : initialGraph.nodes}
-            edges={edges.length ? edges : initialGraph.edges}
+            nodes={nodes}
+            edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             nodesDraggable={editing}
