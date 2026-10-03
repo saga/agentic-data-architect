@@ -49,6 +49,10 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
   const result: SourceOfTruthCandidate[] = [];
 
   for (const [key, items] of grouped) {
+    // 只有同一业务键存在多个物理 dataset 时才生成 Source-of-Truth candidate。
+    // 单一 dataset 只是“已发现资产”，不能因为它存在就宣称需要选 source of truth。
+    if (items.length < 2) continue;
+
     const scored = items.map((dataset) => {
       const lower = dataset.name.toLowerCase();
       const upstream = edges.filter((edge) => edge.target.toLowerCase() === lower).length;
