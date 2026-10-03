@@ -299,11 +299,9 @@ app.post('/api/sessions', async (req, res) => {
     const result = await generateJourneyFlow(
       name,
       context.workflow,
-      body.mode,
       body.prompt,
       body.messages ?? [],
       currentDefinition,
-      body.scope,
       body.selectedNodeId,
     );
     res.json(result);
@@ -539,7 +537,27 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const body = parseRequest(MessageBodySchema, req.body);
     await ensureWorkspace(name);
-    const result = await answerQuestion(name, body.message, undefined, body.turnId);
+    const context = await loadWorkspaceContext(name);
+    let selectedRoute;
+    const message = body.message
+      ?? (() => {
+        selectedRoute = context.journeyPlan?.routes.find((route) => route.id === body.routeId);
+        return selectedRoute ? '选择下一步：' + selectedRoute.title : '';
+      })();
+
+    if (body.routeId && !selectedRoute) {
+      res.status(409).json({ error: '这个下一步已经过期，请根据最新情况重新选择。' });
+      return;
+    }
+
+    const result = await answerQuestion(
+      name,
+      message,
+      undefined,
+      body.turnId,
+      undefined,
+      selectedRoute ? { selectedRoute } : undefined,
+    );
     res.json(result);
   });
 
@@ -547,7 +565,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(MessageBodySchema, req.body);
-    const message = body.message;
+    const context = await loadWorkspaceContext(name);
+    let selectedRoute = body.routeId
+      ? context.journeyPlan?.routes.find((route) => route.id === body.routeId)
+      : undefined;
+    if (body.routeId && !selectedRoute) {
+      res.status(409).json({ error: '这个下一步已经过期，请根据最新情况重新选择。' });
+      return;
+    }
+    const message = body.message
+      ?? (selectedRoute ? '选择下一步：' + selectedRoute.title : '');
     const turnId = body.turnId ?? randomUUID();
 
     await ensureWorkspace(name);
@@ -587,6 +614,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         (delta) => send('delta', { delta }),
         turnId,
         (status) => send('status', { status }),
+        selectedRoute ? { selectedRoute } : undefined,
       );
       send('completed', result);
       finished = true;
