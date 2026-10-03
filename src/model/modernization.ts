@@ -160,7 +160,7 @@ export type ValidationPlan = z.infer<typeof ValidationPlanSchema>;
 /** modernization 中一个待解决的结构性 Gap。 */
 export const ModernizationGapSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(['discovery', 'lineage', 'semantic', 'data_quality', 'architecture', 'mapping', 'migration']),
+  kind: z.enum(['discovery', 'lineage', 'semantic', 'source-of-truth', 'data_quality', 'architecture', 'mapping', 'migration']),
   title: z.string().min(1),
   description: z.string().min(1),
   severity: z.enum(['info', 'low', 'medium', 'high']),
