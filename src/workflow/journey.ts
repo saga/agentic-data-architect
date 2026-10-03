@@ -14,11 +14,14 @@ import { parseSkillManifest } from '../skills/catalog.js';
 
 export type JourneyNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 export type JourneyCompletionMode = 'deterministic' | 'agent';
+export type JourneyActor = 'agent' | 'human' | 'system';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 
 export interface JourneyRoute {
   outcome: string;
   target: string;
+  /** 可选的确定性路由条件；按 DSL 顺序先匹配者优先。 */
+  condition?: string | undefined;
   line?: number | undefined;
 }
 
@@ -30,6 +33,8 @@ export interface JourneyNode {
   visible: boolean;
   /** deterministic 有明确 completeWhen；agent 由 Agent 选择 outcome。 */
   completion: JourneyCompletionMode;
+  /** 主要执行者：Agent、人或系统；默认不改变现有 Workflow 行为。 */
+  actor: JourneyActor;
   completeWhen?: string | undefined;
   tools?: string[] | undefined;
   routes: JourneyRoute[];
@@ -130,6 +135,11 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
         : current.attrs.completeWhen
           ? 'deterministic'
           : 'agent',
+      actor: current.attrs.actor === 'human' || current.attrs.actor === 'system'
+        ? current.attrs.actor
+        : current.type === 'review'
+          ? 'human'
+          : 'agent',
       completeWhen: current.attrs.completeWhen,
       tools: current.attrs.tools
         ? current.attrs.tools.split(',').map((item) => item.trim()).filter(Boolean)
@@ -141,7 +151,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   };
 
   const headingPattern = /^##\s+@(flow|task|gate|review|end|stop)\s+([A-Za-z0-9._:-]+)\s*$/;
-  const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)\s*$/;
+  const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)(?:\s+if\s+([A-Za-z0-9._:-]+))?\s*$/;
   const attrPattern = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*?)\s*$/;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -182,6 +192,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       current.routes.push({
         outcome: route[1].toLowerCase(),
         target: route[2],
+        ...(route[3] ? { condition: route[3].toLowerCase() } : {}),
         line: lineNumber,
       });
       continue;
@@ -344,6 +355,10 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
     if (nodeMap.has(node.id)) issues.push('重复的 workflow node：' + node.id);
     nodeMap.set(node.id, node);
 
+    if (node.actor !== 'agent' && node.actor !== 'human' && node.actor !== 'system') {
+      issues.push(node.id + ' 使用了未知 actor：' + node.actor);
+    }
+
     if (node.completion === 'deterministic' && !node.completeWhen && node.type !== 'end' && node.type !== 'stop') {
       issues.push(node.id + ' 使用 deterministic completion，但没有 completeWhen。');
     }
@@ -366,6 +381,9 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
     for (const route of node.routes) {
       if (!nodeMap.has(route.target)) {
         issues.push(node.id + ' 第 ' + route.line + ' 行指向不存在的节点：' + route.target);
+      }
+      if (route.condition && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(route.condition)) {
+        issues.push(node.id + ' 使用了未知 route condition：' + route.condition);
       }
       const normalizedOutcome = route.outcome.toLowerCase();
       if (outcomes.has(normalizedOutcome)) {
@@ -503,7 +521,11 @@ function advanceDeterministicJourney(
     if (node.completion !== 'deterministic' || !conditionPassed(node.completeWhen, facts)) break;
 
     completed.add(node.id);
-    const route = node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome))
+    const conditionalRoute = node.routes.find(
+      (item) => item.condition && conditionPassed(item.condition, facts),
+    );
+    const route = conditionalRoute
+      ?? node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome))
       ?? (node.routes.length === 1 ? node.routes[0] : undefined);
     if (!route || route.target === node.id) break;
     currentNodeId = route.target;
@@ -607,10 +629,12 @@ export function describeJourneyCurrentNode(
     title: node.title,
     objective: node.objective || node.title,
     completion: node.completion,
+    actor: node.actor,
     ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
     outcomes: node.routes.map((route) => ({
       outcome: route.outcome,
       target: route.target,
+      ...(route.condition ? { condition: route.condition } : {}),
     })),
   };
 }
@@ -626,13 +650,15 @@ export const JourneyDefinitionSchema = z.object({
     objective: z.string().optional(),
     visible: z.boolean(),
     completion: z.enum(['deterministic', 'agent']),
+    actor: z.enum(['agent', 'human', 'system']).default('agent'),
     completeWhen: z.string().optional(),
     tools: z.array(z.string()).optional(),
     routes: z.array(z.object({
       outcome: z.string().min(1),
       target: z.string().min(1),
+      condition: z.string().min(1).optional(),
       line: z.number().int().positive().optional(),
-    })),
+    }).strict()),
     line: z.number().int().positive().optional(),
   }).strict()).min(1),
 }).strict().transform((value) => value as JourneyDefinition);
