@@ -59,7 +59,8 @@ test('workspace CSV becomes a DuckDB dataset with Evidence provenance', async ()
 
     assert.equal(result.rowCount, 2);
     assert.equal(result.rows[0]?.security_id, 'AAPL');
-    assert.equal(result.rows[1]?.quantity, 5);
+    // DuckDB JSON materialization returns BIGINT as a string; preserve precision in the runtime API.
+    assert.equal(Number(result.rows[1]?.quantity), 5);
 
     const context = await loadWorkspaceContext(sessionName);
     const evidence = context.evidence.find((item) => item.id === result.evidenceId);
