@@ -549,7 +549,11 @@ export async function resetJourneyCustomization(
   workflowId: WorkflowId,
 ): Promise<JourneySnapshot> {
   await withWorkspaceContextLock(name, async () => {
+    // Workflow 定义可以重置，但运行历史属于审计/诊断信息，不随 reset 丢失。
+    const events = await readTextOrNull(journeyFile(name, EVENTS_FILE));
     await fs.rm(journeyDir(name), { recursive: true, force: true });
+    await fs.mkdir(journeyDir(name), { recursive: true });
+    if (events) await fs.writeFile(journeyFile(name, EVENTS_FILE), events, 'utf8');
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.copilotSessionId;
