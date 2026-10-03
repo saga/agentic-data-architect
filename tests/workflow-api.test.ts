@@ -24,6 +24,23 @@ test('known workflow ids remain supported', () => {
 });
 
 
+test('journey map AI request accepts bounded multi-turn history', () => {
+  const parsed = JourneyAiRequestSchema.parse({
+    mode: 'modify',
+    prompt: '再增加一个人工评审。',
+    messages: [
+      { role: 'user', content: '先保留当前路线。' },
+      { role: 'assistant', content: '好的，保持现有结构。' },
+    ],
+  });
+  assert.equal(parsed.messages?.length, 2);
+  assert.throws(() => JourneyAiRequestSchema.parse({
+    mode: 'modify',
+    prompt: '继续',
+    messages: Array.from({ length: 13 }, () => ({ role: 'user', content: 'x' })),
+  }));
+});
+
 test('journey map AI request only accepts the two map operations', () => {
   assert.deepEqual(
     JourneyAiRequestSchema.parse({
