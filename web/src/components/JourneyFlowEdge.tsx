@@ -89,6 +89,8 @@ export function JourneyFlowEdge({
         fill={selected ? '#1677ff' : '#94a3b8'}
         stroke="#fff"
         strokeWidth={2}
+        pointerEvents="none"
+        aria-hidden="true"
       />
 
       <EdgeLabelRenderer>
