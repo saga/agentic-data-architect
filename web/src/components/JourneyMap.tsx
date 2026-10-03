@@ -1483,7 +1483,7 @@ export function JourneyMap({
       const body = await response.json() as { error?: string };
       if (!response.ok) throw new Error(body.error || response.statusText);
 
-      message.success('Workflow 已应用，新版本会从修改后的 start 重新执行。');
+      message.success('Workflow 已应用；能保留的当前执行位置会继续使用新版本。');
       setEditing(false);
       setUsingDraft(false);
       newNodeIdsRef.current = new Set();
