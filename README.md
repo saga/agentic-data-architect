@@ -248,6 +248,27 @@ Source
 
 候选只是结构化分析结果，不代表已经确认的业务事实。
 
+## Local Data Workbench
+
+本地数据分析现在直接集成到 Investigation：
+
+~~~text
+SQLite
+  → 应用状态、对话、数据集登记和分析记录
+
+DuckDB
+  → 当前 Investigation 的本地分析
+
+Parquet
+  → 大数据和分析中间结果
+
+CSV / JSON / JSONL
+  → 原始输入
+~~~
+
+Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件，并通过 local_catalog、local_describe、local_sample、local_profile、local_query 完成结构查看、抽样、profiling 和只读 SQL 分析。
+
+上传 CSV / JSON / JSONL / Parquet 后会自动进入 Dataset Registry。文件变化会产生新的 dataset version，分析结果会保存为 Evidence，因此后续回答可以回溯到具体数据文件和 SHA-256。
 ## Structural Analysis
 
 当前增加了一个独立的 structural-analysis capability，底层使用 [Graphify](https://github.com/Graphify-Labs/graphify) 把当前 Investigation working directory 中的代码和 SQL 建成可查询的结构图。
