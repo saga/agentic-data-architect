@@ -24,6 +24,7 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import type { FlowNode, JourneyMapStage, WorkflowNodeType } from './journey-map-types.js';
+import { handleStyle } from './journey-map-graph.js';
 
 const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
   task: '任务',
@@ -39,8 +40,6 @@ const STATUS_META: Record<JourneyMapStage['status'], { label: string; icon: Reac
   future: { label: '待进入', icon: <ClockCircleOutlined /> },
   locked: { label: '暂不可走', icon: <LockOutlined /> },
 };
-import { handleStyle } from './journey-map-graph.js';
-
 const { Text } = Typography;
 
 /**
