@@ -233,8 +233,6 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
       (check) => check.blocking && ['ready', 'passed'].includes(check.status),
     ).length,
     blockingValidationTotal: validationPlan.checks.filter((check) => check.blocking).length,
-    cutoverCriteriaDefined: validationPlan.cutoverCriteria.length > 0,
-    rollbackCriteriaDefined: validationPlan.rollbackCriteria.length > 0,
   });
   const plan: ModernizationPlan = ModernizationPlanSchema.parse({
     id: productId('modernization'),
@@ -306,8 +304,6 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
         (check) => check.blocking && ['ready', 'passed'].includes(check.status),
       ).length,
       blockingValidationTotal: plan.validationPlan.checks.filter((check) => check.blocking).length,
-      cutoverCriteriaDefined: plan.validationPlan.cutoverCriteria.length > 0,
-      rollbackCriteriaDefined: plan.validationPlan.rollbackCriteria.length > 0,
     });
 
     return { ...plan, journey };
