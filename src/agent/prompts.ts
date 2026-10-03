@@ -54,7 +54,7 @@ export function buildQuestionPrompt(args: {
     `用户问题：${args.question}`,
     ``,
     `请严格返回 JSON：`,
-    `{"answer": "...", "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": ["..."], "routeOptions": [{"id": "route-1", "title": "...", "reason": "...", "steps": ["...", "..."]}]}`,
+    `{"answer": "...", "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": ["..."], "routeOptions": [{"id": "route-1", "title": "...", "reason": "...", "steps": ["...", "..."]}], "workflow": {"nodeId": "当前节点 ID", "outcome": "当前节点真实存在的 outcome"}}`,
     `允许引用的 evidenceIds：${args.evidenceIds.join('、') || '（无）'}`,
   ].join('\n');
 }
