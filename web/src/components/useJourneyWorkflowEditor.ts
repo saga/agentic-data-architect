@@ -1037,14 +1037,26 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
   };
 
-  /** 调用工作地图专用 AI。AI 只改图，不直接替用户保存。 */
+  /** AI 只提出 Patch；先预览，用户确认后再应用。 */
   const aiEditFlow = async (
     mode: 'generate' | 'modify',
     prompt: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    scope: 'workflow' | 'selection' = 'workflow',
   ) => {
     const name = sessionNameFromUrl();
-    if (!name || !prompt.trim()) return undefined;
+    const currentSnapshot = snapshotRef.current;
+    if (!name || !prompt.trim() || !currentSnapshot) return undefined;
+    if (scope === 'selection' && !selectedNodeId) {
+      message.warning('请先选中一个步骤。');
+      return undefined;
+    }
+
+    const currentCanvasDefinition = definitionFromGraph(
+      nodesRef.current,
+      edgesRef.current,
+      currentSnapshot.definition,
+    );
 
     try {
       const response = await fetch(
@@ -1057,59 +1069,36 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             prompt: prompt.trim(),
             messages: history.slice(-12),
             definition: currentCanvasDefinition,
+            scope,
+            ...(selectedNodeId ? { selectedNodeId } : {}),
           }),
         },
       );
       const body = await response.json() as {
         definition?: WorkflowDefinition;
         message?: string;
+        changes?: WorkflowChange[];
         error?: string;
       };
-      if (!response.ok || !body.definition) {
-        throw new Error(body.error || response.statusText || 'AI 没有返回工作地图。');
+      if (!response.ok || !body.definition || !body.changes?.length) {
+        throw new Error(body.error || response.statusText || 'AI 没有返回 Workflow 修改。');
       }
-
-      const currentSnapshot = snapshotRef.current;
-      if (!currentSnapshot) return undefined;
-      const currentCanvasDefinition = definitionFromGraph(
-        nodesRef.current,
-        edgesRef.current,
-        currentSnapshot.definition,
-      );
-
-      pushHistory();
-      const graph = graphFromDefinition(
-        body.definition,
-        layoutFromNodes(nodesRef.current),
-        {
-          ...currentSnapshot,
-          definition: body.definition,
-        },
-        setSelectedNodeId,
-        (id) => { void addNodeAfter(id, false); },
-        (id) => { void addNodeAfter(id, true); },
-        deleteNode,
-        setSelectedEdgeId,
-        new Set(),
-      );
-      const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
-      if (!layoutedNodes) return undefined;
-
-      newNodeIdsRef.current = new Set();
-      setNodes(layoutedNodes);
-      setEdges(graph.edges);
-      setSelectedNodeId(undefined);
-      setSelectedEdgeId(undefined);
-      setValidationIssues([]);
-      setDirty(true);
-      pendingFitRef.current = true;
-
-      return { message: body.message?.trim() || 'AI 已更新工作地图，请检查后保存。' };
+      setPendingAiChange({
+        message: body.message?.trim() || 'AI 已提出一版修改。',
+        changes: body.changes,
+        definition: body.definition,
+        baseDefinition: currentCanvasDefinition,
+      });
+      return {
+        message: body.message?.trim() || 'AI 已提出修改，请检查预览。',
+        changes: body.changes,
+      };
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
       return undefined;
     }
   };
+
 
   const resetWorkflow = () => {
     const name = sessionNameFromUrl();
