@@ -399,7 +399,6 @@ export async function getJourneySnapshot(
   const facts = await buildJourneyFacts(name);
   const state = buildJourneyState(active.definition, facts, execution);
   const analysis = analyzeJourneyWorkflow(active.definition);
-  const events = await loadJourneyRunEvents(name);
 
   // Deterministic completion may move the current node without an Agent transition.
   // Persist that state so the next turn cannot observe an older current node.
@@ -429,6 +428,9 @@ export async function getJourneySnapshot(
       await appendDeterministicAdvanceEvents(name, execution, state.execution);
     }
   }
+
+  // 事件必须在自动推进持久化之后重新读取，否则本次 snapshot 会落后一轮。
+  const events = await loadJourneyRunEvents(name);
 
   return {
     workflowId,
