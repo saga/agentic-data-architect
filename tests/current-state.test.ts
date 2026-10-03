@@ -45,6 +45,7 @@ describe('Current-State Intelligence', () => {
     });
 
     assert.equal(result.coverage.sqlParseFailures, 0);
+    assert.equal(result.coverage.datasetLineageConnectionRate, 1);
     assert.ok(result.sourceOfTruthCandidates.some((item) => item.key === 'ibor_position'));
     assert.ok(result.semanticCandidates.some((item) => item.key === 'position' && item.semanticAssets.includes('sv:position')));
   });
