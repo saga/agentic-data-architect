@@ -171,7 +171,7 @@ completion: agent
 
 title: 现状 Gate
 visible: false
-objective: 没有关键 discovery / lineage / semantic 阻塞时，才允许开始目标方案设计。
+objective: 没有关键 discovery / lineage / source-of-truth 阻塞时，才允许开始目标方案设计。
 
 - pass -> target
 - retry -> investigate
