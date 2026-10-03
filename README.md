@@ -178,6 +178,7 @@ Workflow 现在不是只读的路线图。打开“编辑工作地图”后，�
   → 服务端验证
   → 应用修改
   → 新 Workflow version
+  → 尽量保留当前执行位置
   → Agent 下一轮按修改后的 Workflow 执行
 ~~~
 
