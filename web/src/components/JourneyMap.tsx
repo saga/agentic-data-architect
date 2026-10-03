@@ -51,9 +51,9 @@ export function JourneyMap(props: JourneyMapProps) {
  * 工作地图是独立的业务页面：
  * 进入后直接可以拖动、连线、修改属性、让 AI 修改流程，然后明确保存。
  *
- * AI 对话位于右侧“属性”面板，采用 Ant Design X 的 Bubble.List + Sender。
- * 每一轮都基于当前画布继续修改；AI 只替换当前画布，不直接写入服务端，
- * 用户检查后再点击“保存”。
+ * 右侧栏分成“属性”和“AI”两个 Tab：编辑节点时看属性，需要改流程时切到 AI。
+ * AI 对话采用 Ant Design X 的 Bubble.List + Sender；每一轮都基于当前画布继续修改，
+ * 只更新当前画布预览，不直接写入服务端，用户检查后再点击“保存”。
  */
 function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
@@ -179,7 +179,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
               </Tag>
             </Flex>
             <Text type="secondary">
-              直接拖动节点和连线；右侧属性面板提供连续的 Workflow AI 对话，检查后点击保存。
+              直接拖动节点和连线；右侧切换“属性 / AI”，调整后检查并保存。
             </Text>
           </div>
         </div>
