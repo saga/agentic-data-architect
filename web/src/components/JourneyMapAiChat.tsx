@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Flex, Segmented, Tag, Typography } from 'antd';
-import { RobotOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
+import { RobotOutlined, UserOutlined } from '@ant-design/icons';
 import { Bubble, Sender } from '@ant-design/x';
 
 import type { WorkflowDefinition } from './journey-map-types.js';
@@ -134,8 +134,6 @@ export function JourneyMapAiChat({
             ? '例如：在现状确认后增加一个人工评审，再进入目标设计'
             : '例如：重新设计成 6 个步骤，并在关键处加入人工确认'
         }
-        prefix={loading ? undefined : <SendOutlined />}
-        onCancel={() => undefined}
       />
     </section>
   );
