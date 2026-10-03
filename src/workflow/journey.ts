@@ -237,6 +237,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     definition,
     issues: [...new Set(issues)],
   };
+}
 
 /** 根据 Session workflow 加载对应的 Markdown 路线。 */
 export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<JourneyDefinition> {
@@ -262,67 +263,6 @@ export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<Journ
 export async function loadModernizationJourney(): Promise<JourneyDefinition> {
   return loadWorkflowJourney('legacy-modernization');
 }
-
-function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
-  switch (condition) {
-    case 'goal':
-      return Boolean(facts.goal.trim());
-
-    case 'current-state':
-      return Boolean(facts.currentState);
-
-    case 'data-truth':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0
-        && facts.currentState.parseFailures === 0
-        && (facts.currentState.lineageCoverage ?? 0) >= 0.8
-        && (facts.currentState.semanticAssets > 0 || !facts.highGapKinds.includes('semantic')),
-      );
-
-    case 'investigation':
-      return Boolean(
-        facts.currentState
-        && facts.unknowns.length <= 3
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
-      );
-
-    case 'current-state-ready':
-      return Boolean(
-        facts.currentState
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
-      );
-
-    case 'target':
-      return facts.targetComponentCount > 0;
-
-    case 'mapping':
-      return facts.mappingCount > 0;
-
-    case 'validation':
-      return facts.blockingValidationTotal > 0
-        && facts.blockingValidationReady >= facts.blockingValidationTotal;
-
-    case 'cutover':
-      return conditionPassed('validation', facts);
-
-    case 'assessment-current-state':
-      return Boolean(facts.currentState);
-
-    case 'assessment-findings':
-      return (facts.findingCount ?? 0) > 0 || Boolean(facts.currentState);
-
-    case 'assessment-recommendation':
-      return (facts.recommendationCount ?? 0) > 0;
-
-    case 'assessment-roadmap':
-      return (facts.roadmapItemCount ?? 0) > 0;
-
-    default:
-      return false;
-  }
-}
-
 
 /** 当前版本已支持的 deterministic completion 条件。 */
 export const KNOWN_COMPLETION_CONDITIONS = [
