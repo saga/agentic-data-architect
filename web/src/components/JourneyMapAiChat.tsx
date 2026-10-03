@@ -84,8 +84,9 @@ export function JourneyMapAiChat({
     setValue('');
     setLoading(true);
 
+    if (scope === 'selection' && !selectedNodeId) return;
     try {
-      const result = await aiEditFlow(mode, prompt, history);
+      const result = await aiEditFlow(mode, prompt, history, scope);
       setMessages((items) => [
         ...items,
         {
@@ -93,7 +94,7 @@ export function JourneyMapAiChat({
           role: 'assistant',
           content:
             result?.message
-            ?? '我已经更新了一版工作地图，请检查画布后继续告诉我需要调整的地方。',
+            ?? 'AI 已提出修改，请先检查修改预览，再决定是否应用。',
         },
       ]);
     } finally {
