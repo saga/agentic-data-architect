@@ -400,7 +400,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       nextNewIds,
     );
-    const laidOutNodes = await layoutWithElk(graph.nodes, graph.edges);
+    const laidOutNodes = await autoLayoutJourney(graph.nodes, graph.edges);
 
     setNodes(laidOutNodes);
     setEdges(graph.edges);
@@ -457,7 +457,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           setSelectedEdgeId,
           nextNewIds,
         );
-        setNodes(await layoutWithElk(graph.nodes, graph.edges));
+        setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
         setEdges(graph.edges);
         setSelectedNodeId(undefined);
         setSelectedEdgeId(undefined);
@@ -489,7 +489,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       nextNewIds,
     );
 
-    const layoutedNodes = await layoutWithElk(graph.nodes, graph.edges);
+    const layoutedNodes = await autoLayoutJourney(graph.nodes, graph.edges);
     setNodes(layoutedNodes);
     setEdges(graph.edges);
     setValidationIssues([]);
@@ -644,7 +644,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       newNodeIdsRef.current,
     );
-    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
     setEdges(graph.edges);
     setValidationIssues([]);
   };
@@ -780,7 +780,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       nextIds,
     );
 
-    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
     setEdges(graph.edges);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
@@ -831,7 +831,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       newNodeIdsRef.current,
     );
-    const laidOutNodes = await layoutWithElk(graph.nodes, graph.edges);
+    const laidOutNodes = await autoLayoutJourney(graph.nodes, graph.edges);
     setNodes(laidOutNodes);
     setValidationIssues([]);
 
@@ -894,7 +894,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
       const layoutedNodes = sourceLayout.engine === 'elk-v2'
         ? graph.nodes
-        : await layoutWithElk(graph.nodes, graph.edges);
+        : await autoLayoutJourney(graph.nodes, graph.edges);
 
       if (cancelled) return;
 
