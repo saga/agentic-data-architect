@@ -19,21 +19,21 @@ export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 export interface JourneyRoute {
   outcome: string;
   target: string;
-  line: number;
+  line?: number;
 }
 
 export interface JourneyNode {
   id: string;
   type: JourneyNodeType;
   title: string;
-  objective?: string;
+  objective?: string | undefined;
   visible: boolean;
   /** deterministic 有明确 completeWhen；agent 由 Agent 选择 outcome。 */
   completion: JourneyCompletionMode;
-  completeWhen?: string;
-  tools?: string[];
+  completeWhen?: string | undefined;
+  tools?: string[] | undefined;
   routes: JourneyRoute[];
-  line: number;
+  line?: number;
 }
 
 export interface JourneyDefinition {
