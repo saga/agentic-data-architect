@@ -317,17 +317,22 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
     currentState: snapshot?.currentState
       ? {
           datasets: snapshot.currentState.coverage.datasets,
-          lineageCoverage: snapshot.currentState.coverage.datasetLineageCoverage,
           semanticAssets: snapshot.currentState.coverage.semanticAssets,
           parseFailures: snapshot.currentState.coverage.sqlParseFailures,
         }
       : null,
     unknowns: context.unknowns,
-    highGapKinds: [],
+    highGapKinds: buildModernizationGaps({
+      currentState: snapshot?.currentState ?? null,
+      estate: snapshot?.estate ?? null,
+      findings: context.findings,
+    }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
     targetComponentCount: 0,
     mappingCount: 0,
     blockingValidationReady: 0,
     blockingValidationTotal: 0,
+    cutoverCriteriaDefined: false,
+    rollbackCriteriaDefined: false,
   };
 }
 
