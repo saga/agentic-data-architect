@@ -26,11 +26,15 @@ export const UpdateConfigBodySchema = z.object({
   agent: ControlAgentSchema,
 }).strict();
 
-/** 发送 Agent 问题的 HTTP 请求体 Schema，保证 message 非空。 */
+/** 发送 Agent 问题或选择一个下一步动作；两者都走同一条执行通道。 */
 export const MessageBodySchema = z.object({
-  message: z.string().trim().min(1),
+  message: z.string().trim().min(1).optional(),
+  routeId: z.string().trim().min(1).max(80).optional(),
   turnId: z.string().trim().min(1).optional(),
-}).strict();
+}).strict().refine(
+  (value) => Boolean(value.message || value.routeId),
+  { message: '请输入问题，或选择一个下一步动作。' },
+);
 
 /** Stop 请求的 HTTP 请求体 Schema，要求提供 turnId。 */
 export const AbortBodySchema = z.object({
@@ -67,12 +71,6 @@ export const JourneyAiRequestSchema = z.object({
   definition: z.unknown().optional(),
   /** 当前选中的步骤只作为上下文，不限制 AI 可以修改的范围。 */
   selectedNodeId: z.string().trim().min(1).optional(),
-}).strict();
-
-/** 用户从 Agent 给出的下一步候选中选择一项；服务端根据 routeId 读取真实候选。 */
-export const RouteSelectionBodySchema = z.object({
-  routeId: z.string().trim().min(1).max(80),
-  turnId: z.string().trim().min(1).optional(),
 }).strict();
 
 
