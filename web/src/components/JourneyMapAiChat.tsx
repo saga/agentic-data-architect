@@ -130,7 +130,7 @@ export function JourneyMapAiChat({
           </Typography.Text>
         </div>
 
-        <Flex wrap gap={8}>
+        <div className="journey-map-ai-chat-controls">
           <Segmented
             size="small"
             value={mode}
@@ -157,7 +157,7 @@ export function JourneyMapAiChat({
               { value: 'workflow', label: '整张图' },
             ]}
           />
-        </Flex>
+        </div>
       </div>
 
       <div className="journey-map-ai-chat-body">
