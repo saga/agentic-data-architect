@@ -1206,10 +1206,15 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     connectOutcome,
     validationIssues,
     currentDefinition,
+    pendingAiChange: pendingAiChange
+      ? { message: pendingAiChange.message, changes: pendingAiChange.changes }
+      : undefined,
     currentStage,
     completedCount,
     saveWorkflow,
     aiEditFlow,
+    applyAiChanges,
+    discardAiChanges,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
