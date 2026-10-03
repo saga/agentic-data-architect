@@ -1931,7 +1931,7 @@ body {
   min-height: 20px;
 }
 
-.journey-map-inspector-tabs > .ant-tabs-content-holder {
+.journey-map-inspector-tabs > .ant-tabs-body-holder {
   display: flex;
   flex: 1 1 0;
   width: 100%;
