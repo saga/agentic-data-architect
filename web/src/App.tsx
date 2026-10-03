@@ -26,6 +26,7 @@ import {
   InfoCircleOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SendOutlined,
   SettingOutlined,
   ToolOutlined,
