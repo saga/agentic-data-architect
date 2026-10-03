@@ -1974,8 +1974,27 @@ body {
 }
 
 .journey-flow-node-type-gate {
-  border-style: dashed;
+  position: relative;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.journey-flow-node-type-gate::before {
+  content: '';
+  position: absolute;
+  inset: 18px 42px;
   background: #fffef7;
+  border: 1px dashed #d6b656;
+  transform: rotate(45deg);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(31, 45, 61, 0.05);
+}
+
+.journey-flow-node-type-gate .journey-flow-node-content {
+  position: relative;
+  z-index: 1;
+  padding-inline: 28px;
 }
 
 .journey-flow-node-type-end,
