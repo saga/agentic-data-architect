@@ -2038,6 +2038,27 @@ body {
   min-height: 76px;
 }
 
+.journey-map-ai-chat-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  gap: 8px;
+}
+
+.journey-map-ai-chat-controls .ant-segmented {
+  width: 100%;
+}
+
+.journey-map-ai-chat-controls .ant-segmented-group {
+  width: 100%;
+}
+
+.journey-map-ai-chat-controls .ant-segmented-item {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
 .journey-map-ai-chat-header > .ant-flex:last-child {
   width: 100%;
 }
