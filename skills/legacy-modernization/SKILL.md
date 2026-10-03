@@ -50,6 +50,7 @@ start -> intake
 title: 接到任务
 objective: 明确这次为什么改、改什么、范围在哪里，以及当前已经有哪些资料。
 completeWhen: goal
+completion: deterministic
 tools: read,url
 
 先判断：
@@ -70,6 +71,7 @@ tools: read,url
 title: 看清旧系统
 objective: 建立系统地图：数据集、来源、SQL/ETL、主要数据流和下游使用方。
 completeWhen: current-state
+completion: deterministic
 tools: read,url
 
 优先做：
@@ -88,6 +90,7 @@ tools: read,url
 title: 找到数据真相
 objective: 确认数据从哪里来、代表什么、哪个来源最可信，以及数据质量有哪些实际问题。
 completeWhen: data-truth
+completion: deterministic
 tools: read,url
 
 重点检查：
@@ -106,6 +109,7 @@ tools: read,url
 - needs-input -> data-truth
 
 ## @gate data-truth-gate
+completion: agent
 
 title: 数据真相 Gate
 visible: false
@@ -119,6 +123,7 @@ objective: 判断是否已经有足够证据进入关键问题调查。
 title: 查关键问题
 objective: 一次解决一个真正影响迁移的业务问题，把证据、SQL、ETL、数据和业务定义串起来。
 completeWhen: investigation
+completion: deterministic
 tools: read,url
 
 每个问题都走：
@@ -145,6 +150,7 @@ Web Search 只在本地代码、目录和内部资料无法解释问题时使用
 title: 定下现状
 objective: 把已经查清楚的 source、lineage、business rules、semantic context 和主要问题整理成当前系统的完整说明。
 completeWhen: current-state-ready
+completion: deterministic
 tools: read,url
 
 Current State 至少回答：
@@ -161,6 +167,7 @@ Current State 至少回答：
 - needs-input -> investigate
 
 ## @gate current-state-gate
+completion: agent
 
 title: 现状 Gate
 visible: false
@@ -174,6 +181,7 @@ objective: 没有关键 discovery / lineage / semantic 阻塞时，才允许开�
 title: 设计新方案
 objective: 在旧系统已经说清楚以后，确定新的数据怎么接、怎么整理、业务定义放哪里、怎么管。
 completeWhen: target
+completion: deterministic
 tools: read,url
 
 设计内容：
@@ -198,6 +206,7 @@ tools: read,url
 title: 新旧对应
 objective: 把旧数据对应到新数据，并把 transformation、business rule、validation rule 写清楚。
 completeWhen: mapping
+completion: deterministic
 tools: read,url
 
 每条 mapping 至少说明：
@@ -220,6 +229,7 @@ tools: read,url
 title: 验证结果
 objective: 证明目标系统和旧系统在关键业务结果上可以对得上，并提前定义切换条件。
 completeWhen: validation
+completion: deterministic
 tools: read,url
 
 至少覆盖：
@@ -244,6 +254,7 @@ tools: read,url
 title: 切换
 objective: 只有验证完成后才进入 mock migration、parallel run、cutover、rollback 和旧系统退役。
 completeWhen: cutover
+completion: deterministic
 tools: read,url
 
 这里不把“生成了一份计划”当成真正切换完成。
