@@ -1730,6 +1730,18 @@ body {
   margin-top: 14px;
 }
 
+.mcp-builtins {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mcp-builtins > div {
+  display: grid;
+  gap: 2px;
+}
+
+
 .workflow-danger-zone {
   border-color: #ffccc7;
   background: #fffafa;
