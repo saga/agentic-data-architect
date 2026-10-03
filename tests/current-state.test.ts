@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCurrentStateIntelligence } from '../src/analysis/current-state.js';
 import { emptyEstate, nodeId } from '../src/model/estate.js';
