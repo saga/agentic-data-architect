@@ -52,6 +52,7 @@ import {
   type EdgeProps,
   type Node,
   type NodeProps,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 
 const { Text } = Typography;
@@ -222,10 +223,9 @@ interface HandleSpec {
 
 function handleStyle(index: number, total: number): React.CSSProperties {
   const top = ((index + 1) / (total + 1)) * 100;
-  return {
-    top: String(top) + '%',
-    transform: 'translateY(-50%)',
-  };
+  // React Flow 自己负责 Left/Right handle 的水平偏移和垂直居中；
+  // 这里只改变 top，否则覆盖它的 transform 会让连线起点错位。
+  return { top: String(top) + '%' };
 }
 
 function stageStatus(snapshot: WorkflowSnapshot, id: string): JourneyMapStage['status'] {
@@ -685,7 +685,7 @@ export function JourneyMap({
   const edgesRef = useRef<FlowEdge[]>([]);
   const snapshotRef = useRef<WorkflowSnapshot>();
   const newNodeIdsRef = useRef<Set<string>>(new Set());
-  const flowInstanceRef = useRef<{ fitView: (options?: unknown) => void } | null>(null);
+  const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
 
   useEffect(() => {
     nodesRef.current = nodes;
