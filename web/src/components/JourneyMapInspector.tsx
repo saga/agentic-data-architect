@@ -18,6 +18,7 @@ import { JourneyMapAiChat } from './JourneyMapAiChat.js';
 import type {
   FlowEdge,
   FlowNode,
+  WorkflowChange,
   WorkflowNodeDefinition,
   WorkflowNodeType,
   WorkflowActor,
@@ -43,11 +44,16 @@ interface JourneyMapInspectorProps {
   connectSelectedNode: () => Promise<void>;
   deleteSelectedEdge: () => void;
   currentDefinition?: import('./journey-map-types.js').WorkflowDefinition;
+  selectedNodeId?: string;
+  pendingAiChange?: { message: string; changes: WorkflowChange[] };
   aiEditFlow: (
     mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-  ) => Promise<{ message: string } | undefined>;
+    scope?: 'workflow' | 'selection',
+  ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
+  applyAiChanges: () => Promise<void>;
+  discardAiChanges: () => void;
 }
 
 /**
@@ -73,8 +79,12 @@ export function JourneyMapInspector({
   connectSelectedNode,
   deleteSelectedEdge,
   currentDefinition,
+  selectedNodeId,
+  pendingAiChange,
   aiEditFlow,
-}: JourneyMapInspectorProps) {
+  applyAiChanges,
+  discardAiChanges,
+}: JourneyMapInspectorProps {
   return (
     <div className="journey-map-inspector">
       <div className="journey-map-inspector-header">
@@ -164,6 +174,38 @@ export function JourneyMapInspector({
                 setNodeDraft({
                   ...nodeDraft,
                   completion: value as CompletionMode,
+                })}
+            />
+          </div>
+
+          <div>
+            <Text type="secondary">前置成果</Text>
+            <Input
+              value={nodeDraft.requires?.join(', ') ?? ''}
+              placeholder="例如 current-state, evidence"
+              onChange={(event) =>
+                setNodeDraft({
+                  ...nodeDraft,
+                  requires: event.target.value
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter(Boolean),
+                })}
+            />
+          </div>
+
+          <div>
+            <Text type="secondary">产出成果</Text>
+            <Input
+              value={nodeDraft.produces?.join(', ') ?? ''}
+              placeholder="例如 target, validation"
+              onChange={(event) =>
+                setNodeDraft({
+                  ...nodeDraft,
+                  produces: event.target.value
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter(Boolean),
                 })}
             />
           </div>
@@ -318,7 +360,11 @@ export function JourneyMapInspector({
 
       <JourneyMapAiChat
         currentDefinition={currentDefinition}
+        selectedNodeId={selectedNodeId}
+        pendingAiChange={pendingAiChange}
         aiEditFlow={aiEditFlow}
+        applyAiChanges={applyAiChanges}
+        discardAiChanges={discardAiChanges}
       />
     </div>
   );
