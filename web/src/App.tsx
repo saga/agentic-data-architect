@@ -27,7 +27,6 @@ import {
   PaperClipOutlined,
   PlusOutlined,
   SettingOutlined,
-  SendOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
 import {
@@ -173,127 +172,20 @@ interface SessionData {
   semanticAssets?: unknown[];
 }
 
-interface JourneyStage {
-  id: string;
-  title: string;
-  objective: string;
-  status: 'completed' | 'current' | 'locked' | 'future';
-  nodeType: 'task' | 'gate' | 'review' | 'end' | 'stop';
-  unlocked: boolean;
-}
-
-interface ArchitectureAssessmentPlan {
-  id: string;
-  title: string;
-  status: string;
-  goal: string;
-  scope: string[];
-  currentState: {
-    datasets: number;
-    lineageCoverage: number | null;
-    semanticAssets: number;
-    findings: number;
-    unknowns: number;
-  };
-  findings: Array<{
-    id: string;
-    title: string;
-    severity: string;
-    description: string;
-    recommendation: string;
-    evidenceIds: string[];
-  }>;
-  recommendations: string[];
-  roadmap: Array<{
+interface JourneyState {
+  workflowId: string;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  unlockedNodeIds: string[];
+  stages: Array<{
     id: string;
     title: string;
     objective: string;
-    findingIds: string[];
+    status: 'completed' | 'current' | 'locked' | 'future';
+    nodeType: 'task' | 'gate' | 'review' | 'end' | 'stop';
+    unlocked: boolean;
   }>;
-  journey?: {
-    workflowId: string;
-    currentNodeId: string;
-    completedNodeIds: string[];
-    unlockedNodeIds: string[];
-    stages: JourneyStage[];
-  };
-  journeyPlan?: {
-    version: number;
-    source: 'agent';
-    generatedAt: string;
-    turnId?: string;
-    routes: Array<{
-      id: string;
-      title: string;
-      reason: string;
-      steps: string[];
-    }>;
-  };
 }
-
-interface ModernizationPlan {
-  id: string;
-  title: string;
-  status: string;
-  goal: string;
-  scope: string[];
-  currentState: {
-    datasets: number;
-    lineageCoverage: number | null;
-    parseFailures: number;
-    semanticAssets: number;
-    findings: number;
-  };
-  gaps: ModernizationGap[];
-  analysisCases: Array<{
-    title: string;
-    question: string;
-    steps: Array<{ title: string; status: string; action: string }>;
-    conclusion?: string;
-  }>;
-  targetArchitecture: {
-    principles: string[];
-    components: Array<{ id: string; name: string; type: string; description: string; sourceAssets?: string[] }>;
-    openQuestions: string[];
-  };
-  migrationStages: Array<{
-    id: string;
-    name: string;
-    objective: string;
-    outputs: string[];
-    blockedByGapIds: string[];
-  }>;
-  mappings: Array<{
-    id: string;
-    title: string;
-    sourceAsset: string;
-    targetAsset: string;
-    transformation?: string;
-    businessRule?: string;
-    validationRule?: string;
-    status: string;
-  }>;
-  journey?: {
-    workflowId: string;
-    currentNodeId: string;
-    completedNodeIds: string[];
-    unlockedNodeIds: string[];
-    stages: JourneyStage[];
-  };
-  validationPlan: {
-    checks: Array<{
-      id: string;
-      type: string;
-      name: string;
-      description: string;
-      status: string;
-      blocking: boolean;
-    }>;
-    cutoverCriteria: string[];
-    rollbackCriteria: string[];
-  };
-}
-
 const markdownComponents = {
   mermaid: Mermaid as React.ComponentType<any>,
 };
@@ -574,7 +466,7 @@ function AppInner() {
   const [workflowConfirmText, setWorkflowConfirmText] = useState('');
   const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
-  const [journey, setJourney] = useState<ModernizationPlan['journey']>();
+  const [journey, setJourney] = useState<JourneyState>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
