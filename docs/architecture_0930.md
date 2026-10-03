@@ -122,9 +122,11 @@ local_describe
 local_sample
 local_profile
 local_query
+local_transform
+local_export_parquet
 ~~~
 
-通常按 local_catalog → local_describe → local_sample / local_profile → local_query 的顺序调查。
+通常按 local_catalog → local_describe → local_sample / local_profile → local_query 的顺序调查；需要沉淀结果时再用 local_transform 或 local_export_parquet。
 
 工具层会限制路径和 SQL。Agent 不能通过 local_query 使用 ATTACH、COPY、INSTALL、LOAD、文件读取函数、HTTP、SQLite/PostgreSQL scanner，也不能执行多条 SQL。
 
