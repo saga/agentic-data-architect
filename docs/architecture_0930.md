@@ -2968,7 +2968,7 @@ GET  /api/sessions/:name/workflow/instruction
 - elk.layered.crossingMinimization.strategy = LAYER_SWEEP
 - 每个 incoming / outgoing route 使用独立 port，并固定 port order。
 
-React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。citeturn836866search5turn836866search9
+React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。（参考 React Flow 官方 Auto Layout、ELK Multiple Handles 示例）
 
 新建节点使用明显的橙色虚线样式，并提供两种连接方式：
 
