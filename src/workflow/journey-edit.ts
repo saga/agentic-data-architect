@@ -376,15 +376,35 @@ export function validateJourneyChangeScope(
     if (selected.routes.some((route) => route.target === node.id)) allowed.add(node.id);
   }
 
+  // 同一批 Patch 可以先新增节点，再把选中节点附近的分支接到这些新节点。
+  // 因此 scope 计算分两步：先把新增节点 ID 纳入允许集合，再检查所有操作。
+  const addedNodeIds = new Set(
+    changes
+      .filter((change) => change.type === 'add-node')
+      .map((change) => change.node.id),
+  );
+  for (const id of addedNodeIds) allowed.add(id);
+
   const issues: string[] = [];
   for (const change of changes) {
     switch (change.type) {
       case 'replace-definition':
         issues.push('“仅修改当前步骤”模式不能整体替换 Workflow。');
         break;
+
       case 'add-node':
-        // 新节点本身可以新增，但后续 route 必须连接到允许范围。
+        for (const route of change.node.routes) {
+          if (!allowed.has(route.target)) {
+            issues.push(
+              'AI 新增步骤的连接超出了选中节点附近的范围：'
+              + change.node.id
+              + ' → '
+              + route.target,
+            );
+          }
+        }
         break;
+
       case 'update-node':
       case 'remove-node':
       case 'add-route':
@@ -393,10 +413,18 @@ export function validateJourneyChangeScope(
         if (!allowed.has(change.nodeId)) {
           issues.push('AI 修改超出了选中节点附近的范围：' + change.nodeId);
         }
-        if (change.type === 'update-route' && change.patch.target && !allowed.has(change.patch.target)) {
+        if (
+          change.type === 'update-route'
+          && change.patch.target
+          && !allowed.has(change.patch.target)
+        ) {
           issues.push('AI 新连接目标超出了选中节点附近的范围：' + change.patch.target);
         }
-        if (change.type === 'add-route' && !allowed.has(change.route.target) && change.route.target !== selectedNodeId) {
+        if (
+          change.type === 'add-route'
+          && !allowed.has(change.route.target)
+          && change.route.target !== selectedNodeId
+        ) {
           issues.push('AI 新连接目标超出了选中节点附近的范围：' + change.route.target);
         }
         break;
