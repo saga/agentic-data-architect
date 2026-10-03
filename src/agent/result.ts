@@ -31,6 +31,10 @@ export const AgentAnswerSchema = z.object({
   routeOptions: z.array(JourneyRouteOptionSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
+  workflow: z.object({
+    nodeId: z.string().min(1),
+    outcome: z.string().min(1),
+  }).strict().optional(),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
@@ -105,6 +109,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
     routeOptions: parsed.data.routeOptions,
+    ...(parsed.data.workflow ? { workflow: parsed.data.workflow } : {}),
     warnings,
     droppedEvidenceRefs,
   };
