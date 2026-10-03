@@ -172,7 +172,7 @@ export function applyWorkflowChanges(
 /** 保存 React Flow 节点位置。
  *
  * Workflow 语义仍然由 Markdown/Definition 保存；这里仅保存 Canvas layout。
- * elk-v2 是“需要重新自动排版”的版本标记，不代表 Workflow 版本。
+ * elk-v5 是“需要重新自动排版”的版本标记，不代表 Workflow 版本。
  */
 export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   const result: Record<string, { x: number; y: number }> = {};
@@ -336,6 +336,30 @@ function findConnectionIssues(
   return issues;
 }
 
+/**
+ * 去掉同一节点上的完全重复出口。
+ *
+ * Workflow 定义偶尔会因为 AI patch / 历史版本合并产生完全相同的 route：
+ * source + target + outcome + condition 全都一样。画布上这种连接没有任何新增信息，
+ * 只会制造两条重叠的线和两个连接点，因此只保留第一条。
+ */
+function dedupeRoutes(routes: WorkflowNodeDefinition['routes']): WorkflowNodeDefinition['routes'] {
+  const seen = new Set<string>();
+
+  return routes.filter((route) => {
+    const key =
+      route.target
+      + '\u0000'
+      + route.outcome.trim().toLowerCase()
+      + '\u0000'
+      + String(route.condition ?? '').trim();
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** 把 Workflow Definition 投影成 React Flow。
  *
  * 这里故意让“锁定模式”和“编辑模式”走同一份建图代码。
@@ -356,7 +380,7 @@ export function graphFromDefinition(
   const outgoing = new Map<string, Array<{ target: string; outcome: string; id: string }>>();
 
   for (const node of definition.nodes) {
-    node.routes.forEach((route, index) => {
+    dedupeRoutes(node.routes).forEach((route, index) => {
       // Self-loop 不属于工作地图的可视连接，也不能占用 Handle。
       if (!nodeMap.has(route.target) || route.target === node.id) return;
 
@@ -470,7 +494,7 @@ export function graphFromDefinition(
   const edges: FlowEdge[] = [];
 
   for (const node of definition.nodes) {
-    const validRoutes = node.routes.filter(
+    const validRoutes = dedupeRoutes(node.routes).filter(
       (route) => nodeMap.has(route.target) && route.target !== node.id,
     );
 
