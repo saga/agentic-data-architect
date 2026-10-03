@@ -85,6 +85,10 @@ export function JourneyMapAiChat({
       content,
     }));
 
+    if (scope === 'selection' && !selectedNodeId) {
+      return;
+    }
+
     setMessages((items) => [
       ...items,
       {
@@ -95,8 +99,6 @@ export function JourneyMapAiChat({
     ]);
     setValue('');
     setLoading(true);
-
-    if (scope === 'selection' && !selectedNodeId) return;
     try {
       const result = await aiEditFlow(mode, prompt, history, scope);
       setMessages((items) => [
@@ -147,7 +149,7 @@ export function JourneyMapAiChat({
               { value: 'workflow', label: '整张图' },
             ]}
           />
-        </Flex>>
+        </Flex>
       </div>
 
       <div className="journey-map-ai-chat-body">
