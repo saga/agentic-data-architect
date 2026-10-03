@@ -157,6 +157,7 @@ export function buildCurrentStateIntelligence(args: {
 
   const datasetNames = new Set(datasets.map((name) => name.toLowerCase()));
   // 这里只统计当前 estate 中已知 dataset 的连接，避免把外部/未建模对象算进 datasets。
+  const connected = new Set<string>();
   for (const edge of args.lineage?.edges || []) {
     for (const endpoint of [edge.source, edge.target]) {
       const normalized = endpoint.toLowerCase();
