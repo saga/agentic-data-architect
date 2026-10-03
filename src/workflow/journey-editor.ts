@@ -1,11 +1,8 @@
 /**
- * Investigation 级 Workflow Editor。
+ * 工作地图编辑器的服务端存储边界。
  *
- * 内置 Skill 的 SKILL.md 永远不直接被 UI 改写。
- * 编辑流程：
- *   journey-draft.md -> validate -> journey.md -> journey-execution.json
- *
- * React Flow 的坐标和 viewport 只属于 layout，不进入 Workflow 语义。
+ * 内置 Skill 只提供初始路线；用户修改后直接保存到 Investigation workspace。
+ * React Flow 的坐标只属于画布布局，不进入 Workflow 语义。
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -38,10 +35,8 @@ import {
 
 const JOURNEY_DIR = 'workflow';
 const ACTIVE_FILE = 'journey.md';
-const DRAFT_FILE = 'journey-draft.md';
 const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
-const DRAFT_LAYOUT_FILE = 'journey-draft-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
 
 export const JourneyLayoutNodeSchema = z.object({
@@ -85,11 +80,6 @@ export interface JourneySnapshot {
   layout: JourneyLayout;
   execution: JourneyExecution;
   state: JourneyState;
-  draft: {
-    definition: JourneyDefinition;
-    layout: JourneyLayout;
-    issues: string[];
-  } | null;
 }
 
 function journeyDir(name: string): string {
@@ -344,25 +334,6 @@ export async function getJourneySnapshot(
     });
   }
 
-  const draftMarkdown = await readTextOrNull(journeyFile(name, DRAFT_FILE));
-  let draft: JourneySnapshot['draft'] = null;
-
-  if (draftMarkdown !== null) {
-    const parsed = parseJourneyMarkdown(draftMarkdown);
-    const rawLayout = await readJson<unknown>(journeyFile(name, DRAFT_LAYOUT_FILE));
-    const parsedLayout = JourneyLayoutSchema.safeParse(rawLayout);
-
-    if (parsed.definition) {
-      draft = {
-        definition: parsed.definition,
-        layout: parsedLayout.success
-          ? parsedLayout.data
-          : defaultJourneyLayout(parsed.definition),
-        issues: parsed.issues,
-      };
-    }
-  }
-
   return {
     workflowId,
     source: active.source,
@@ -372,32 +343,7 @@ export async function getJourneySnapshot(
     layout: active.layout,
     execution: state.execution,
     state,
-    draft,
   };
-}
-
-/** 保存草稿；即使图暂时无效，也允许保存后继续修改。 */
-export async function saveJourneyDraft(
-  name: string,
-  workflowId: WorkflowId,
-  definitionInput: JourneyDefinition,
-  layoutInput: JourneyLayout,
-): Promise<{ issues: string[] }> {
-  const definition = JourneyDefinitionSchema.parse(definitionInput);
-  const layout = JourneyLayoutSchema.parse(layoutInput);
-  if (definition.id !== workflowId) throw new Error('Workflow id 不能修改为另一个工作方式。');
-
-  const issues = validateJourneyDefinition(definition);
-  await ensureWorkspace(name);
-  await fs.mkdir(journeyDir(name), { recursive: true });
-  await fs.writeFile(
-    journeyFile(name, DRAFT_FILE),
-    serializeJourneyMarkdown(definition),
-    'utf8',
-  );
-  await writeJsonAtomic(journeyFile(name, DRAFT_LAYOUT_FILE), layout);
-
-  return { issues };
 }
 
 /** 图验证入口；同时检查每个节点是否有画布位置。 */
@@ -416,8 +362,8 @@ export function validateJourneyEdit(
   return { issues: [...new Set(issues)] };
 }
 
-/** 正式应用一个 Workflow 版本；应用时重新验证，不能绕过 UI 校验。 */
-export async function applyJourneyDefinition(
+/** 保存一张工作地图；服务端重新验证，不能绕过结构检查。 */
+export async function saveJourneyDefinition(
   name: string,
   workflowId: WorkflowId,
   definitionInput: JourneyDefinition,
@@ -475,8 +421,6 @@ export async function applyJourneyDefinition(
       version: nextVersion,
     } satisfies JourneyMeta);
     await writeJsonAtomic(journeyFile(name, LAYOUT_FILE), layout);
-    await fs.rm(journeyFile(name, DRAFT_FILE), { force: true });
-    await fs.rm(journeyFile(name, DRAFT_LAYOUT_FILE), { force: true });
     await writeJsonAtomic(
       journeyFile(name, EXECUTION_FILE),
       migratedExecution,
