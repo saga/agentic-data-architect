@@ -19,6 +19,8 @@ const baseFacts: JourneyFacts = {
   mappingCount: 0,
   blockingValidationReady: 0,
   blockingValidationTotal: 0,
+  cutoverCriteriaDefined: false,
+  rollbackCriteriaDefined: false,
 };
 
 test('parses workflow branches and completion mode', () => {
@@ -305,4 +307,193 @@ test('loads the architecture assessment markdown workflow', async () => {
   assert.equal(definition.id, 'data-architecture-assessment');
   assert.equal(definition.start, 'intake');
   assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
+});
+
+
+test('data-truth does not use an arbitrary lineage percentage', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> truth',
+    '',
+    '## @task truth',
+    'completion: deterministic',
+    'completeWhen: data-truth',
+    '- success -> done',
+    '- retry -> truth',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+
+  const incompleteLineage = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 10,
+        lineageConnectionRate: 0.8,
+        semanticAssets: 0,
+        parseFailures: 0,
+      },
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(incompleteLineage.currentNodeId, 'truth');
+
+  const completeEnoughWithoutThreshold = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 10,
+        lineageConnectionRate: 0.95,
+        semanticAssets: 0,
+        parseFailures: 0,
+      },
+      highGapKinds: [],
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(completeEnoughWithoutThreshold.currentNodeId, 'done');
+});
+
+test('investigation ignores unknown count and blocks only on critical gaps', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> investigate',
+    '',
+    '## @task investigate',
+    'completion: deterministic',
+    'completeWhen: investigation',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+
+  const manyLowImpactUnknowns = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 10,
+        lineageConnectionRate: 0.95,
+        semanticAssets: 1,
+        parseFailures: 0,
+      },
+      unknowns: ['u1', 'u2', 'u3', 'u4', 'u5'],
+      highGapKinds: [],
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(manyLowImpactUnknowns.currentNodeId, 'done');
+
+  const oneCriticalGap = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 10,
+        lineageConnectionRate: 0.95,
+        semanticAssets: 1,
+        parseFailures: 0,
+      },
+      unknowns: [],
+      highGapKinds: ['source-of-truth'],
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(oneCriticalGap.currentNodeId, 'investigate');
+});
+
+test('cutover requires validation plus explicit cutover and rollback criteria', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> cutover',
+    '',
+    '## @task cutover',
+    'completion: deterministic',
+    'completeWhen: cutover',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+
+  const blocked = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      blockingValidationReady: 2,
+      blockingValidationTotal: 2,
+      cutoverCriteriaDefined: true,
+      rollbackCriteriaDefined: false,
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(blocked.currentNodeId, 'cutover');
+
+  const ready = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      blockingValidationReady: 2,
+      blockingValidationTotal: 2,
+      cutoverCriteriaDefined: true,
+      rollbackCriteriaDefined: true,
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(ready.currentNodeId, 'done');
+});
+
+test('assessment findings gate does not pass from current-state alone', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> findings',
+    '',
+    '## @task findings',
+    'completion: deterministic',
+    'completeWhen: assessment-findings',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+
+  assert.ok(result.definition);
+
+  const noFinding = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 1,
+        lineageConnectionRate: 1,
+        semanticAssets: 1,
+        parseFailures: 0,
+      },
+      findingCount: 0,
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(noFinding.currentNodeId, 'findings');
+
+  const withFinding = buildJourneyState(
+    result.definition!,
+    {
+      ...baseFacts,
+      currentState: {
+        datasets: 1,
+        lineageConnectionRate: 1,
+        semanticAssets: 1,
+        parseFailures: 0,
+      },
+      findingCount: 1,
+    },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(withFinding.currentNodeId, 'done');
 });
