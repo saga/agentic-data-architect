@@ -86,11 +86,8 @@ export function JourneyMapInspector({
   aiEditFlow,
   applyAiChanges,
   discardAiChanges,
-<<<<<<< HEAD
-=======
   humanWaiting,
   applyHumanWorkflowTransition,
->>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
 }: JourneyMapInspectorProps) {
   return (
     <div className="journey-map-inspector">
