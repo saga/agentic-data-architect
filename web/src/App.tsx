@@ -162,6 +162,7 @@ interface SessionData {
   currentState?: {
     coverage: {
       datasets: number;
+      connectedDatasets: number;
       datasetLineageConnectionRate: number | null;
       sqlParseFailures: number;
       semanticAssets: number;
