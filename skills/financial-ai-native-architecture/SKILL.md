@@ -37,6 +37,7 @@ start -> intake
 title: 明确业务目标
 objective: 明确用户、业务目标、范围和最终交付物。
 completeWhen: goal
+completion: deterministic
 tools: read,url
 
 先回答：
@@ -51,6 +52,7 @@ tools: read,url
 - needs-input -> intake
 
 ## @task requirements
+completion: agent
 
 title: 明确业务需求
 objective: 把用户真正要解决的问题和关键使用场景说清楚。
@@ -69,6 +71,7 @@ tools: read,url
 - needs-input -> intake
 
 ## @task data
+completion: agent
 
 title: 查数据
 objective: 找到需要的数据、来源、质量、时效和历史版本。
@@ -89,6 +92,7 @@ tools: read,url
 - retry -> data
 
 ## @task domain-model
+completion: agent
 
 title: 定义金融业务模型
 objective: 把业务对象、关系、时间语义和关键业务规则说清楚。
@@ -113,6 +117,7 @@ Portfolio、Account、Security、Issuer、Position、Transaction、Order / Trade
 - retry -> data
 
 ## @task architecture
+completion: agent
 
 title: 设计数据架构
 objective: 确定数据如何进入 Snowflake、如何组织、如何提供给分析和 Agent。
@@ -135,6 +140,7 @@ tools: read,url
 - retry -> data
 
 ## @task semantic
+completion: agent
 
 title: 设计业务语义
 objective: 把指标、实体、维度和时间口径变成可供 Agent 使用的 Semantic View 定义。
@@ -158,6 +164,7 @@ Semantic View 是业务语义入口，不等于完整 ontology。
 - retry -> semantic
 
 ## @task agent
+completion: agent
 
 title: 设计 Agent
 objective: 确定 DeepAgents、Skills、Tools 和人工确认点如何协同完成 Portfolio Research 等工作。
@@ -181,6 +188,7 @@ tools: read,url
 - retry -> requirements
 
 ## @task controls
+completion: agent
 
 title: 设计安全和运行控制
 objective: 明确数据访问、工具权限、Evidence、审计和高风险操作的控制边界。
@@ -202,6 +210,7 @@ tools: read,url
 - retry -> data
 
 ## @task evaluation
+completion: agent
 
 title: 设计验证和评估
 objective: 证明 Agent 的答案、数据、业务口径和工具使用是可靠的。
@@ -225,6 +234,7 @@ tools: read,url
 - retry -> agent
 
 ## @task roadmap
+completion: agent
 
 title: 形成实施路线
 objective: 把方案拆成可以逐步建设的阶段，并明确风险、依赖和待确认事项。
