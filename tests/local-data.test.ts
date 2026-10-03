@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto';
 import {
   closeLocalAnalytics,
   localQuery,
+  localTransform,
+  localExportParquet,
   registerLocalDataset,
   validateLocalReadOnlySql,
 } from '../src/analytics/local-data.js';
@@ -65,6 +67,23 @@ test('workspace CSV becomes a DuckDB dataset with Evidence provenance', async ()
     assert.equal(evidence?.type, 'query_result');
     assert.equal(evidence?.sourceHash, dataset.sha256);
     assert.equal(evidence?.discoveryRunId.startsWith('local:analysis-'), true);
+    const transformed = await localTransform(
+      sessionName,
+      'analysis',
+      'position_value',
+      'SELECT security_id, quantity * price AS market_value FROM ' + dataset.relation,
+    );
+    assert.equal(transformed.schema, 'analysis');
+    assert.equal(transformed.rowCount, 2);
+
+    const exported = await localExportParquet(
+      sessionName,
+      'SELECT * FROM ' + transformed.relation + ' ORDER BY security_id',
+      'parquet/position_value.parquet',
+    );
+    assert.equal(exported.format, 'parquet');
+    assert.equal(exported.version, 1);
+    assert.equal(exported.relativePath, 'parquet/position_value.parquet');
   } finally {
     closeLocalAnalytics();
     await fs.rm(sessionRoot, { recursive: true, force: true });
