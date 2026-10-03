@@ -426,7 +426,24 @@ class LocalDuckDBEngine {
   static async create(sessionName: string): Promise<LocalDuckDBEngine> {
     const root = workspaceRoot(sessionName);
     await fs.mkdir(root, { recursive: true });
-    const dbFile = path.join(root, 'analysis.duckdb');
+
+    // DuckDB uses the database filename as the default catalog name. If the
+    // catalog is also called "analysis", references such as analysis.table are
+    // ambiguous because "analysis" is both catalog and schema.
+    // Keep the schema name "analysis", but use a different database filename.
+    const legacyDbFile = path.join(root, 'analysis.duckdb');
+    const dbFile = path.join(root, 'local.duckdb');
+    try {
+      await fs.access(legacyDbFile);
+      try {
+        await fs.access(dbFile);
+      } catch {
+        await fs.rename(legacyDbFile, dbFile);
+      }
+    } catch {
+      // No legacy database to migrate.
+    }
+
     const instance = await DuckDBInstance.fromCache(dbFile);
     const connection = await instance.connect();
 
