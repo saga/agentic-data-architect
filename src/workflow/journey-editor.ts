@@ -17,6 +17,7 @@ import {
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
 import { loadLatestSnapshot } from '../investigation/store.js';
+import { buildModernizationGaps } from '../analysis/gap.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
