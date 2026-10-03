@@ -6,6 +6,27 @@ import {
   type JourneyRoute,
 } from './journey.js';
 
+const JourneyWorkflowNodeSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['task', 'gate', 'review', 'end', 'stop']),
+  title: z.string().min(1),
+  objective: z.string().optional(),
+  visible: z.boolean(),
+  completion: z.enum(['deterministic', 'agent']),
+  actor: z.enum(['agent', 'human', 'system']).default('agent'),
+  completeWhen: z.string().optional(),
+  tools: z.array(z.string()).optional(),
+  requires: z.array(z.string()).optional(),
+  produces: z.array(z.string()).optional(),
+  routes: z.array(z.object({
+    outcome: z.string().min(1),
+    target: z.string().min(1),
+    condition: z.string().min(1).optional(),
+    line: z.number().int().positive().optional(),
+  }).strict()),
+  line: z.number().int().positive().optional(),
+}).strict();
+
 /** 可被人工编辑器和 Workflow AI 共用的语义修改操作。 */
 export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
   z.object({
@@ -14,7 +35,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
   }).strict(),
   z.object({
     type: z.literal('add-node'),
-    node: JourneyDefinitionSchema.shape.nodes.element,
+    node: JourneyWorkflowNodeSchema,
   }).strict(),
   z.object({
     type: z.literal('update-node'),
@@ -42,7 +63,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     route: z.object({
       outcome: z.string().min(1),
       target: z.string().min(1),
-      condition: z.string().min(1).nullable().optional(),
+      condition: z.string().min(1).optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -51,7 +72,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     outcome: z.string().min(1),
     patch: z.object({
       target: z.string().min(1).optional(),
-      condition: z.string().min(1).optional(),
+      condition: z.string().min(1).nullable().optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -150,8 +171,16 @@ export function applyJourneyWorkflowChanges(
         if (!node) throw new Error('找不到节点：' + change.nodeId);
         const index = node.routes.findIndex((route) => normalize(route.outcome) === normalize(change.outcome));
         if (index < 0) throw new Error(node.id + ' 不存在 outcome=' + change.outcome);
-        node.routes[index] = { ...node.routes[index], ...change.patch };
-        if (change.patch.condition === null) delete node.routes[index]!.condition;
+        const currentRoute = node.routes[index]!;
+        const updatedRoute: JourneyRoute = {
+          ...currentRoute,
+          ...(change.patch.target !== undefined ? { target: change.patch.target } : {}),
+          ...(change.patch.condition !== undefined && change.patch.condition !== null
+            ? { condition: change.patch.condition }
+            : {}),
+        };
+        if (change.patch.condition === null) delete updatedRoute.condition;
+        node.routes[index] = updatedRoute;
         break;
       }
 
