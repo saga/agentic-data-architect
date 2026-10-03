@@ -18,10 +18,19 @@ import {
   RequestValidationError,
   UpdateConfigBodySchema,
   UpdateWorkflowBodySchema,
+  JourneyAiRequestSchema,
   parseRequest,
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
+import { generateJourneyFlow } from './workflow/journey-ai.js';
+import {
+  getJourneySnapshot,
+  JourneyEditBodySchema,
+  resetJourneyCustomization,
+  saveJourneyDefinition,
+  validateJourneyEdit,
+} from './workflow/journey-editor.js';
 import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
 import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
@@ -225,6 +234,76 @@ app.post('/api/sessions', async (req, res) => {
     }
     res.json({ context });
   });
+
+  /** 返回当前 Workflow 给工作地图页面；页面打开后直接进入可编辑状态。 */
+  app.get('/api/sessions/:name/workflow', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (!context.workflow) {
+      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      return;
+    }
+    res.json(await getJourneySnapshot(name, context.workflow));
+  });
+
+  /** 保存工作地图；服务端先做完整结构检查，通过后才创建新版本。 */
+  app.put('/api/sessions/:name/workflow', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (!context.workflow) {
+      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      return;
+    }
+
+    const body = parseRequest(JourneyEditBodySchema, req.body);
+    const validation = validateJourneyEdit(body.definition, body.layout);
+    if (validation.issues.length) {
+      res.status(400).json({
+        error: '工作地图还不能保存，请先修正这些问题。',
+        issues: validation.issues,
+      });
+      return;
+    }
+
+    const result = await saveJourneyDefinition(
+      name,
+      context.workflow,
+      body.definition,
+      body.layout,
+    );
+    res.json(result);
+  });
+
+  /** 工作地图专用 AI：只生成/修改 Workflow，不参与数据分析。 */
+  app.post('/api/sessions/:name/workflow/ai', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (!context.workflow) {
+      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      return;
+    }
+
+    const body = parseRequest(JourneyAiRequestSchema, req.body);
+    const result = await generateJourneyFlow(
+      name,
+      context.workflow,
+      body.mode,
+      body.prompt,
+    );
+    res.json(result);
+  });
+
+  /** 删除当前 Investigation 的自定义地图，恢复所选工作方式的内置路线。 */
+  app.post('/api/sessions/:name/workflow/reset', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (!context.workflow) {
+      res.status(409).json({ error: '这个调查还没有选择工作方式，无法恢复工作地图。' });
+      return;
+    }
+    res.json(await resetJourneyCustomization(name, context.workflow));
+  });
+
 
   app.put('/api/sessions/:name/config', async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
