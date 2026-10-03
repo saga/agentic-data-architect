@@ -1415,6 +1415,30 @@ body {
 .journey-flow-node-kicker-future { color: #6b7a90; }
 .journey-flow-node-kicker-locked { color: #9aa6b5; }
 
+.journey-flow-node-completed {
+  border-color: #95de64;
+  background: linear-gradient(180deg, #fbfff8 0%, #f6ffed 100%);
+}
+
+.journey-flow-node-current {
+  border-color: #91caff;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f7ff 100%);
+  box-shadow:
+    0 0 0 4px rgba(22, 119, 255, 0.08),
+    0 12px 30px rgba(22, 119, 255, 0.12);
+}
+
+.journey-flow-node-locked {
+  border-style: dashed;
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+.journey-flow-node-future {
+  border-color: #d6e4ff;
+  background: #fcfdff;
+}
+
 .journey-flow-node-type {
   margin-left: auto;
   padding: 2px 6px;
