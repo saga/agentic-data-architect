@@ -122,6 +122,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const newNodeIdsRef = useRef<Set<string>>(new Set());
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
   const lastMeasuredNodeCountRef = useRef(0);
+  const layoutRequestRef = useRef(0);
 
   // React Flow 会在首次渲染和新增节点后重新测量真实 DOM 尺寸。
   // 自动布局必须在“测量完成”后再跑一次，否则 ELK 只能使用估算高度。
@@ -132,6 +133,25 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     edgesRef.current = edges;
     snapshotRef.current = snapshot;
   }, [nodes, edges, snapshot]);
+
+  /**
+   * 所有布局请求共享一个递增 token。
+   *
+   * ELK 是异步的：用户连续点击“自动排版”、新增节点后又马上修改节点，
+   * 老请求可能比新请求更晚返回。没有 token 时，老结果会覆盖新结果。
+   * 因此只有最后一次 layout request 可以写回 React Flow。
+   */
+  const layoutWithLatest = async (
+    nodesToLayout: FlowNode[],
+    edgesToLayout: FlowEdge[],
+  ): Promise<FlowNode[] | undefined> => {
+    const requestId = ++layoutRequestRef.current;
+    const layouted = await autoLayoutJourney(nodesToLayout, edgesToLayout);
+
+    return requestId === layoutRequestRef.current ? layouted : undefined;
+  };
+
+
 
   // ---- 服务端 Workflow 生命周期 -----------------------------------------
   /** 只负责把服务端快照取回来。
@@ -405,8 +425,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       nextNewIds,
     );
-    const laidOutNodes = await autoLayoutJourney(graph.nodes, graph.edges);
+    const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
 
+    if (!laidOutNodes) return;
     setNodes(laidOutNodes);
     setEdges(graph.edges);
     setSelectedNodeId(id);
@@ -461,7 +482,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           setSelectedEdgeId,
           nextNewIds,
         );
-        setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
+        setNodes((await layoutWithLatest(graph.nodes, graph.edges)) ?? nodesRef.current);
         setEdges(graph.edges);
         setSelectedNodeId(undefined);
         setSelectedEdgeId(undefined);
@@ -493,7 +514,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       nextNewIds,
     );
 
-    const layoutedNodes = await autoLayoutJourney(graph.nodes, graph.edges);
+    const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
     setNodes(layoutedNodes);
     setEdges(graph.edges);
     setValidationIssues([]);
@@ -835,6 +856,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       newNodeIdsRef.current,
     );
     const laidOutNodes = await autoLayoutJourney(graph.nodes, graph.edges);
+    if (!laidOutNodes) return;
     setNodes(laidOutNodes);
     setValidationIssues([]);
 
@@ -944,7 +966,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     let cancelled = false;
 
     const relayoutAfterMeasure = async () => {
-      const layouted = await autoLayoutJourney(nodesRef.current, edgesRef.current);
+      const layouted = await layoutWithLatest(nodesRef.current, edgesRef.current);
       if (!cancelled) {
         setNodes(layouted);
       }
