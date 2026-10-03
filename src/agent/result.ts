@@ -96,6 +96,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       unknowns: ['模型没有返回合法 JSON，需要重问或收紧提示词'],
       followUpQuestions: [],
       routeOptions: [],
+      workflow: undefined,
       warnings: ['这次回答没有返回可解析的结构化结果，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
@@ -109,6 +110,7 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       unknowns: ['模型返回的结构化结果不符合预期，需要重问或收紧提示词'],
       followUpQuestions: [],
       routeOptions: [],
+      workflow: undefined,
       warnings: ['这次回答不符合结构化结果 Schema，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
