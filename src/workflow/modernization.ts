@@ -40,8 +40,8 @@ function buildValidationPlan(
     {
       id: 'validation:coverage',
       type: 'coverage' as const,
-      name: 'Current-State 覆盖率',
-      description: '先确认关键 SQL、数据集和上下游关系已经查得比较完整。',
+      name: 'Current-State 基础完整性',
+      description: '先确认关键 SQL 已解析，并且数据集连接情况已经查清。',
       status: current ? (current.coverage.sqlParseFailures === 0 ? 'ready' as const : 'blocked' as const) : 'blocked' as const,
       blocking: true,
       evidenceIds,
@@ -50,8 +50,12 @@ function buildValidationPlan(
       id: 'validation:lineage',
       type: 'lineage' as const,
       name: '关键链路完整性',
-      description: '确认关键数据从哪里来、流向哪里，而且人工抽查过。',
-      status: current?.coverage.datasetLineageCoverage !== null && (current?.coverage.datasetLineageCoverage ?? 0) >= 0.8 ? 'ready' as const : 'blocked' as const,
+      description: '确认当前发现的数据集都已经出现在血缘连接里；这只是图上的连接完整性，不等于业务 Source-of-Truth 已确认。',
+      status: current
+        && current.coverage.sqlParseFailures === 0
+        && current.coverage.datasetLineageConnectionRate === 1
+        ? 'ready' as const
+        : 'blocked' as const,
       blocking: true,
       evidenceIds,
     },
@@ -217,7 +221,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     goal: inv.goal || inv.userPrompt,
     currentState: current ? {
       datasets: current.coverage.datasets,
-      lineageCoverage: current.coverage.datasetLineageCoverage,
+      lineageConnectionRate: current.coverage.datasetLineageConnectionRate,
       semanticAssets: current.coverage.semanticAssets,
       parseFailures: current.coverage.sqlParseFailures,
     } : null,
@@ -230,6 +234,8 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
       (check) => check.blocking && ['ready', 'passed'].includes(check.status),
     ).length,
     blockingValidationTotal: validationPlan.checks.filter((check) => check.blocking).length,
+    cutoverCriteriaDefined: validationPlan.cutoverCriteria.length > 0,
+    rollbackCriteriaDefined: validationPlan.rollbackCriteria.length > 0,
   });
   const plan: ModernizationPlan = ModernizationPlanSchema.parse({
     id: productId('modernization'),
@@ -241,7 +247,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     scope: inv.scope,
     currentState: {
       datasets: current?.coverage.datasets ?? snapshot?.lineage?.tables.filter((t) => !t.startsWith('file:')).length ?? 0,
-      lineageCoverage: current?.coverage.datasetLineageCoverage ?? null,
+      lineageConnectionRate: current?.coverage.datasetLineageConnectionRate ?? null,
       parseFailures: current?.coverage.sqlParseFailures ?? snapshot?.lineage?.parseFailures.length ?? 0,
       semanticAssets: current?.coverage.semanticAssets ?? snapshot?.semanticAssets?.length ?? 0,
       findings: inv.findings.length,
@@ -288,7 +294,7 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
       goal: inv.goal || inv.userPrompt,
       currentState: current ? {
         datasets: current.coverage.datasets,
-        lineageCoverage: current.coverage.datasetLineageCoverage,
+        lineageConnectionRate: current.coverage.datasetLineageConnectionRate,
         semanticAssets: current.coverage.semanticAssets,
         parseFailures: current.coverage.sqlParseFailures,
       } : null,
