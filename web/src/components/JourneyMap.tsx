@@ -669,28 +669,46 @@ export function JourneyMap({
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
+  const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
+  const nodesRef = useRef<FlowNode[]>([]);
+  const edgesRef = useRef<FlowEdge[]>([]);
+  const snapshotRef = useRef<WorkflowSnapshot>();
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+    snapshotRef.current = snapshot;
+  }, [nodes, edges, snapshot]);
 
   const loadWorkflow = useCallback(async () => {
     const name = sessionNameFromUrl();
     if (!name) return;
 
     setFetching(true);
+
     try {
-      const response = await fetch('/api/sessions/' + encodeURIComponent(name) + '/workflow');
+      const response = await fetch(
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow',
+      );
+
       if (!response.ok) {
         if (response.status === 409) {
           setSnapshot(undefined);
+          setNodes([]);
+          setEdges([]);
           return;
         }
         throw new Error(await response.text());
       }
+
       const data = await response.json() as WorkflowSnapshot;
       setSnapshot(data);
+
       if (!editing) {
-        setNodes(graphFromDefinition(
+        const graph = graphFromDefinition(
           data.definition,
           data.layout,
           data,
@@ -700,18 +718,15 @@ export function JourneyMap({
           undefined,
           undefined,
           setSelectedEdgeId,
-        ).nodes);
-        setEdges(graphFromDefinition(
-          data.definition,
-          data.layout,
-          data,
-          false,
-          setSelectedNodeId,
-          undefined,
-          undefined,
-          undefined,
-          setSelectedEdgeId,
-        ).edges);
+        );
+
+        const shouldUpgradeLayout = data.layout.engine !== 'elk';
+        const laidOutNodes = shouldUpgradeLayout
+          ? await layoutWithElk(graph.nodes, graph.edges)
+          : graph.nodes;
+
+        setNodes(laidOutNodes);
+        setEdges(graph.edges);
       }
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
@@ -767,8 +782,15 @@ export function JourneyMap({
   }, [selectedEdge]);
 
   const snapshotNow = (): { nodes: FlowNode[]; edges: FlowEdge[] } => ({
-    nodes: nodes.map((node) => ({ ...node, data: { ...node.data }, position: { ...node.position } })),
-    edges: edges.map((edge) => ({ ...edge, data: edge.data ? { ...edge.data } : undefined })),
+    nodes: nodesRef.current.map((node) => ({
+      ...node,
+      data: { ...node.data },
+      position: { ...node.position },
+    })),
+    edges: edgesRef.current.map((edge) => ({
+      ...edge,
+      data: edge.data ? { ...edge.data } : undefined,
+    })),
   });
 
   const pushHistory = () => {
