@@ -1590,12 +1590,17 @@ body {
   pointer-events: none;
 }
 
-/* 工作地图独立页面 --------------------------------------------------------- */
+/* 独立子页面 ------------------------------------------------------------ */
 .subpage-app {
-  width: 100%;
-  height: 100vh;
+  /* AppInner 的父级不是 flex 容器，不能依赖 height: 100% 链式继承。
+     用 viewport 锚定，保证工作地图/配置/轨迹页一定占满整个浏览器可视区域。 */
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100dvh;
   min-width: 0;
-  min-height: 0;
+  min-height: 100dvh;
   overflow: hidden;
   background: #f7f9fc;
 }
@@ -1604,7 +1609,7 @@ body {
   width: 100%;
   height: 100%;
   min-width: 0;
-  min-height: 0;
+  min-height: 100%;
   overflow: hidden;
 }
 
