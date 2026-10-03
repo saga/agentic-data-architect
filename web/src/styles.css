@@ -1951,6 +1951,26 @@ body {
   padding-right: 3px;
 }
 
+.journey-map-property-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.journey-map-property-id .ant-typography {
+  margin: 0;
+}
+
+.journey-map-inspector-properties .ant-collapse {
+  border-radius: 10px;
+  background: #fafbfd;
+}
+
+.journey-map-inspector-properties .ant-collapse-content-box {
+  padding: 10px 12px !important;
+}
+
 .journey-map-inspector-ai {
   overflow: hidden;
 }
