@@ -27,6 +27,7 @@ import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
 import {
+  buildJourneyAgentInstruction,
   getJourneySnapshot,
   JourneyEditBodySchema,
   resetJourneyCustomization,
@@ -36,11 +37,10 @@ import {
 } from './workflow/journey-editor.js';
 import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
-import { buildModernizationPlan, loadModernizationPlan, loadModernizationJourneyState } from './workflow/modernization.js';
+import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
   loadArchitectureAssessmentPlan,
-  loadArchitectureAssessmentJourneyState,
 } from './workflow/assessment.js';
 import { config } from './config.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
@@ -448,15 +448,34 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     });
   });
 
+  /** 兼容旧 Journey UI；如果当前 Investigation 选择了 Workflow，统一返回当前 Workflow state。 */
   app.get('/api/sessions/:name/journey', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
-    const journey = context.workflow === 'legacy-modernization'
-      ? await loadModernizationJourneyState(name)
-      : context.workflow === 'data-architecture-assessment'
-        ? await loadArchitectureAssessmentJourneyState(name)
-        : null;
-    res.json({ journey, routePlan: context.journeyPlan ?? null });
+    if (!context.workflow) {
+      res.json({ journey: null, routePlan: context.journeyPlan ?? null });
+      return;
+    }
+
+    const snapshot = await getJourneySnapshot(name, context.workflow);
+    res.json({
+      journey: snapshot.state,
+      routePlan: context.journeyPlan ?? null,
+      workflow: {
+        source: snapshot.source,
+        baseWorkflowId: snapshot.baseWorkflowId,
+        version: snapshot.version,
+      },
+    });
+  });
+
+  /** 给调试/测试和普通 Agent 路径使用的当前 Workflow 控制摘要。 */
+  app.get('/api/sessions/:name/workflow/instruction', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    res.type('text/plain').send(
+      await buildJourneyAgentInstruction(name, context.workflow),
+    );
   });
 
   app.get('/api/sessions/:name/assessment', async (req, res) => {
