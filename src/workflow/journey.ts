@@ -65,7 +65,7 @@ export interface JourneyFacts {
   roadmapItemCount?: number;
   currentState: {
     datasets: number;
-    lineageCoverage: number | null;
+    lineageConnectionRate: number | null;
     semanticAssets: number;
     parseFailures: number;
   } | null;
@@ -75,6 +75,9 @@ export interface JourneyFacts {
   mappingCount: number;
   blockingValidationReady: number;
   blockingValidationTotal: number;
+  /** 只是说明切换/回退的基本条件是否已经明确，不代表已经执行切换。 */
+  cutoverCriteriaDefined: boolean;
+  rollbackCriteriaDefined: boolean;
 }
 
 export interface JourneyStage {
@@ -352,19 +355,21 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
         facts.currentState
         && facts.currentState.datasets > 0
         && facts.currentState.parseFailures === 0
-        && (facts.currentState.lineageCoverage ?? 0) >= 0.8
-        && (facts.currentState.semanticAssets > 0 || !facts.highGapKinds.includes('semantic')),
+        && !facts.highGapKinds.some((kind) =>
+          ['discovery', 'lineage', 'source-of-truth'].includes(kind)),
       );
     case 'investigation':
       return Boolean(
         facts.currentState
-        && facts.unknowns.length <= 3
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
+        && !facts.highGapKinds.some((kind) =>
+          ['discovery', 'lineage', 'source-of-truth'].includes(kind)),
       );
     case 'current-state-ready':
       return Boolean(
         facts.currentState
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage', 'semantic'].includes(kind)),
+        && facts.currentState.datasets > 0
+        && !facts.highGapKinds.some((kind) =>
+          ['discovery', 'lineage', 'source-of-truth'].includes(kind)),
       );
     case 'target':
       return facts.targetComponentCount > 0;
@@ -374,11 +379,19 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
       return facts.blockingValidationTotal > 0
         && facts.blockingValidationReady >= facts.blockingValidationTotal;
     case 'cutover':
-      return conditionPassed('validation', facts);
+      return Boolean(
+        conditionPassed('validation', facts)
+        && facts.cutoverCriteriaDefined
+        && facts.rollbackCriteriaDefined,
+      );
     case 'assessment-current-state':
-      return Boolean(facts.currentState);
+      return Boolean(
+        facts.currentState
+        && facts.currentState.datasets > 0
+        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage'].includes(kind)),
+      );
     case 'assessment-findings':
-      return (facts.findingCount ?? 0) > 0 || Boolean(facts.currentState);
+      return (facts.findingCount ?? 0) > 0;
     case 'assessment-recommendation':
       return (facts.recommendationCount ?? 0) > 0;
     case 'assessment-roadmap':
