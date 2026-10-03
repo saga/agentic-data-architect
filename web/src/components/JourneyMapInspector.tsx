@@ -35,7 +35,7 @@ interface JourneyMapInspectorProps {
   connectTargetId?: string;
   connectOutcome: string;
   setNodeDraft: React.Dispatch<React.SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
-  setEdgeDraft: React.Dispatch<React.SetStateAction<{ outcome: string; target: string } | undefined>>;
+  setEdgeDraft: React.Dispatch<React.SetStateAction<{ outcome: string; target: string; condition?: string } | undefined>>;
   setConnectTargetId: React.Dispatch<React.SetStateAction<string | undefined>>;
   setConnectOutcome: React.Dispatch<React.SetStateAction<string>>;
   applyNodeDraft: () => Promise<void>;
