@@ -108,7 +108,7 @@ interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
   /** 画布布局算法；旧数据没有此字段时，编辑器会自动升级到 ELK 布局。 */
-  engine?: 'elk';
+  engine?: 'elk-v2' | 'elk';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -434,8 +434,8 @@ async function layoutWithElk(
       'elk.direction': 'RIGHT',
       'elk.edgeRouting': 'ORTHOGONAL',
       // 留出足够白空间，尤其是编辑模式节点会展开完成方式/提示等内容。
-      'elk.spacing.nodeNode': '120',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '180',
+      'elk.spacing.nodeNode': '100',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '140',
       'elk.layered.spacing.edgeNodeBetweenLayers': '75',
       'elk.layered.spacing.edgeEdgeBetweenLayers': '55',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -655,7 +655,7 @@ function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   for (const node of nodes) {
     result[node.id] = { x: node.position.x, y: node.position.y };
   }
-  return { version: 1, engine: 'elk', nodes: result };
+  return { version: 1, engine: 'elk-v2', nodes: result };
 }
 
 function definitionFromGraph(nodes: FlowNode[], edges: FlowEdge[], base: WorkflowDefinition): WorkflowDefinition {
@@ -805,7 +805,7 @@ export function JourneyMap({
         newNodeIdsRef.current,
       );
 
-      const shouldUpgradeLayout = data.layout.engine !== 'elk';
+      const shouldUpgradeLayout = data.layout.engine !== 'elk-v2';
       const laidOutNodes = shouldUpgradeLayout
         ? await layoutWithElk(graph.nodes, graph.edges)
         : graph.nodes;
@@ -1511,7 +1511,7 @@ export function JourneyMap({
         newNodeIdsRef.current,
       );
 
-      const layoutedNodes = sourceLayout.engine === 'elk'
+      const layoutedNodes = sourceLayout.engine === 'elk-v2'
         ? graph.nodes
         : await layoutWithElk(graph.nodes, graph.edges);
 
@@ -1687,7 +1687,7 @@ export function JourneyMap({
   const completedCount = snapshot.state.completedNodeIds.filter((id) => activeDefinition.nodes.some((node) => node.id === id)).length;
 
   return (
-    <div className={'journey-map-canvas journey-map-editor-shell' + (editing ? ' journey-map-editor-mode' : '')}>
+    <div className={'journey-map-canvas journey-map-editor-shell' + (editing ? ' journey-map-editor-mode' : ' journey-map-locked-mode')}>
       <div className="journey-map-editor-header">
         <div>
           <div className="journey-map-heading-title">工作地图</div>
