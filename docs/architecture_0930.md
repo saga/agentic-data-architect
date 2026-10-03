@@ -2984,3 +2984,47 @@ React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项�
 ~~~
 
 “添加下一步”在存在主 success 路线时会插入节点，避免产生 success-1 / success-2 之类难以理解的 outcome。
+### V1.8 Journey Map 前端重构
+
+Journey Map 不再由一个组件同时负责 React Flow rendering、Graph 转换、ELK layout、编辑状态、表单和 API。
+
+当前边界：
+
+```text
+JourneyMap
+  → 页面组合 / React Flow
+
+useJourneyWorkflowEditor
+  → 编辑状态 / Undo / Graph mutation / Draft Apply
+
+journey-map-graph
+  → Definition ↔ Graph / Handle / 连接问题诊断
+
+journey-map-layout
+  → measured dimensions / ELK / collision guard
+
+JourneyFlowNode
+  → node rendering / handles / toolbar
+
+JourneyFlowEdge
+  → edge rendering / self-loop / labels
+
+JourneyMapInspector
+  → node / edge property editing
+```
+
+自动排版现在不是简单把节点交给 ELK 后直接使用位置，而是：
+
+```text
+React Flow 实测节点尺寸
+        ↓
+ELK layered layout
+        ↓
+较大的 node/layer spacing
+        ↓
+collision guard
+        ↓
+setNodes
+```
+
+并通过 layout request token 丢弃过期的异步 ELK 结果，避免快速连续编辑时旧布局覆盖新布局。
