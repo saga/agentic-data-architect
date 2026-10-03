@@ -345,7 +345,6 @@ export function graphFromDefinition(
   definition: WorkflowDefinition,
   layout: WorkflowLayout,
   snapshot: WorkflowSnapshot,
-  onSelectNode?: (id: string) => void,
   onAddStep?: (id: string) => void,
   onAddBranch?: (id: string) => void,
   onDelete?: (id: string) => void,
@@ -449,7 +448,6 @@ export function graphFromDefinition(
               connectionIssueText: connectionIssue.text,
             }
           : {}),
-        onSelect: onSelectNode,
         onAddStep,
         onAddBranch,
         onDelete,
