@@ -124,21 +124,15 @@ export function JourneyMapAiChat({
         >
           <Flex align="center" gap={7} style={{ minWidth: 0 }}>
             <RobotOutlined />
-            <Typography.Text strong>AI 修改工作地图</Typography.Text>
+            <Typography.Text strong>AI 调整</Typography.Text>
           </Flex>
-          <Tag bordered={false}>
-            {selectedNode ? `当前：${selectedNode.title}` : '当前：整个工作地图'}
+          <Tag bordered={false} color={selectedNode ? 'blue' : undefined}>
+            {selectedNode ? selectedNode.title : '整张图'}
           </Tag>
         </Flex>
         <Typography.Text type="secondary" className="journey-map-inspector-desc">
-          直接说要怎么改。AI 只生成修改预览，确认后才会写进当前画布。
+          直接告诉 AI 怎么调整，修改会先预览，不会自动保存。
         </Typography.Text>
-
-        <div className="journey-map-ai-chat-hint">
-          <Typography.Text type="secondary">
-            直接描述你想怎么改；点中了步骤时，AI 会优先参考该步骤。
-          </Typography.Text>
-        </div>
       </div>
 
       <div className="journey-map-ai-chat-body">
