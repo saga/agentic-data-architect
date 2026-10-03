@@ -134,7 +134,14 @@ export async function generateJourneyFlow(
   prompt: string,
   history: JourneyAiConversationMessage[] = [],
   baseDefinition?: JourneyDefinition,
-): Promise<{ definition: JourneyDefinition; message: string }> {
+  scope: 'workflow' | 'selection' = 'workflow',
+  selectedNodeId?: string,
+): Promise<{
+  definition: JourneyDefinition;
+  message: string;
+  changes: JourneyWorkflowChange[];
+  summary: string[];
+}> {
   const snapshot = await getJourneySnapshot(name, workflowId);
   const context = await loadWorkspaceContext(name);
   const currentDefinition = baseDefinition
@@ -152,6 +159,8 @@ export async function generateJourneyFlow(
       context.goal || context.userPrompt,
       currentDefinition,
       history,
+      scope,
+      selectedNodeId,
     ),
     systemPrompt: buildSystemPrompt(workflowId),
     purpose: 'journey-map',
@@ -163,21 +172,46 @@ export async function generateJourneyFlow(
     parsed = JourneyAiOutputSchema.parse(extractJson(raw));
   } catch (error) {
     throw new Error(
-      error instanceof Error ? error.message : 'AI 返回的工作地图格式不正确，请重试。',
+      error instanceof Error ? error.message : 'AI 返回的工作地图修改格式不正确，请重试。',
     );
   }
 
-  if (parsed.definition.id !== workflowId) {
-    throw new Error('AI 返回的工作地图与当前工作方式不一致，请重试。');
+  const changes = parsed.changes.map((change) => JourneyWorkflowChangeSchema.parse(change));
+
+  if (mode === 'generate') {
+    if (changes.length !== 1 || changes[0]?.type !== 'replace-definition') {
+      throw new Error('重新设计模式必须返回一个 replace-definition 修改。');
+    }
+  } else if (changes.some((change) => change.type === 'replace-definition')) {
+    throw new Error('修改模式只能返回局部 Workflow changes。');
   }
 
-  const issues = validateJourneyDefinition(parsed.definition);
+  if (scope === 'selection') {
+    const scopeIssues = validateJourneyChangeScope(currentDefinition, changes, selectedNodeId);
+    if (scopeIssues.length) {
+      throw new Error('AI 修改范围超出当前选中步骤：\n' + scopeIssues.join('\n'));
+    }
+  }
+
+  let nextDefinition: JourneyDefinition;
+  try {
+    nextDefinition = applyJourneyWorkflowChanges(currentDefinition, changes);
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : 'AI 修改无法应用到当前工作地图。',
+    );
+  }
+
+  const issues = validateJourneyDefinition(nextDefinition);
   if (issues.length) {
     throw new Error('AI 生成的工作地图还不能使用：\n' + issues.join('\n'));
   }
 
+  const canonicalChanges = diffJourneyWorkflowDefinitions(currentDefinition, nextDefinition);
   return {
-    definition: parsed.definition,
-    message: parsed.message?.trim() || 'AI 已生成一版工作地图，请检查后保存。',
+    definition: nextDefinition,
+    message: parsed.message?.trim() || 'AI 已提出一版工作地图修改，请检查变更后应用。',
+    changes: canonicalChanges,
+    summary: canonicalChanges.map(describeJourneyWorkflowChange),
   };
 }
