@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-/** DSL 中允许出现的 Workflow 节点类型。保持小集合，避免演变成 BPMN。 */
+/** DSL 中允许出现的 Workflow 节点类型；只取 BPMN 里最有价值的一小部分语义。 */
 export type WorkflowNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 
 /** 节点如何判断“这一阶段完成”。 */
