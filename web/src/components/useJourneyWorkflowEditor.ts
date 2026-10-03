@@ -398,7 +398,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       definition,
       layoutFromNodes(nextNodes),
       currentSnapshot,
-      true,
       setSelectedNodeId,
       (value) => { void addNodeAfter(value, false); },
       (value) => { void addNodeAfter(value, true); },
@@ -455,7 +454,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           definition,
           layoutFromNodes(nextNodes),
           currentSnapshot,
-          true,
           setSelectedNodeId,
           (value) => { void addNodeAfter(value, false); },
           (value) => { void addNodeAfter(value, true); },
@@ -486,7 +484,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       definition,
       layoutFromNodes(nextNodes),
       currentSnapshot,
-      true,
       setSelectedNodeId,
       (value) => { void addNodeAfter(value, false); },
       (value) => { void addNodeAfter(value, true); },
@@ -528,7 +525,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   };
 
   const onReconnect = async (oldEdge: FlowEdge, connection: Connection) => {
-    if (!editing || !connection.source || !connection.target || connection.source === connection.target) return;
+    if (!connection.source || !connection.target || connection.source === connection.target) return;
 
     pushHistory();
     const currentNodes = nodesRef.current;
@@ -638,7 +635,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       definition,
       layoutFromNodes(nextNodes),
       currentSnapshot,
-      true,
       setSelectedNodeId,
       (id) => { void addNodeAfter(id, false); },
       (id) => { void addNodeAfter(id, true); },
@@ -779,7 +775,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       definition,
       layoutFromNodes([...currentNodes, node]),
       currentSnapshot,
-      true,
       setSelectedNodeId,
       (value) => { void addNodeAfter(value, false); },
       (value) => { void addNodeAfter(value, true); },
@@ -833,7 +828,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       currentDefinition,
       layoutFromNodes(nodesRef.current),
       snapshotRef.current ?? snapshot!,
-      true,
       setSelectedNodeId,
       (id) => { void addNodeAfter(id, false); },
       (id) => { void addNodeAfter(id, true); },
@@ -888,7 +882,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         current.definition,
         current.layout,
         current,
-        true,
         setSelectedNodeId,
         (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
@@ -1057,7 +1050,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           ...currentSnapshot,
           definition: body.definition,
         },
-        true,
         setSelectedNodeId,
         (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
