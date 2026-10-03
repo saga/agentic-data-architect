@@ -2240,3 +2240,89 @@ body {
     flex-direction: column;
   }
 }
+
+
+/* Workflow editor: make newly-created nodes unmistakable. */
+.journey-flow-node-new {
+  border: 2px dashed #fa8c16 !important;
+  background: #fffbe6 !important;
+  box-shadow:
+    0 0 0 3px rgba(250, 140, 22, 0.12),
+    0 7px 20px rgba(250, 140, 22, 0.14);
+}
+
+.journey-flow-node-new .journey-flow-node-title {
+  color: #ad4e00;
+}
+
+.journey-flow-node-new-tag {
+  margin-top: 8px;
+  margin-inline-end: 0;
+  align-self: flex-start;
+  font-weight: 600;
+}
+
+.journey-flow-handle-edit {
+  width: 11px !important;
+  height: 11px !important;
+  background: #1677ff !important;
+  border: 2px solid #fff !important;
+  box-shadow: 0 0 0 1px #1677ff, 0 1px 5px rgba(22, 119, 255, 0.25);
+  z-index: 5;
+}
+
+.journey-flow-node-new .journey-flow-handle-edit {
+  background: #fa8c16 !important;
+  box-shadow: 0 0 0 1px #fa8c16, 0 1px 5px rgba(250, 140, 22, 0.28);
+}
+
+.journey-flow-edge-label {
+  z-index: 10;
+}
+
+.journey-map-connect-box {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 11px;
+  border: 1px solid #e5e9ef;
+  border-radius: 10px;
+  background: #fafbfd;
+}
+
+.journey-map-connect-box > .ant-typography {
+  line-height: 18px;
+}
+
+.journey-map-connect-hint {
+  display: block;
+  line-height: 17px;
+  font-size: 11px;
+}
+
+.journey-map-editor-header .ant-btn {
+  white-space: nowrap;
+}
+
+.journey-map-flow-wrap .react-flow__edge {
+  pointer-events: stroke;
+}
+
+.journey-map-flow-wrap .react-flow__handle {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.journey-map-flow-wrap .react-flow__handle:hover {
+  transform: translateY(-50%) scale(1.25);
+}
+
+@media (max-width: 1100px) {
+  .journey-map-editor-body {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .journey-map-editor-header .journey-map-heading-subtitle {
+    max-width: 500px;
+  }
+}
