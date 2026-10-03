@@ -149,7 +149,11 @@ export function JourneyMapAiChat({
             value={scope}
             onChange={(next) => setScope(next as 'workflow' | 'selection')}
             options={[
-              { value: 'selection', label: '选中步骤', disabled: mode === 'generate' },
+              {
+                value: 'selection',
+                label: '选中步骤',
+                disabled: mode === 'generate' || !selectedNodeId,
+              },
               { value: 'workflow', label: '整张图' },
             ]}
           />
