@@ -1,4 +1,4 @@
-# 当前实现状态（V1.5）
+# 当前实现状态（V1.6）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -51,6 +51,141 @@ Evidence / State / Findings
 - 由于这是本机单用户模型，Copilot SDK 使用 `mode: "copilot-cli"`。以后若改成多人共享服务，必须重新采用 `mode: "empty"` 和显式的工具 / MCP / Skill / workspace allowlist。
 
 这个决定也意味着：**配置页是“调整这次调查的输入”，不是“手工组装一个 Agent”**。
+## V1.6 Local Data Workbench：SQLite + DuckDB + Parquet
+
+V1.6 开始把本地轻量数据库真正作为 Agent 工作台的一部分，但不把 SQLite 和 DuckDB 混成一个万能数据库。
+
+职责固定为：
+
+~~~text
+SQLite
+  = 应用状态 / 对话 / Dataset Registry / Analysis Run metadata
+
+DuckDB
+  = 每个 Investigation 的本地分析引擎
+
+Parquet
+  = 大型分析数据和可移植中间格式
+
+Filesystem
+  = 原始输入和用户可直接打开的工作产物
+~~~
+
+### 1. 每个 Investigation 一个分析数据库
+
+本地分析数据放在：
+
+~~~text
+.workspace/<investigation>/
+  ├── analysis.duckdb
+  ├── uploads/
+  ├── reports/
+  └── artifacts/
+~~~
+
+analysis.duckdb 只服务当前 Investigation。不会把所有 Investigation 共用一份 DuckDB 写库，也不会把 DuckDB 当作整个 App 的 system of record。
+
+DuckDB 内部固定创建四个轻量 schema：
+
+~~~text
+raw       原始文件对应的只读 view
+analysis  可继续复用的分析结果
+semantic  本次 Investigation 临时形成的业务语义结果
+scratch   Agent 的临时实验
+~~~
+
+当前阶段自动建立 schema 和 raw views；analysis、semantic、scratch 是后续本地分析产物的固定落点，不再为此增加第二套数据库抽象。
+
+### 2. Dataset Registry 放在现有 SQLite
+
+项目已经有本地 SQLite conversation store，因此 V1.6 不再新建第三个元数据库，而是在同一个 SQLite 文件中增加 local_datasets 和 local_analysis_runs。
+
+local_datasets 保存：
+
+~~~text
+dataset id / Investigation / 文件相对路径 / 格式
+DuckDB relation / version / SHA-256 / 文件更新时间 / 大小
+~~~
+
+文件变化时 version 递增。分析 Evidence 绑定 dataset version + SHA-256。
+
+local_analysis_runs 保存分析操作、dataset id、SQL、SQL hash、行数、耗时和 Evidence id，用来回看这次分析到底做了什么。
+
+### 3. Agent 不直接操作 DuckDB
+
+Agent 使用六个本地数据工具：
+
+~~~text
+local_catalog
+local_register_dataset
+local_describe
+local_sample
+local_profile
+local_query
+~~~
+
+通常按 local_catalog → local_describe → local_sample / local_profile → local_query 的顺序调查。
+
+工具层会限制路径和 SQL。Agent 不能通过 local_query 使用 ATTACH、COPY、INSTALL、LOAD、文件读取函数、HTTP、SQLite/PostgreSQL scanner，也不能执行多条 SQL。
+
+### 4. 原始数据和分析数据不重复复制
+
+CSV、JSON、JSONL、Parquet 首次进入 Registry 后，在 DuckDB 中建立 raw view，而不是强制把整个文件 COPY 进 DuckDB。
+
+因此大 Parquet 可以直接被 DuckDB 分析，小文件也保持简单。Parquet 是后续本地分析中间结果的首选格式；很大的结果不要转换成 JSON 再送给 Agent。
+
+### 5. Evidence provenance
+
+本地分析继续使用 Evidence-first：
+
+~~~text
+Local Dataset Version
+        ↓
+DuckDB Analysis Run
+        ↓
+Evidence
+        ↓
+Claim / Finding
+~~~
+
+describe、sample、profile、query 都记录对应 Evidence。Evidence 包含 dataset id、version、SHA-256、SQL 或 operation、有限结果样本和 analysis run id。
+
+这样 Agent 能引用真实数据结果，而不会把自己的解释冒充成数据事实。
+
+### 6. 为什么不把 DuckDB MCP 作为核心路径
+
+当前项目已经拥有 Dataset Registry、read-only SQL guard、Evidence provenance 和 Investigation workspace boundary，因此默认让 Agent 使用 local_* 工具。
+
+通用 DuckDB MCP 可以保留为实验能力，但不要成为默认路径；否则 Agent 很容易绕过这里已经建立的数据集边界和 Evidence 记录。
+
+### 7. 与外部数据库的边界
+
+PostgreSQL / Snowflake 继续由 adapters 负责发现外部真实状态。DuckDB 负责把本地数据变成可快速分析、比较和转换的 analytical staging layer。
+
+推荐的数据流：
+
+~~~text
+PostgreSQL / Snowflake
+        ↓
+      Adapter
+        ↓
+metadata / selected data
+        ↓
+   Local Dataset
+        ↓
+      DuckDB
+        ↓
+     analysis
+        ↓
+     Evidence
+~~~
+
+### 8. 当前阶段刻意不做的事情
+
+V1.6 不做统一 SQL abstraction framework、复杂 Repository / Unit of Work、多进程共享 DuckDB writer、完整 ETL scheduler、向量数据库、Lakehouse catalog 或云端同步。
+
+下一阶段再考虑 Dataset Version → Parquet snapshot、分析结果 → reusable local dataset、semantic/* → local semantic model，以及把现有 conversations.db 最终统一成 app.sqlite。
+
 
 ### Structural Analysis 控制边界
 
