@@ -61,10 +61,17 @@ export function JourneyFlowEdge({
 
   return (
     <>
+      {/* React Flow 官方推荐用 BaseEdge + markerEnd 表达方向；这里把箭头加大，
+          同时在 source 端补一个小圆点，让“从哪里开始、到哪里结束”一眼可见。 */}
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={MarkerType.ArrowClosed}
+        markerEnd={{
+          type: MarkerType.ArrowClosed,
+          width: selected ? 18 : 16,
+          height: selected ? 18 : 16,
+          color: selected ? '#1677ff' : '#94a3b8',
+        }}
         className="journey-flow-edge-path"
         style={selected
           ? {
@@ -73,6 +80,15 @@ export function JourneyFlowEdge({
               filter: 'drop-shadow(0 0 3px #ffd666) drop-shadow(0 0 7px rgba(255, 214, 102, 0.95))',
             }
           : undefined}
+      />
+      <circle
+        className="journey-flow-edge-source-dot"
+        cx={sourceX}
+        cy={sourceY}
+        r={selected ? 4 : 3}
+        fill={selected ? '#1677ff' : '#94a3b8'}
+        stroke="#fff"
+        strokeWidth={2}
       />
 
       <EdgeLabelRenderer>
@@ -107,7 +123,7 @@ export function JourneyFlowEdge({
               style={{ transform: 'translate(-50%, -50%) translate(' + sourceX + 'px,' + sourceY + 'px)' }}
               aria-hidden="true"
             >
-              <span>来源</span>
+              <span>源：{sourceTitle}</span>
             </div>
             <div
               className="journey-flow-edge-endpoint journey-flow-edge-endpoint-target"
