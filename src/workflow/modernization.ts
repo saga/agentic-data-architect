@@ -193,24 +193,6 @@ function buildTargetArchitecture(
 }
 
 /** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
-/**
- * 只计算当前调查走到哪一关，不要求已经生成完整 Modernization Plan。
- * 因此新建调查也可以立即显示路线图。
- */
-async function loadModernizationPlanIfPresent(name: string): Promise<ModernizationPlan | null> {
-  try {
-    const raw = JSON.parse(
-      await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'),
-    );
-    return ModernizationPlanSchema.parse(raw);
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-}
-
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
