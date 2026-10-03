@@ -16,6 +16,7 @@ let starting: Promise<CopilotClient> | null = null;
 
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
 const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
+const WORKFLOW_SKILL_NAMES = ['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'];
 
 // Keep the host tool surface intentionally small; the CLI-like runtime provides
 // ambient Copilot skills and built-in MCPs, while the workbench adds only tools it needs.
@@ -90,8 +91,8 @@ export interface AskInput {
   sessionId?: string;
   workingDirectory?: string;
   model?: string;
-  /** Skills that must be eagerly preloaded because they represent the selected Workflow. */
-  eagerSkills?: string[];
+  /** The user-selected Workflow Skill. Other Workflow Skills are disabled to avoid route mixing. */
+  workflowSkill?: string;
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
@@ -211,6 +212,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const graphifyEnabled = config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
+  const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
   const mcpServers = {
     ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
     ...(input.mcpServers ?? {}),
@@ -221,7 +223,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     workingDirectory,
     systemMessage: { mode: 'append' as const, content: input.systemPrompt },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
-    ...(input.eagerSkills?.length ? { skills: input.eagerSkills } : {}),
+    // Capability Skills stay available for Copilot's automatic task-based selection.
+    // Only the other Workflow Skills are disabled so two routes are not mixed.
+    disabledSkills: disabledWorkflowSkills,
     availableTools: WORKBENCH_TOOLS,
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
