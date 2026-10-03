@@ -1100,6 +1100,56 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   };
 
 
+  /** 应用 AI Patch；等待期间如果画布发生变化，则放弃旧提议。 */
+  const applyAiChanges = async () => {
+    const pending = pendingAiChange;
+    const currentSnapshot = snapshotRef.current;
+    if (!pending || !currentSnapshot) return;
+
+    const currentCanvasDefinition = definitionFromGraph(
+      nodesRef.current,
+      edgesRef.current,
+      currentSnapshot.definition,
+    );
+    if (JSON.stringify(currentCanvasDefinition) !== JSON.stringify(pending.baseDefinition)) {
+      message.warning('画布已经发生变化，请重新让 AI 修改当前版本。');
+      setPendingAiChange(undefined);
+      return;
+    }
+
+    try {
+      const nextDefinition = applyWorkflowChanges(currentCanvasDefinition, pending.changes);
+      pushHistory();
+      const graph = graphFromDefinition(
+        nextDefinition,
+        layoutFromNodes(nodesRef.current),
+        { ...currentSnapshot, definition: nextDefinition },
+        setSelectedNodeId,
+        (id) => { void addNodeAfter(id, false); },
+        (id) => { void addNodeAfter(id, true); },
+        deleteNode,
+        setSelectedEdgeId,
+        new Set(),
+      );
+      const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
+      if (!layoutedNodes) return;
+
+      newNodeIdsRef.current = new Set();
+      setNodes(layoutedNodes);
+      setEdges(graph.edges);
+      setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
+      setValidationIssues([]);
+      setDirty(true);
+      setPendingAiChange(undefined);
+      pendingFitRef.current = true;
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const discardAiChanges = () => setPendingAiChange(undefined);
+
   const resetWorkflow = () => {
     const name = sessionNameFromUrl();
     if (!name) return;
