@@ -7,6 +7,7 @@ import {
   reconnectEdge,
   useEdgesState,
   useNodesInitialized,
+  useNodesState,
   type Connection,
   type NodeChange,
   type EdgeChange,
@@ -24,6 +25,9 @@ import {
   targetHandleId,
 } from './journey-map-graph.js';
 import { autoLayoutJourney } from './journey-map-layout.js';
+import {
+  EDGE_TYPE,
+} from './journey-map-types.js';
 import type {
   FlowEdge,
   FlowNode,
@@ -440,7 +444,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         const nextNewIds = new Set(newNodeIdsRef.current);
         nextNewIds.delete(id);
         newNodeIdsRef.current = nextNewIds;
-        setNewNodeIds(nextNewIds);
 
         const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
         const definition = definitionFromGraph(nextNodes, nextEdges, base);
@@ -553,9 +556,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     );
   };
 
-  const handleNodesChange = (
-    changes: Parameters<typeof onNodesChangeInternal>[0],
-  ) => {
+  const handleNodesChange = (changes: NodeChange<FlowNode>[]) => {
     const removed = changes.filter((change) => change.type === 'remove');
     if (!editing || !removed.length) {
       onNodesChangeInternal(changes);
@@ -586,9 +587,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setSelectedEdgeId(undefined);
   };
 
-  const handleEdgesChange = (
-    changes: Parameters<typeof onEdgesChangeInternal>[0],
-  ) => {
+  const handleEdgesChange = (changes: EdgeChange<FlowEdge>[]) => {
     const removed = changes.filter((change) => change.type === 'remove');
     if (!editing || !removed.length) {
       onEdgesChangeInternal(changes);
@@ -1038,7 +1037,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setEditing(false);
       setUsingDraft(false);
       newNodeIdsRef.current = new Set();
-      setNewNodeIds(new Set());
       setValidationIssues([]);
       await loadWorkflow();
     } catch (error) {
@@ -1068,7 +1066,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         setEditing(false);
         setUsingDraft(false);
         newNodeIdsRef.current = new Set();
-        setNewNodeIds(new Set());
         await loadWorkflow();
       },
     });
