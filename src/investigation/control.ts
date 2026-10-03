@@ -166,7 +166,19 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
   return InvestigationControlSchema.parse({
     ...base,
     history: Array.isArray(raw.history)
-      ? raw.history.filter((item): item is InvestigationControl['history'][number] => Boolean(item) && typeof item === 'object')
+      ? raw.history
+          .filter((item): item is InvestigationControl['history'][number] => Boolean(item) && typeof item === 'object')
+          .map((item) => {
+            // Skill configuration used to live inside each historical Agent snapshot.
+            // Strip that obsolete field while preserving the rest of the historical record.
+            const snapshot = item.snapshot as unknown as Record<string, unknown>;
+            const snapshotAgent = snapshot?.agent;
+            if (snapshotAgent && typeof snapshotAgent === 'object' && !Array.isArray(snapshotAgent) && 'skills' in snapshotAgent) {
+              const { skills: _skills, ...agentWithoutSkills } = snapshotAgent as Record<string, unknown>;
+              return { ...item, snapshot: { ...snapshot, agent: agentWithoutSkills } };
+            }
+            return item;
+          })
       : [],
   });
 }
