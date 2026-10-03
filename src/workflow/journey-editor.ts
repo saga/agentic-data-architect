@@ -628,7 +628,10 @@ export async function buildJourneyAgentInstruction(
   const outcomes = current.outcomes.length
     ? '允许的出口：\n'
       + current.outcomes
-        .map((item) => '- ' + item.outcome + ' -> ' + item.target)
+        .map((item) =>
+          '- ' + item.outcome + ' -> ' + item.target
+          + (item.condition ? ' [condition=' + item.condition + ']' : '')
+        )
         .join('\n')
     : '当前节点没有可用出口；请不要自行推进 Workflow。';
 
@@ -639,8 +642,12 @@ export async function buildJourneyAgentInstruction(
     '',
     '当前节点：' + current.nodeId + '（' + current.title + '）',
     '节点类型：' + current.type,
+    '执行者：' + current.actor,
     '节点目标：' + current.objective,
     '完成方式：' + current.completion + completionLine,
+    ...(current.actor === 'human'
+      ? ['这是人工步骤：Agent 不应假装已经完成，应等待用户确认或补充结果。']
+      : []),
     '',
     outcomes,
     '',
