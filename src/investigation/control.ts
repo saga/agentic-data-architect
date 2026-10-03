@@ -223,7 +223,7 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
   }
 }
 
-/** 串行更新 Research/Agent 配置、递增版本、记录 Skill/MCP 版本变化并写审计。 */
+/** 串行更新 Research/Agent 配置、递增版本、记录调查说明和 MCP 变化并写审计。 */
 export async function updateInvestigationControl(
   name: string,
   next: Pick<InvestigationControl, 'research' | 'agent'>,
@@ -277,7 +277,6 @@ async function updateInvestigationControlImpl(
         version: promptChanged ? current.agent.systemPrompt.version + 1 : current.agent.systemPrompt.version,
         content: next.agent.systemPrompt.content,
       },
-      skills: nextSkills,
       mcpServers: nextMcp,
     },
     history: [],
