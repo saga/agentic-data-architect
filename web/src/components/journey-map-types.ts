@@ -165,6 +165,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
   condition?: string;
   labelOffsetY?: number;
+  onSelect?: (id: string) => void;
 }
 
 export type FlowNode = Node<FlowNodeData>;
