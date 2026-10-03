@@ -221,7 +221,6 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     goal: inv.goal || inv.userPrompt,
     currentState: current ? {
       datasets: current.coverage.datasets,
-      lineageConnectionRate: current.coverage.datasetLineageConnectionRate,
       semanticAssets: current.coverage.semanticAssets,
       parseFailures: current.coverage.sqlParseFailures,
     } : null,
@@ -294,8 +293,7 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
       goal: inv.goal || inv.userPrompt,
       currentState: current ? {
         datasets: current.coverage.datasets,
-        lineageConnectionRate: current.coverage.datasetLineageConnectionRate,
-        semanticAssets: current.coverage.semanticAssets,
+          semanticAssets: current.coverage.semanticAssets,
         parseFailures: current.coverage.sqlParseFailures,
       } : null,
       unknowns: inv.unknowns,
