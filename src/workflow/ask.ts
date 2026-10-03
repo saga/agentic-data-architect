@@ -202,7 +202,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
     systemPrompt: [
       LEAD_SYSTEM_PROMPT,
       inv.workflow
-        ? '当前工作方式：' + inv.workflow + '。把其中的 Markdown Workflow 当作参考地图，不是强制顺序。用户可以跳过阶段、改查别的问题或改变方向；当新证据或用户动作改变最有价值的路线时重新规划。'
+        ? '当前工作方式：' + inv.workflow + '。它是当前 Investigation 的可执行工作流；Agent 必须围绕当前节点工作，并且只能使用工作流定义中存在的 outcome 推进。是否推进由本轮实际结果和证据决定，不能猜。'
         : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
       knowledgeText,
       buildResearchConfigPrompt(control),
