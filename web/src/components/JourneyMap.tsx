@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ELK from 'elkjs';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import {
   App as AntApp,
   Button,
@@ -54,6 +54,7 @@ import {
   type Node,
   type NodeProps,
   type ReactFlowInstance,
+  useUpdateNodeInternals,
 } from '@xyflow/react';
 
 const { Text } = Typography;
@@ -434,10 +435,16 @@ async function layoutWithElk(
 
 
 function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
+  const updateNodeInternals = useUpdateNodeInternals();
   const meta = STATUS_META[data.status];
   const terminal = data.nodeType === 'end' || data.nodeType === 'stop';
   const targetHandles = data.targetHandles;
   const sourceHandles = data.sourceHandles;
+
+  // Workflow 分支改变时，Handle 数量和位置也会改变；通知 React Flow 重新测量。
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, sourceHandles.length, targetHandles.length, updateNodeInternals]);
 
   return (
     <>
