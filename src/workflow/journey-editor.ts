@@ -500,7 +500,6 @@ export async function saveJourneyDefinition(
       ? oldExecution.currentNodeId
       : definition.start;
     const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
-    const preservedTargetNode = definition.nodes.find((node) => node.id === preservedCurrent);
     const migratedExecutionBase: JourneyExecution = {
       workflowId: definition.id,
       workflowVersion: nextVersion,
@@ -511,7 +510,7 @@ export async function saveJourneyDefinition(
         ? 'completed'
         : preservedNode?.type === 'stop'
           ? 'stopped'
-          : preservedTargetNode?.actor === 'human'
+          : preservedNode?.actor === 'human'
             ? 'waiting'
             : 'active',
     };
@@ -520,8 +519,8 @@ export async function saveJourneyDefinition(
           ...migratedExecutionBase,
           pendingInteraction: {
             id: 'pending-' + definition.id + '-' + String(nextVersion),
-            nodeId: preservedTargetNode.id,
-            reason: '等待人工完成“' + preservedTargetNode.title + '”。',
+            nodeId: preservedNode.id,
+            reason: '等待人工完成“' + preservedNode.title + '”。',
             requestedAt: new Date().toISOString(),
           },
         }
