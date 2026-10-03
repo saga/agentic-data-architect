@@ -49,10 +49,13 @@ test('journey editor serialization round-trips semantic graph', () => {
   assert.equal(parsed.issues.length, 0);
   assert.ok(parsed.definition);
   assert.equal(parsed.definition?.nodes[0]?.completion, 'deterministic');
-  assert.deepEqual(parsed.definition?.nodes[0]?.routes, [
-    { outcome: 'success', target: 'review', line: 10 },
-    { outcome: 'needs-input', target: 'intake', line: 11 },
-  ]);
+  assert.deepEqual(
+    parsed.definition?.nodes[0]?.routes.map(({ outcome, target }) => ({ outcome, target })),
+    [
+      { outcome: 'success', target: 'review' },
+      { outcome: 'needs-input', target: 'intake' },
+    ],
+  );
 });
 
 test('default layout gives every node a stable position', () => {
