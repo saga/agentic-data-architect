@@ -284,12 +284,22 @@ app.post('/api/sessions', async (req, res) => {
     }
 
     const body = parseRequest(JourneyAiRequestSchema, req.body);
+    const currentDefinition = body.definition === undefined
+      ? undefined
+      : JourneyDefinitionSchema.parse(body.definition);
+
+    if (currentDefinition && currentDefinition.id !== context.workflow) {
+      res.status(400).json({ error: '当前工作地图与所选 Workflow 不一致，请刷新后重试。' });
+      return;
+    }
+
     const result = await generateJourneyFlow(
       name,
       context.workflow,
       body.mode,
       body.prompt,
       body.messages ?? [],
+      currentDefinition,
     );
     res.json(result);
   });
