@@ -12,7 +12,7 @@ const elk = new ELK();
  * React Flow 真正渲染后卡片变高，最终彼此压住。
  */
 const FALLBACK_NODE_WIDTH = 236;
-const FALLBACK_NODE_HEIGHT = 190;
+const FALLBACK_NODE_HEIGHT = 220;
 const TERMINAL_NODE_WIDTH = 190;
 const TERMINAL_NODE_HEIGHT = 96;
 
@@ -22,8 +22,8 @@ const TERMINAL_NODE_HEIGHT = 96;
  * ELK 的 node-node spacing 是最小安全距离，不是视觉上的“宽松程度”。
  * 对当前 230px 左右的卡片，140px 左右的额外留白比较合适。
  */
-const NODE_GAP = 140;
-const LAYER_GAP = 200;
+const NODE_GAP = 160;
+const LAYER_GAP = 220;
 const EDGE_NODE_GAP = 80;
 const EDGE_EDGE_GAP = 60;
 
@@ -45,7 +45,7 @@ function nodeDimensions(node: FlowNode): { width: number; height: number } {
     ),
     height: Math.max(
       FALLBACK_NODE_HEIGHT,
-      Number(node.measured?.height ?? FALLBACK_NODE_HEIGHT) + 20,
+      Number(node.measured?.height ?? FALLBACK_NODE_HEIGHT) + 28,
     ),
   };
 }
@@ -75,6 +75,7 @@ export async function layoutWithElk(
       'elk.layered.spacing.nodeNodeBetweenLayers': String(LAYER_GAP),
       'elk.layered.spacing.edgeNodeBetweenLayers': String(EDGE_NODE_GAP),
       'elk.layered.spacing.edgeEdgeBetweenLayers': String(EDGE_EDGE_GAP),
+      'elk.spacing.componentComponent': '180',
 
       // 让 crossing minimization 有足够机会调整 branch 顺序。
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
