@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button, Flex, Segmented, Tag, Typography } from 'antd';
+import { Button, Flex, Tag, Typography } from 'antd';
 import { RobotOutlined, UserOutlined } from '@ant-design/icons';
 import { Bubble, Sender, type BubbleListProps } from '@ant-design/x';
 
@@ -47,10 +47,8 @@ export function JourneyMapAiChat({
   applyAiChanges,
   discardAiChanges,
 }: JourneyMapAiChatProps) {
-  const [mode, setMode] = useState<'modify' | 'generate'>('modify');
-  const [scope, setScope] = useState<'workflow' | 'selection'>(
-    selectedNodeId ? 'selection' : 'workflow',
-  );
+  // 不再把“修改 / 重设计 / 选中步骤 / 整张图”做成模式按钮。
+  // 用户直接用自然语言描述意图；当前选中节点仅作为默认上下文。
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Array<{
@@ -85,10 +83,6 @@ export function JourneyMapAiChat({
       content,
     }));
 
-    if (scope === 'selection' && !selectedNodeId) {
-      return;
-    }
-
     setMessages((items) => [
       ...items,
       {
@@ -100,7 +94,10 @@ export function JourneyMapAiChat({
     setValue('');
     setLoading(true);
     try {
-      const result = await aiEditFlow(mode, prompt, history, scope);
+      // UI 不再要求用户选择模式；Agent 以当前画布为上下文解释自然语言。
+      // 有选中节点时默认聚焦该节点，没有选中节点时按整张图处理。
+      const scope = selectedNodeId ? 'selection' : 'workflow';
+      const result = await aiEditFlow('modify', prompt, history, scope);
       setMessages((items) => [
         ...items,
         {
@@ -134,42 +131,17 @@ export function JourneyMapAiChat({
             <Typography.Text strong>AI 修改工作地图</Typography.Text>
           </Flex>
           <Tag bordered={false}>
-            {mode === 'modify'
-              ? (scope === 'selection' && selectedNode ? `选中：${selectedNode.title}` : '当前工作地图')
-              : '重新设计整张图'}
+            {selectedNode ? `当前：${selectedNode.title}` : '当前：整个工作地图'}
           </Tag>
         </Flex>
         <Typography.Text type="secondary" className="journey-map-inspector-desc">
           直接说要怎么改。AI 只生成修改预览，确认后才会写进当前画布。
         </Typography.Text>
 
-        <div className="journey-map-ai-chat-controls">
-          <Segmented
-            size="small"
-            value={mode}
-            onChange={(next) => {
-              const nextMode = next as 'modify' | 'generate';
-              setMode(nextMode);
-              if (nextMode === 'generate') setScope('workflow');
-            }}
-            options={[
-              { value: 'modify', label: '修改' },
-              { value: 'generate', label: '重设计' },
-            ]}
-          />
-          <Segmented
-            size="small"
-            value={scope}
-            onChange={(next) => setScope(next as 'workflow' | 'selection')}
-            options={[
-              {
-                value: 'selection',
-                label: '选中步骤',
-                disabled: mode === 'generate' || !selectedNodeId,
-              },
-              { value: 'workflow', label: '整张图' },
-            ]}
-          />
+        <div className="journey-map-ai-chat-hint">
+          <Typography.Text type="secondary">
+            直接描述你想怎么改；点中了步骤时，AI 会优先参考该步骤。
+          </Typography.Text>
         </div>
       </div>
 
@@ -225,11 +197,7 @@ export function JourneyMapAiChat({
         loading={loading}
         onChange={setValue}
         onSubmit={(nextValue) => void submit(nextValue)}
-        placeholder={
-          mode === 'modify'
-            ? '例如：在现状确认后增加一个人工评审，再进入目标设计'
-            : '例如：重新设计成 6 个步骤，并在关键处加入人工确认'
-        }
+        placeholder="例如：在现状确认后增加一个人工评审，再进入目标设计"
       />
     </section>
   );
