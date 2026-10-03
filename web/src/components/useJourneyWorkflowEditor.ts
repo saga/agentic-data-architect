@@ -77,7 +77,7 @@ interface JourneyWorkflowEditorResult {
   applyEdgeDraft: () => Promise<void>;
   connectSelectedNode: () => Promise<void>;
   setNodeDraft: Dispatch<SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
-  setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string } | undefined>>;
+  setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string; condition?: string } | undefined>>;
   setConnectTargetId: Dispatch<SetStateAction<string | undefined>>;
   setConnectOutcome: Dispatch<SetStateAction<string>>;
   handleNodesChange: (changes: NodeChange<FlowNode>[]) => void;
@@ -106,7 +106,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
-  const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
+  const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
   const [connectOutcome, setConnectOutcome] = useState('success');
   // ---- 编辑器状态 ---------------------------------------------------------
@@ -158,9 +158,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   // ---- 服务端 Workflow 生命周期 -----------------------------------------
   /** 只负责把服务端快照取回来。
    *
-   * 画布统一由下面那个 graphKey effect 重建——它知道当前该画"草稿"还是"已应用版本"。
-   * 这里千万别顺手建图：带 await fetch 的这条总会后跑完，把草稿覆盖成已应用版本，
-   * 结果就是顶部提示"已载入草稿"、校验面板列出问题，画布却还是旧的那张图。
+   * 画布统一由下面那个 graphKey effect 重建。
+   * loadWorkflow 只负责读取服务端保存版本，不在请求完成后额外覆盖用户当前的 React Flow 编辑状态。
    */
   const loadWorkflow = useCallback(async () => {
     const name = sessionNameFromUrl();
@@ -851,7 +850,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setValidationIssues([]);
   };
 
-  /** 画布只显示当前已保存版本；所有打开后的编辑都直接发生在本地画布。 */
+  /** 画布打开后始终可编辑；React Flow 是本地编辑状态，保存时再写回 Workflow DSL。 */
   const graphKey = (() => {
     if (!snapshot) return 'none';
 
@@ -864,8 +863,13 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         objective: node.objective,
         visible: node.visible,
         completion: node.completion,
+        actor: node.actor,
         completeWhen: node.completeWhen,
-        routes: node.routes.map(({ outcome, target }) => ({ outcome, target })),
+        routes: node.routes.map(({ outcome, target, condition }) => ({
+          outcome,
+          target,
+          condition,
+        })),
       }))
       .sort()
       .join('|');
