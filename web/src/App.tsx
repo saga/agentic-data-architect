@@ -377,10 +377,34 @@ function documentReferences(context?: SessionContext): string[] {
 }
 
 
+/** 只把给用户看的 answer 渲染出来；Agent 的结构化 JSON 属于内部协议，不应该出现在聊天气泡里。 */
+function displayAssistantContent(content: string): string {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('{')) return content;
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && 'answer' in parsed
+      && typeof parsed.answer === 'string'
+      && parsed.answer.trim()
+    ) {
+      return parsed.answer.trim();
+    }
+  } catch {
+    // 流式阶段 JSON 还没收完整时，先不要把内部 JSON 直接显示给用户。
+    if (/"answer"\s*:/.test(trimmed)) return '';
+  }
+
+  return content;
+}
+
 function ChatMarkdown({ content }: { content: string }) {
   return (
     <XMarkdown
-      content={content}
+      content={displayAssistantContent(content)}
       components={markdownComponents}
       className="message-markdown x-markdown-light"
     />
@@ -774,9 +798,9 @@ function AppInner() {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
-        content: currentStreamingAnswer.content
+        content: displayAssistantContent(currentStreamingAnswer.content)
           ? <ChatMarkdown content={currentStreamingAnswer.content} />
-          : <Text type="secondary">助手正在处理你的问题，请稍候…</Text>,
+          : <Text type="secondary">助手正在整理答案，请稍候…</Text>,
         footer: undefined,
       });
     }
