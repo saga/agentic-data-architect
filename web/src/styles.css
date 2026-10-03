@@ -1940,6 +1940,16 @@ body {
   font-size: 12px;
 }
 
+.journey-map-human-review {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  border: 1px solid #91caff;
+  border-radius: 10px;
+  background: #f0f7ff;
+}
+
 .journey-map-ai-preview {
   display: grid;
   gap: 8px;
