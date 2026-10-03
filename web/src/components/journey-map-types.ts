@@ -5,6 +5,7 @@ export type WorkflowNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 
 /** 节点如何判断“这一阶段完成”。 */
 export type CompletionMode = 'deterministic' | 'agent';
+export type WorkflowActor = 'agent' | 'human' | 'system';
 
 export interface JourneyMapStage {
   id: string;
@@ -25,6 +26,8 @@ export interface JourneyMapRoute {
 export interface JourneyRouteDefinition {
   outcome: string;
   target: string;
+  /** 可选确定性条件；命中后优先使用该出口。 */
+  condition?: string;
   line?: number;
 }
 
@@ -35,6 +38,7 @@ export interface WorkflowNodeDefinition {
   objective?: string;
   visible: boolean;
   completion: CompletionMode;
+  actor: WorkflowActor;
   completeWhen?: string;
   tools?: string[];
   routes: JourneyRouteDefinition[];
@@ -81,19 +85,6 @@ export interface WorkflowSnapshot {
   layout: WorkflowLayout;
   execution: WorkflowExecution;
   state: WorkflowState;
-  draft: {
-    definition: WorkflowDefinition;
-    layout: WorkflowLayout;
-    issues: string[];
-  } | null;
-}
-
-export interface JourneyMapProps {
-  journey?: { stages: JourneyMapStage[] };
-  routes?: JourneyMapRoute[];
-  loading?: boolean;
-  onChooseRoute?: (route: JourneyMapRoute) => void;
-  onAskStage?: (stage: JourneyMapStage) => void;
 }
 
 export interface HandleSpec {
@@ -107,6 +98,7 @@ export interface FlowNodeData extends Record<string, unknown> {
   nodeType: WorkflowNodeType;
   status: JourneyMapStage['status'];
   completion: CompletionMode;
+  actor: WorkflowActor;
   completeWhen?: string;
   visible: boolean;
   isNew?: boolean;
@@ -122,6 +114,7 @@ export interface FlowNodeData extends Record<string, unknown> {
 
 export interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
+  condition?: string;
   labelOffsetY?: number;
   onSelect?: (id: string) => void;
 }
