@@ -107,7 +107,10 @@ export function JourneyFlowEdge({
           }}
           onClick={() => data?.onSelect?.(id)}
         >
-          {data?.outcome}
+          <span>{data?.outcome}</span>
+          {data?.condition ? (
+            <span className="journey-flow-edge-condition"> · {data.condition}</span>
+          ) : null}
         </div>
       </EdgeLabelRenderer>
     </>
