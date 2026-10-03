@@ -10,6 +10,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
+import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -212,6 +213,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
   const graphifyEnabled = config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
+  const investigationName = path.basename(workingDirectory);
+  const workflowInstruction = await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
   const mcpServers = {
@@ -222,7 +225,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const sessionConfig: CreateSessionConfig = {
     model: input.model ?? config.model,
     workingDirectory,
-    systemMessage: { mode: 'append' as const, content: input.systemPrompt },
+    systemMessage: {
+      mode: 'append' as const,
+      content: [input.systemPrompt, workflowInstruction].filter(Boolean).join('\n\n'),
+    },
     skillDirectories: input.skillDirectories ?? [config.skillsDir],
     // Capability Skills stay available for Copilot's automatic task-based selection.
     // Only the other Workflow Skills are disabled so two routes are not mixed.
@@ -387,6 +393,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
       throw new Error('Turn aborted.');
     }
     const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
+    const finalContent = final?.data.content || content;
+    const workflowTransition = await applyAgentWorkflowTransition(
+      investigationName,
+      input.workflowSkill ?? null,
+      finalContent,
+    );
+    if (workflowTransition.error) {
+      input.onTrajectory?.({
+        type: 'status',
+        name: 'Workflow transition 未应用',
+        status: 'info',
+        details: { error: workflowTransition.error },
+      });
+    }
     const usageAfter = await getSessionUsageMetrics(session);
     const turnUsage = diffUsageMetrics(usageAfter, usageBefore);
     input.onTrajectory?.({
@@ -397,7 +417,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(turnUsage ? { turnUsage: redactTrajectoryValue(turnUsage) } : {}),
       },
     });
-    return final?.data.content || content;
+    return finalContent;
   } catch (e) {
     input.onTrajectory?.({
       type: 'error',
