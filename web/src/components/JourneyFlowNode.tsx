@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import {
   Button,
   Space,
@@ -9,11 +9,8 @@ import {
 import {
   AimOutlined,
   BranchesOutlined,
-  CheckCircleFilled,
-  ClockCircleOutlined,
   DeleteOutlined,
   EditOutlined,
-  LockOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import {
@@ -186,11 +183,3 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
     </>
   );
 }
-
-/** 保留导入名称，方便以后增加多种 Workflow node type。 */
-export const journeyFlowNodeIcons = {
-  current: <AimOutlined />,
-  completed: <CheckCircleFilled />,
-  future: <ClockCircleOutlined />,
-  locked: <LockOutlined />,
-};
