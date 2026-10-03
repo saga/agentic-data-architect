@@ -4,6 +4,7 @@
  * 内置 Skill 只提供初始路线；用户修改后直接保存到 Investigation workspace。
  * React Flow 的坐标只属于画布布局，不进入 Workflow 语义。
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
@@ -30,14 +31,20 @@ import {
   type JourneyDefinition,
   type JourneyExecution,
   type JourneyFacts,
+  type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
+import {
+  analyzeJourneyWorkflow,
+  type JourneyAnalysisIssue,
+} from './journey-edit.js';
 
 const JOURNEY_DIR = 'workflow';
 const ACTIVE_FILE = 'journey.md';
 const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
+const EVENTS_FILE = 'journey-run-events.jsonl';
 
 export const JourneyLayoutNodeSchema = z.object({
   x: z.number().finite(),
@@ -80,6 +87,8 @@ export interface JourneySnapshot {
   layout: JourneyLayout;
   execution: JourneyExecution;
   state: JourneyState;
+  analysis: JourneyAnalysisIssue[];
+  events: JourneyRunEvent[];
 }
 
 function journeyDir(name: string): string {
@@ -107,6 +116,27 @@ async function readTextOrNull(file: string): Promise<string | null> {
     throw error;
   }
 }
+/**
+ * 运行事件用 JSONL 追加保存：简单、可检查，不让 execution.json 无限增长。
+ */
+export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
+  await fs.mkdir(journeyDir(name), { recursive: true });
+  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(event) + '\n', 'utf8');
+}
+
+/** 只读取最近的事件，避免快照随着运行历史无限增长。 */
+export async function loadJourneyRunEvents(name: string, limit = 80): Promise<JourneyRunEvent[]> {
+  const raw = await readTextOrNull(journeyFile(name, EVENTS_FILE));
+  if (!raw) return [];
+  return raw.split(/\r?\n/).filter(Boolean).slice(-limit).flatMap((line) => {
+    try {
+      return [JSON.parse(line) as JourneyRunEvent];
+    } catch {
+      return [];
+    }
+  });
+}
+
 
 /** 按图深度给新 Workflow 一个稳定初始布局；用户拖动后的坐标另存。 */
 export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayout {
@@ -300,9 +330,16 @@ export async function loadJourneyExecution(
   const parsed = z.object({
     workflowId: z.string(),
     workflowVersion: z.number().int().nonnegative(),
+    runId: z.string().optional(),
     currentNodeId: z.string(),
     completedNodeIds: z.array(z.string()),
-    status: z.enum(['active', 'completed', 'stopped']),
+    status: z.enum(['active', 'waiting', 'completed', 'stopped']),
+    pendingInteraction: z.object({
+      id: z.string(),
+      nodeId: z.string(),
+      reason: z.string(),
+      requestedAt: z.string().datetime(),
+    }).optional(),
   }).safeParse(raw);
 
   return normalizeExecution(definition, version, parsed.success ? parsed.data : null);
@@ -317,6 +354,8 @@ export async function getJourneySnapshot(
   const execution = await loadJourneyExecution(name, active.definition, active.version);
   const facts = await buildJourneyFacts(name);
   const state = buildJourneyState(active.definition, facts, execution);
+  const analysis = analyzeJourneyWorkflow(active.definition);
+  const events = await loadJourneyRunEvents(name);
 
   // Deterministic completion may move the current node without an Agent transition.
   // Persist that state so the next turn cannot observe an older current node.
@@ -347,6 +386,8 @@ export async function getJourneySnapshot(
     layout: active.layout,
     execution: state.execution,
     state,
+    analysis,
+    events,
   };
 }
 
@@ -354,16 +395,20 @@ export async function getJourneySnapshot(
 export function validateJourneyEdit(
   definitionInput: JourneyDefinition,
   layoutInput: JourneyLayout,
-): { issues: string[] } {
+): { issues: string[]; warnings: string[] } {
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const layout = JourneyLayoutSchema.parse(layoutInput);
   const issues = validateJourneyDefinition(definition);
+  const warnings = analyzeJourneyWorkflow(definition).map((item) => item.message);
 
   for (const node of definition.nodes) {
     if (!layout.nodes[node.id]) issues.push('节点缺少画布位置：' + node.id);
   }
 
-  return { issues: [...new Set(issues)] };
+  return {
+    issues: [...new Set(issues)],
+    warnings: [...new Set(warnings)],
+  };
 }
 
 /** 保存一张工作地图；服务端重新验证，不能绕过结构检查。 */
@@ -400,17 +445,31 @@ export async function saveJourneyDefinition(
       ? oldExecution.currentNodeId
       : definition.start;
     const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
+    const preservedTargetNode = definition.nodes.find((node) => node.id === preservedCurrent);
     const migratedExecution: JourneyExecution = {
       ...oldExecution,
       workflowId: definition.id,
       workflowVersion: nextVersion,
+      runId: definition.id + '-v' + String(nextVersion),
       currentNodeId: preservedCurrent,
       completedNodeIds: preservedCompleted,
       status: preservedNode?.type === 'end'
         ? 'completed'
         : preservedNode?.type === 'stop'
           ? 'stopped'
-          : 'active',
+          : preservedTargetNode?.actor === 'human'
+            ? 'waiting'
+            : 'active',
+      ...(preservedTargetNode?.actor === 'human'
+        ? {
+            pendingInteraction: {
+              id: 'pending-' + definition.id + '-' + String(nextVersion),
+              nodeId: preservedTargetNode.id,
+              reason: '等待人工完成“' + preservedTargetNode.title + '”。',
+              requestedAt: new Date().toISOString(),
+            },
+          }
+        : { pendingInteraction: undefined }),
     };
 
     await fs.mkdir(journeyDir(name), { recursive: true });
