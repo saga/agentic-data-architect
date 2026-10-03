@@ -84,7 +84,15 @@ export const TargetArchitectureSchema = WorkProductBaseSchema.extend({
   principles: z.array(z.string()),
   components: z.array(TargetComponentSchema),
   openQuestions: z.array(z.string()),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.status !== 'draft' && (value.components.length === 0 || value.evidenceIds.length === 0)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['components'],
+      message: '非草案的目标架构必须有实际组件和证据。',
+    });
+  }
+});
 export type TargetArchitecture = z.infer<typeof TargetArchitectureSchema>;
 
 /** 单条 Source-to-Target Mapping，明确物理来源、目标和转换规则。 */
@@ -96,18 +104,34 @@ export const SourceToTargetMappingSchema = WorkProductBaseSchema.extend({
   businessRule: z.string().optional(),
   validationRule: z.string().optional(),
   status: z.enum(['proposed', 'reviewed', 'approved', 'rejected']),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.status !== 'proposed' && value.evidenceIds.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['evidenceIds'],
+      message: '已审核或已批准的 Mapping 必须保留证据。',
+    });
+  }
+});
 export type SourceToTargetMapping = z.infer<typeof SourceToTargetMappingSchema>;
 
 /** Architecture Decision Record 的轻量模型，避免引入重量级 ADR/BPMN 系统。 */
 export const ArchitectureDecisionSchema = WorkProductBaseSchema.extend({
   type: z.literal('architecture_decision'),
   context: z.string().min(1),
-  options: z.array(z.string()),
+  options: z.array(z.string()).min(2),
   decision: z.string().min(1),
   rationale: z.string().min(1),
   tradeoffs: z.array(z.string()),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.status !== 'draft' && value.evidenceIds.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['evidenceIds'],
+      message: '已审核或已批准的架构决定必须保留证据。',
+    });
+  }
+});
 export type ArchitectureDecision = z.infer<typeof ArchitectureDecisionSchema>;
 
 /** modernization 中一个待解决的结构性 Gap。 */
