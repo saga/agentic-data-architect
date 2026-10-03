@@ -36,6 +36,7 @@ export interface JourneyNode {
   /** 主要执行者：Agent、人或系统；默认不改变现有 Workflow 行为。 */
   actor: JourneyActor;
   completeWhen?: string | undefined;
+  /** 提示性工具标签，不决定 Agent 实际可用工具、MCP 权限或授权边界。 */
   tools?: string[] | undefined;
   /** 这一步依赖的前置成果；只是轻量数据依赖声明，不执行变量解析。 */
   requires?: string[] | undefined;
