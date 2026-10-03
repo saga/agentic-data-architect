@@ -31,7 +31,6 @@ import {
   loadArchitectureAssessmentJourneyState,
 } from './workflow/assessment.js';
 import { config } from './config.js';
-import { listSkillManifests } from './skills/catalog.js';
 import {
   appendContextInput,
   ensureWorkspace,
@@ -185,9 +184,6 @@ app.post('/api/sessions', async (req, res) => {
     });
   });
 
-  app.get('/api/skills', async (_req, res) => {
-    res.json({ skills: await listSkillManifests() });
-  });
 
   app.get('/api/sessions/:name/trajectory', async (req, res) => {
     const name = sessionKey(req.params.name);
