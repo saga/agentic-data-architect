@@ -200,6 +200,8 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     lines.push('actor: ' + node.actor);
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
     if (node.tools?.length) lines.push('tools: ' + node.tools.join(', '));
+    if (node.requires?.length) lines.push('requires: ' + node.requires.join(', '));
+    if (node.produces?.length) lines.push('produces: ' + node.produces.join(', '));
     for (const route of node.routes) {
       lines.push(
         '- ' + route.outcome + ' -> ' + route.target
@@ -226,9 +228,27 @@ function normalizeExecution(
     return initialJourneyExecution(definition, version);
   }
 
+  const currentNode = definition.nodes.find((node) => node.id === execution.currentNodeId);
+  const needsHuman = currentNode?.actor === 'human' && currentNode.type !== 'end' && currentNode.type !== 'stop';
+  const runId = execution.runId || definition.id + '-v' + String(version);
+  if (needsHuman && execution.status !== 'waiting') {
+    return {
+      ...execution,
+      workflowVersion: version,
+      runId,
+      status: 'waiting',
+      pendingInteraction: {
+        id: 'pending-' + runId + '-' + currentNode.id,
+        nodeId: currentNode.id,
+        reason: '等待人工完成“' + currentNode.title + '”。',
+        requestedAt: new Date().toISOString(),
+      },
+    };
+  }
   return {
     ...execution,
     workflowVersion: version,
+    runId,
   };
 }
 
