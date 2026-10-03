@@ -1,8 +1,8 @@
 /**
  * 工作地图 AI。
  *
- * 这是独立的“工作地图设计助手”，只负责根据目标生成或修改 Workflow Definition。
- * 它不参与数据分析，也不读取 Dataset Registry、Evidence 或普通调查对话。
+ * 这是独立的“工作地图设计助手”，只负责提出 Workflow Patch。
+ * 服务端应用 Patch、校验后返回候选 Definition；不会直接保存。
  */
 import * as z from 'zod';
 import { askCopilot } from '../agent/copilot.js';
@@ -13,11 +13,20 @@ import {
   validateJourneyDefinition,
   type JourneyDefinition,
 } from './journey.js';
+import {
+  applyJourneyWorkflowChanges,
+  describeJourneyWorkflowChange,
+  diffJourneyWorkflowDefinitions,
+  validateJourneyChangeScope,
+  JourneyWorkflowChangesSchema,
+  JourneyWorkflowChangeSchema,
+  type JourneyWorkflowChange,
+} from './journey-edit.js';
 import { getJourneySnapshot } from './journey-editor.js';
 
 const JourneyAiOutputSchema = z.object({
   message: z.string().trim().optional(),
-  definition: JourneyDefinitionSchema,
+  changes: JourneyWorkflowChangesSchema,
 }).strict();
 
 export interface JourneyAiConversationMessage {
