@@ -35,7 +35,19 @@
 - Workflow Skill 是唯一例外：它代表用户明确选择的工作方式，而不是普通能力。用户选择某个 Workflow 后，当前 Workflow 可以预加载；其它 capability 仍由 Agent 自动发现。
 - “本次调查说明”只是用户给本次 Investigation 的额外说明，会追加到平台系统指令后面；它不是整个 System Prompt，也不能修改平台安全、Evidence 或运行规则。默认可以是空的，但 UI 必须给出可直接照抄的示例。
 - Copilot CLI 自带的 MCP 不进入 Investigation 的 `control.json`。配置页只保存用户主动添加的额外 MCP；页面应该明确告诉用户“自带服务已经可以直接使用”。
-- 如果未来把这个项目改成多人共享服务，必须重新设计运行时隔离和权限边界，并改用 `mode: "empty"` 等显式 allowlist 方案；不能直接沿用本地单用户模式。**凡是用户能看到的内容，都优先用最简单、最直接的中文。**
+- 如果未来把这个项目改成多人共享服务，必须重新设计运行时隔离和权限边界，并改用 `mode: "empty"` 等显式 allowlist 方案；不能直接沿用本地单用户模式。
+### 本地数据层
+
+SQLite、DuckDB、Parquet 的职责必须保持分开：
+
+- SQLite 是应用状态的 system of record，保存对话、Investigation、Dataset Registry 和分析运行记录。
+- DuckDB 是本地分析引擎，每个 Investigation 有自己的 analysis.duckdb。
+- Parquet 是大型数据和分析中间结果的首选格式。
+- 原始文件和用户可直接查看的产物继续保存在 workspace 文件系统中。
+- Agent 不直接打开 analysis.duckdb；使用 local_catalog / local_register_dataset / local_describe / local_sample / local_profile / local_query。
+- local_query 必须经过只读检查，不能借此访问 workspace 外部文件、网络或其它数据库。
+- 本地分析 Evidence 必须记录 dataset version、SHA-256、SQL 和 analysis run。
+- 不要为了统一而增加复杂数据库抽象；LocalAnalyticsEngine 已经足够作为本地分析边界。**凡是用户能看到的内容，都优先用最简单、最直接的中文。**
 
 - UI、按钮、标题、提示、错误信息、报告摘要、Agent 回答：先说人能直接理解的话。
 - 不要为了“显得专业”堆砌术语。像“现代化工作”“当前状态”“业务语义”“源到目标映射”“工作产物”“差距分析”这类词，除非确实有必要，否则换成日常说法。
