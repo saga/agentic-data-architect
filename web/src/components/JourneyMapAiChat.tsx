@@ -130,7 +130,7 @@ export function JourneyMapAiChat({
           </Typography.Text>
         </div>
 
-        <Flex vertical align="end" gap={6}>
+        <Flex wrap gap={8}>
           <Segmented
             size="small"
             value={mode}
