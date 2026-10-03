@@ -17,9 +17,8 @@ let starting: Promise<CopilotClient> | null = null;
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
 const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
 
-// Explicitly opt into the host tools this workbench needs. Mode "empty" avoids
-// inheriting unrelated Copilot CLI capabilities while still allowing Skills,
-// read/search tools, deterministic Skill scripts, and configured MCP servers.
+// Keep the host tool surface intentionally small; the CLI-like runtime provides
+// ambient Copilot skills and built-in MCPs, while the workbench adds only tools it needs.
 const WORKBENCH_TOOLS = new ToolSet()
   .addBuiltIn(['ask_user', 'task_complete', 'exit_plan_mode', 'skill', 'grep', 'glob', 'view', 'bash'])
   .addMcp('*');
@@ -33,9 +32,7 @@ export async function getClient(): Promise<CopilotClient> {
   assertGraphifyRuntimeAvailable();
   if (starting) return starting;
   starting = (async () => {
-    // empty 模式不会再默认把 Copilot 状态写到用户家目录。
-    // 所有 Investigation 共用这个运行时目录，具体 Session 再由 SDK 按 sessionId 分目录保存。
-    // 这样既满足 SDK 的显式持久化要求，也不会让不同 Investigation 共用同一份 Session 状态。
+    // 所有 Investigation 共用这个应用自己的 Copilot 运行目录，具体 Session 再由 SDK 按 sessionId 分目录保存。
     const copilotBaseDirectory = path.join(config.workspaceDir, 'copilot');
     await fs.mkdir(copilotBaseDirectory, { recursive: true });
 
@@ -185,7 +182,6 @@ function statusFromIntent(intent: string): string {
   return '助手正在处理你的问题，请稍候…';
 }
 
-/** 扫描 Skills 目录并读取 Skill 名称；无效 Skill 目录直接忽略。 */
 /** 判断指定 turn 是否仍绑定运行中的 Copilot Session。 */
 export function hasActiveCopilotTurn(turnId: string): boolean {
   return activeSessions.has(turnId);
