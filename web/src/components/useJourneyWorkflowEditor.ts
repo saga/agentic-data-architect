@@ -8,6 +8,8 @@ import {
   useEdgesState,
   useNodesInitialized,
   type Connection,
+  type NodeChange,
+  type EdgeChange,
   type ReactFlowInstance,
 } from '@xyflow/react';
 
@@ -71,8 +73,8 @@ interface JourneyWorkflowEditorResult {
   setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string } | undefined>>;
   setConnectTargetId: Dispatch<SetStateAction<string | undefined>>;
   setConnectOutcome: Dispatch<SetStateAction<string>>;
-  handleNodesChange: (changes: Parameters<ReturnType<typeof useNodesState<FlowNode>>[2]>[0]) => void;
-  handleEdgesChange: (changes: Parameters<ReturnType<typeof useEdgesState<FlowEdge>>[2]>[0]) => void;
+  handleNodesChange: (changes: NodeChange<FlowNode>[]) => void;
+  handleEdgesChange: (changes: EdgeChange<FlowEdge>[]) => void;
   onConnect: (connection: Connection) => Promise<void>;
   onReconnect: (oldEdge: FlowEdge, connection: Connection) => Promise<void>;
   undo: () => void;
