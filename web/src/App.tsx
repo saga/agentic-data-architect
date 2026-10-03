@@ -162,7 +162,7 @@ interface SessionData {
   currentState?: {
     coverage: {
       datasets: number;
-      datasetLineageCoverage: number | null;
+      datasetLineageConnectionRate: number | null;
       sqlParseFailures: number;
       semanticAssets: number;
       profiledDatasets: number;
@@ -1163,7 +1163,7 @@ function AppInner() {
                   <>
                     <div className="right-facts">
                       <span>数据集 {current.currentState.coverage.datasets}</span>
-                      <span>数据来路 {current.currentState.coverage.datasetLineageCoverage == null ? '未统计' : Math.round(current.currentState.coverage.datasetLineageCoverage * 100) + '%'}</span>
+                      <span>已连上线的数据集 {current.currentState.coverage.connectedDatasets}/{current.currentState.coverage.datasets}</span>
                       <span>业务定义 {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}</span>
                       <span>待查 {current.context.unknowns.length}</span>
                     </div>
