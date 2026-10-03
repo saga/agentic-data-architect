@@ -1,8 +1,7 @@
 /**
  * Workflow-aware server entrypoint。
  *
- * 旧 src/server.ts 继续维护原有业务 API；本入口在其前面增加 Workflow Editor
- * 路由，并覆盖 /journey 响应。以后如果这些 API 稳定，可以再合并回 server.ts。
+ * src/server.ts 负责当前业务 API；本入口只保留 /journey 兼容响应和服务启动逻辑。
  */
 import express, { type Response } from 'express';
 import { createServer as createHttpServer } from 'node:http';
@@ -13,13 +12,9 @@ import { config } from './config.js';
 import { createApp } from './server.js';
 import { parseRequest } from './api/schemas.js';
 import {
-  applyJourneyDefinition,
   buildJourneyAgentInstruction,
   getJourneySnapshot,
-  JourneyEditBodySchema,
   resetJourneyCustomization,
-  saveJourneyDraft,
-  validateJourneyEdit,
 } from './workflow/journey-editor.js';
 import { loadWorkspaceContext } from './investigation/workspace.js';
 import { closeConversationStore, recoverRunningConversationTurns } from './investigation/conversation.js';
@@ -68,6 +63,7 @@ function registerJourneyRoutes(app: express.Express): void {
     }
   });
 
+<<<<<<< HEAD
   /** 编辑器需要的完整 Workflow + layout + execution + draft。 */
   app.get('/api/sessions/:name/workflow', async (req, res) => {
     try {
@@ -148,6 +144,8 @@ function registerJourneyRoutes(app: express.Express): void {
     }
   });
 
+=======
+>>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
   /** 恢复 Skill 内置路线，并清除 Investigation 级自定义 Workflow。 */
   app.post('/api/sessions/:name/workflow/reset', async (req, res) => {
     try {

@@ -217,9 +217,15 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
   return lines.join('\n').trimEnd() + '\n';
 }
 
+type JourneyExecutionInput = Omit<JourneyExecution, 'runId' | 'pendingInteraction'> & {
+  runId?: string | undefined;
+  pendingInteraction?: JourneyExecution['pendingInteraction'] | undefined;
+};
+
 function normalizeExecution(
   definition: JourneyDefinition,
   version: number,
+<<<<<<< HEAD
   /** 磁盘存盘形状：老文件可能没有 runId / pendingInteraction，缺的在这里补。 */
   execution: {
     workflowId: string;
@@ -230,6 +236,9 @@ function normalizeExecution(
     status: 'active' | 'waiting' | 'completed' | 'stopped';
     pendingInteraction?: JourneyPendingInteraction | undefined;
   } | null,
+=======
+  execution: JourneyExecutionInput | null,
+>>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
 ): JourneyExecution {
   if (
     !execution
@@ -243,25 +252,28 @@ function normalizeExecution(
   const currentNode = definition.nodes.find((node) => node.id === execution.currentNodeId);
   const needsHuman = currentNode?.actor === 'human' && currentNode.type !== 'end' && currentNode.type !== 'stop';
   const runId = execution.runId || definition.id + '-v' + String(version);
-  if (needsHuman && execution.status !== 'waiting') {
+  const baseExecution: JourneyExecution = {
+    workflowId: definition.id,
+    workflowVersion: version,
+    runId,
+    currentNodeId: execution.currentNodeId,
+    completedNodeIds: [...execution.completedNodeIds],
+    status: needsHuman ? 'waiting' : execution.status,
+  };
+
+  if (needsHuman) {
     return {
-      ...execution,
-      workflowVersion: version,
-      runId,
-      status: 'waiting',
-      pendingInteraction: {
-        id: 'pending-' + runId + '-' + currentNode.id,
-        nodeId: currentNode.id,
-        reason: '等待人工完成“' + currentNode.title + '”。',
+      ...baseExecution,
+      pendingInteraction: execution.pendingInteraction ?? {
+        id: 'pending-' + runId + '-' + currentNode!.id,
+        nodeId: currentNode!.id,
+        reason: '等待人工完成“' + currentNode!.title + '”。',
         requestedAt: new Date().toISOString(),
       },
     };
   }
-  return {
-    ...execution,
-    workflowVersion: version,
-    runId,
-  };
+
+  return baseExecution;
 }
 
 async function loadCustomActive(
@@ -537,8 +549,7 @@ export async function applyJourneyDefinition(
       : definition.start;
     const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
     const preservedTargetNode = definition.nodes.find((node) => node.id === preservedCurrent);
-    const migratedExecution: JourneyExecution = {
-      ...oldExecution,
+    const migratedExecutionBase: JourneyExecution = {
       workflowId: definition.id,
       workflowVersion: nextVersion,
       runId: definition.id + '-v' + String(nextVersion),
@@ -551,17 +562,18 @@ export async function applyJourneyDefinition(
           : preservedTargetNode?.actor === 'human'
             ? 'waiting'
             : 'active',
-      ...(preservedTargetNode?.actor === 'human'
-        ? {
-            pendingInteraction: {
-              id: 'pending-' + definition.id + '-' + String(nextVersion),
-              nodeId: preservedTargetNode.id,
-              reason: '等待人工完成“' + preservedTargetNode.title + '”。',
-              requestedAt: new Date().toISOString(),
-            },
-          }
-        : { pendingInteraction: undefined }),
     };
+    const migratedExecution: JourneyExecution = preservedTargetNode?.actor === 'human'
+      ? {
+          ...migratedExecutionBase,
+          pendingInteraction: {
+            id: 'pending-' + definition.id + '-' + String(nextVersion),
+            nodeId: preservedTargetNode.id,
+            reason: '等待人工完成“' + preservedTargetNode.title + '”。',
+            requestedAt: new Date().toISOString(),
+          },
+        }
+      : migratedExecutionBase;
 
     await fs.mkdir(journeyDir(name), { recursive: true });
     await fs.writeFile(

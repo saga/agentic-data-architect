@@ -54,6 +54,8 @@ interface JourneyMapInspectorProps {
   ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
   applyAiChanges: () => Promise<void>;
   discardAiChanges: () => void;
+  humanWaiting?: boolean;
+  applyHumanWorkflowTransition: (outcome: string) => Promise<void>;
 }
 
 /**
@@ -84,6 +86,11 @@ export function JourneyMapInspector({
   aiEditFlow,
   applyAiChanges,
   discardAiChanges,
+<<<<<<< HEAD
+=======
+  humanWaiting,
+  applyHumanWorkflowTransition,
+>>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
 }: JourneyMapInspectorProps) {
   return (
     <div className="journey-map-inspector">
@@ -96,6 +103,29 @@ export function JourneyMapInspector({
         </div>
         <SettingOutlined />
       </div>
+
+      {humanWaiting && selectedNode ? (
+        <div className="journey-map-human-review">
+          <Flex align="center" justify="space-between" gap={8}>
+            <Text strong>等待人工处理</Text>
+            <Tag color="blue">当前步骤</Tag>
+          </Flex>
+          <Text type="secondary">
+            请根据当前评审结果选择一个出口；Agent 不会替你推进这一步。
+          </Text>
+          <Flex wrap gap={8}>
+            {selectedNode.data.sourceHandles.map((handle) => (
+              <Button
+                key={handle.id}
+                size="small"
+                onClick={() => void applyHumanWorkflowTransition(handle.label)}
+              >
+                {handle.label}
+              </Button>
+            ))}
+          </Flex>
+        </div>
+      ) : null}
 
       {selectedNode && nodeDraft ? (
         <Flex vertical gap={12}>
