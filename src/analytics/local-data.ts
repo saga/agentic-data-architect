@@ -226,7 +226,7 @@ export async function registerLocalDataset(
   const sha256 = unchanged ? existing.sha256 : await hashFile(file.absolute);
   const now = new Date().toISOString();
   const id = existing?.id
-    ?? 'ds-' + createHash('sha256').update(sessionName + '\\0' + normalized).digest('hex').slice(0, 16);
+    ?? 'ds-' + createHash('sha256').update(sessionName + '\0' + normalized).digest('hex').slice(0, 16);
   const name = displayName?.trim() || existing?.name || path.basename(normalized, path.extname(normalized));
   const relation = existing?.relation || 'raw.ds_' + id.slice(3);
   const version = existing
@@ -350,16 +350,16 @@ function escapeIdentifier(value: string): string {
 /** 只允许 SELECT/WITH，且严禁 Agent 绕过 Dataset Registry 直接读文件、网络或其它数据库。 */
 export function validateLocalReadOnlySql(sql: string): string {
   const sanitized = sql
-    .replace(/--[^\\n]*(?:\\n|$)/g, ' ')
+    .replace(/--[^\n]*(?:\n|$)/g, ' ')
     .replace(/\\*[\\s\\S]*?\\*/g, ' ')
     .replace(/'(?:''|[^'])*'/g, ' ')
     .trim();
 
-  if (!/^(select|with)\\b/i.test(sanitized)) {
+  if (!/^(select|with)\b/i.test(sanitized)) {
     throw new Error('本地分析只允许执行 SELECT 或 WITH 查询。');
   }
 
-  const dangerous = /\\b(insert|update|delete|merge|alter|drop|create|truncate|grant|revoke|copy|attach|detach|install|load|export|import|call|execute|pragma|set|vacuum)\\b/i;
+  const dangerous = /\b(insert|update|delete|merge|alter|drop|create|truncate|grant|revoke|copy|attach|detach|install|load|export|import|call|execute|pragma|set|vacuum)\b/i;
   if (
     dangerous.test(sanitized)
     || /\\bFOR\\s+(UPDATE|SHARE)\\b/i.test(sanitized)
@@ -370,12 +370,12 @@ export function validateLocalReadOnlySql(sql: string): string {
 
   if (
     /\\b(read_csv_auto|read_csv|read_parquet|read_json_auto|read_json|read_text|read_blob|read_csv_objects|parquet_scan|glob|httpfs|sqlite_scan|postgres_scan)\\s*\\(/i.test(sanitized)
-    || /https?:\\/\\//i.test(sanitized)
+    || /https?:\/\//i.test(sanitized)
   ) {
     throw new Error('本地分析查询必须使用已经登记的数据集，不能自己读取文件、网络或其它数据库。');
   }
 
-  const trimmed = sanitized.replace(/;\\s*$/g, '');
+  const trimmed = sanitized.replace(/;\s*$/g, '');
   if (trimmed.includes(';')) throw new Error('本地分析一次只能执行一条查询。');
   return trimmed;
 }
