@@ -505,6 +505,7 @@ GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/workflow
 PUT  /api/sessions/:name/workflow
 POST /api/sessions/:name/workflow/ai
+POST /api/sessions/:name/workflow/transition
 POST /api/sessions/:name/workflow/reset
 ~~~
 
@@ -514,8 +515,9 @@ POST /api/sessions/:name/workflow/reset
 - /workflow：工作地图完整快照。
 - PUT /workflow：保存当前工作地图，并创建新版本。
 - /workflow/ai：工作地图专用多轮 AI；请求可带最近 12 条对话和当前未保存 Definition。
+- /workflow/transition：人工推进当前 waiting 节点；服务端检查节点、outcome、Workflow version 和执行状态。
 - /workflow/reset：恢复内置 Skill。
-- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要。
+- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要；这是唯一仍放在 `src/server-main.ts` 的 Workflow 路由。
 ## 12. 与现有代码的边界
 
 ### src/workflow/journey.ts
@@ -558,15 +560,28 @@ validation UI
 AI 操作、保存 / 恢复
 ~~~
 
-### src/server-main.ts
+### src/server.ts
 
-在原有 src/server.ts 外增加：
+负责：
 
 ~~~text
-Workflow Editor APIs
+Workflow Editor API
+GET /workflow
+PUT /workflow
+POST /workflow/ai
+POST /workflow/transition
+POST /workflow/reset
 ~~~
 
-这样不用把已有 API 文件继续做成“大杂烩”。
+### src/server-main.ts
+
+只保留：
+
+~~~text
+GET /workflow/instruction
+~~~
+
+它只是把当前 Workflow 控制摘要接到普通 Agent 请求链路；工作地图编辑 API 不在这里维护，避免出现两套 Workflow API。
 
 ## 13. 后续可以做，但当前不要做
 
