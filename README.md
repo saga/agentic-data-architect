@@ -18,7 +18,7 @@
   → 切换
 ~~~
 
-Agent 在每一关负责调查和推理；Workflow / Journey 提供当前导航位置和确定性通关条件，但不替 Agent 决定唯一下一步。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、Structural Analysis、GitHub、Confluence、Web Search 等由工具执行。
+Agent 在每一关负责调查和推理；Workflow / Journey 提供当前导航位置、分支和通关规则；用户也可以在当前 Investigation 中编辑这张工作地图。具体调查方法由 Skill 提供，SQL、Lineage、Profiling、Structural Analysis、GitHub、Confluence、Web Search 等由工具执行。
 
 ## 总体架构
 
@@ -141,7 +141,7 @@ New Investigation
   → Data Architecture Assessment Workflow
 ~~~
 
-路线不是 Investigation 类型，而是 Agent 可以采用的 playbook。自主调查时没有固定 Journey；调查过程中可以改变工作方式，但这不是首页上的普通下拉选择，而是在“调查配置 → 工作方式”里经过明确确认后执行。已有消息、Discovery、Evidence、Findings 和 workspace 都会保留；旧的动态路线建议会被清除并重新规划。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
+路线不是 Investigation 类型，而是一份可执行的 playbook。内置路线来自 Skill；用户可以在当前 Investigation 中复制为自定义 Workflow，验证通过后再应用。自主调查时没有固定 Journey；调查过程中可以改变工作方式，但这不是首页上的普通下拉选择，而是在“调查配置 → 工作方式”里经过明确确认后执行。已有消息、Discovery、Evidence、Findings 和 workspace 都会保留；旧的动态路线建议会被清除并重新规划。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
 
 从零建设金融 Portfolio Research Agent 的路线定义在：
 
@@ -165,6 +165,44 @@ skills/financial-ai-native-architecture/SKILL.md
 ~~~
 
 该路线直接覆盖 LangChain / DeepAgents、LangSmith、Snowflake Semantic View、金融数据模型和 Portfolio Research 场景。
+
+## 工作地图编辑器
+
+Workflow 现在不是只读的路线图。打开“编辑工作地图”后，可以拖动节点、添加步骤、增加分支、修改分支目标和 outcome、删除节点，并通过右侧属性面板修改节点定义。
+
+编辑采用：
+
+~~~text
+编辑
+  → 保存草稿
+  → 服务端验证
+  → 应用修改
+  → 新 Workflow version
+  → Agent 下一轮按修改后的 Workflow 执行
+~~~
+
+内置 Skill 的 SKILL.md 不会被直接改写。自定义 Workflow 保存在当前 Investigation 的 workflow/ 目录，并把 Markdown DSL、画布布局和执行状态分开保存。
+
+Workflow DSL 新增 completion：
+
+~~~text
+completion: deterministic
+completion: agent
+~~~
+
+有 completeWhen 的旧节点默认按 deterministic 处理；没有 completeWhen 的旧节点默认由 Agent 根据实际 outcome 推进。Workflow 的分支仍然使用简单的：
+
+~~~text
+- success -> next
+- needs-input -> intake
+- retry -> investigate
+~~~
+
+服务端会检查悬空目标、重复 outcome、不可达节点、死路、无法到达终点的环以及非法 completeWhen。验证通过后才允许 Apply。
+
+完整设计见：
+
+[docs/journey-workflow-editor.md](docs/journey-workflow-editor.md)
 
 ## Data Architecture Assessment Workflow
 
