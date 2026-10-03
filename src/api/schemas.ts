@@ -51,3 +51,10 @@ export function parseRequest<T extends z.ZodType>(schema: T, input: unknown): z.
   if (!result.success) throw new RequestValidationError(result.error.issues);
   return result.data;
 }
+
+
+/** 工作地图 AI 请求。AI 只处理工作流图，不参与数据分析。 */
+export const JourneyAiRequestSchema = z.object({
+  mode: z.enum(['generate', 'modify']),
+  prompt: z.string().trim().min(1).max(4000),
+}).strict();
