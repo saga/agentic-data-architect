@@ -141,7 +141,7 @@ New Investigation
   → Data Architecture Assessment Workflow
 ~~~
 
-路线不是 Investigation 类型，而是一份可执行的 playbook。内置路线来自 Skill；用户可以在当前 Investigation 中复制为自定义 Workflow，验证通过后再应用。自主调查时没有固定 Journey；调查过程中可以改变工作方式，但这不是首页上的普通下拉选择，而是在“调查配置 → 工作方式”里经过明确确认后执行。已有消息、Discovery、Evidence、Findings 和 workspace 都会保留；旧的动态路线建议会被清除并重新规划。选择路线只约束高层阶段和 Gate，具体调查仍由 Agent 根据证据决定。
+路线不是 Investigation 类型，而是一份可执行的 playbook。内置路线来自 Skill；用户可以在当前 Investigation 中复制为自定义 Workflow，验证通过后再应用。自主调查时没有固定 Journey；调查过程中可以改变工作方式，但这不是首页上的普通下拉选择，而是在“调查配置 → 工作方式”里经过明确确认后执行。已有消息、Discovery、Evidence、Findings 和 workspace 都会保留；旧的动态路线会被清除并重新生成。具体调查仍由 Agent 根据证据决定。
 
 从零建设金融 Portfolio Research Agent 的路线定义在：
 
@@ -250,7 +250,7 @@ Workflow 和 Skill 分工如下：
 ~~~text
 Workflow → 提供高层导航骨架和确定性通关条件
 Journey  → 把当前 Workflow 变成当前可见位置
-Agent    → 理解证据、选择调查动作、生成动态路线和下一步建议
+Agent    → 理解证据、执行用户选择的下一步、必要时给出少量下一步候选
 Skill    → 这一关具体怎么查
 Tool     → 真正执行 SQL / profiling / lineage / search
 Human    → 确认业务定义、范围和例外
@@ -258,7 +258,7 @@ Human    → 确认业务定义、范围和例外
 
 ## Modernization Work Products
 
-工作台的核心交付物不是聊天记录，而是：
+这些对象是最终工作产物，不是发现几个表以后自动填出来的模板：
 
 ~~~text
 Analysis Case
@@ -268,7 +268,12 @@ Architecture Decision
 Modernization Plan
 ~~~
 
-Agent 可以协助生成和修改这些对象；重要结论继续通过 Evidence / Claim / Human Review 固化。
+当前规则：
+
+- Target Architecture 在证据和业务范围还不清楚时只保留空白草稿，不自动拼一套通用组件。
+- Source-to-Target Mapping 只有在真实 source、target、转换规则和证据都明确后才创建；不会把“看起来像对应关系”当成 Mapping。
+- Architecture Decision 只有在确实出现需要选择的架构问题时才创建，并保留候选方案、依据、取舍和人工决定。
+- `npm run modernize` 仍会生成一个工作包文件，但里面未确认的对象保持为空，避免把模板误当成结果。
 
 ## Current-State Intelligence
 
