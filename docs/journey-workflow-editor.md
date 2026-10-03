@@ -147,7 +147,7 @@ useEdgesState
 ReactFlow
 ~~~
 
-官方文档建议用 useNodesState / useEdgesState 管理受控节点和边，并通过 onConnect + addEdge 增加连接。当前实现还支持 onReconnect + reconnectEdge 修改已有分支的目标。边上的 outcome 使用 EdgeLabelRenderer，因此可以直接点击分支标签编辑。
+官方文档建议用 useNodesState / useEdgesState 管理受控节点和边，并通过 onConnect + addEdge 增加连接。当前实现还支持 onReconnect + reconnectEdge 修改已有分支的目标。边上的 outcome 使用 EdgeLabelRenderer，因此可以直接点击分支标签编辑。当前编辑器还为每条 incoming/outgoing route 分配独立 Handle，并使用 ELK layered layout 与 orthogonal edge routing 减少线路交叉。React Flow 官方的 ELK multiple-handles 示例明确使用独立 ports 和 FIXED_ORDER 来降低 edge crossings。
 
 参考：
 
@@ -565,3 +565,44 @@ Workflow Editor APIs
 ~~~
 
 后续如果真实 Workflow 开始出现明显的图复杂度，再考虑 ELK 自动布局；如果出现多人同时编辑，再增加 optimistic concurrency / revision check，而不是现在提前做完整协作系统。
+
+## 14. 为什么这次改了布局
+
+之前的默认布局只是按图深度分列。对于简单线性流程还能工作，但一个节点存在多个 outcome 后，所有边从同一个右侧连接点出发，线路和标签很容易叠在一起。
+
+现在使用 ELK layered layout。React Flow 官方把 Dagre 作为简单方案，把 ELK 作为更可配置的方案；官方的 multiple-handles 示例还展示了通过 ports + FIXED_ORDER 降低 edge crossings 的做法。citeturn836866search10turn836866search9
+
+本项目选择 ELK 的原因不是为了做复杂 BPMN，而只是解决当前编辑器最明显的两个问题：
+
+~~~text
+节点位置
+  ↓
+分层 + 间距 + crossing minimization
+
+连接点
+  ↓
+每条 outgoing / incoming route 独立 port
+
+边
+  ↓
+ORTHOGONAL routing
+
+标签
+  ↓
+按分支序号做轻微垂直偏移
+~~~
+
+因此新增分支后不再要求用户自己一点点挪节点躲线。
+
+React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 label 设置 pointer-events: all，并使用 nodrag / nopan，让用户可以直接点击 outcome 编辑。citeturn836866search0turn836866search2
+
+### 新节点的交互
+
+- 新节点使用橙色虚线框 + “新建步骤”标签。
+- 创建后自动选中。
+- 如果当前节点已有 success 路线，“添加下一步”会把新节点插入现有 success 路线，而不是生成 success-1 之类难以理解的出口。
+- “添加分支”会创建一条新的 branch；存在主 success 目标时，新分支会先接回主流程。
+- 任何节点都可以通过“连接到现有步骤”直接选择目标和 outcome。
+- 也可以拖动右侧 source Handle 到目标节点左侧 target Handle。
+
+这些操作最后仍然只生成原来的 Markdown DSL；没有增加第二套图语法。
