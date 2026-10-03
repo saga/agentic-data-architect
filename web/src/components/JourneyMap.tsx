@@ -667,6 +667,8 @@ export function JourneyMap({
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
+  const [connectTargetId, setConnectTargetId] = useState<string>();
+  const [connectOutcome, setConnectOutcome] = useState('success');
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
@@ -1155,19 +1157,140 @@ export function JourneyMap({
     setValidationIssues([]);
   };
 
-  const applyEdgeDraft = () => {
+  const applyEdgeDraft = async () => {
     if (!selectedEdge || !edgeDraft) return;
     const outcome = edgeDraft.outcome.trim();
     if (!outcome) {
       message.warning('分支结果不能是空的。');
       return;
     }
+
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    if (
+      currentEdges.some(
+        (edge) =>
+          edge.id !== selectedEdge.id
+          && edge.source === selectedEdge.source
+          && edge.target === edgeDraft.target,
+      )
+    ) {
+      message.info('这个节点已经连向该目标步骤；可以保留一条连接，再通过 outcome 区分。');
+    }
+
     pushHistory();
-    setEdges((items) => items.map((edge) => (
+    const nextEdges = currentEdges.map((edge) => (
       edge.id === selectedEdge.id
-        ? { ...edge, target: edgeDraft.target, data: { ...(edge.data ?? {}), outcome } }
+        ? {
+            ...edge,
+            target: edgeDraft.target,
+            data: {
+              ...(edge.data ?? {}),
+              outcome,
+            },
+          }
         : edge
-    )));
+    ));
+    await rebuildStructuralGraph(currentNodes, nextEdges);
+  };
+
+  const connectSelectedNode = async () => {
+    const source = selectedNodeId;
+    const target = connectTargetId;
+    if (!source || !target || source === target) {
+      message.warning('请选择一个不同于当前节点的目标步骤。');
+      return;
+    }
+
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    if (currentEdges.some((edge) => edge.source === source && edge.target === target)) {
+      message.info('这两个步骤已经有连接。点击对应连线标签可以修改 outcome。');
+      return;
+    }
+
+    pushHistory();
+    const sourceNode = currentNodes.find((node) => node.id === source);
+    const targetNode = currentNodes.find((node) => node.id === target);
+    if (!sourceNode || !targetNode) return;
+
+    const outcome = connectOutcome.trim() || 'success';
+    const edge: FlowEdge = {
+      id: source + ':' + outcome + ':' + target + ':' + String(
+        currentEdges.filter((item) => item.source === source).length,
+      ),
+      source,
+      target,
+      type: EDGE_TYPE,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      data: { outcome },
+    };
+    await rebuildStructuralGraph(currentNodes, [...currentEdges, edge]);
+    setConnectTargetId(undefined);
+    setConnectOutcome('success');
+    setSelectedEdgeId(edge.id);
+  };
+
+  const createStandaloneNode = async () => {
+    const currentSnapshot = snapshotRef.current;
+    const currentNodes = nodesRef.current;
+    if (!currentSnapshot) return;
+
+    const id = nextId('step', new Set(currentNodes.map((node) => node.id)));
+    const maxX = currentNodes.reduce((max, node) => Math.max(max, node.position.x), 0);
+    const node: FlowNode = {
+      id,
+      type: 'journey',
+      position: { x: maxX + 360, y: 0 },
+      draggable: true,
+      selectable: true,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      data: {
+        title: '新建步骤',
+        objective: '填写这一步要解决的问题。',
+        nodeType: 'task',
+        status: 'future',
+        completion: 'agent',
+        visible: true,
+        editing: true,
+        isNew: true,
+        sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
+        targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
+        onSelect: setSelectedNodeId,
+        onAddStep: (value) => { void addNodeAfter(value, false); },
+        onAddBranch: (value) => { void addNodeAfter(value, true); },
+        onDelete: deleteNode,
+      },
+      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future journey-flow-node-new',
+      style: { width: 236 },
+    };
+
+    pushHistory();
+    const nextIds = new Set(newNodeIdsRef.current);
+    nextIds.add(id);
+    newNodeIdsRef.current = nextIds;
+    setNewNodeIds(nextIds);
+
+    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const definition = definitionFromGraph([...currentNodes, node], currentEdges, base);
+    const graph = graphFromDefinition(
+      definition,
+      layoutFromNodes([...currentNodes, node]),
+      currentSnapshot,
+      true,
+      setSelectedNodeId,
+      (value) => { void addNodeAfter(value, false); },
+      (value) => { void addNodeAfter(value, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      nextIds,
+    );
+
+    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    setEdges(graph.edges);
+    setSelectedNodeId(id);
+    setSelectedEdgeId(undefined);
     setValidationIssues([]);
   };
 
@@ -1431,7 +1554,12 @@ export function JourneyMap({
             <>
               <Button size="small" icon={<UndoOutlined />} disabled={!past.length} onClick={undo}>撤销</Button>
               <Button size="small" icon={<RedoOutlined />} disabled={!future.length} onClick={redo}>重做</Button>
-              <Button size="small" icon={<NodeIndexOutlined />} onClick={autoLayout}>自动排版</Button>
+              <Button size="small" icon={<NodeIndexOutlined />} onClick={() => void autoLayout()}>
+                自动排版
+              </Button>
+              <Button size="small" icon={<PlusOutlined />} onClick={() => void createStandaloneNode()}>
+                新建步骤
+              </Button>
               <Button size="small" icon={<SaveOutlined />} onClick={() => void saveDraft()}>保存草稿</Button>
               <Button size="small" onClick={() => void validate()}>验证</Button>
               <Button size="small" onClick={resetWorkflow}>恢复内置</Button>
@@ -1578,7 +1706,41 @@ export function JourneyMap({
                     />
                   </div>
                 ) : null}
-                <Button type="primary" icon={<SaveOutlined />} onClick={applyNodeDraft}>应用节点属性</Button>
+                <div className="journey-map-connect-box">
+                  <Text strong>连接到现有步骤</Text>
+                  <Text type="secondary">新建步骤通常需要先接回现有流程，否则验证会提示它没有出口。</Text>
+                  <Select
+                    value={connectTargetId}
+                    allowClear
+                    placeholder="选择目标步骤"
+                    style={{ width: '100%' }}
+                    options={nodes
+                      .filter((node) => node.id !== selectedNode.id)
+                      .map((node) => ({
+                        value: node.id,
+                        label: node.id + ' · ' + node.data.title,
+                      }))}
+                    onChange={(value) => setConnectTargetId(value)}
+                  />
+                  <Input
+                    value={connectOutcome}
+                    placeholder="success / retry / needs-input"
+                    onChange={(event) => setConnectOutcome(event.target.value)}
+                    addonBefore="outcome"
+                  />
+                  <Button
+                    block
+                    icon={<ArrowRightOutlined />}
+                    disabled={!connectTargetId}
+                    onClick={() => void connectSelectedNode()}
+                  >
+                    建立连接
+                  </Button>
+                  <Text type="secondary" className="journey-map-connect-hint">
+                    也可以直接拖动右侧圆点 → 目标步骤左侧圆点。
+                  </Text>
+                </div>
+                                <Button type="primary" icon={<SaveOutlined />} onClick={applyNodeDraft}>应用节点属性</Button>
               </Flex>
             ) : selectedEdge && edgeDraft ? (
               <Flex vertical gap={12}>
