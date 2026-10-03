@@ -1373,6 +1373,184 @@ body {
   line-height: 1.45;
 }
 
+/* Workflow map node base -------------------------------------------------- */
+/* 自定义 nodeType=journey 不会吃 React Flow default node 的背景/边框变量，
+   因此这些视觉基础样式必须由项目自己的 class 明确定义。 */
+.journey-flow-node {
+  position: relative;
+  width: 236px;
+  min-width: 236px;
+  border: 1px solid #d9e1ec;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  color: rgba(0, 0, 0, 0.88);
+  box-shadow: 0 8px 26px rgba(31, 42, 55, 0.08);
+  overflow: visible;
+}
+
+.journey-flow-node-content {
+  display: grid;
+  gap: 8px;
+  padding: 13px 14px;
+  min-width: 0;
+}
+
+.journey-flow-stage-content {
+  min-height: 176px;
+}
+
+.journey-flow-node-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.journey-flow-node-kicker-completed { color: #389e0d; }
+.journey-flow-node-kicker-current { color: #1677ff; }
+.journey-flow-node-kicker-future { color: #6b7a90; }
+.journey-flow-node-kicker-locked { color: #9aa6b5; }
+
+.journey-flow-node-type {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #7b8794;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.journey-flow-node-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.journey-flow-node-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 650;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.journey-flow-node-subtitle {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 11px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.journey-flow-node-config {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 7px;
+  border-top: 1px solid #f0f2f5;
+}
+
+.journey-flow-node-config > .ant-typography {
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.journey-flow-node-waiting-label {
+  color: #1677ff;
+  font-weight: 700;
+}
+
+.journey-flow-terminal-content {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid #d9e1ec;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(31, 42, 55, 0.08);
+}
+
+.journey-flow-event-symbol {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f0f5ff;
+  color: #1677ff;
+  font-weight: 700;
+}
+
+.journey-flow-edge {
+  stroke: #c9d2df;
+  stroke-width: 2;
+}
+
+.journey-flow-edge-current {
+  stroke: #1677ff;
+  stroke-width: 2.8;
+}
+
+.journey-flow-edge-traversed {
+  stroke: #52c41a;
+  stroke-width: 2.6;
+}
+
+.journey-flow-edge-path {
+  stroke: #c9d2df;
+  stroke-width: 2;
+}
+
+.journey-flow-edge-current .journey-flow-edge-path,
+.journey-flow-edge-current {
+  stroke: #1677ff;
+  stroke-width: 2.8;
+}
+
+.journey-flow-edge-label {
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 6px;
+  border: 1px solid #e6eaf0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: rgba(0, 0, 0, 0.58);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.journey-flow-edge-condition {
+  color: rgba(0, 0, 0, 0.46);
+}
+
+.journey-node-editor-toolbar {
+  z-index: 20;
+  padding: 4px;
+  border: 1px solid #e6eaf0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.1);
+}
+
 /* Workflow editor: make newly-created nodes unmistakable. */
 .journey-flow-node-new {
   border: 2px dashed #fa8c16 !important;
