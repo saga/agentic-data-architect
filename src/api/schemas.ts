@@ -53,8 +53,15 @@ export function parseRequest<T extends z.ZodType>(schema: T, input: unknown): z.
 }
 
 
+/** 工作地图 AI 对话中的一条历史消息。只保存用户消息和 AI 的简短回复，不保存思维链。 */
+export const JourneyAiMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().trim().min(1).max(8000),
+}).strict();
+
 /** 工作地图 AI 请求。AI 只处理工作流图，不参与数据分析。 */
 export const JourneyAiRequestSchema = z.object({
   mode: z.enum(['generate', 'modify']),
   prompt: z.string().trim().min(1).max(4000),
+  messages: z.array(JourneyAiMessageSchema).max(12).optional(),
 }).strict();
