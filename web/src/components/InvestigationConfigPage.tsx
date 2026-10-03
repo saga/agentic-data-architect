@@ -96,7 +96,7 @@ export function InvestigationConfigPage(props:{
           </Card>
           <Card size='small' className='settings-card'>
             <Text strong>技能怎么工作</Text>
-            <Paragraph type='secondary' style={{marginBottom:0}}>本机的技能目录会一直提供给 Copilot。它会根据你的问题和每个 SKILL.md 的描述，在真正相关时加载对应技能；需要固定工作路线时，当前工作方式会预加载对应的 Workflow。</Paragraph>
+            <Paragraph type='secondary' style={{marginBottom:0}}>本机的技能目录会一直提供给 Copilot。它会根据你的问题和每个 SKILL.md 的描述，在真正相关时加载对应技能；选择工作方式后，只保留对应 Workflow Skill，避免不同路线混在一起。</Paragraph>
           </Card>
         </div>}
         {tab==='mcp'&&<div className='settings-page'>
