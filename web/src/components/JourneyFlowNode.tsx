@@ -170,7 +170,6 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               拖右侧连接点到另一个步骤左侧连接点即可连线
             </Text>
           </div>
-        </div>
       </div>
 
       {!terminal
