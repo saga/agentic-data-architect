@@ -437,6 +437,29 @@ export async function applyJourneyDefinition(
     await ensureWorkspace(name);
     const active = await loadActiveJourney(name, workflowId);
     const nextVersion = active.source === 'custom' ? active.version + 1 : 1;
+    const oldExecution = await loadJourneyExecution(
+      name,
+      active.definition,
+      active.version,
+    );
+    const newNodeIds = new Set(definition.nodes.map((node) => node.id));
+    const preservedCompleted = oldExecution.completedNodeIds.filter((id) => newNodeIds.has(id));
+    const preservedCurrent = newNodeIds.has(oldExecution.currentNodeId)
+      ? oldExecution.currentNodeId
+      : definition.start;
+    const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
+    const migratedExecution: JourneyExecution = {
+      ...oldExecution,
+      workflowId: definition.id,
+      workflowVersion: nextVersion,
+      currentNodeId: preservedCurrent,
+      completedNodeIds: preservedCompleted,
+      status: preservedNode?.type === 'end'
+        ? 'completed'
+        : preservedNode?.type === 'stop'
+          ? 'stopped'
+          : 'active',
+    };
 
     await fs.mkdir(journeyDir(name), { recursive: true });
     await fs.writeFile(
@@ -454,7 +477,7 @@ export async function applyJourneyDefinition(
     await fs.rm(journeyFile(name, DRAFT_LAYOUT_FILE), { force: true });
     await writeJsonAtomic(
       journeyFile(name, EXECUTION_FILE),
-      initialJourneyExecution(definition, nextVersion),
+      migratedExecution,
     );
 
     const current = await loadWorkspaceContext(name);
