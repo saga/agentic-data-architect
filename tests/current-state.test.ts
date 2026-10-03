@@ -50,3 +50,31 @@ describe('Current-State Intelligence', () => {
     assert.ok(result.semanticCandidates.some((item) => item.key === 'position' && item.semanticAssets.includes('sv:position')));
   });
 });
+
+
+test('does not invent a source-of-truth candidate for a uniquely named dataset', () => {
+  const estate = emptyEstate();
+  estate.nodes.push({
+    id: nodeId('dataset', 'prod.unique_position'),
+    type: 'dataset',
+    name: 'prod.unique_position',
+    attributes: { adapter: 'snowflake' },
+  });
+
+  const result = buildCurrentStateIntelligence({
+    inventory: {
+      root: '/tmp',
+      discoveryRunId: 'run-2',
+      scannedAt: new Date().toISOString(),
+      files: [],
+      sqlFiles: [],
+      unknowns: [],
+    },
+    estate,
+    lineage: null,
+    profiles: [],
+    semanticAssets: [],
+  });
+
+  assert.deepEqual(result.sourceOfTruthCandidates, []);
+});
