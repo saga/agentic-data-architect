@@ -69,7 +69,7 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
         .flatMap((edge) => edge.evidenceIds);
 
       return { dataset, priorityScore, reasons, evidenceIds };
-    }).sort((a, b) => b.score - a.score);
+    }).sort((a, b) => b.priorityScore - a.priorityScore);
 
     const top = scored.slice(0, 5);
     result.push({
@@ -177,7 +177,7 @@ export function buildCurrentStateIntelligence(args: {
     connectedDatasets: connected.size,
     datasetLineageConnectionRate: datasets.length === 0
       ? null
-      : Math.min(connected.size, datasets.length) / datasets.length,
+      : connected.size / datasets.length,
     columnLineageEdges: args.lineage?.columns.length || 0,
     semanticAssets: semanticAssets.length,
     profiledDatasets: args.profiles.length,
