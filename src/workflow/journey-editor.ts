@@ -774,6 +774,9 @@ export async function applyAgentWorkflowTransition(
   const transition = extractWorkflowTransition(rawAnswer);
   if (!transition) return { applied: false };
 
+  let eventRunId = workflowId + '-rejected';
+  let eventWorkflowVersion = 0;
+
   try {
     const active = await loadActiveJourney(name, workflowId);
     const execution = await loadJourneyExecution(
@@ -781,6 +784,8 @@ export async function applyAgentWorkflowTransition(
       active.definition,
       active.version,
     );
+    eventRunId = execution.runId;
+    eventWorkflowVersion = execution.workflowVersion;
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
@@ -845,9 +850,9 @@ export async function applyAgentWorkflowTransition(
 
     await appendJourneyRunEvent(name, {
       id: crypto.randomUUID(),
-      runId: workflowId + '-rejected',
+      runId: eventRunId,
       workflowId,
-      workflowVersion: 0,
+      workflowVersion: eventWorkflowVersion,
       type: 'transition-rejected',
       timestamp: new Date().toISOString(),
       nodeId: transition.nodeId,
@@ -878,9 +883,14 @@ export async function applyHumanWorkflowTransition(
   nodeId: string,
   outcome: string,
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
+  let eventRunId = workflowId + '-rejected';
+  let eventWorkflowVersion = 0;
+
   try {
     const active = await loadActiveJourney(name, workflowId);
     const execution = await loadJourneyExecution(name, active.definition, active.version);
+    eventRunId = execution.runId;
+    eventWorkflowVersion = execution.workflowVersion;
     if (execution.status !== 'waiting') {
       throw new Error('当前 Workflow 并未等待人工处理。');
     }
@@ -936,6 +946,19 @@ export async function applyHumanWorkflowTransition(
     return { applied: true, execution: next };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: eventRunId,
+      workflowId,
+      workflowVersion: eventWorkflowVersion,
+      type: 'transition-rejected',
+      timestamp: new Date().toISOString(),
+      nodeId,
+      outcome,
+      error: message,
+    });
+
     return { applied: false, error: message };
   }
 }
