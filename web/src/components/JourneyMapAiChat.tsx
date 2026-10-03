@@ -62,7 +62,7 @@ export function JourneyMapAiChat({
       id: 'journey-ai-welcome',
       role: 'assistant',
       content:
-        '我可以直接帮你修改当前工作地图。可以连续告诉我怎么调整，例如“再增加一个人工评审”“把这个判断移到前面”，每一轮都会基于当前画布继续修改。',
+        '告诉我你要怎么调整即可，例如“增加一个人工评审”“把这个判断移到前面”。后续每一轮都会基于刚刚修改后的画布继续。',
     },
   ]);
 
@@ -116,6 +116,10 @@ export function JourneyMapAiChat({
     }
   };
 
+  const selectedNode = selectedNodeId
+    ? currentDefinition?.nodes.find((node) => node.id === selectedNodeId)
+    : undefined;
+
   return (
     <section className="journey-map-ai-chat">
       <div className="journey-map-ai-chat-header">
@@ -125,11 +129,18 @@ export function JourneyMapAiChat({
           gap={8}
           className="journey-map-ai-chat-title-row"
         >
-          <Typography.Text strong>修改工作地图</Typography.Text>
-          <Tag bordered={false}>{mode === 'modify' ? '修改当前图' : '重新设计'}</Tag>
+          <Flex align="center" gap={7} style={{ minWidth: 0 }}>
+            <RobotOutlined />
+            <Typography.Text strong>AI 修改工作地图</Typography.Text>
+          </Flex>
+          <Tag bordered={false}>
+            {mode === 'modify'
+              ? (scope === 'selection' && selectedNode ? `选中：${selectedNode.title}` : '当前工作地图')
+              : '重新设计整张图'}
+          </Tag>
         </Flex>
         <Typography.Text type="secondary" className="journey-map-inspector-desc">
-          连续描述怎么调整；AI 先生成修改预览，保存后才正式生效。
+          直接说要怎么改。AI 只生成修改预览，确认后才会写进当前画布。
         </Typography.Text>
 
         <div className="journey-map-ai-chat-controls">
