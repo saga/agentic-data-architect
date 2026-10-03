@@ -1103,10 +1103,17 @@ export function JourneyMap({
     pushHistory();
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
+    const remainingEdges = currentEdges.filter((edge) => edge.id !== oldEdge.id);
     const nextConnection = {
       ...connection,
-      sourceHandle: connection.sourceHandle ?? oldEdge.sourceHandle,
-      targetHandle: connection.targetHandle,
+      sourceHandle: sourceHandleId(
+        connection.source,
+        remainingEdges.filter((edge) => edge.source === connection.source).length,
+      ),
+      targetHandle: targetHandleId(
+        connection.target,
+        remainingEdges.filter((edge) => edge.target === connection.target).length,
+      ),
     };
     const rebuilt = await rebuildStructuralGraph(
       [...currentNodes],
