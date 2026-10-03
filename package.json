@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Evidence-backed Data Architecture Workbench. See docs/architecture_0930.md",
   "scripts": {
-    "start": "tsx src/server.ts",
-    "dev": "tsx src/server.ts",
+    "start": "tsx src/server-main.ts",
+    "dev": "tsx src/server-main.ts",
     "init": "tsx src/cli.ts init",
     "discover": "tsx src/cli.ts discover",
     "ask": "tsx src/cli.ts ask",
