@@ -20,7 +20,7 @@ describe('Modernization workbench', () => {
           sqlParseFailures: 1,
           datasets: 4,
           connectedDatasets: 2,
-          datasetLineageCoverage: 0.5,
+          datasetLineageConnectionRate: 0.5,
           columnLineageEdges: 2,
           semanticAssets: 0,
           profiledDatasets: 1,
