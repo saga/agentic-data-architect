@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
   Button,
   Space,
@@ -20,11 +20,22 @@ import {
   useUpdateNodeInternals,
   type NodeProps,
 } from '@xyflow/react';
-import {
-  NODE_TYPE_LABEL,
-  STATUS_META,
-  type FlowNode,
-} from './journey-map-types.js';
+import type { FlowNode, JourneyMapStage, WorkflowNodeType } from './journey-map-types.js';
+
+const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
+  task: '任务',
+  gate: '判断点',
+  review: '评审',
+  end: '完成',
+  stop: '停止',
+};
+
+const STATUS_META: Record<JourneyMapStage['status'], { label: string; icon: ReactNode }> = {
+  completed: { label: '已完成', icon: <CheckCircleFilled /> },
+  current: { label: '当前', icon: <AimOutlined /> },
+  future: { label: '待进入', icon: <ClockCircleOutlined /> },
+  locked: { label: '暂不可走', icon: <LockOutlined /> },
+};
 import { handleStyle } from './journey-map-graph.js';
 
 const { Text } = Typography;
