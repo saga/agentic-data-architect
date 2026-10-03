@@ -26,7 +26,6 @@ const NODE_GAP = 56;
 const LAYER_GAP = 72;
 const EDGE_NODE_GAP = 40;
 const EDGE_EDGE_GAP = 40;
-const BRANCH_VERTICAL_GAP = 72;
 
 /** 给布局引擎提供真实/保守的节点尺寸。 */
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
