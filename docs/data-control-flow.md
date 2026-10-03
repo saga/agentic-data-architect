@@ -698,6 +698,28 @@ local_query 只允许 SELECT / WITH，禁止多语句、ATTACH、COPY、INSTALL�
 
 Dataset Registry 与 conversation store 当前共用同一 SQLite 文件，后续可以自然迁移成统一 app.sqlite，但不需要因为这个目标提前重写现有 Conversation API。
 
+### Local Data 并发与写入边界
+
+每个 Investigation 只有一个进程内 DuckDB engine 和 connection。Agent 的本地分析操作通过单队列串行化；Dataset Registry 仍使用 SQLite WAL 和 busy_timeout。
+
+原始文件只读，raw schema 只建立 view。需要写入时，Agent 只能生成 analysis / scratch 派生表，或把只读查询导出成当前 Investigation 内的 Parquet 文件。
+
+因此本地数据路径仍然是：
+
+~~~text
+raw input
+   ↓
+Dataset Registry
+   ↓
+DuckDB read-only analysis
+   ├─ query/profile/sample
+   ├─ analysis/scratch derived table
+   └─ Parquet export
+   ↓
+Evidence
+~~~
+
+
 ## 19. Schema 与边界验证（当前实现）
 
 运行时数据不再只靠 TypeScript interface 约束。当前代码使用 Zod 作为 JSON / API 边界的运行时 Schema：
