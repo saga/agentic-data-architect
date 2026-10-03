@@ -24,7 +24,18 @@
 
 ### 4）说人话、去掉 AI 味
 
-这个项目是给 Data Analyst / Data Architect 用的，不是给模型展示术语的。**凡是用户能看到的内容，都优先用最简单、最直接的中文。**
+这个项目是给 Data Analyst / Data Architect 用的，不是给模型展示术语的。
+
+### 本项目的运行模型：个人本机 Agent
+
+这是一个**单人、本机运行、面向个人生产力的 AI Agent**，不是多人共享的 Agent Server。架构和 UI 都应围绕“用户提出目标，Agent 自己判断、检索、调用技能和工具并持续完成任务”设计。
+
+- 默认使用 Copilot SDK 的 `mode: "copilot-cli"`，保留 Copilot CLI 自带的工具、技能和内置 MCP。不要把单用户本机应用做成“每次 Investigation 手工装配一遍 Agent”。
+- capability Skill 放在 `skills/*/SKILL.md`，由 Copilot 根据问题和 Skill 的 `description` 自动判断是否需要使用；**不要让用户为每次 Investigation 逐项勾选 capability Skill**。
+- Workflow Skill 是唯一例外：它代表用户明确选择的工作方式，而不是普通能力。用户选择某个 Workflow 后，当前 Workflow 可以预加载；其它 capability 仍由 Agent 自动发现。
+- “本次调查说明”只是用户给本次 Investigation 的额外说明，会追加到平台系统指令后面；它不是整个 System Prompt，也不能修改平台安全、Evidence 或运行规则。默认可以是空的，但 UI 必须给出可直接照抄的示例。
+- Copilot CLI 自带的 MCP 不进入 Investigation 的 `control.json`。配置页只保存用户主动添加的额外 MCP；页面应该明确告诉用户“自带服务已经可以直接使用”。
+- 如果未来把这个项目改成多人共享服务，必须重新设计运行时隔离和权限边界，并改用 `mode: "empty"` 等显式 allowlist 方案；不能直接沿用本地单用户模式。**凡是用户能看到的内容，都优先用最简单、最直接的中文。**
 
 - UI、按钮、标题、提示、错误信息、报告摘要、Agent 回答：先说人能直接理解的话。
 - 不要为了“显得专业”堆砌术语。像“现代化工作”“当前状态”“业务语义”“源到目标映射”“工作产物”“差距分析”这类词，除非确实有必要，否则换成日常说法。
