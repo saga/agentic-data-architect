@@ -22,9 +22,9 @@ const TERMINAL_NODE_HEIGHT = 96;
  * ELK 的 node-node spacing 是最小安全距离，不是视觉上的“宽松程度”。
  * 对当前 230px 左右的卡片，140px 左右的额外留白比较合适。
  */
-const NODE_GAP = 64;
-const LAYER_GAP = 96;
-const EDGE_NODE_GAP = 48;
+const NODE_GAP = 56;
+const LAYER_GAP = 72;
+const EDGE_NODE_GAP = 40;
 const EDGE_EDGE_GAP = 40;
 const BRANCH_VERTICAL_GAP = 72;
 
