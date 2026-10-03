@@ -248,7 +248,14 @@ activeAfterExecution.phase = 'committing';
   }
   abortRequestedTurns.delete(turnId);
 
-  const parsed = parseAgentAnswer(raw, existingEvidence);
+  // local_* 工具可能在模型执行期间新增 Evidence。重新读取最新 Investigation，
+  // 让模型刚刚使用真实数据得到的 Evidence ID 也能通过 ownership 校验。
+  const latestAfterTools = await loadInvestigation(investigationName);
+  const evidenceAfterTools = new Map(latestAfterTools.evidence.map((e) => [e.id, e]));
+  for (const evidence of latestAfterTools.evidence) {
+    if (!inv.evidence.some((item) => item.id === evidence.id)) inv.evidence.push(evidence);
+  }
+  const parsed = parseAgentAnswer(raw, evidenceAfterTools);
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
   if (!inv.questions.includes(question)) inv.questions.push(question);
