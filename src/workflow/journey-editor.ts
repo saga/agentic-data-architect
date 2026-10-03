@@ -214,7 +214,10 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
   return lines.join('\n').trimEnd() + '\n';
 }
 
-type JourneyExecutionInput = Omit<JourneyExecution, 'runId'> & { runId?: string };
+type JourneyExecutionInput = Omit<JourneyExecution, 'runId' | 'pendingInteraction'> & {
+  runId?: string | undefined;
+  pendingInteraction?: JourneyExecution['pendingInteraction'] | undefined;
+};
 
 function normalizeExecution(
   definition: JourneyDefinition,
