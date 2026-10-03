@@ -63,23 +63,6 @@ function registerJourneyRoutes(app: express.Express): void {
     }
   });
 
-  /** 兼容旧调试入口：只验证，不落盘。 */
-  app.post('/api/sessions/:name/workflow/validate', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      res.json(validateJourneyEdit(body.definition, body.layout));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
   /** 恢复 Skill 内置路线，并清除 Investigation 级自定义 Workflow。 */
   app.post('/api/sessions/:name/workflow/reset', async (req, res) => {
     try {
