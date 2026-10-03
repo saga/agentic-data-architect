@@ -126,6 +126,7 @@ export function definitionFromGraph(
     routes.push({
       outcome: edge.data?.outcome || 'success',
       target: edge.target,
+      ...(edge.data?.condition ? { condition: edge.data.condition } : {}),
     });
 
     routeBySource.set(edge.source, routes);
@@ -143,6 +144,7 @@ export function definitionFromGraph(
         objective: node.data.objective,
         visible: node.data.visible,
         completion: node.data.completion,
+        actor: node.data.actor,
         completeWhen: node.data.completeWhen,
         tools: source?.tools,
         routes: routeBySource.get(node.id) ?? [],
@@ -333,6 +335,7 @@ export function graphFromDefinition(
         nodeType: item.type,
         status,
         completion: item.completion,
+        actor: item.actor,
         completeWhen: item.completeWhen,
         visible: item.visible,
         isNew: newNodeIds.has(item.id),
@@ -391,6 +394,7 @@ export function graphFromDefinition(
           + (isCurrent ? ' journey-flow-edge-current' : ''),
         data: {
           outcome: route.outcome,
+          ...(route.condition ? { condition: route.condition } : {}),
           // 分支多时标签也需要错开，否则“success / retry / rollback”会叠成一团。
           labelOffsetY:
             (routeIndex - (validRoutes.length - 1) / 2) * 20
