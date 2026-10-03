@@ -236,25 +236,28 @@ function normalizeExecution(
   const currentNode = definition.nodes.find((node) => node.id === execution.currentNodeId);
   const needsHuman = currentNode?.actor === 'human' && currentNode.type !== 'end' && currentNode.type !== 'stop';
   const runId = execution.runId || definition.id + '-v' + String(version);
-  if (needsHuman && execution.status !== 'waiting') {
+  const baseExecution: JourneyExecution = {
+    workflowId: definition.id,
+    workflowVersion: version,
+    runId,
+    currentNodeId: execution.currentNodeId,
+    completedNodeIds: [...execution.completedNodeIds],
+    status: needsHuman ? 'waiting' : execution.status,
+  };
+
+  if (needsHuman) {
     return {
-      ...execution,
-      workflowVersion: version,
-      runId,
-      status: 'waiting',
-      pendingInteraction: {
-        id: 'pending-' + runId + '-' + currentNode.id,
-        nodeId: currentNode.id,
-        reason: '等待人工完成“' + currentNode.title + '”。',
+      ...baseExecution,
+      pendingInteraction: execution.pendingInteraction ?? {
+        id: 'pending-' + runId + '-' + currentNode!.id,
+        nodeId: currentNode!.id,
+        reason: '等待人工完成“' + currentNode!.title + '”。',
         requestedAt: new Date().toISOString(),
       },
     };
   }
-  return {
-    ...execution,
-    workflowVersion: version,
-    runId,
-  };
+
+  return baseExecution;
 }
 
 async function loadCustomActive(
