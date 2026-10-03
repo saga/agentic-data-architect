@@ -310,7 +310,7 @@ Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由�
   → 切换
 ```
 
-Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `@flow / @task / @gate / @end` 语法。参考 copilot-server-agent 的 Skill Flow，但本项目目前只实现路线解析、route 校验和确定性 Journey 状态计算，不引入完整的审批/命令执行引擎。
+Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `@flow / @task / @gate / @end / @stop` 语法。现在 Workflow 已经有 Investigation 级 execution state：deterministic 节点由状态推进，agent 节点通过合法 outcome 推进；用户可以在工作地图中创建自定义 Workflow，并由服务端验证后应用。仍不引入完整的审批/命令执行引擎。
 
 边界：
 
@@ -321,9 +321,9 @@ Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `
 - Agent：根据当前证据决定具体调查动作，并解释结果。
 - 人：确认业务定义、范围和不能自动判断的例外。
 
-Legacy Modernization Workflow 的状态不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；路线只根据 Current-State、Evidence、Mapping、Validation 等确定性状态推进。
+Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。draft Target Architecture、proposed Mapping 不会自动把关卡标记为完成；deterministic 节点只根据当前 Investigation 状态推进，而需要判断的 agent 节点必须返回当前节点实际存在的 outcome，服务端才会推进。
 
-右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区，避免被窄侧栏弱化。全屏工作地图展示 Workflow 主线、当前节点、已完成路径和 Agent 建议分支；选择路线只是向 Agent 表达用户意图，不直接跳转 Journey 状态。当前节点还可以通过 NodeToolbar 直接要求 Agent 围绕该阶段继续。发现新的 lineage / semantic / data-quality 问题，或用户主动改道后，下一轮会重新规划路线。
+右侧工作区展示当前地图的紧凑导引和当前事实；Agent 动态建议优先显示在主对话区。全屏工作地图展示 Workflow 主线和 Agent 临时建议；进入编辑模式后，用户可以拖动节点、添加步骤、增加分支、修改 outcome/目标、删除节点或分支。保存草稿不会改变执行；服务端验证通过并 Apply 后，生成新的 Workflow version，并从修改后的 Workflow 重新执行。
 
 ## Agent Trajectory / 执行轨迹
 
