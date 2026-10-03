@@ -276,6 +276,8 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             nodesConnectable
             elementsSelectable
             edgesReconnectable
+            minZoom={0.2}
+            maxZoom={1.4}
             connectionLineType={ConnectionLineType.SmoothStep}
             connectionRadius={28}
             onNodesChange={handleNodesChange}
