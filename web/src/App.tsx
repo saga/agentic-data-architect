@@ -1356,7 +1356,7 @@ function AppInner() {
                   <Flex className="right-section-heading" justify="space-between" align="center">
                     <Space size={6}>
                       <Text strong>地图导引</Text>
-                      <Tag bordered={false}>参考</Tag>
+                      <Tag bordered={false}>{current?.context.workflow ? '当前 Workflow' : '自主调查'}</Tag>
                     </Space>
                     <Button
                       type="link"
