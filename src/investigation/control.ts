@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { workspaceRoot, writeJsonAtomic } from './workspace.js';
 import {
@@ -25,8 +25,6 @@ function controlFile(name: string): string {
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
 const controlInitLocks = new Map<string, Promise<void>>();
-const WORKFLOW_SKILL_NAMES = new Set(['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment']);
-
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
@@ -76,45 +74,7 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
     .filter((item) => item.name);
 }
 
-/**
- * Hash every file in a Skill bundle, not only SKILL.md.
- * A change to a deterministic script/reference must create a new Skill version too.
- */
-async function skillSourceHash(name: string): Promise<string | undefined> {
-  const root = path.join(config.skillsDir, name);
-  try {
-    const files: string[] = [];
-
-    const visit = async (directory: string, relative = ''): Promise<void> => {
-      const entries = await fs.readdir(directory, { withFileTypes: true });
-      for (const entry of entries) {
-        const nextRelative = path.join(relative, entry.name);
-        const nextAbsolute = path.join(directory, entry.name);
-        if (entry.isDirectory()) {
-          await visit(nextAbsolute, nextRelative);
-        } else if (entry.isFile()) {
-          files.push(nextRelative);
-        }
-      }
-    };
-
-    await visit(root);
-    files.sort();
-
-    const hash = createHash('sha256');
-    for (const relative of files) {
-      hash.update(relative);
-      hash.update('\0');
-      hash.update(await fs.readFile(path.join(root, relative)));
-      hash.update('\0');
-    }
-    return hash.digest('hex');
-  } catch {
-    return undefined;
-  }
-}
-
-/** 创建一个新 Investigation 的默认配置，默认 Skill 来自环境配置。 */
+/** 创建一个新 Investigation 的默认配置。技能由 Copilot 根据当前任务自动发现。 */
 function defaultControl(): Omit<InvestigationControl, 'history'> {
   const now = new Date().toISOString();
   return {
@@ -133,7 +93,6 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
         version: 1,
         content: '',
       },
-      skills: config.copilotSkills.filter((name) => !WORKFLOW_SKILL_NAMES.has(name)).map((name) => ({ name, version: 1, parameters: {} })),
       mcpServers: [],
     },
   };
@@ -154,7 +113,6 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
     agent: {
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
-      skills: control.agent.skills.map((item) => ({ ...item, parameters: { ...(item.parameters ?? {}) } })),
       mcpServers: control.agent.mcpServers.map((item) => ({
         ...item,
         ...(item.args ? { args: [...item.args] } : {}),
@@ -201,22 +159,6 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
         version: Number(agent.systemPrompt?.version ?? 1) || 1,
         content: typeof agent.systemPrompt?.content === 'string' ? agent.systemPrompt.content : '',
       },
-      skills: Array.isArray(agent.skills)
-        ? agent.skills
-            .map((item) => ({
-              name: String(item.name ?? '').trim(),
-              version: Number(item.version ?? 1) || 1,
-              ...(typeof (item as { sourceHash?: unknown }).sourceHash === 'string'
-                ? { sourceHash: (item as { sourceHash: string }).sourceHash }
-                : {}),
-              parameters: item && typeof item === 'object' && (item as { parameters?: unknown }).parameters
-                && typeof (item as { parameters?: unknown }).parameters === 'object'
-                && !Array.isArray((item as { parameters?: unknown }).parameters)
-                ? { ...((item as { parameters: Record<string, unknown> }).parameters) }
-                : {},
-            }))
-            .filter((item) => item.name && !WORKFLOW_SKILL_NAMES.has(item.name))
-        : defaults.agent.skills,
       mcpServers: normalizeMcpServers(agent.mcpServers),
     },
   } as Omit<InvestigationControl, 'history'>;
@@ -300,22 +242,6 @@ async function updateInvestigationControlImpl(
   const current = await loadInvestigationControl(name);
   const now = new Date().toISOString();
 
-  // Skill version is tied to the complete bundle hash, so scripts/references
-  // cannot change underneath a configuration version without being recorded.
-  const nextSkills = await Promise.all(next.agent.skills
-    .map(async (item) => {
-      const old = current.agent.skills.find((candidate) => candidate.name === item.name);
-      const sourceHash = await skillSourceHash(item.name);
-      const changed = Boolean(old && old.sourceHash && sourceHash && old.sourceHash !== sourceHash);
-      return {
-        name: item.name.trim(),
-        version: old ? old.version + (changed ? 1 : 0) : 1,
-        ...(sourceHash ? { sourceHash } : {}),
-        parameters: { ...(item.parameters ?? {}) },
-      };
-    }))
-    .then((items) => items.filter((item) => item.name));
-
   const currentMcp = new Map(current.agent.mcpServers.map((item) => [item.name, item]));
   const nextMcp = normalizeMcpServers(next.agent.mcpServers).map((item) => {
     const old = currentMcp.get(item.name);
@@ -345,7 +271,7 @@ async function updateInvestigationControlImpl(
     },
     agent: {
       // Platform capabilities are controlled by the application, not the per-Investigation UI.
-      // Preserve the current fixed snapshot while Skills/MCP remain user-configurable.
+      // Custom MCP servers remain user-configurable for this Investigation.
       platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: {
         version: promptChanged ? current.agent.systemPrompt.version + 1 : current.agent.systemPrompt.version,
@@ -371,8 +297,7 @@ async function updateInvestigationControlImpl(
 
   const changed: string[] = [];
   if (JSON.stringify(current.research) !== JSON.stringify(control.research)) changed.push('research');
-  if (promptChanged) changed.push('systemPrompt');
-  if (JSON.stringify(current.agent.skills) !== JSON.stringify(control.agent.skills)) changed.push('skills');
+  if (promptChanged) changed.push('guidance');
   if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
 
   await appendAuditEvent(name, {
@@ -382,8 +307,7 @@ async function updateInvestigationControlImpl(
     configurationVersion: control.version,
     details: {
       changed,
-      promptVersion: control.agent.systemPrompt.version,
-      skillVersions: Object.fromEntries(control.agent.skills.map((item) => [item.name, item.version])),
+      guidanceVersion: control.agent.systemPrompt.version,
       mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
     },
@@ -456,7 +380,7 @@ export function buildResearchConfigPrompt(control: InvestigationControl): string
   }
 
   if (control.agent.systemPrompt.content.trim()) {
-    lines.push('Additional system guidance:');
+    lines.push('Additional investigation guidance:');
     lines.push(control.agent.systemPrompt.content.trim());
   }
 
