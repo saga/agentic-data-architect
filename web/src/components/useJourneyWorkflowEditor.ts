@@ -74,6 +74,7 @@ interface JourneyWorkflowEditorResult {
   pendingAiChange?: { message: string; changes: WorkflowChange[] };
   applyAiChanges: () => Promise<void>;
   discardAiChanges: () => void;
+  applyHumanWorkflowTransition: (outcome: string) => Promise<void>;
   resetWorkflow: () => void;
   autoLayout: () => Promise<void>;
   createStandaloneNode: () => Promise<void>;
@@ -1150,6 +1151,34 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
   const discardAiChanges = () => setPendingAiChange(undefined);
 
+  /** 人工完成当前 waiting 节点；服务端负责 version/状态校验。 */
+  const applyHumanWorkflowTransition = async (outcome: string) => {
+    const name = sessionNameFromUrl();
+    const currentSnapshot = snapshotRef.current;
+    if (!name || !currentSnapshot) return;
+
+    try {
+      const response = await fetch(
+        '/api/sessions/' + encodeURIComponent(name) + '/workflow/transition',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            nodeId: currentSnapshot.execution.currentNodeId,
+            outcome,
+          }),
+        },
+      );
+      const body = await response.json() as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error || response.statusText || '人工 Workflow transition 失败。');
+      }
+      await loadWorkflow();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const resetWorkflow = () => {
     const name = sessionNameFromUrl();
     if (!name) return;
@@ -1215,6 +1244,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     aiEditFlow,
     applyAiChanges,
     discardAiChanges,
+    applyHumanWorkflowTransition,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
