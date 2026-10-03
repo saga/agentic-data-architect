@@ -1,3 +1,16 @@
+## 2026-10-03 — Workflow editor cleanup
+
+### 做了什么
+
+- 工作地图从“只读导航”收敛为真正的 Investigation Workflow 编辑器，编辑结果只存在当前画布，点击保存后才创建新的 Workflow version。
+- 删除早期 draft / validate / apply 三段式 API 和 draft 文件设计，当前编辑 API 统一为 `/workflow`、`/workflow/ai`、`/workflow/transition`、`/workflow/reset`。
+- 右侧工作区改为 Ant Design Tabs，在“属性”和“AI”之间切换，避免两个面板同时挤占空间。
+- 修正节点属性 `requires / produces` 未写回画布的问题。
+- 统一异步 ELK 布局的 request token，避免独立新建节点时旧布局结果覆盖新结果。
+- 修正文档中残留的 draft API、draft 文件和旧的 `server-main.ts` API ownership 描述。
+
+---
+
 ## 2026-10-02 — Adaptive navigation / actionable work map
 
 ### 做了什么
