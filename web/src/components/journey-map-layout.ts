@@ -345,141 +345,89 @@ export function enforceWorkflowReadingOrder(
 
   const ranks = calculateFlowRanks(nodes, edges);
   const dimensions = new Map(nodes.map((node) => [node.id, nodeDimensions(node)]));
-  const forwardEdges = getForwardLayoutEdges(nodes, edges);
-  const outgoing = new Map<string, FlowEdge[]>();
+  const grouped = new Map<number, FlowNode[]>();
 
-  for (const edge of forwardEdges) {
-    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]);
-  }
-
-  const rankWidth = new Map<number, number>();
   for (const node of nodes) {
     const rank = ranks.get(node.id) ?? 0;
+    grouped.set(rank, [...(grouped.get(rank) ?? []), node]);
+  }
+
+  // 每一列只负责一个流程深度；Y 轴完全由我们控制，不再沿用 ELK 对 feedback edge 的
+  // 随机/拓扑副产物。这样正常流程天然是一条水平主线。
+  const rankWidth = new Map<number, number>();
+  for (const [rank, group] of grouped) {
     rankWidth.set(
       rank,
       Math.max(
-        rankWidth.get(rank) ?? 0,
-        dimensions.get(node.id)?.width ?? FALLBACK_NODE_WIDTH,
+        ...group.map((node) => dimensions.get(node.id)?.width ?? FALLBACK_NODE_WIDTH),
       ),
     );
   }
 
   const rankX = new Map<number, number>();
   let x = 0;
-  const maxRank = Math.max(...Array.from(ranks.values()));
+  const maxRank = Math.max(...Array.from(grouped.keys()));
 
   for (let rank = 0; rank <= maxRank; rank += 1) {
     rankX.set(rank, x);
     x += (rankWidth.get(rank) ?? FALLBACK_NODE_WIDTH) + LAYER_GAP;
   }
 
-  const result = nodes.map((node) => ({
-    ...node,
-    position: {
-      x: rankX.get(ranks.get(node.id) ?? 0) ?? node.position.x,
-      y: node.position.y,
-    },
-  }));
-
+  const result = nodes.map((node) => ({ ...node }));
   const resultById = new Map(result.map((node) => [node.id, node]));
 
-  // 多出口：主出口保持在 source 的 y 中心，分支出口分到上/下。
-  for (const source of nodes) {
-    const sourceEdges = outgoing.get(source.id) ?? [];
-    if (sourceEdges.length < 2) continue;
-
-    const main = resultById.get(source.id);
-    if (!main) continue;
-
-    const sourceHeight = dimensions.get(source.id)?.height ?? FALLBACK_NODE_HEIGHT;
-
-    const ordered = [...sourceEdges].sort((a, b) => {
-      const primaryDelta = Number(isPrimaryRoute(b)) - Number(isPrimaryRoute(a));
-      if (primaryDelta !== 0) return primaryDelta;
-
-      const aTarget = resultById.get(a.target);
-      const bTarget = resultById.get(b.target);
-      return (aTarget?.position.y ?? 0) - (bTarget?.position.y ?? 0);
-    });
-
-    const primary = ordered[0];
-    const branchEdges = ordered.slice(1);
-    const primaryTarget = resultById.get(primary.target);
-
-    if (primaryTarget) {
-      primaryTarget.position.y = main.position.y;
-    }
-
-    const verticalStep = Math.max(
-      sourceHeight + BRANCH_VERTICAL_GAP,
-      FALLBACK_NODE_HEIGHT + NODE_GAP,
+  for (let rank = 0; rank <= maxRank; rank += 1) {
+    const group = [...(grouped.get(rank) ?? [])].sort(
+      (a, b) => a.position.y - b.position.y || a.id.localeCompare(b.id),
     );
 
-    branchEdges.forEach((edge, index) => {
-      const target = resultById.get(edge.target);
-      if (!target) return;
+    const totalHeight =
+      group.reduce(
+        (sum, node) => sum + (dimensions.get(node.id)?.height ?? FALLBACK_NODE_HEIGHT),
+        0,
+      )
+      + Math.max(0, group.length - 1) * NODE_GAP;
 
-      const direction = index % 2 === 0 ? -1 : 1;
-      const distance = Math.floor(index / 2) + 1;
+    let y = -totalHeight / 2;
+
+    for (const node of group) {
+      const target = resultById.get(node.id);
+      if (!target) continue;
+
       target.position = {
-        x: Math.max(
-          target.position.x,
-          main.position.x
-            + (dimensions.get(source.id)?.width ?? FALLBACK_NODE_WIDTH)
-            + LAYER_GAP,
-        ),
-        y: main.position.y + direction * distance * verticalStep,
+        x: rankX.get(rank) ?? 0,
+        y,
       };
-    });
-  }
 
-  // 再做一次硬约束：所有正常 forward edge 的 target 至少位于 source 右侧。
-  // 不依赖 ELK 的偶然排序，直接保证工作地图不会出现“出口连到左边”的明显错误。
-  for (let pass = 0; pass < nodes.length; pass += 1) {
-    let changed = false;
-
-    for (const edge of forwardEdges) {
-      const source = resultById.get(edge.source);
-      const target = resultById.get(edge.target);
-      if (!source || !target) continue;
-
-      const sourceWidth =
-        dimensions.get(edge.source)?.width ?? FALLBACK_NODE_WIDTH;
-      const targetX = source.position.x + sourceWidth + LAYER_GAP;
-
-      if (target.position.x < targetX) {
-        target.position.x = targetX;
-        changed = true;
-      }
+      y += (dimensions.get(node.id)?.height ?? FALLBACK_NODE_HEIGHT) + NODE_GAP;
     }
-
-    if (!changed) break;
   }
 
-  // terminal 必须放到整个正常流程的最右侧。
-  const terminalNodes = result.filter(
-    (node) => node.data.nodeType === 'end' || node.data.nodeType === 'stop',
-  );
+  // 所有正常流程列都围绕同一条视觉中线；把最小 Y 归一到 40，便于保存和初次 fitView。
+  const minY = Math.min(...result.map((node) => node.position.y));
+  const yOffset = 40 - minY;
 
-  if (terminalNodes.length) {
-    const nonTerminalRight = Math.max(
-      0,
-      ...result
-        .filter((node) => node.data.nodeType !== 'end' && node.data.nodeType !== 'stop')
-        .map((node) => {
-          const width = dimensions.get(node.id)?.width ?? FALLBACK_NODE_WIDTH;
-          return node.position.x + width;
-        }),
-    );
+  for (const node of result) {
+    node.position = {
+      x: node.position.x,
+      y: node.position.y + yOffset,
+    };
+  }
 
-    const terminalX = nonTerminalRight + LAYER_GAP;
+  // 正常 forward edge 的 source 必须严格位于 target 左侧。
+  // 这只是最后一道结构约束，不修改回退/重试路线。
+  const forwardEdges = getForwardLayoutEdges(nodes, edges);
+  for (const edge of forwardEdges) {
+    const source = resultById.get(edge.source);
+    const target = resultById.get(edge.target);
+    if (!source || !target) continue;
 
-    terminalNodes.forEach((node) => {
-      node.position = {
-        x: Math.max(node.position.x, terminalX),
-        y: node.position.y,
-      };
-    });
+    const sourceWidth = dimensions.get(edge.source)?.width ?? FALLBACK_NODE_WIDTH;
+    const minTargetX = source.position.x + sourceWidth + LAYER_GAP;
+
+    if (target.position.x < minTargetX) {
+      target.position.x = minTargetX;
+    }
   }
 
   return result;
