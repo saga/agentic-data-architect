@@ -973,7 +973,8 @@ function AppInner() {
         </Header>
 
         <Content className="chat-layout">
-          <div className="chat-main">            {bubbleItems.length ? (
+          <div className="chat-main">
+            {bubbleItems.length ? (
               <Bubble.List
                 role={{
                   assistant: { placement: 'start' },
@@ -1155,7 +1156,7 @@ function AppInner() {
               <section className="right-section right-current-state">
                 <div className="right-section-heading"><Text strong>当前事实</Text></div>
                 {!current?.currentState ? (
-                  <Text type="secondary">还没有形成完整的事实地图。主区会优先展示 Agent 建议，你也可以直接提出真正想解决的问题。</Text>
+                  <Text type="secondary">还没有形成完整的事实地图。主区会直接展示你和 Agent 的调查过程。</Text>
                 ) : (
                   <>
                     <div className="right-facts">
@@ -1163,7 +1164,8 @@ function AppInner() {
                       <span>数据来路 {current.currentState.coverage.datasetLineageCoverage == null ? '未统计' : Math.round(current.currentState.coverage.datasetLineageCoverage * 100) + '%'}</span>
                       <span>业务定义 {current.currentState.coverage.semanticAssets ?? current.semanticAssets?.length ?? 0}</span>
                       <span>待查 {current.context.unknowns.length}</span>
-                    </div>                  </>
+                    </div>
+                  </>
                 )}
               </section>
             </aside>
