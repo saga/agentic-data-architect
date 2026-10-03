@@ -515,6 +515,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     );
 
     const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
+    if (!layoutedNodes) return undefined;
     setNodes(layoutedNodes);
     setEdges(graph.edges);
     setValidationIssues([]);
@@ -664,7 +665,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       newNodeIdsRef.current,
     );
-    setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
+    const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
+    if (!layoutedNodes) return;
+    setNodes(layoutedNodes);
     setEdges(graph.edges);
     setValidationIssues([]);
   };
@@ -855,7 +858,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       newNodeIdsRef.current,
     );
-    const laidOutNodes = await autoLayoutJourney(graph.nodes, graph.edges);
+    const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
     if (!laidOutNodes) return;
     setNodes(laidOutNodes);
     setValidationIssues([]);
@@ -967,7 +970,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const relayoutAfterMeasure = async () => {
       const layouted = await layoutWithLatest(nodesRef.current, edgesRef.current);
-      if (!cancelled) {
+      if (!cancelled && layouted) {
         setNodes(layouted);
       }
     };
