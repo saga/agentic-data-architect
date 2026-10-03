@@ -24,6 +24,7 @@ import {
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, requestAbort } from './workflow/ask.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
+import { JourneyDefinitionSchema } from './workflow/journey.js';
 import {
   getJourneySnapshot,
   JourneyEditBodySchema,
