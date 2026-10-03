@@ -10,10 +10,8 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import {
   ModernizationPlanSchema,
   type AnalysisCase,
-  type ArchitectureDecision,
   type ModernizationPlan,
   type TargetArchitecture,
-  type SourceToTargetMapping,
   type ValidationPlan,
 } from '../model/modernization.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -26,54 +24,6 @@ function productId(prefix: string): string {
 
 function now(): string {
   return new Date().toISOString();
-}
-
-/** 把物理资产名转成目标数据域的可读 key；只是命名建议，不代表业务模型已确认。 */
-function targetKey(name: string): string {
-  const last = name.replace(/"/g, '').split('.').filter(Boolean).at(-1) || name;
-  return last.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-}
-
-/** 先把旧数据和新数据大致对应起来，给后面人工确认打个底。 */
-function buildInitialMappings(
-  current: DiscoverySnapshot['currentState'] | null,
-  evidenceIds: string[],
-): SourceToTargetMapping[] {
-  if (!current) return [];
-
-  const candidates = current.sourceOfTruthCandidates.length > 0
-    ? current.sourceOfTruthCandidates
-    : current.highValueAssets.map((dataset) => ({
-        key: targetKey(dataset),
-        candidateDatasetIds: [],
-        candidateDatasets: [dataset],
-        score: 0,
-        reasons: ['Current-State high-value asset'],
-        evidenceIds: [],
-      }));
-
-  return candidates.slice(0, 30).map((candidate, index) => {
-    const timestamp = now();
-    const source = candidate.candidateDatasets[0] ?? current.highValueAssets[index];
-    const key = targetKey(candidate.key || source || `asset_${index + 1}`);
-    return {
-      id: productId('mapping'),
-      type: 'source_to_target',
-      title: `建议对应：${source || 'legacy asset'} → ${key}`,
-      version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      evidenceIds: [...new Set([...candidate.evidenceIds, ...evidenceIds.slice(0, 3)])],
-      findingIds: [],
-      decisionIds: [],
-      sourceAsset: source || `unknown:${index + 1}`,
-      targetAsset: `target:domain-data:${key}`,
-      transformation: '还需要继续看现有 SQL 和 ETL，才能确定具体怎么转换。现在只是先把“旧数据放到哪里”画出来。',
-      businessRule: '还需要业务人员确认这个数据到底代表什么，以及哪一个系统是准的。',
-      validationRule: '改造前后对比关键记录、数量、金额和时间范围，确认结果一致。',
-      status: 'proposed',
-    };
-  });
 }
 
 /** 把真正迁移前要检查的事情列出来，避免到了最后才发现没法验证。 */
@@ -214,122 +164,32 @@ function buildInitialAnalysisCase(goal: string, scope: string[], evidenceIds: st
   };
 }
 
-/** 先给一个不绑死具体产品的方案草稿；它只是起点，必须经过人工确认。 */
+/** 初始阶段只记录“待设计”，不根据资产名字自动编造目标组件、方案原则或架构决定。 */
 function buildTargetArchitecture(
   goal: string,
   gaps: ReturnType<typeof buildModernizationGaps>,
-  sourceAssets: string[],
 ): TargetArchitecture {
   const timestamp = now();
-  const gapIds = gaps.map((g) => g.id);
   return {
     id: productId('target'),
     type: 'target_architecture',
-    title: '目标方案草案',
-    status: 'draft',
-    version: 1,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    evidenceIds: gaps.flatMap((g) => g.evidenceIds),
-    findingIds: gaps.filter((g) => g.kind === 'data_quality' || g.kind === 'architecture').map((g) => g.id),
-    decisionIds: [],
-    principles: [
-      '重要业务含义要说清楚，而且能找到依据。',
-      '存储和处理技术以后可以换，不要把方案锁死在某个产品上。',
-      '真正切换之前，要说清数据从哪里来、怎么流、怎么检查。',
-      '这是一个需要人审核的方案，不是 Agent 说了就算。',
-    ],
-    components: [
-      {
-        id: 'target:source',
-        type: 'source',
-        name: '老系统和外部数据',
-        description: '现在还在使用的数据库、文件、接口和外部数据来源。',
-        dependsOn: [],
-        sourceAssets,
-      },
-      {
-        id: 'target:ingestion',
-        type: 'ingestion',
-        name: '把数据接进来',
-        description: '规定数据怎么进来、多久更新一次、出问题怎么处理。',
-        dependsOn: ['target:source'],
-        sourceAssets: [],
-      },
-      {
-        id: 'target:domain-data',
-        type: 'domain_data',
-        name: '整理后的业务数据',
-        description: '按业务来整理数据，并说清楚谁负责、哪个来源最可信。',
-        dependsOn: ['target:ingestion'],
-        sourceAssets: sourceAssets.slice(0, 50),
-      },
-      {
-        id: 'target:transformation',
-        type: 'transformation',
-        name: '业务规则和计算',
-        description: '把业务计算和数据接入分开，这样更容易检查和迁移。',
-        dependsOn: ['target:domain-data'],
-        sourceAssets: [],
-      },
-      {
-        id: 'target:semantic',
-        type: 'semantic',
-        name: '业务定义和指标',
-        description: '把业务定义、指标和口径集中说明。Snowflake Semantic View 或 Data Product 都可以作为来源。',
-        dependsOn: ['target:domain-data', 'target:transformation'],
-        sourceAssets: sourceAssets.slice(0, 50),
-      },
-      {
-        id: 'target:serving',
-        type: 'serving',
-        name: '报表和应用',
-        description: '报表、看板、研究分析和其他使用这些数据的应用。',
-        dependsOn: ['target:semantic'],
-        sourceAssets: [],
-      },
-      {
-        id: 'target:governance',
-        type: 'governance',
-        name: '质量、来源和权限',
-        description: '用来检查数据、追踪来源、控制权限和留下记录。',
-        dependsOn: ['target:ingestion', 'target:domain-data', 'target:semantic', 'target:serving'],
-        sourceAssets: [],
-      },
-    ],
-    openQuestions: [
-      goal ? `这次改造必须保留哪些业务结果和范围： ${goal}` : '这次改造必须保留哪些业务结果和范围？',
-      ...gapIds.map((id) => `解决这个问题：${id}`),
-    ],
-  };
-}
-
-/** 先留一个设计决定的位置，真正的决定还要看资料并由人确认。 */
-function buildInitialDecisions(): ArchitectureDecision[] {
-  const timestamp = now();
-  return [{
-    id: productId('decision'),
-    type: 'architecture_decision',
-    title: '业务定义不要绑死在一个产品上',
+    title: '目标架构（待设计）',
     status: 'draft',
     version: 1,
     createdAt: timestamp,
     updatedAt: timestamp,
     evidenceIds: [],
-    findingIds: [],
+    findingIds: gaps.map((gap) => gap.id),
     decisionIds: [],
-    context: '我们需要理解业务含义，但不能因为用了某个平台，就把整个系统绑死在这个平台上。',
-    options: [
-      '把 Snowflake 当成唯一的业务定义来源',
-      '使用通用的业务定义接口',
+    principles: [],
+    components: [],
+    openQuestions: [
+      goal ? '这次改造要保留哪些业务结果和范围？' : '先明确这次改造要保留哪些业务结果和范围。',
+      '哪些关键业务问题已经有证据，哪些仍然需要调查？',
+      '关键业务数据的权威来源和业务定义是什么？',
+      ...gaps.slice(0, 10).map((gap) => gap.title),
     ],
-    decision: '使用通用的业务定义接口.',
-    rationale: 'Snowflake 可以提供大量业务定义，但其他目录、数据产品和业务文档也应该可以接进来。',
-    tradeoffs: [
-      '不同来源需要各自的接入方式。',
-      '某些平台特有的信息暂时保留，之后再统一。',
-    ],
-  }];
+  };
 }
 
 /** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
@@ -367,9 +227,9 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
 
   const analysisCase = buildInitialAnalysisCase(inv.goal || inv.userPrompt, inv.scope, evidenceIds.slice(0, 100));
   const sourceAssets = current?.highValueAssets ?? [];
-  const targetArchitecture = buildTargetArchitecture(inv.goal || inv.userPrompt, gaps, sourceAssets);
-  const decisions = buildInitialDecisions();
-  const mappings = buildInitialMappings(current, evidenceIds);
+  const targetArchitecture = buildTargetArchitecture(inv.goal || inv.userPrompt, gaps);
+  const decisions: ModernizationPlan['decisions'] = [];
+  const mappings: ModernizationPlan['mappings'] = [];
   const validationPlan = buildValidationPlan(current, mappings, gaps, evidenceIds, inv.scope);
   const journeyDefinition = await loadModernizationJourney();
   const journey = buildJourneyState(journeyDefinition, {
