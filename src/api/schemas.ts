@@ -66,4 +66,14 @@ export const JourneyAiRequestSchema = z.object({
   messages: z.array(JourneyAiMessageSchema).max(12).optional(),
   /** 当前画布的未保存 Definition；服务端仍会重新用 Workflow schema 校验。 */
   definition: z.unknown().optional(),
+  /** AI 修改范围；selection 只允许修改选中节点及其直接相邻结构。 */
+  scope: z.enum(['workflow', 'selection']).default('workflow'),
+  selectedNodeId: z.string().trim().min(1).optional(),
+}).strict();
+
+
+/** 人工完成 waiting Workflow 节点时提交的 outcome。 */
+export const JourneyTransitionBodySchema = z.object({
+  nodeId: z.string().trim().min(1),
+  outcome: z.string().trim().min(1),
 }).strict();

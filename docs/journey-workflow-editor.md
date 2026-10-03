@@ -55,7 +55,8 @@ skills/<workflow>/SKILL.md
 - journey.md：当前真正生效的自定义 Workflow。
 - journey-meta.json：对应哪个内置 Workflow，以及版本号。
 - journey-layout.json：React Flow 节点位置。
-- journey-execution.json：当前执行位置、已完成节点和 Workflow version。
+- journey-execution.json：当前执行位置、已完成节点、runId 和 waiting 状态。
+- journey-run-events.jsonl：轻量运行事件历史；Workflow reset 不会删除这份历史。
 
 没有自定义 Workflow 时，直接读取 Skill 内置 Markdown；版本为 0。
 
@@ -99,6 +100,8 @@ objective:
 visible:
 completion:
 completeWhen:
+requires:
+produces:
 tools:
 
 success -> next
@@ -246,7 +249,7 @@ POST /api/sessions/:name/workflow/ai
 
 工作地图 AI 是独立的业务能力，不参与数据分析。它不会读取 Dataset Registry、SQL、数据证据，也不会参与 Investigation 的正常执行推进。AI 只返回候选 Workflow Definition；服务端立即用与人工保存相同的 Workflow validation 检查它。
 
-AI 不直接保存。返回结果只替换当前画布，用户检查后再点击“保存”。这样“AI 修改建议”和“真正改变执行 Workflow”之间保留一个明确的确认点。
+AI 不直接保存。返回结果是 WorkflowChange[]，服务端先应用并验证，再返回候选 Definition。前端先展示 Diff/修改预览，用户点击“应用修改”后才更新当前画布，最后再点击“保存”创建新的 Workflow version。
 
 ### 验证
 

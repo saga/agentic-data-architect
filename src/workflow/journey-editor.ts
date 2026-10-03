@@ -4,6 +4,7 @@
  * 内置 Skill 只提供初始路线；用户修改后直接保存到 Investigation workspace。
  * React Flow 的坐标只属于画布布局，不进入 Workflow 语义。
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
@@ -30,8 +31,14 @@ import {
   type JourneyDefinition,
   type JourneyExecution,
   type JourneyFacts,
+  type JourneyPendingInteraction,
+  type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
+import {
+  analyzeJourneyWorkflow,
+  type JourneyAnalysisIssue,
+} from './journey-edit.js';
 
 const JOURNEY_DIR = 'workflow';
 const ACTIVE_FILE = 'journey.md';
@@ -40,6 +47,7 @@ const LAYOUT_FILE = 'journey-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
 const DRAFT_DEF_FILE = 'journey-draft.md';
 const DRAFT_LAYOUT_FILE = 'journey-draft-layout.json';
+const EVENTS_FILE = 'journey-run-events.jsonl';
 
 export const JourneyLayoutNodeSchema = z.object({
   x: z.number().finite(),
@@ -82,6 +90,8 @@ export interface JourneySnapshot {
   layout: JourneyLayout;
   execution: JourneyExecution;
   state: JourneyState;
+  analysis: JourneyAnalysisIssue[];
+  events: JourneyRunEvent[];
 }
 
 function journeyDir(name: string): string {
@@ -109,6 +119,27 @@ async function readTextOrNull(file: string): Promise<string | null> {
     throw error;
   }
 }
+/**
+ * 运行事件用 JSONL 追加保存：简单、可检查，不让 execution.json 无限增长。
+ */
+export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
+  await fs.mkdir(journeyDir(name), { recursive: true });
+  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(event) + '\n', 'utf8');
+}
+
+/** 只读取最近的事件，避免快照随着运行历史无限增长。 */
+export async function loadJourneyRunEvents(name: string, limit = 80): Promise<JourneyRunEvent[]> {
+  const raw = await readTextOrNull(journeyFile(name, EVENTS_FILE));
+  if (!raw) return [];
+  return raw.split(/\r?\n/).filter(Boolean).slice(-limit).flatMap((line) => {
+    try {
+      return [JSON.parse(line) as JourneyRunEvent];
+    } catch {
+      return [];
+    }
+  });
+}
+
 
 /** 按图深度给新 Workflow 一个稳定初始布局；用户拖动后的坐标另存。 */
 export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayout {
@@ -172,6 +203,8 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     lines.push('actor: ' + node.actor);
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
     if (node.tools?.length) lines.push('tools: ' + node.tools.join(', '));
+    if (node.requires?.length) lines.push('requires: ' + node.requires.join(', '));
+    if (node.produces?.length) lines.push('produces: ' + node.produces.join(', '));
     for (const route of node.routes) {
       lines.push(
         '- ' + route.outcome + ' -> ' + route.target
@@ -187,7 +220,16 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
 function normalizeExecution(
   definition: JourneyDefinition,
   version: number,
-  execution: JourneyExecution | null,
+  /** 磁盘存盘形状：老文件可能没有 runId / pendingInteraction，缺的在这里补。 */
+  execution: {
+    workflowId: string;
+    workflowVersion: number;
+    runId?: string | undefined;
+    currentNodeId: string;
+    completedNodeIds: string[];
+    status: 'active' | 'waiting' | 'completed' | 'stopped';
+    pendingInteraction?: JourneyPendingInteraction | undefined;
+  } | null,
 ): JourneyExecution {
   if (
     !execution
@@ -198,9 +240,27 @@ function normalizeExecution(
     return initialJourneyExecution(definition, version);
   }
 
+  const currentNode = definition.nodes.find((node) => node.id === execution.currentNodeId);
+  const needsHuman = currentNode?.actor === 'human' && currentNode.type !== 'end' && currentNode.type !== 'stop';
+  const runId = execution.runId || definition.id + '-v' + String(version);
+  if (needsHuman && execution.status !== 'waiting') {
+    return {
+      ...execution,
+      workflowVersion: version,
+      runId,
+      status: 'waiting',
+      pendingInteraction: {
+        id: 'pending-' + runId + '-' + currentNode.id,
+        nodeId: currentNode.id,
+        reason: '等待人工完成“' + currentNode.title + '”。',
+        requestedAt: new Date().toISOString(),
+      },
+    };
+  }
   return {
     ...execution,
     workflowVersion: version,
+    runId,
   };
 }
 
@@ -302,9 +362,16 @@ export async function loadJourneyExecution(
   const parsed = z.object({
     workflowId: z.string(),
     workflowVersion: z.number().int().nonnegative(),
+    runId: z.string().optional(),
     currentNodeId: z.string(),
     completedNodeIds: z.array(z.string()),
-    status: z.enum(['active', 'completed', 'stopped']),
+    status: z.enum(['active', 'waiting', 'completed', 'stopped']),
+    pendingInteraction: z.object({
+      id: z.string(),
+      nodeId: z.string(),
+      reason: z.string(),
+      requestedAt: z.string().datetime(),
+    }).optional(),
   }).safeParse(raw);
 
   return normalizeExecution(definition, version, parsed.success ? parsed.data : null);
@@ -319,6 +386,8 @@ export async function getJourneySnapshot(
   const execution = await loadJourneyExecution(name, active.definition, active.version);
   const facts = await buildJourneyFacts(name);
   const state = buildJourneyState(active.definition, facts, execution);
+  const analysis = analyzeJourneyWorkflow(active.definition);
+  const events = await loadJourneyRunEvents(name);
 
   // Deterministic completion may move the current node without an Agent transition.
   // Persist that state so the next turn cannot observe an older current node.
@@ -349,6 +418,8 @@ export async function getJourneySnapshot(
     layout: active.layout,
     execution: state.execution,
     state,
+    analysis,
+    events,
   };
 }
 
@@ -356,16 +427,20 @@ export async function getJourneySnapshot(
 export function validateJourneyEdit(
   definitionInput: JourneyDefinition,
   layoutInput: JourneyLayout,
-): { issues: string[] } {
+): { issues: string[]; warnings: string[] } {
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const layout = JourneyLayoutSchema.parse(layoutInput);
   const issues = validateJourneyDefinition(definition);
+  const warnings = analyzeJourneyWorkflow(definition).map((item) => item.message);
 
   for (const node of definition.nodes) {
     if (!layout.nodes[node.id]) issues.push('节点缺少画布位置：' + node.id);
   }
 
-  return { issues: [...new Set(issues)] };
+  return {
+    issues: [...new Set(issues)],
+    warnings: [...new Set(warnings)],
+  };
 }
 
 /** 保存一张工作地图；服务端重新验证，不能绕过结构检查。 */
@@ -388,7 +463,7 @@ export async function saveJourneyDraft(
   workflowId: WorkflowId,
   definitionInput: JourneyDefinition,
   layoutInput: JourneyLayout,
-): Promise<{ issues: string[] }> {
+): Promise<{ issues: string[]; warnings: string[] }> {
   const definition = JourneyDefinitionSchema.safeParse(definitionInput);
   const layout = JourneyLayoutSchema.safeParse(layoutInput);
   const issues: string[] = [];
@@ -399,12 +474,15 @@ export async function saveJourneyDraft(
     issues.push('画布布局读不懂，先修正后再存草稿。');
   }
   if (!definition.success || !layout.success) {
-    return { issues };
+    return { issues, warnings: [] };
   }
+  let warnings: string[] = [];
   if (definition.data.id !== workflowId) {
     issues.push('Workflow id 不能修改为另一个工作方式。');
   } else {
-    issues.push(...validateJourneyEdit(definition.data, layout.data).issues);
+    const validation = validateJourneyEdit(definition.data, layout.data);
+    issues.push(...validation.issues);
+    warnings = validation.warnings;
   }
 
   await withWorkspaceContextLock(name, async () => {
@@ -418,7 +496,7 @@ export async function saveJourneyDraft(
     await writeJsonAtomic(journeyFile(name, DRAFT_LAYOUT_FILE), layout.data);
   });
 
-  return { issues: [...new Set(issues)] };
+  return { issues: [...new Set(issues)], warnings: [...new Set(warnings)] };
 }
 
 /**
@@ -458,17 +536,31 @@ export async function applyJourneyDefinition(
       ? oldExecution.currentNodeId
       : definition.start;
     const preservedNode = definition.nodes.find((node) => node.id === preservedCurrent);
+    const preservedTargetNode = definition.nodes.find((node) => node.id === preservedCurrent);
     const migratedExecution: JourneyExecution = {
       ...oldExecution,
       workflowId: definition.id,
       workflowVersion: nextVersion,
+      runId: definition.id + '-v' + String(nextVersion),
       currentNodeId: preservedCurrent,
       completedNodeIds: preservedCompleted,
       status: preservedNode?.type === 'end'
         ? 'completed'
         : preservedNode?.type === 'stop'
           ? 'stopped'
-          : 'active',
+          : preservedTargetNode?.actor === 'human'
+            ? 'waiting'
+            : 'active',
+      ...(preservedTargetNode?.actor === 'human'
+        ? {
+            pendingInteraction: {
+              id: 'pending-' + definition.id + '-' + String(nextVersion),
+              nodeId: preservedTargetNode.id,
+              reason: '等待人工完成“' + preservedTargetNode.title + '”。',
+              requestedAt: new Date().toISOString(),
+            },
+          }
+        : { pendingInteraction: undefined }),
     };
 
     await fs.mkdir(journeyDir(name), { recursive: true });
@@ -528,7 +620,11 @@ export async function resetJourneyCustomization(
   workflowId: WorkflowId,
 ): Promise<JourneySnapshot> {
   await withWorkspaceContextLock(name, async () => {
+    // Workflow 定义可以重置，但运行历史属于审计/诊断信息，不随 reset 丢失。
+    const events = await readTextOrNull(journeyFile(name, EVENTS_FILE));
     await fs.rm(journeyDir(name), { recursive: true, force: true });
+    await fs.mkdir(journeyDir(name), { recursive: true });
+    if (events) await fs.writeFile(journeyFile(name, EVENTS_FILE), events, 'utf8');
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.copilotSessionId;
@@ -582,6 +678,64 @@ function extractWorkflowTransition(
     : null;
 }
 
+/**
+ * transition 成功后记录最小运行事件；详细 trace 仍交给 Agent runtime / OTel。
+ */
+async function appendJourneyTransitionEvents(
+  name: string,
+  execution: JourneyExecution,
+  nodeId: string,
+  outcome: string,
+  next: JourneyExecution,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const currentEvent: JourneyRunEvent = {
+    id: crypto.randomUUID(),
+    runId: execution.runId,
+    workflowId: execution.workflowId,
+    workflowVersion: execution.workflowVersion,
+    type: 'node-completed',
+    timestamp: now,
+    nodeId,
+    outcome,
+    data: { nextNodeId: next.currentNodeId },
+  };
+  await appendJourneyRunEvent(name, currentEvent);
+
+  if (next.status === 'waiting' && next.pendingInteraction) {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'node-waiting',
+      timestamp: new Date().toISOString(),
+      nodeId: next.pendingInteraction.nodeId,
+      data: next.pendingInteraction,
+    });
+  } else if (next.status === 'completed') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'workflow-completed',
+      timestamp: new Date().toISOString(),
+      nodeId: next.currentNodeId,
+    });
+  } else if (next.status === 'stopped') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: next.runId,
+      workflowId: next.workflowId,
+      workflowVersion: next.workflowVersion,
+      type: 'workflow-stopped',
+      timestamp: new Date().toISOString(),
+      nodeId: next.currentNodeId,
+    });
+  }
+}
+
 /** 将 Agent 返回的合法 outcome 写入 durable Workflow execution。 */
 export async function applyAgentWorkflowTransition(
   name: string,
@@ -600,6 +754,10 @@ export async function applyAgentWorkflowTransition(
       active.definition,
       active.version,
     );
+    const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
+    if (execution.status === 'waiting' || currentNode?.actor === 'human') {
+      throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
     const next = applyJourneyTransition(
       active.definition,
       execution,
@@ -633,6 +791,14 @@ export async function applyAgentWorkflowTransition(
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
     });
 
+    await appendJourneyTransitionEvents(
+      name,
+      execution,
+      transition.nodeId,
+      transition.outcome,
+      next,
+    );
+
     await appendAuditEvent(name, {
       actor: 'system',
       action: 'workflow.transition',
@@ -650,6 +816,18 @@ export async function applyAgentWorkflowTransition(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: workflowId + '-rejected',
+      workflowId,
+      workflowVersion: 0,
+      type: 'transition-rejected',
+      timestamp: new Date().toISOString(),
+      nodeId: transition.nodeId,
+      outcome: transition.outcome,
+      error: message,
+    });
+
     await appendAuditEvent(name, {
       actor: 'system',
       action: 'workflow.transition.rejected',
@@ -665,6 +843,76 @@ export async function applyAgentWorkflowTransition(
     return { applied: false, error: message };
   }
 }
+
+/** 人工推进 waiting 节点；沿用同一条 transition / version 检查路径。 */
+export async function applyHumanWorkflowTransition(
+  name: string,
+  workflowId: WorkflowId,
+  nodeId: string,
+  outcome: string,
+): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
+  try {
+    const active = await loadActiveJourney(name, workflowId);
+    const execution = await loadJourneyExecution(name, active.definition, active.version);
+    if (execution.status !== 'waiting') {
+      throw new Error('当前 Workflow 并未等待人工处理。');
+    }
+
+    const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
+    if (!currentNode || currentNode.actor !== 'human') {
+      throw new Error('当前 Workflow 节点不是人工步骤。');
+    }
+    if (currentNode.id !== nodeId) {
+      throw new Error('提交的人工节点不是当前 waiting 节点。');
+    }
+
+    const next = applyJourneyTransition(
+      active.definition,
+      execution,
+      nodeId,
+      outcome,
+    );
+
+    await withWorkspaceContextLock(name, async () => {
+      const latestActive = await loadActiveJourney(name, workflowId);
+      if (latestActive.source !== active.source || latestActive.version !== active.version) {
+        throw new Error('Workflow 在人工处理期间发生变化，本次 transition 不再适用。');
+      }
+
+      const latest = await loadJourneyExecution(name, latestActive.definition, latestActive.version);
+      if (
+        latest.currentNodeId !== execution.currentNodeId
+        || latest.workflowVersion !== execution.workflowVersion
+        || latest.status !== execution.status
+      ) {
+        throw new Error('Workflow 执行状态已变化，请刷新后重新处理。');
+      }
+
+      await fs.mkdir(journeyDir(name), { recursive: true });
+      await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
+    });
+
+    await appendJourneyTransitionEvents(name, execution, nodeId, outcome, next);
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'workflow.human.transition',
+      summary: 'Applied human Workflow outcome.',
+      details: {
+        workflowId,
+        workflowVersion: active.version,
+        nodeId,
+        outcome,
+        target: next.currentNodeId,
+      },
+    });
+
+    return { applied: true, execution: next };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { applied: false, error: message };
+  }
+}
+
 
 /** 给 Agent 的低 token Workflow 控制说明，只注入当前节点及其合法出口。 */
 export async function buildJourneyAgentInstruction(

@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react';
 
 import {
+  applyWorkflowChanges,
   definitionFromGraph,
   graphFromDefinition,
   layoutFromNodes,
@@ -32,6 +33,7 @@ import type {
   FlowEdge,
   FlowNode,
   JourneyMapStage,
+  WorkflowChange,
   WorkflowDefinition,
   WorkflowNodeDefinition,
   WorkflowNodeType,
@@ -67,7 +69,11 @@ interface JourneyWorkflowEditorResult {
     mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-  ) => Promise<{ message: string } | undefined>;
+    scope?: 'workflow' | 'selection',
+  ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
+  pendingAiChange?: { message: string; changes: WorkflowChange[] };
+  applyAiChanges: () => Promise<void>;
+  discardAiChanges: () => void;
   resetWorkflow: () => void;
   autoLayout: () => Promise<void>;
   createStandaloneNode: () => Promise<void>;
@@ -105,6 +111,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [pendingAiChange, setPendingAiChange] = useState<{
+    message: string;
+    changes: WorkflowChange[];
+    definition: WorkflowDefinition;
+    baseDefinition: WorkflowDefinition;
+  }>();
   const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
@@ -221,6 +233,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       completion: selectedNode.data.completion,
       actor: selectedNode.data.actor,
       completeWhen: selectedNode.data.completeWhen,
+      requires: selectedNode.data.requires,
+      produces: selectedNode.data.produces,
     });
   }, [selectedNode]);
 
@@ -1023,14 +1037,26 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
   };
 
-  /** 调用工作地图专用 AI。AI 只改图，不直接替用户保存。 */
+  /** AI 只提出 Patch；先预览，用户确认后再应用。 */
   const aiEditFlow = async (
     mode: 'generate' | 'modify',
     prompt: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    scope: 'workflow' | 'selection' = 'workflow',
   ) => {
     const name = sessionNameFromUrl();
-    if (!name || !prompt.trim()) return undefined;
+    const currentSnapshot = snapshotRef.current;
+    if (!name || !prompt.trim() || !currentSnapshot) return undefined;
+    if (scope === 'selection' && !selectedNodeId) {
+      message.warning('请先选中一个步骤。');
+      return undefined;
+    }
+
+    const currentCanvasDefinition = definitionFromGraph(
+      nodesRef.current,
+      edgesRef.current,
+      currentSnapshot.definition,
+    );
 
     try {
       const response = await fetch(
@@ -1043,34 +1069,61 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             prompt: prompt.trim(),
             messages: history.slice(-12),
             definition: currentCanvasDefinition,
+            scope,
+            ...(selectedNodeId ? { selectedNodeId } : {}),
           }),
         },
       );
       const body = await response.json() as {
         definition?: WorkflowDefinition;
         message?: string;
+        changes?: WorkflowChange[];
         error?: string;
       };
-      if (!response.ok || !body.definition) {
-        throw new Error(body.error || response.statusText || 'AI 没有返回工作地图。');
+      if (!response.ok || !body.definition || !body.changes?.length) {
+        throw new Error(body.error || response.statusText || 'AI 没有返回 Workflow 修改。');
       }
+      setPendingAiChange({
+        message: body.message?.trim() || 'AI 已提出一版修改。',
+        changes: body.changes,
+        definition: body.definition,
+        baseDefinition: currentCanvasDefinition,
+      });
+      return {
+        message: body.message?.trim() || 'AI 已提出修改，请检查预览。',
+        changes: body.changes,
+      };
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+      return undefined;
+    }
+  };
 
-      const currentSnapshot = snapshotRef.current;
-      if (!currentSnapshot) return undefined;
-      const currentCanvasDefinition = definitionFromGraph(
-        nodesRef.current,
-        edgesRef.current,
-        currentSnapshot.definition,
-      );
 
+  /** 应用 AI Patch；等待期间如果画布发生变化，则放弃旧提议。 */
+  const applyAiChanges = async () => {
+    const pending = pendingAiChange;
+    const currentSnapshot = snapshotRef.current;
+    if (!pending || !currentSnapshot) return;
+
+    const currentCanvasDefinition = definitionFromGraph(
+      nodesRef.current,
+      edgesRef.current,
+      currentSnapshot.definition,
+    );
+    if (JSON.stringify(currentCanvasDefinition) !== JSON.stringify(pending.baseDefinition)) {
+      message.warning('画布已经发生变化，请重新让 AI 修改当前版本。');
+      setPendingAiChange(undefined);
+      return;
+    }
+
+    try {
+      const nextDefinition = applyWorkflowChanges(currentCanvasDefinition, pending.changes);
       pushHistory();
       const graph = graphFromDefinition(
-        body.definition,
+        nextDefinition,
         layoutFromNodes(nodesRef.current),
-        {
-          ...currentSnapshot,
-          definition: body.definition,
-        },
+        { ...currentSnapshot, definition: nextDefinition },
         setSelectedNodeId,
         (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
@@ -1079,7 +1132,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         new Set(),
       );
       const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
-      if (!layoutedNodes) return undefined;
+      if (!layoutedNodes) return;
 
       newNodeIdsRef.current = new Set();
       setNodes(layoutedNodes);
@@ -1088,14 +1141,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId(undefined);
       setValidationIssues([]);
       setDirty(true);
+      setPendingAiChange(undefined);
       pendingFitRef.current = true;
-
-      return { message: body.message?.trim() || 'AI 已更新工作地图，请检查后保存。' };
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
-      return undefined;
     }
   };
+
+  const discardAiChanges = () => setPendingAiChange(undefined);
 
   const resetWorkflow = () => {
     const name = sessionNameFromUrl();
@@ -1153,10 +1206,15 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     connectOutcome,
     validationIssues,
     currentDefinition,
+    pendingAiChange: pendingAiChange
+      ? { message: pendingAiChange.message, changes: pendingAiChange.changes }
+      : undefined,
     currentStage,
     completedCount,
     saveWorkflow,
     aiEditFlow,
+    applyAiChanges,
+    discardAiChanges,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,

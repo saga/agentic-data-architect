@@ -62,6 +62,7 @@ test('journey map AI request only accepts the two map operations', () => {
     {
       mode: 'modify',
       prompt: '把资料核对和评审之间增加一个人工确认步骤。',
+      scope: 'workflow',
     },
   );
   assert.throws(() => JourneyAiRequestSchema.parse({ mode: 'chat', prompt: 'hello' }));

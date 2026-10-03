@@ -74,6 +74,9 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     completedCount,
     saveWorkflow,
     aiEditFlow,
+    pendingAiChange,
+    applyAiChanges,
+    discardAiChanges,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
@@ -100,7 +103,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     beginNodeDrag,
   } = editor;
 
-  const currentDefinition = snapshot?.definition;
+  const currentDefinition = editor.currentDefinition;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -164,6 +167,15 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
                   : '内置路线'}
               </Tag>
               {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
+              <Tag color={snapshot.execution.status === 'waiting' ? 'blue' : undefined}>
+                {snapshot.execution.status === 'waiting'
+                  ? '等待人工'
+                  : snapshot.execution.status === 'completed'
+                    ? '已完成'
+                    : snapshot.execution.status === 'stopped'
+                      ? '已停止'
+                      : '运行中'}
+              </Tag>
             </Flex>
             <Text type="secondary">
               直接拖动节点和连线；右侧属性面板提供连续的 Workflow AI 对话，检查后点击保存。
@@ -221,6 +233,20 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
       </header>
 
 
+
+      {snapshot.analysis?.length ? (
+        <div className="journey-map-warning-panel">
+          <Flex align="center" justify="space-between">
+            <Text strong>Workflow 检查</Text>
+            <Tag color="warning">{snapshot.analysis.length} 个提醒</Tag>
+          </Flex>
+          <div className="journey-map-validation-items">
+            {snapshot.analysis.slice(0, 6).map((item, index) => (
+              <Text type="warning" key={index}>{item.message}</Text>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {validationIssues.length ? (
         <div className="journey-map-validation-panel">
@@ -311,7 +337,11 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
           connectSelectedNode={connectSelectedNode}
           deleteSelectedEdge={deleteSelectedEdge}
           currentDefinition={currentDefinition}
+          selectedNodeId={selectedNode?.id}
+          pendingAiChange={pendingAiChange}
           aiEditFlow={aiEditFlow}
+          applyAiChanges={applyAiChanges}
+          discardAiChanges={discardAiChanges}
         />
       </div>
 

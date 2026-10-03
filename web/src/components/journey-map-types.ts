@@ -41,9 +41,20 @@ export interface WorkflowNodeDefinition {
   actor: WorkflowActor;
   completeWhen?: string;
   tools?: string[];
+  requires?: string[];
+  produces?: string[];
   routes: JourneyRouteDefinition[];
   line?: number;
 }
+
+export type WorkflowChange =
+  | { type: 'replace-definition'; definition: WorkflowDefinition }
+  | { type: 'add-node'; node: WorkflowNodeDefinition }
+  | { type: 'update-node'; nodeId: string; patch: Partial<Omit<WorkflowNodeDefinition, 'id' | 'routes' | 'line'>> }
+  | { type: 'remove-node'; nodeId: string }
+  | { type: 'add-route'; nodeId: string; route: { outcome: string; target: string; condition?: string } }
+  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string; condition?: string } }
+  | { type: 'remove-route'; nodeId: string; outcome: string };
 
 export interface WorkflowDefinition {
   id: string;
@@ -59,12 +70,47 @@ export interface WorkflowLayout {
   viewport?: { x: number; y: number; zoom: number };
 }
 
+export interface WorkflowPendingInteraction {
+  id: string;
+  nodeId: string;
+  reason: string;
+  requestedAt: string;
+}
+
+export interface WorkflowRunEvent {
+  id: string;
+  runId: string;
+  workflowId: string;
+  workflowVersion: number;
+  type: string;
+  timestamp: string;
+  nodeId?: string;
+  outcome?: string;
+  error?: string;
+  data?: unknown;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    cost?: number;
+  };
+}
+
+export interface WorkflowAnalysisIssue {
+  severity: 'warning' | 'error';
+  code: string;
+  nodeId?: string;
+  message: string;
+}
+
 export interface WorkflowExecution {
   workflowId: string;
   workflowVersion: number;
+  runId: string;
   currentNodeId: string;
   completedNodeIds: string[];
-  status: 'active' | 'completed' | 'stopped';
+  status: 'active' | 'waiting' | 'completed' | 'stopped';
+  pendingInteraction?: WorkflowPendingInteraction;
 }
 
 export interface WorkflowState {
@@ -85,6 +131,8 @@ export interface WorkflowSnapshot {
   layout: WorkflowLayout;
   execution: WorkflowExecution;
   state: WorkflowState;
+  analysis: WorkflowAnalysisIssue[];
+  events: WorkflowRunEvent[];
 }
 
 export interface HandleSpec {
@@ -100,6 +148,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   completion: CompletionMode;
   actor: WorkflowActor;
   completeWhen?: string;
+  requires?: string[];
+  produces?: string[];
   visible: boolean;
   isNew?: boolean;
   sourceHandles: HandleSpec[];

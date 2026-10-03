@@ -103,6 +103,7 @@ function registerJourneyRoutes(app: express.Express): void {
       res.json({
         saved: true,
         issues: result.issues,
+        warnings: result.warnings,
         snapshot: await getJourneySnapshot(name, context.workflow),
       });
     } catch (error) {

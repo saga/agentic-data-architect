@@ -37,8 +37,12 @@ export interface JourneyNode {
   actor: JourneyActor;
   completeWhen?: string | undefined;
   tools?: string[] | undefined;
+  /** 这一步依赖的前置成果；只是轻量数据依赖声明，不执行变量解析。 */
+  requires?: string[] | undefined;
+  /** 这一步产出的工作成果；供后续步骤理解依赖关系。 */
+  produces?: string[] | undefined;
   routes: JourneyRoute[];
-  line?: number;
+  line?: number | undefined;
 }
 
 export interface JourneyDefinition {
@@ -81,12 +85,50 @@ export interface JourneyStage {
   unlocked: boolean;
 }
 
+export interface JourneyPendingInteraction {
+  id: string;
+  nodeId: string;
+  reason: string;
+  requestedAt: string;
+}
+
+export type JourneyRunEventType =
+  | 'workflow-started'
+  | 'node-started'
+  | 'node-completed'
+  | 'node-waiting'
+  | 'node-failed'
+  | 'workflow-completed'
+  | 'workflow-stopped'
+  | 'transition-rejected';
+
+export interface JourneyRunEvent {
+  id: string;
+  runId: string;
+  workflowId: string;
+  workflowVersion: number;
+  type: JourneyRunEventType;
+  timestamp: string;
+  nodeId?: string;
+  outcome?: string;
+  error?: string;
+  data?: unknown;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    cost?: number;
+  };
+}
+
 export interface JourneyExecution {
   workflowId: string;
   workflowVersion: number;
+  runId: string;
   currentNodeId: string;
   completedNodeIds: string[];
-  status: 'active' | 'completed' | 'stopped';
+  status: 'active' | 'waiting' | 'completed' | 'stopped';
+  pendingInteraction?: JourneyPendingInteraction | undefined;
 }
 
 export interface JourneyState {
@@ -143,6 +185,12 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       completeWhen: current.attrs.completeWhen,
       tools: current.attrs.tools
         ? current.attrs.tools.split(',').map((item) => item.trim()).filter(Boolean)
+        : undefined,
+      requires: current.attrs.requires
+        ? current.attrs.requires.split(',').map((item) => item.trim()).filter(Boolean)
+        : undefined,
+      produces: current.attrs.produces
+        ? current.attrs.produces.split(',').map((item) => item.trim()).filter(Boolean)
         : undefined,
       routes: current.routes,
       line: current.line,
@@ -446,12 +494,25 @@ export function initialJourneyExecution(
   definition: JourneyDefinition,
   workflowVersion = 0,
 ): JourneyExecution {
+  const startNode = definition.nodes.find((node) => node.id === definition.start);
+  const waitingForHuman = startNode?.actor === 'human';
   return {
     workflowId: definition.id,
     workflowVersion,
+    runId: definition.id + '-v' + String(workflowVersion),
     currentNodeId: definition.start,
     completedNodeIds: [],
-    status: 'active',
+    status: waitingForHuman ? 'waiting' : 'active',
+    ...(waitingForHuman
+      ? {
+          pendingInteraction: {
+            id: 'pending-' + definition.id + '-' + String(workflowVersion),
+            nodeId: definition.start,
+            reason: '等待人工完成“' + (startNode?.title ?? definition.start) + '”。',
+            requestedAt: new Date().toISOString(),
+          },
+        }
+      : {}),
   };
 }
 
@@ -486,15 +547,33 @@ export function applyJourneyTransition(
   const completed = new Set(execution.completedNodeIds);
   if (target.id !== nodeId) completed.add(nodeId);
 
+  const waitingForHuman = target.actor === 'human'
+    && target.type !== 'end'
+    && target.type !== 'stop';
+  const nextStatus: JourneyExecution['status'] = target.type === 'end'
+    ? 'completed'
+    : target.type === 'stop'
+      ? 'stopped'
+      : waitingForHuman
+        ? 'waiting'
+        : 'active';
+
+  const { pendingInteraction: _pendingInteraction, ...executionWithoutPending } = execution;
   return {
-    ...execution,
+    ...executionWithoutPending,
     currentNodeId: target.id,
     completedNodeIds: [...completed],
-    status: target.type === 'end'
-      ? 'completed'
-      : target.type === 'stop'
-        ? 'stopped'
-        : 'active',
+    status: nextStatus,
+    ...(waitingForHuman
+      ? {
+          pendingInteraction: {
+            id: 'pending-' + execution.workflowId + '-' + String(execution.workflowVersion) + '-' + target.id,
+            nodeId: target.id,
+            reason: '等待人工完成“' + target.title + '”。',
+            requestedAt: new Date().toISOString(),
+          },
+        }
+      : {}),
   };
 }
 
@@ -506,16 +585,33 @@ function advanceDeterministicJourney(
   const completed = new Set(execution.completedNodeIds);
   let currentNodeId = execution.currentNodeId;
   let status = execution.status;
+  let pendingInteraction = execution.pendingInteraction;
+
+  if (status === 'waiting') {
+    return execution;
+  }
 
   for (let guard = 0; guard < definition.nodes.length + 1; guard += 1) {
     const node = definition.nodes.find((item) => item.id === currentNodeId);
     if (!node) break;
     if (node.type === 'end') {
       status = 'completed';
+      pendingInteraction = undefined;
       break;
     }
     if (node.type === 'stop') {
       status = 'stopped';
+      pendingInteraction = undefined;
+      break;
+    }
+    if (node.actor === 'human') {
+      status = 'waiting';
+      pendingInteraction = pendingInteraction ?? {
+        id: 'pending-' + execution.workflowId + '-' + String(execution.workflowVersion) + '-' + node.id,
+        nodeId: node.id,
+        reason: '等待人工完成“' + node.title + '”。',
+        requestedAt: new Date().toISOString(),
+      };
       break;
     }
     if (node.completion !== 'deterministic' || !conditionPassed(node.completeWhen, facts)) break;
@@ -531,11 +627,13 @@ function advanceDeterministicJourney(
     currentNodeId = route.target;
   }
 
+  const { pendingInteraction: _pendingInteraction, ...executionWithoutPending } = execution;
   return {
-    ...execution,
+    ...executionWithoutPending,
     currentNodeId,
     completedNodeIds: [...completed],
     status,
+    ...(status === 'waiting' && pendingInteraction ? { pendingInteraction } : {}),
   };
 }
 
@@ -639,26 +737,32 @@ export function describeJourneyCurrentNode(
   };
 }
 
-/** 编辑器和运行时共用的结构 schema。 */
+/** 编辑器和运行时共用的结构 schema（节点/边另行导出，供 journey-edit 等复用）。 */
+export const JourneyRouteSchema = z.object({
+  outcome: z.string().min(1),
+  target: z.string().min(1),
+  condition: z.string().min(1).optional(),
+  line: z.number().int().positive().optional(),
+}).strict();
+
+export const JourneyNodeSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['task', 'gate', 'review', 'end', 'stop']),
+  title: z.string().min(1),
+  objective: z.string().optional(),
+  visible: z.boolean(),
+  completion: z.enum(['deterministic', 'agent']),
+  actor: z.enum(['agent', 'human', 'system']).default('agent'),
+  completeWhen: z.string().optional(),
+  tools: z.array(z.string()).optional(),
+  requires: z.array(z.string()).optional(),
+  produces: z.array(z.string()).optional(),
+  routes: z.array(JourneyRouteSchema),
+  line: z.number().int().positive().optional(),
+}).strict();
+
 export const JourneyDefinitionSchema = z.object({
   id: z.string().min(1),
   start: z.string().min(1),
-  nodes: z.array(z.object({
-    id: z.string().min(1),
-    type: z.enum(['task', 'gate', 'review', 'end', 'stop']),
-    title: z.string().min(1),
-    objective: z.string().optional(),
-    visible: z.boolean(),
-    completion: z.enum(['deterministic', 'agent']),
-    actor: z.enum(['agent', 'human', 'system']).default('agent'),
-    completeWhen: z.string().optional(),
-    tools: z.array(z.string()).optional(),
-    routes: z.array(z.object({
-      outcome: z.string().min(1),
-      target: z.string().min(1),
-      condition: z.string().min(1).optional(),
-      line: z.number().int().positive().optional(),
-    }).strict()),
-    line: z.number().int().positive().optional(),
-  }).strict()).min(1),
+  nodes: z.array(JourneyNodeSchema).min(1),
 }).strict().transform((value) => value as JourneyDefinition);

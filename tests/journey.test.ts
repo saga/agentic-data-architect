@@ -246,6 +246,14 @@ test('applies only an actual outgoing workflow outcome', () => {
   assert.deepEqual(success.completedNodeIds, ['investigate']);
 });
 
+test('human review starts in waiting state', () => {
+  const result = parseJourneyMarkdown(['## @flow demo','start -> review','','## @review review','actor: human','- approved -> done','','## @end done'].join('\n'));
+  assert.ok(result.definition);
+  const execution = initialJourneyExecution(result.definition!, 1);
+  assert.equal(execution.status, 'waiting');
+  assert.equal(execution.pendingInteraction?.nodeId, 'review');
+});
+
 test('loads the architecture assessment markdown workflow', async () => {
   const definition = await loadWorkflowJourney('data-architecture-assessment');
   assert.equal(definition.id, 'data-architecture-assessment');
