@@ -95,15 +95,7 @@ function buildValidationPlan(
       blocking: false,
       evidenceIds: [],
     },
-    {
-      id: 'validation:cutover',
-      type: 'cutover' as const,
-      name: 'Cutover / Rollback readiness',
-      description: '在真正切换前，先说清楚什么时候可以切、出了问题什么时候退回去。',
-      status: hasHighGap ? 'blocked' as const : 'planned' as const,
-      blocking: true,
-      evidenceIds: [],
-    },
+
   ];
 
   return {
