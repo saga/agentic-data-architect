@@ -551,13 +551,61 @@ Agent transition
 负责：
 
 ~~~text
-React Flow
-graph interaction
-node inspector
-edge inspector
-undo/redo
-validation UI
-AI 操作、保存 / 恢复
+页面组合
+React Flow 容器
+工具栏 / 状态栏
+~~~
+
+### web/src/components/useJourneyWorkflowEditor.ts
+
+负责：
+
+~~~text
+编辑状态
+Graph mutation
+Undo / Redo
+AI 请求与 Patch 预览
+保存 / Reset
+Human transition
+~~~
+
+### web/src/components/JourneyMapInspector.tsx
+
+负责：
+
+~~~text
+属性 Tab
+节点 / 分支编辑表单
+waiting 人工操作
+~~~
+
+### web/src/components/JourneyMapAiChat.tsx
+
+负责：
+
+~~~text
+Workflow AI 对话 UI
+模式 / scope
+Patch 预览
+~~~
+
+### web/src/components/journey-map-graph.ts
+
+负责：
+
+~~~text
+Workflow Definition ↔ React Flow
+连接点 / 边
+结构诊断
+~~~
+
+### web/src/components/journey-map-layout.ts
+
+负责：
+
+~~~text
+ELK layout
+collision guard
 ~~~
 
 ### src/server.ts
