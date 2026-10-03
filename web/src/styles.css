@@ -1196,7 +1196,7 @@ body {
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
-  padding: 14px 16px 16px;
+  padding: 12px 14px 14px;
   overflow: hidden;
 }
 
@@ -1240,7 +1240,7 @@ body {
   min-height: 0;
   gap: 10px;
   overflow: auto;
-  padding: 10px 4px 2px 0;
+  padding: 10px 2px 2px 0;
   scrollbar-gutter: stable;
 }
 
@@ -1276,7 +1276,7 @@ body {
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
 }
 
@@ -1291,17 +1291,6 @@ body {
   align-items: stretch;
   gap: 7px;
   min-width: 0;
-}
-
-.journey-map-ai-chat-hint {
-  padding: 6px 8px;
-  border-radius: 7px;
-  background: #f7f9fc;
-}
-
-.journey-map-ai-chat-hint .ant-typography {
-  font-size: 11px;
-  line-height: 16px;
 }
 
 .journey-map-ai-chat-body {
@@ -1459,11 +1448,6 @@ body {
   transform: translateY(-50%) scale(1.25);
 }
 
-@media (max-width: 1100px) {
-  
-
-  
-}
 
 /* Workflow map: both locked and edit modes use the same visible graph. */
 .journey-flow-node-deemphasized {
@@ -1639,7 +1623,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 12px 18px;
+  padding: 11px 16px 10px;
   border-bottom: 1px solid #e9edf3;
   background: rgba(255,255,255,.97);
   flex: 0 0 auto;
@@ -1710,10 +1694,24 @@ body {
   overflow: hidden;
 }
 
-.journey-map-workspace .journey-map-flow-wrap {
+.journey-map-workspace > * {
+  min-width: 0;
   min-height: 0;
+}
+
+.journey-map-workspace .journey-map-flow-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
   border-right: 1px solid #e9edf3;
+}
+
+.journey-map-workspace .journey-map-flow-wrap > .react-flow {
+  width: 100%;
+  height: 100%;
 }
 
 .journey-map-workspace .journey-map-inspector {
