@@ -1,20 +1,22 @@
+import { useEffect, useState } from 'react';
 import {
   Button,
   Empty,
   Flex,
+  Input,
+  Segmented,
+  Space,
   Tag,
   Typography,
 } from 'antd';
 import {
-  ArrowRightOutlined,
-  BranchesOutlined,
-  EditOutlined,
+  ArrowLeftOutlined,
   NodeIndexOutlined,
   PlusOutlined,
   RedoOutlined,
+  RobotOutlined,
   SaveOutlined,
   UndoOutlined,
-  UploadOutlined,
 } from '@ant-design/icons';
 import {
   Background,
@@ -29,103 +31,43 @@ import {
 import { JourneyFlowEdge } from './JourneyFlowEdge.js';
 import { JourneyFlowNode } from './JourneyFlowNode.js';
 import { JourneyMapInspector } from './JourneyMapInspector.js';
-import {
-  EDGE_TYPE,
-} from './journey-map-types.js';
-import type {
-  JourneyMapProps,
-  JourneyMapRoute,
-  JourneyMapStage,
-  FlowNodeData,
-} from './journey-map-types.js';
+import { EDGE_TYPE, type FlowNodeData } from './journey-map-types.js';
 import { useJourneyWorkflowEditor } from './useJourneyWorkflowEditor.js';
 
 const { Text } = Typography;
 
-/** 保持原文件的公共类型导出，避免其它页面需要跟着改 import。 */
-export type {
-  JourneyMapProps,
-  JourneyMapRoute,
-  JourneyMapStage,
-};
+export interface JourneyMapProps {
+  /** 从完整工作页返回调查对话。 */
+  onBack?: () => void;
+}
 
-/**
- * 工作地图的入口，只做一件事：把 React Flow 的 Provider 放到画布外面。
- *
- * React Flow 的 hook（useNodesState / useNodesInitialized …）读的是
- * ReactFlowProvider 提供的 store。Provider 必须包在**调用这些 hook 的组件外面**，
- * 因为 <ReactFlow> 只是给它的子节点提供 store，管不到自己所在的组件。
- *
- * 之前 useJourneyWorkflowEditor 就写在渲染 <ReactFlow> 的这个组件里，
- * 等于在 Provider 外面调 hook，一打开工作地图就抛
- * “Seems like you have not used ReactFlowProvider as an ancestor”，
- * React 直接卸载整棵树 → 整个页面白屏。所以这里必须拆成两层。
- */
+/** 工作地图页面。 */
 export function JourneyMap(props: JourneyMapProps) {
   return (
     <ReactFlowProvider>
-      <JourneyMapCanvas {...props} />
+      <JourneyMapCanvas onBack={props.onBack} />
     </ReactFlowProvider>
   );
 }
 
 /**
- * 工作地图只负责“页面”：
+ * 工作地图是独立的业务页面：
+ * 进入后直接可以拖动、连线、修改属性、让 AI 修改流程，然后明确保存。
  *
- * - React Flow 画布
- * - Header 工具栏
- * - Inspector
- * - Journey 底部摘要
- *
- * 所有编辑状态、Graph 变换、HTTP 持久化和 Undo/Redo 都已经放到
- * useJourneyWorkflowEditor，避免一个组件同时承担太多职责。
+ * AI 修改只替换当前画布，不直接写入服务端。用户检查后再点击“保存”，
+ * 这样 AI 生成错误时不会悄悄改变正在执行的 Workflow。
  */
-function JourneyMapCanvas({
-  journey,
-  routes = [],
-  loading = false,
-  onChooseRoute,
-  onAskStage,
-}: JourneyMapProps) {
+function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
-
-  if (loading || editor.fetching) {
-    return (
-      <div className="journey-map-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="正在整理工作地图…"
-        />
-      </div>
-    );
-  }
-
-  if (!editor.snapshot) {
-    if (!journey?.stages.length && !routes.length) {
-      return (
-        <div className="journey-map-empty">
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="当前是自主调查，没有固定 Workflow。"
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div className="journey-map-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="工作地图加载失败。请关闭后重新打开。"
-        />
-      </div>
-    );
-  }
+  const [aiMode, setAiMode] = useState<'modify' | 'generate'>('modify');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
 
   const {
     snapshot,
-    editing,
-    usingDraft,
+    fetching,
+    dirty,
     nodes,
     edges,
     selectedNode,
@@ -137,11 +79,8 @@ function JourneyMapCanvas({
     validationIssues,
     currentStage,
     completedCount,
-    enterEdit,
-    cancelEdit,
-    saveDraft,
-    validate,
-    applyWorkflow,
+    saveWorkflow,
+    aiEditFlow,
     resetWorkflow,
     autoLayout,
     createStandaloneNode,
@@ -165,146 +104,208 @@ function JourneyMapCanvas({
     onEdgeClick,
     clearSelection,
     deleteSelectedEdge,
-    currentDefinition,
+    beginNodeDrag,
   } = editor;
 
-  const activeDefinition = currentDefinition ?? snapshot.definition;
+  const currentDefinition = snapshot?.definition;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (dirty) void saveWorkflow();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [dirty, saveWorkflow]);
+
+  const submitAi = async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt || aiLoading) return;
+
+    setAiLoading(true);
+    setAiMessage('');
+    try {
+      const result = await aiEditFlow(aiMode, prompt);
+      if (result) {
+        setAiMessage(result.message);
+        setAiPrompt('');
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  if (fetching) {
+    return (
+      <div className="journey-map-page journey-map-empty">
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="正在打开工作地图，请稍候…"
+        />
+      </div>
+    );
+  }
+
+  if (!snapshot) {
+    return (
+      <div className="journey-map-page journey-map-empty">
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="这个调查还没有固定工作方式，先到调查设置选择一种工作方式。"
+        />
+        {onBack ? (
+          <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回调查</Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={
-        'journey-map-canvas journey-map-editor-shell'
-        + (editing
-          ? ' journey-map-editor-mode'
-          : ' journey-map-locked-mode')
-      }
-    >
-      <div className="journey-map-editor-header">
-        <div>
-          <div className="journey-map-heading-title">工作地图</div>
-          <div className="journey-map-heading-subtitle">
-            {editing
-              ? '正在编辑 Workflow 草稿。拖动节点、连线、添加分支；验证通过后才会改变执行路线。'
-              : '这是当前 Workflow 的完整路线。锁定模式只能查看；有连接问题的步骤会直接标出。'}
+    <div className="journey-map-page">
+      <header className="journey-map-page-header">
+        <div className="journey-map-page-header-main">
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={onBack}
+            aria-label="返回调查"
+          >
+            返回调查
+          </Button>
+          <div className="journey-map-page-title-group">
+            <Flex align="center" gap={8}>
+              <Typography.Title level={4} style={{ margin: 0 }}>
+                工作地图
+              </Typography.Title>
+              <Tag color={snapshot.source === 'custom' ? 'blue' : undefined}>
+                {snapshot.source === 'custom'
+                  ? '自定义 v' + String(snapshot.version)
+                  : '内置路线'}
+              </Tag>
+              {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
+            </Flex>
+            <Text type="secondary">
+              直接拖动节点和连线；也可以告诉 AI 怎么改，检查后点击保存。
+            </Text>
           </div>
         </div>
 
         <Flex align="center" gap={8} wrap>
-          <Tag color={snapshot.source === 'custom' ? 'blue' : undefined}>
-            {snapshot.source === 'custom'
-              ? '自定义 v' + String(snapshot.version)
-              : '内置 Workflow'}
-          </Tag>
-
-          {editing ? (
-            <>
-              <Button
-                size="small"
-                icon={<UndoOutlined />}
-                disabled={!canUndo}
-                onClick={undo}
-              >
-                撤销
-              </Button>
-              <Button
-                size="small"
-                icon={<RedoOutlined />}
-                disabled={!canRedo}
-                onClick={redo}
-              >
-                重做
-              </Button>
-              <Button
-                size="small"
-                icon={<NodeIndexOutlined />}
-                onClick={() => void autoLayout()}
-              >
-                自动排版
-              </Button>
-              <Button
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => void createStandaloneNode()}
-              >
-                新建步骤
-              </Button>
-              <Button
-                size="small"
-                icon={<SaveOutlined />}
-                onClick={() => void saveDraft()}
-              >
-                保存草稿
-              </Button>
-              <Button
-                size="small"
-                onClick={() => void validate()}
-              >
-                验证
-              </Button>
-              <Button size="small" onClick={resetWorkflow}>
-                恢复内置
-              </Button>
-              <Button
-                size="small"
-                onClick={() => void cancelEdit()}
-              >
-                取消
-              </Button>
-              <Button
-                type="primary"
-                size="small"
-                icon={<UploadOutlined />}
-                onClick={() => void applyWorkflow()}
-              >
-                应用修改
-              </Button>
-            </>
-          ) : (
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<EditOutlined />}
-              onClick={enterEdit}
-            >
-              编辑工作地图
-            </Button>
-          )}
+          <Button
+            size="small"
+            icon={<UndoOutlined />}
+            disabled={!canUndo}
+            onClick={undo}
+          >
+            撤销
+          </Button>
+          <Button
+            size="small"
+            icon={<RedoOutlined />}
+            disabled={!canRedo}
+            onClick={redo}
+          >
+            重做
+          </Button>
+          <Button
+            size="small"
+            icon={<NodeIndexOutlined />}
+            onClick={() => void autoLayout()}
+          >
+            自动排版
+          </Button>
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => void createStandaloneNode()}
+          >
+            新建步骤
+          </Button>
+          <Button
+            size="small"
+            onClick={resetWorkflow}
+          >
+            恢复内置
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            icon={<SaveOutlined />}
+            disabled={!dirty}
+            onClick={() => void saveWorkflow()}
+          >
+            保存
+          </Button>
         </Flex>
-      </div>
+      </header>
 
-      {editing && snapshot.draft ? (
-        <div className="journey-map-draft-banner">
-          <Text>
-            已载入之前保存的草稿。当前执行位置仍属于 active Workflow，
-            直到你点击“应用修改”。
-          </Text>
+      <section className="journey-map-ai-bar">
+        <div className="journey-map-ai-title">
+          <RobotOutlined />
+          <Text strong>让 AI 帮你改工作地图</Text>
         </div>
-      ) : null}
+        <Segmented
+          value={aiMode}
+          onChange={(value) => setAiMode(value as 'modify' | 'generate')}
+          options={[
+            { value: 'modify', label: '修改当前图' },
+            { value: 'generate', label: '重新设计' },
+          ]}
+        />
+        <Input.TextArea
+          value={aiPrompt}
+          onChange={(event) => setAiPrompt(event.target.value)}
+          onPressEnter={(event) => {
+            if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
+              event.preventDefault();
+              void submitAi();
+            }
+          }}
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          placeholder={
+            aiMode === 'modify'
+              ? '例如：把“资料核对”和“业务定义”拆成两个并行步骤，最后汇总后进入评审。'
+              : '例如：把这张图重新设计成 5～7 个步骤，增加必要的确认点，减少重复检查。'
+          }
+          disabled={aiLoading}
+        />
+        <Button
+          type="primary"
+          icon={<RobotOutlined />}
+          loading={aiLoading}
+          disabled={!aiPrompt.trim()}
+          onClick={() => void submitAi()}
+        >
+          生成
+        </Button>
+        {aiMessage ? (
+          <Text type="secondary" className="journey-map-ai-message">
+            {aiMessage}
+          </Text>
+        ) : null}
+      </section>
 
-      {editing && validationIssues.length ? (
+      {validationIssues.length ? (
         <div className="journey-map-validation-panel">
           <div className="journey-map-validation-title">
-            <Text strong>验证问题 {validationIssues.length}</Text>
-            <Text type="secondary">这些问题修正后才能应用。</Text>
+            <Text strong>保存前需要修正 {validationIssues.length} 个问题</Text>
+            <Text type="secondary">当前画布仍然可以继续编辑。</Text>
           </div>
-
           <div className="journey-map-validation-items">
             {validationIssues.slice(0, 8).map((issue, index) => (
-              <Text type="danger" key={index}>
-                • {issue}
-              </Text>
+              <Text type="danger" key={index}>{issue}</Text>
             ))}
             {validationIssues.length > 8 ? (
-              <Text type="secondary">
-                还有 {validationIssues.length - 8} 个问题…
-              </Text>
+              <Text type="secondary">还有 {validationIssues.length - 8} 个问题。</Text>
             ) : null}
           </div>
         </div>
       ) : null}
 
-      <div className="journey-map-editor-body">
+      <div className="journey-map-workspace">
         <div className="journey-map-flow-wrap">
           <ReactFlow
             nodes={nodes}
@@ -314,23 +315,19 @@ function JourneyMapCanvas({
             onInit={(instance) => {
               flowInstanceRef.current = instance;
             }}
-            nodesDraggable={editing}
-            nodesConnectable={editing}
-            elementsSelectable={editing}
-            edgesReconnectable={editing}
+            nodesDraggable
+            nodesConnectable
+            elementsSelectable
+            edgesReconnectable
             connectionLineType={ConnectionLineType.SmoothStep}
             connectionRadius={28}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onNodeDragStart={editor.beginNodeDrag}
+            onNodeDragStart={beginNodeDrag}
             onConnect={onConnect}
             onReconnect={onReconnect}
-            onNodeClick={(_, node) => {
-              if (editing) onNodeClick(node.id);
-            }}
-            onEdgeClick={(_, edge) => {
-              if (editing) onEdgeClick(edge.id);
-            }}
+            onNodeClick={(_, node) => onNodeClick(node.id)}
+            onEdgeClick={(_, edge) => onEdgeClick(edge.id)}
             onPaneClick={clearSelection}
             colorMode="light"
             proOptions={{ hideAttribution: true }}
@@ -342,7 +339,7 @@ function JourneyMapCanvas({
               color="#dfe5ee"
             />
 
-            <Controls showInteractive={editing} />
+            <Controls showInteractive />
 
             <MiniMap
               pannable
@@ -363,82 +360,48 @@ function JourneyMapCanvas({
           </ReactFlow>
         </div>
 
-        {editing ? (
-          <JourneyMapInspector
-            nodes={nodes}
-            selectedNode={selectedNode}
-            selectedEdge={selectedEdge}
-            nodeDraft={nodeDraft}
-            edgeDraft={edgeDraft}
-            connectTargetId={connectTargetId}
-            connectOutcome={connectOutcome}
-            setNodeDraft={setNodeDraft}
-            setEdgeDraft={setEdgeDraft}
-            setConnectTargetId={setConnectTargetId}
-            setConnectOutcome={setConnectOutcome}
-            applyNodeDraft={applyNodeDraft}
-            applyEdgeDraft={applyEdgeDraft}
-            connectSelectedNode={connectSelectedNode}
-            deleteSelectedEdge={deleteSelectedEdge}
-          />
-        ) : null}
+        <JourneyMapInspector
+          nodes={nodes}
+          selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
+          nodeDraft={nodeDraft}
+          edgeDraft={edgeDraft}
+          connectTargetId={connectTargetId}
+          connectOutcome={connectOutcome}
+          setNodeDraft={setNodeDraft}
+          setEdgeDraft={setEdgeDraft}
+          setConnectTargetId={setConnectTargetId}
+          setConnectOutcome={setConnectOutcome}
+          applyNodeDraft={applyNodeDraft}
+          applyEdgeDraft={applyEdgeDraft}
+          connectSelectedNode={connectSelectedNode}
+          deleteSelectedEdge={deleteSelectedEdge}
+        />
       </div>
 
-      {!editing ? (
-        <>
-          <div className="journey-map-summary-row">
-            <Flex gap={8} align="center" wrap>
-              <Text strong>{currentStage?.title ?? '当前调查'}</Text>
-
-              <Tag bordered={false}>
-                {completedCount}/
-                {Math.max(
-                  activeDefinition.nodes.filter((node) => node.visible).length,
-                  1,
-                )}{' '}
-                已完成
-              </Tag>
-
-              <Tag bordered={false}>
-                {snapshot.state.currentNodeId}
-              </Tag>
-            </Flex>
-
-            {currentStage && onAskStage ? (
-              <Button
-                size="small"
-                type="primary"
-                ghost
-                icon={<ArrowRightOutlined />}
-                onClick={() => onAskStage(currentStage)}
-              >
-                围绕当前阶段继续
-              </Button>
-            ) : null}
-          </div>
-
-          {routes.length ? (
-            <div className="journey-map-route-list">
-              <div className="journey-map-route-list-title">
-                <BranchesOutlined />
-                Agent 临时建议
-              </div>
-
-              <Flex gap={8} wrap>
-                {routes.slice(0, 3).map((route) => (
-                  <Button
-                    key={route.id}
-                    size="small"
-                    onClick={() => onChooseRoute?.(route)}
-                  >
-                    {route.title}
-                  </Button>
-                ))}
-              </Flex>
-            </div>
-          ) : null}
-        </>
-      ) : null}
+      <footer className="journey-map-page-footer">
+        <Flex align="center" gap={8} wrap>
+          <Text strong>{currentStage?.title ?? '当前步骤'}</Text>
+          <Tag bordered={false}>
+            {completedCount}/{Math.max(currentDefinition?.nodes.filter((node) => node.visible).length ?? 0, 1)} 已完成
+          </Tag>
+          <Text type="secondary">
+            当前执行位置：{snapshot.state.currentNodeId}
+          </Text>
+        </Flex>
+        <Space size={12}>
+          <Text type="secondary">
+            Cmd/Ctrl + S 保存
+          </Text>
+          {snapshot.execution.status === 'completed' ? (
+            <Tag color="green" bordered={false}>这条路线已经走完</Tag>
+          ) : snapshot.execution.status === 'stopped' ? (
+            <Tag color="red" bordered={false}>这条路线已停止</Tag>
+          ) : (
+            <Tag bordered={false}>正在执行</Tag>
+          )}
+        </Space>
+      </footer>
     </div>
   );
 }
