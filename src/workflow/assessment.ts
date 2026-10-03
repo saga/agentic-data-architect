@@ -134,8 +134,19 @@ export async function loadArchitectureAssessmentPlan(name: string): Promise<Arch
 async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeof loadInvestigation>>, current: DiscoverySnapshot['currentState'] | null, plan: ArchitectureAssessmentPlan): Promise<JourneyState> {
   return buildJourneyState(await loadWorkflowJourney('data-architecture-assessment'), {
     goal: inv.goal || inv.userPrompt,
-    currentState: current ? { datasets: current.coverage.datasets, lineageCoverage: current.coverage.datasetLineageCoverage, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
-    unknowns: inv.unknowns, highGapKinds: [], targetComponentCount: 0, mappingCount: 0, blockingValidationReady: 0, blockingValidationTotal: 0,
+    currentState: current ? { datasets: current.coverage.datasets, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
+    unknowns: inv.unknowns,
+    highGapKinds: buildModernizationGaps({
+      currentState,
+      estate: null,
+      findings: inv.findings,
+    }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+    targetComponentCount: 0,
+    mappingCount: 0,
+    blockingValidationReady: 0,
+    blockingValidationTotal: 0,
+    cutoverCriteriaDefined: false,
+    rollbackCriteriaDefined: false,
     findingCount: plan.findings.length, recommendationCount: plan.recommendations.length, roadmapItemCount: plan.roadmap.length,
   });
 }
