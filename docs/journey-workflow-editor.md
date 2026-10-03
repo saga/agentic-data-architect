@@ -596,6 +596,12 @@ ORTHOGONAL routing
 
 React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 label 设置 pointer-events: all，并使用 nodrag / nopan，让用户可以直接点击 outcome 编辑。（参考 React Flow 官方 EdgeLabelRenderer 文档）
 
+### 连接问题提示与锁定模式
+
+地图会直接在节点上标出结构性连接问题：普通节点没有入口或出口、或者存在指向不存在节点的 route，会显示红框和“需要修正连接”。`@end` / `@stop` 没有出口以及 Workflow start 没有入口属于正常情况，不会误报。
+
+锁定模式和编辑模式使用完全相同的节点、边、Handle 和布局；区别只有交互权限。锁定模式的 Handle 是可见但不可拖动的，因此用户看到的就是完整、真实的 Workflow。
+
 ### 新节点的交互
 
 - 新节点使用橙色虚线框 + “新建步骤”标签。
