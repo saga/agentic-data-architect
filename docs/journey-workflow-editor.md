@@ -567,14 +567,19 @@ Workflow Editor APIs
 
 ## 13. 后续可以做，但当前不要做
 
+当前已经吸收少量 BPMN-like 语义，但暂时不把它升级成完整 BPMN runtime。
+
 暂时不引入：
 
-- BPMN / Temporal
+- 完整 BPMN 2.0 XML / execution engine
+- parallel / inclusive gateway
+- timer / message event
+- subprocess / multi-token join
+- Temporal
 - 独立 Workflow Registry
 - 独立 Agent Registry
 - 通用规则引擎
 - React Flow Pro 依赖
-- ELK
 - 多用户 Workflow 权限体系
 - Workflow marketplace
 
@@ -589,7 +594,7 @@ Workflow Editor APIs
 → 出问题能恢复内置版本
 ~~~
 
-后续如果真实 Workflow 开始出现明显的图复杂度，再考虑 ELK 自动布局；如果出现多人同时编辑，再增加 optimistic concurrency / revision check，而不是现在提前做完整协作系统。
+后续如果真实 Workflow 开始需要并行执行、消息/定时事件或子流程，再扩展执行状态模型，而不是先堆 DSL 语法。多人同时编辑时再增加 optimistic concurrency / revision check。
 
 ## 14. 为什么这次改了布局
 
