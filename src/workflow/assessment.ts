@@ -139,16 +139,3 @@ async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeo
     findingCount: plan.findings.length, recommendationCount: plan.recommendations.length, roadmapItemCount: plan.roadmap.length,
   });
 }
-
-export async function loadArchitectureAssessmentJourneyState(name: string): Promise<JourneyState> {
-  const inv = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-  const plan = await loadArchitectureAssessmentPlan(name);
-  const current = snapshot?.currentState ?? null;
-  return buildJourneyState(await loadWorkflowJourney('data-architecture-assessment'), {
-    goal: inv.goal || inv.userPrompt,
-    currentState: current ? { datasets: current.coverage.datasets, lineageCoverage: current.coverage.datasetLineageCoverage, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
-    unknowns: inv.unknowns, highGapKinds: [], targetComponentCount: 0, mappingCount: 0, blockingValidationReady: 0, blockingValidationTotal: 0,
-    findingCount: plan?.findings.length ?? inv.findings.length, recommendationCount: plan?.recommendations.length ?? 0, roadmapItemCount: plan?.roadmap.length ?? 0,
-  });
-}
