@@ -252,7 +252,6 @@ export function graphFromDefinition(
   definition: WorkflowDefinition,
   layout: WorkflowLayout,
   snapshot: WorkflowSnapshot,
-  editing: boolean,
   onSelectNode?: (id: string) => void,
   onAddStep?: (id: string) => void,
   onAddBranch?: (id: string) => void,
@@ -324,8 +323,8 @@ export function graphFromDefinition(
       id: item.id,
       type: 'journey',
       position: layout.nodes[item.id] ?? { x: 0, y: 0 },
-      draggable: editing,
-      selectable: editing,
+      draggable: true,
+      selectable: true,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
       data: {
@@ -336,7 +335,6 @@ export function graphFromDefinition(
         completion: item.completion,
         completeWhen: item.completeWhen,
         visible: item.visible,
-        editing,
         isNew: newNodeIds.has(item.id),
         sourceHandles,
         targetHandles,
@@ -346,10 +344,10 @@ export function graphFromDefinition(
               connectionIssueText: connectionIssue.text,
             }
           : {}),
-        onSelect: editing ? onSelectNode : undefined,
-        onAddStep: editing ? onAddStep : undefined,
-        onAddBranch: editing ? onAddBranch : undefined,
-        onDelete: editing ? onDelete : undefined,
+        onSelect: onSelectNode,
+        onAddStep,
+        onAddBranch,
+        onDelete,
       },
       className:
         'journey-flow-node journey-flow-node-stage '
@@ -397,7 +395,7 @@ export function graphFromDefinition(
           labelOffsetY:
             (routeIndex - (validRoutes.length - 1) / 2) * 20
             + (Math.max(0, incomingIndex) - (Math.max(0, targetIncoming.length) - 1) / 2) * 10,
-          onSelect: editing ? onSelectEdge : undefined,
+          onSelect: onSelectEdge,
         },
       });
     });
