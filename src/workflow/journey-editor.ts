@@ -31,7 +31,6 @@ import {
   type JourneyDefinition,
   type JourneyExecution,
   type JourneyFacts,
-  type JourneyPendingInteraction,
   type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
@@ -45,8 +44,6 @@ const ACTIVE_FILE = 'journey.md';
 const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
-const DRAFT_DEF_FILE = 'journey-draft.md';
-const DRAFT_LAYOUT_FILE = 'journey-draft-layout.json';
 const EVENTS_FILE = 'journey-run-events.jsonl';
 
 export const JourneyLayoutNodeSchema = z.object({
@@ -225,20 +222,7 @@ type JourneyExecutionInput = Omit<JourneyExecution, 'runId' | 'pendingInteractio
 function normalizeExecution(
   definition: JourneyDefinition,
   version: number,
-<<<<<<< HEAD
-  /** 磁盘存盘形状：老文件可能没有 runId / pendingInteraction，缺的在这里补。 */
-  execution: {
-    workflowId: string;
-    workflowVersion: number;
-    runId?: string | undefined;
-    currentNodeId: string;
-    completedNodeIds: string[];
-    status: 'active' | 'waiting' | 'completed' | 'stopped';
-    pendingInteraction?: JourneyPendingInteraction | undefined;
-  } | null,
-=======
   execution: JourneyExecutionInput | null,
->>>>>>> 1646023f6d1430275469c6bea0b9290671f73244
 ): JourneyExecution {
   if (
     !execution
@@ -457,65 +441,6 @@ export function validateJourneyEdit(
 
 /** 保存一张工作地图；服务端重新验证，不能绕过结构检查。 */
 export async function saveJourneyDefinition(
-  name: string,
-  workflowId: WorkflowId,
-  definitionInput: JourneyDefinition,
-  layoutInput: JourneyLayout,
-): Promise<{ version: number; snapshot: JourneySnapshot }> {
-  return applyJourneyDefinition(name, workflowId, definitionInput, layoutInput);
-}
-
-/**
- * 保存编辑草稿：只验证、不改变 active Workflow。
- * 有语义问题也照存（返回 issues 让编辑器标红），刷新页面不会丢改动；
- * 真正生效必须走 applyJourneyDefinition。
- */
-export async function saveJourneyDraft(
-  name: string,
-  workflowId: WorkflowId,
-  definitionInput: JourneyDefinition,
-  layoutInput: JourneyLayout,
-): Promise<{ issues: string[]; warnings: string[] }> {
-  const definition = JourneyDefinitionSchema.safeParse(definitionInput);
-  const layout = JourneyLayoutSchema.safeParse(layoutInput);
-  const issues: string[] = [];
-  if (!definition.success) {
-    issues.push('Workflow 结构读不懂，先修正后再存草稿。');
-  }
-  if (!layout.success) {
-    issues.push('画布布局读不懂，先修正后再存草稿。');
-  }
-  if (!definition.success || !layout.success) {
-    return { issues, warnings: [] };
-  }
-  let warnings: string[] = [];
-  if (definition.data.id !== workflowId) {
-    issues.push('Workflow id 不能修改为另一个工作方式。');
-  } else {
-    const validation = validateJourneyEdit(definition.data, layout.data);
-    issues.push(...validation.issues);
-    warnings = validation.warnings;
-  }
-
-  await withWorkspaceContextLock(name, async () => {
-    await ensureWorkspace(name);
-    await fs.mkdir(journeyDir(name), { recursive: true });
-    await fs.writeFile(
-      journeyFile(name, DRAFT_DEF_FILE),
-      serializeJourneyMarkdown(definition.data),
-      'utf8',
-    );
-    await writeJsonAtomic(journeyFile(name, DRAFT_LAYOUT_FILE), layout.data);
-  });
-
-  return { issues: [...new Set(issues)], warnings: [...new Set(warnings)] };
-}
-
-/**
- * 应用草稿（或编辑器当前内容）：服务端再次完整验证，通过后创建新 Workflow version。
- * 有问题直接抛错，由路由转成 400 返回。
- */
-export async function applyJourneyDefinition(
   name: string,
   workflowId: WorkflowId,
   definitionInput: JourneyDefinition,
