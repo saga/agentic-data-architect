@@ -1,0 +1,659 @@
+/**
+ * Investigation 级 Workflow Editor。
+ *
+ * 内置 Skill 的 SKILL.md 永远不直接被 UI 改写。
+ * 编辑流程：
+ *   journey-draft.md -> validate -> journey.md -> journey-execution.json
+ *
+ * React Flow 的坐标和 viewport 只属于 layout，不进入 Workflow 语义。
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import * as z from 'zod';
+import { appendAuditEvent } from '../investigation/control.js';
+import {
+  ensureWorkspace,
+  loadWorkspaceContext,
+  writeJsonAtomic,
+  workspaceRoot,
+  withWorkspaceContextLock,
+} from '../investigation/workspace.js';
+import { loadLatestSnapshot } from '../investigation/store.js';
+import type { WorkflowId } from '../investigation/schemas.js';
+import type { DiscoverySnapshot } from './discover.js';
+import {
+  applyJourneyTransition,
+  buildJourneyState,
+  describeJourneyCurrentNode,
+  initialJourneyExecution,
+  JourneyDefinitionSchema,
+  loadWorkflowJourney,
+  parseJourneyMarkdown,
+  validateJourneyDefinition,
+  type JourneyDefinition,
+  type JourneyExecution,
+  type JourneyFacts,
+  type JourneyState,
+} from './journey.js';
+
+const JOURNEY_DIR = 'workflow';
+const ACTIVE_FILE = 'journey.md';
+const DRAFT_FILE = 'journey-draft.md';
+const META_FILE = 'journey-meta.json';
+const LAYOUT_FILE = 'journey-layout.json';
+const DRAFT_LAYOUT_FILE = 'journey-draft-layout.json';
+const EXECUTION_FILE = 'journey-execution.json';
+
+export const JourneyLayoutNodeSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+}).strict();
+
+export const JourneyLayoutSchema = z.object({
+  version: z.literal(1),
+  nodes: z.record(z.string(), JourneyLayoutNodeSchema),
+  viewport: z.object({
+    x: z.number().finite(),
+    y: z.number().finite(),
+    zoom: z.number().finite().positive(),
+  }).optional(),
+}).strict();
+
+export type JourneyLayout = z.infer<typeof JourneyLayoutSchema>;
+
+export const JourneyEditBodySchema = z.object({
+  definition: JourneyDefinitionSchema,
+  layout: JourneyLayoutSchema,
+}).strict();
+
+const JourneyMetaSchema = z.object({
+  schemaVersion: z.literal(1),
+  baseWorkflowId: z.string().min(1),
+  version: z.number().int().nonnegative(),
+}).strict();
+
+type JourneyMeta = z.infer<typeof JourneyMetaSchema>;
+
+export interface JourneySnapshot {
+  workflowId: WorkflowId;
+  source: 'base' | 'custom';
+  baseWorkflowId: WorkflowId;
+  version: number;
+  definition: JourneyDefinition;
+  layout: JourneyLayout;
+  execution: JourneyExecution;
+  state: JourneyState;
+  draft: {
+    definition: JourneyDefinition;
+    layout: JourneyLayout;
+    issues: string[];
+  } | null;
+}
+
+function journeyDir(name: string): string {
+  return path.join(workspaceRoot(name), JOURNEY_DIR);
+}
+
+function journeyFile(name: string, file: string): string {
+  return path.join(journeyDir(name), file);
+}
+
+async function readJson<T>(file: string): Promise<T | null> {
+  try {
+    return JSON.parse(await fs.readFile(file, 'utf8')) as T;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function readTextOrNull(file: string): Promise<string | null> {
+  try {
+    return await fs.readFile(file, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+/** 按图深度给新 Workflow 一个稳定初始布局；用户拖动后的坐标另存。 */
+export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayout {
+  const depth = new Map<string, number>([[definition.start, 0]]);
+  const queue = [definition.start];
+  const outgoing = new Map<string, string[]>();
+
+  for (const node of definition.nodes) {
+    for (const route of node.routes) {
+      outgoing.set(node.id, [...(outgoing.get(node.id) ?? []), route.target]);
+    }
+  }
+
+  while (queue.length) {
+    const current = queue.shift() as string;
+    const currentDepth = depth.get(current) ?? 0;
+    for (const target of outgoing.get(current) ?? []) {
+      if (depth.has(target)) continue;
+      depth.set(target, currentDepth + 1);
+      queue.push(target);
+    }
+  }
+
+  const levels = new Map<number, string[]>();
+  for (const node of definition.nodes) {
+    const level = depth.get(node.id) ?? 0;
+    levels.set(level, [...(levels.get(level) ?? []), node.id]);
+  }
+
+  const nodes: JourneyLayout['nodes'] = {};
+  for (const [level, ids] of levels) {
+    ids.forEach((id, index) => {
+      nodes[id] = {
+        x: level * 310,
+        y: (index - (ids.length - 1) / 2) * 175,
+      };
+    });
+  }
+
+  return { version: 1, nodes };
+}
+
+/** 序列化成可人工阅读、可重新 parse 的 Workflow Markdown。 */
+export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): string {
+  const definition = JourneyDefinitionSchema.parse(definitionInput);
+  const lines = [
+    '# Generated Investigation Workflow',
+    '',
+    '## @flow ' + definition.id,
+    '',
+    'start -> ' + definition.start,
+    '',
+  ];
+
+  for (const node of definition.nodes) {
+    lines.push('## @' + node.type + ' ' + node.id);
+    lines.push('title: ' + node.title);
+    if (node.objective) lines.push('objective: ' + node.objective);
+    lines.push('visible: ' + String(node.visible));
+    lines.push('completion: ' + node.completion);
+    if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
+    if (node.tools?.length) lines.push('tools: ' + node.tools.join(', '));
+    for (const route of node.routes) {
+      lines.push('- ' + route.outcome + ' -> ' + route.target);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n').trimEnd() + '\n';
+}
+
+function normalizeExecution(
+  definition: JourneyDefinition,
+  version: number,
+  execution: JourneyExecution | null,
+): JourneyExecution {
+  if (
+    !execution
+    || execution.workflowId !== definition.id
+    || execution.workflowVersion !== version
+    || !definition.nodes.some((node) => node.id === execution.currentNodeId)
+  ) {
+    return initialJourneyExecution(definition, version);
+  }
+
+  return {
+    ...execution,
+    workflowVersion: version,
+  };
+}
+
+async function loadCustomActive(
+  name: string,
+  workflowId: WorkflowId,
+): Promise<{ definition: JourneyDefinition; layout: JourneyLayout; version: number } | null> {
+  const markdown = await readTextOrNull(journeyFile(name, ACTIVE_FILE));
+  if (markdown === null) return null;
+
+  const meta = JourneyMetaSchema.safeParse(await readJson<unknown>(journeyFile(name, META_FILE)));
+  if (!meta.success || meta.data.baseWorkflowId !== workflowId) return null;
+
+  const parsed = parseJourneyMarkdown(markdown);
+  if (!parsed.definition || parsed.issues.length) {
+    throw new Error(
+      'Investigation 自定义 Workflow 无效：\n' + parsed.issues.join('\n'),
+    );
+  }
+  if (parsed.definition.id !== workflowId) {
+    throw new Error('自定义 Workflow id 必须与当前工作方式一致：' + workflowId);
+  }
+
+  const rawLayout = await readJson<unknown>(journeyFile(name, LAYOUT_FILE));
+  const parsedLayout = JourneyLayoutSchema.safeParse(rawLayout);
+
+  return {
+    definition: parsed.definition,
+    layout: parsedLayout.success
+      ? parsedLayout.data
+      : defaultJourneyLayout(parsed.definition),
+    version: meta.data.version,
+  };
+}
+
+/** Journey 的 deterministic facts 不发起模型调用，只读取已有 workspace 状态。 */
+async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
+  const context = await loadWorkspaceContext(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+
+  return {
+    goal: context.goal || context.userPrompt,
+    currentState: snapshot?.currentState
+      ? {
+          datasets: snapshot.currentState.coverage.datasets,
+          lineageCoverage: snapshot.currentState.coverage.datasetLineageCoverage,
+          semanticAssets: snapshot.currentState.coverage.semanticAssets,
+          parseFailures: snapshot.currentState.coverage.sqlParseFailures,
+        }
+      : null,
+    unknowns: context.unknowns,
+    highGapKinds: [],
+    targetComponentCount: 0,
+    mappingCount: 0,
+    blockingValidationReady: 0,
+    blockingValidationTotal: 0,
+  };
+}
+
+/** 当前 Investigation 的 active Workflow；没有 custom 时使用内置 Skill。 */
+export async function loadActiveJourney(
+  name: string,
+  workflowId: WorkflowId,
+): Promise<{
+  source: 'base' | 'custom';
+  baseWorkflowId: WorkflowId;
+  version: number;
+  definition: JourneyDefinition;
+  layout: JourneyLayout;
+}> {
+  const custom = await loadCustomActive(name, workflowId);
+  if (custom) {
+    return {
+      source: 'custom',
+      baseWorkflowId: workflowId,
+      version: custom.version,
+      definition: custom.definition,
+      layout: custom.layout,
+    };
+  }
+
+  const definition = await loadWorkflowJourney(workflowId);
+  return {
+    source: 'base',
+    baseWorkflowId: workflowId,
+    version: 0,
+    definition,
+    layout: defaultJourneyLayout(definition),
+  };
+}
+
+/** 读取和版本绑定的执行状态。 */
+export async function loadJourneyExecution(
+  name: string,
+  definition: JourneyDefinition,
+  version: number,
+): Promise<JourneyExecution> {
+  const raw = await readJson<unknown>(journeyFile(name, EXECUTION_FILE));
+  const parsed = z.object({
+    workflowId: z.string(),
+    workflowVersion: z.number().int().nonnegative(),
+    currentNodeId: z.string(),
+    completedNodeIds: z.array(z.string()),
+    status: z.enum(['active', 'completed', 'stopped']),
+  }).safeParse(raw);
+
+  return normalizeExecution(definition, version, parsed.success ? parsed.data : null);
+}
+
+/** 编辑器 / 右侧 Journey 共用的完整快照。 */
+export async function getJourneySnapshot(
+  name: string,
+  workflowId: WorkflowId,
+): Promise<JourneySnapshot> {
+  const active = await loadActiveJourney(name, workflowId);
+  const execution = await loadJourneyExecution(name, active.definition, active.version);
+  const facts = await buildJourneyFacts(name);
+  const state = buildJourneyState(active.definition, facts, execution);
+
+  const draftMarkdown = await readTextOrNull(journeyFile(name, DRAFT_FILE));
+  let draft: JourneySnapshot['draft'] = null;
+
+  if (draftMarkdown !== null) {
+    const parsed = parseJourneyMarkdown(draftMarkdown);
+    const rawLayout = await readJson<unknown>(journeyFile(name, DRAFT_LAYOUT_FILE));
+    const parsedLayout = JourneyLayoutSchema.safeParse(rawLayout);
+
+    if (parsed.definition) {
+      draft = {
+        definition: parsed.definition,
+        layout: parsedLayout.success
+          ? parsedLayout.data
+          : defaultJourneyLayout(parsed.definition),
+        issues: parsed.issues,
+      };
+    }
+  }
+
+  return {
+    workflowId,
+    source: active.source,
+    baseWorkflowId: active.baseWorkflowId,
+    version: active.version,
+    definition: active.definition,
+    layout: active.layout,
+    execution: state.execution,
+    state,
+    draft,
+  };
+}
+
+/** 保存草稿；即使图暂时无效，也允许保存后继续修改。 */
+export async function saveJourneyDraft(
+  name: string,
+  workflowId: WorkflowId,
+  definitionInput: JourneyDefinition,
+  layoutInput: JourneyLayout,
+): Promise<{ issues: string[] }> {
+  const definition = JourneyDefinitionSchema.parse(definitionInput);
+  const layout = JourneyLayoutSchema.parse(layoutInput);
+  if (definition.id !== workflowId) throw new Error('Workflow id 不能修改为另一个工作方式。');
+
+  const issues = validateJourneyDefinition(definition);
+  await ensureWorkspace(name);
+  await fs.mkdir(journeyDir(name), { recursive: true });
+  await fs.writeFile(
+    journeyFile(name, DRAFT_FILE),
+    serializeJourneyMarkdown(definition),
+    'utf8',
+  );
+  await writeJsonAtomic(journeyFile(name, DRAFT_LAYOUT_FILE), layout);
+
+  return { issues };
+}
+
+/** 图验证入口；同时检查每个节点是否有画布位置。 */
+export function validateJourneyEdit(
+  definitionInput: JourneyDefinition,
+  layoutInput: JourneyLayout,
+): { issues: string[] } {
+  const definition = JourneyDefinitionSchema.parse(definitionInput);
+  const layout = JourneyLayoutSchema.parse(layoutInput);
+  const issues = validateJourneyDefinition(definition);
+
+  for (const node of definition.nodes) {
+    if (!layout.nodes[node.id]) issues.push('节点缺少画布位置：' + node.id);
+  }
+
+  return { issues: [...new Set(issues)] };
+}
+
+/** 正式应用一个 Workflow 版本；应用时重新验证，不能绕过 UI 校验。 */
+export async function applyJourneyDefinition(
+  name: string,
+  workflowId: WorkflowId,
+  definitionInput: JourneyDefinition,
+  layoutInput: JourneyLayout,
+): Promise<{ version: number; snapshot: JourneySnapshot }> {
+  const definition = JourneyDefinitionSchema.parse(definitionInput);
+  const layout = JourneyLayoutSchema.parse(layoutInput);
+
+  if (definition.id !== workflowId) {
+    throw new Error('Workflow id 不能修改为另一个工作方式。');
+  }
+
+  const validation = validateJourneyEdit(definition, layout);
+  if (validation.issues.length) {
+    throw new Error('Workflow 验证失败：\n' + validation.issues.join('\n'));
+  }
+
+  const version = await withWorkspaceContextLock(name, async () => {
+    await ensureWorkspace(name);
+    const active = await loadActiveJourney(name, workflowId);
+    const nextVersion = active.source === 'custom' ? active.version + 1 : 1;
+
+    await fs.mkdir(journeyDir(name), { recursive: true });
+    await fs.writeFile(
+      journeyFile(name, ACTIVE_FILE),
+      serializeJourneyMarkdown(definition),
+      'utf8',
+    );
+    await writeJsonAtomic(journeyFile(name, META_FILE), {
+      schemaVersion: 1,
+      baseWorkflowId: workflowId,
+      version: nextVersion,
+    } satisfies JourneyMeta);
+    await writeJsonAtomic(journeyFile(name, LAYOUT_FILE), layout);
+    await fs.rm(journeyFile(name, DRAFT_FILE), { force: true });
+    await fs.rm(journeyFile(name, DRAFT_LAYOUT_FILE), { force: true });
+    await writeJsonAtomic(
+      journeyFile(name, EXECUTION_FILE),
+      initialJourneyExecution(definition, nextVersion),
+    );
+
+    const current = await loadWorkspaceContext(name);
+    const nextContext = { ...current };
+    delete nextContext.copilotSessionId;
+    delete nextContext.copilotConfigurationVersion;
+    await writeJsonAtomic(
+      path.join(workspaceRoot(name), 'context.json'),
+      {
+        ...nextContext,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+
+    return nextVersion;
+  });
+
+  await appendAuditEvent(name, {
+    actor: 'user',
+    action: 'workflow.applied',
+    summary: 'Applied a validated Investigation Workflow version.',
+    details: {
+      workflowId,
+      version,
+      nodeCount: definition.nodes.length,
+      edgeCount: definition.nodes.reduce((sum, node) => sum + node.routes.length, 0),
+    },
+  });
+
+  return {
+    version,
+    snapshot: await getJourneySnapshot(name, workflowId),
+  };
+}
+
+/** 删除 Investigation 自定义 Workflow，恢复内置 Skill，并重新开始执行。 */
+export async function resetJourneyCustomization(
+  name: string,
+  workflowId: WorkflowId,
+): Promise<JourneySnapshot> {
+  await withWorkspaceContextLock(name, async () => {
+    await fs.rm(journeyDir(name), { recursive: true, force: true });
+    const current = await loadWorkspaceContext(name);
+    const nextContext = { ...current };
+    delete nextContext.copilotSessionId;
+    delete nextContext.copilotConfigurationVersion;
+    await writeJsonAtomic(
+      path.join(workspaceRoot(name), 'context.json'),
+      {
+        ...nextContext,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+  });
+
+  await appendAuditEvent(name, {
+    actor: 'user',
+    action: 'workflow.reset',
+    summary: 'Reset Investigation Workflow to the built-in Skill definition.',
+    details: { workflowId },
+  });
+
+  return getJourneySnapshot(name, workflowId);
+}
+
+/** 从 Agent 严格 JSON 中提取 workflow transition。 */
+function extractWorkflowTransition(
+  raw: string,
+): { nodeId: string; outcome: string } | null {
+  let data: unknown;
+
+  try {
+    const fenced = raw.match(new RegExp('\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\x60{3}'));
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    const jsonText = fenced?.[1]?.trim()
+      ?? (start >= 0 && end > start ? raw.slice(start, end + 1) : raw);
+    data = JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+
+  const workflow = data && typeof data === 'object'
+    ? (data as Record<string, unknown>).workflow
+    : null;
+
+  if (!workflow || typeof workflow !== 'object') return null;
+
+  const nodeId = (workflow as Record<string, unknown>).nodeId;
+  const outcome = (workflow as Record<string, unknown>).outcome;
+  return typeof nodeId === 'string' && typeof outcome === 'string' && Boolean(nodeId) && Boolean(outcome)
+    ? { nodeId, outcome }
+    : null;
+}
+
+/** 将 Agent 返回的合法 outcome 写入 durable Workflow execution。 */
+export async function applyAgentWorkflowTransition(
+  name: string,
+  workflowId: WorkflowId | null,
+  rawAnswer: string,
+): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
+  if (!workflowId) return { applied: false };
+
+  const transition = extractWorkflowTransition(rawAnswer);
+  if (!transition) return { applied: false };
+
+  try {
+    const active = await loadActiveJourney(name, workflowId);
+    const execution = await loadJourneyExecution(
+      name,
+      active.definition,
+      active.version,
+    );
+    const next = applyJourneyTransition(
+      active.definition,
+      execution,
+      transition.nodeId,
+      transition.outcome,
+    );
+
+    await withWorkspaceContextLock(name, async () => {
+      const latest = await loadJourneyExecution(
+        name,
+        active.definition,
+        active.version,
+      );
+
+      if (
+        latest.currentNodeId !== execution.currentNodeId
+        || latest.workflowVersion !== execution.workflowVersion
+      ) {
+        throw new Error('Workflow 在 Agent 执行期间发生变化，本次 transition 不再适用。');
+      }
+
+      await fs.mkdir(journeyDir(name), { recursive: true });
+      await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
+    });
+
+    await appendAuditEvent(name, {
+      actor: 'system',
+      action: 'workflow.transition',
+      summary: 'Applied Agent-selected Workflow outcome.',
+      details: {
+        workflowId,
+        workflowVersion: active.version,
+        nodeId: transition.nodeId,
+        outcome: transition.outcome,
+        target: next.currentNodeId,
+      },
+    });
+
+    return { applied: true, execution: next };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    await appendAuditEvent(name, {
+      actor: 'system',
+      action: 'workflow.transition.rejected',
+      summary: 'Rejected invalid Agent Workflow outcome.',
+      details: {
+        workflowId,
+        nodeId: transition.nodeId,
+        outcome: transition.outcome,
+        error: message,
+      },
+    });
+
+    return { applied: false, error: message };
+  }
+}
+
+/** 给 Agent 的低 token Workflow 控制说明，只注入当前节点及其合法出口。 */
+export async function buildJourneyAgentInstruction(
+  name: string,
+  workflowId: WorkflowId | null,
+): Promise<string> {
+  if (!workflowId) return '';
+
+  const snapshot = await getJourneySnapshot(name, workflowId);
+  const current = describeJourneyCurrentNode(
+    snapshot.definition,
+    snapshot.execution,
+  );
+
+  const completionLine = current.completeWhen
+    ? '；completeWhen=' + current.completeWhen
+    : '';
+
+  const outcomes = current.outcomes.length
+    ? '允许的出口：\n'
+      + current.outcomes
+        .map((item) => '- ' + item.outcome + ' -> ' + item.target)
+        .join('\n')
+    : '当前节点没有可用出口；请不要自行推进 Workflow。';
+
+  return [
+    '## Active Workflow Control',
+    '当前 Investigation 有一条真正会影响执行位置的 Workflow，不是仅供参考的路线图。',
+    'Workflow 节点和出口由服务端校验；Agent 不能自行发明 nodeId 或 outcome。',
+    '',
+    '当前节点：' + current.nodeId + '（' + current.title + '）',
+    '节点类型：' + current.type,
+    '节点目标：' + current.objective,
+    '完成方式：' + current.completion + completionLine,
+    '',
+    outcomes,
+    '',
+    '当这一轮已经完成当前节点并有足够依据选择出口时，在最终 JSON 中额外返回：',
+    '{"workflow":{"nodeId":"当前节点 ID","outcome":"允许的 outcome"}}',
+    '如果这轮没有完成当前节点，或者不能可靠判断出口，不要返回 workflow 字段，不要猜。',
+    '需要用户补充信息时，使用当前节点真正存在的 needs-input 等 outcome。',
+  ].join('\n');
+}
+
+/** 返回当前 Workflow 的状态。 */
+export async function getJourneyState(
+  name: string,
+  workflowId: WorkflowId,
+): Promise<JourneyState> {
+  const snapshot = await getJourneySnapshot(name, workflowId);
+  return snapshot.state;
+}
