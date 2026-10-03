@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Flex, Segmented, Tag, Typography } from 'antd';
 import { RobotOutlined, UserOutlined } from '@ant-design/icons';
-import { Bubble, Sender } from '@ant-design/x';
+import { Bubble, Sender, type BubbleListProps } from '@ant-design/x';
 
 import type { WorkflowDefinition } from './journey-map-types.js';
 
@@ -46,6 +46,11 @@ export function JourneyMapAiChat({
     () => messages.slice(-12),
     [messages],
   );
+
+  const role: BubbleListProps['role'] = {
+    assistant: { placement: 'start' },
+    user: { placement: 'end' },
+  };
 
   const submit = async (nextValue: string) => {
     const prompt = nextValue.trim();
@@ -111,10 +116,10 @@ export function JourneyMapAiChat({
 
       <div className="journey-map-ai-chat-body">
         <Bubble.List
+          role={role}
           items={visibleMessages.map((item) => ({
             key: item.id,
             role: item.role,
-            placement: item.role === 'user' ? 'end' : 'start',
             content: item.content,
             avatar:
               item.role === 'user'
