@@ -29,7 +29,7 @@ describe('Modernization workbench', () => {
           key: 'position',
           candidateDatasetIds: ['dataset:position'],
           candidateDatasets: ['position'],
-          score: 2,
+          priorityScore: 2,
           reasons: ['downstream usage'],
           evidenceIds: ['ev-1'],
         }],
