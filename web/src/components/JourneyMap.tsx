@@ -268,12 +268,9 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
             nodeTypes={{ journey: JourneyFlowNode }}
             edgeTypes={{ [EDGE_TYPE]: JourneyFlowEdge }}
             onInit={(instance) => {
+              // 只保存实例，不在 React Flow 尚未完成测量时 fitView。
+              // 真正的 viewport 对齐统一交给下方 ResizeObserver + nodesInitialized 逻辑。
               flowInstanceRef.current = instance;
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  if (nodes.length) instance.fitView({ padding: 0.14, minZoom: 0.2, maxZoom: 1.4, duration: 0 });
-                });
-              });
             }}
             nodesDraggable
             nodesConnectable
