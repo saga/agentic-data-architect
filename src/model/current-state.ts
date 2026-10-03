@@ -13,7 +13,8 @@ export interface CurrentStateCoverage {
   sqlParseFailures: number;
   datasets: number;
   connectedDatasets: number;
-  datasetLineageCoverage: number | null;
+  /** 出现在已发现血缘连接中的数据集占比；只是连接度指标，不代表业务事实或调查完成度。 */
+  datasetLineageConnectionRate: number | null;
   columnLineageEdges: number;
   semanticAssets: number;
   profiledDatasets: number;
@@ -23,7 +24,8 @@ export interface SourceOfTruthCandidate {
   key: string;
   candidateDatasetIds: string[];
   candidateDatasets: string[];
-  score: number;
+  /** 仅表示“优先调查顺序”的 heuristic 分数，不是 source-of-truth 置信度。 */
+  priorityScore: number;
   reasons: string[];
   evidenceIds: string[];
 }
