@@ -108,16 +108,24 @@ export async function generateJourneyFlow(
   mode: 'generate' | 'modify',
   prompt: string,
   history: JourneyAiConversationMessage[] = [],
+  baseDefinition?: JourneyDefinition,
 ): Promise<{ definition: JourneyDefinition; message: string }> {
   const snapshot = await getJourneySnapshot(name, workflowId);
   const context = await loadWorkspaceContext(name);
+  const currentDefinition = baseDefinition
+    ? JourneyDefinitionSchema.parse(baseDefinition)
+    : snapshot.definition;
+
+  if (currentDefinition.id !== workflowId) {
+    throw new Error('AI 使用的工作地图与当前工作方式不一致，请刷新后重试。');
+  }
 
   const raw = await askCopilot({
     prompt: buildPrompt(
       mode,
       prompt,
       context.goal || context.userPrompt,
-      snapshot.definition,
+      currentDefinition,
       history,
     ),
     systemPrompt: buildSystemPrompt(workflowId),
