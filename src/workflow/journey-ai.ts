@@ -34,6 +34,34 @@ export interface JourneyAiConversationMessage {
   content: string;
 }
 
+/**
+ * 工作地图 AI 只需要最近的少量上下文。
+ * 限制总字符数，避免长时间多轮对话把 Workflow Definition 之外的历史撑得过大。
+ */
+const MAX_HISTORY_CHARS = 18000;
+const MAX_HISTORY_MESSAGE_CHARS = 3000;
+
+function limitConversationHistory(
+  history: JourneyAiConversationMessage[],
+): JourneyAiConversationMessage[] {
+  const result: JourneyAiConversationMessage[] = [];
+  let total = 0;
+
+  for (const item of history.slice(-12).reverse()) {
+    const content = item.content.trim();
+    if (!content) continue;
+
+    const remaining = MAX_HISTORY_CHARS - total;
+    if (remaining <= 0) break;
+
+    const limited = content.slice(0, Math.min(MAX_HISTORY_MESSAGE_CHARS, remaining));
+    result.unshift({ role: item.role, content: limited });
+    total += limited.length;
+  }
+
+  return result;
+}
+
 function extractJson(raw: string): unknown {
   const fenced = raw.match(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/);
   const text = fenced?.[1]?.trim() ?? raw.trim();
@@ -114,15 +142,18 @@ function buildPrompt(
     '当前工作地图 JSON：',
     JSON.stringify(current, null, 2),
     '',
-    ...(history.length
-      ? [
-          '之前的工作地图 AI 对话（这些内容只是上下文，当前画布才是真实状态）：',
-          ...history.slice(-12).map((item) => (
-            (item.role === 'user' ? '用户：' : 'AI：') + item.content
-          )),
-          '',
-        ]
-      : []),
+    ...(() => {
+      const limitedHistory = limitConversationHistory(history);
+      return limitedHistory.length
+        ? [
+            '之前的工作地图 AI 对话（这些内容只是上下文，当前画布才是真实状态）：',
+            ...limitedHistory.map((item) => (
+              (item.role === 'user' ? '用户：' : 'AI：') + item.content
+            )),
+            '',
+          ]
+        : [];
+    })(),
     '请只返回严格 JSON。',
   ].join('\n');
 }
