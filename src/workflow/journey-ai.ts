@@ -1,0 +1,130 @@
+/**
+ * 工作地图 AI。
+ *
+ * 这是独立的“工作地图设计助手”，只负责根据目标生成或修改 Workflow Definition。
+ * 它不参与数据分析，也不读取 Dataset Registry、Evidence 或普通调查对话。
+ */
+import * as z from 'zod';
+import { askCopilot } from '../agent/copilot.js';
+import { loadWorkspaceContext, workspaceRoot } from '../investigation/workspace.js';
+import type { WorkflowId } from '../investigation/schemas.js';
+import {
+  JourneyDefinitionSchema,
+  validateJourneyDefinition,
+  type JourneyDefinition,
+} from './journey.js';
+import { getJourneySnapshot } from './journey-editor.js';
+
+const JourneyAiOutputSchema = z.object({
+  message: z.string().trim().optional(),
+  definition: JourneyDefinitionSchema,
+}).strict();
+
+function extractJson(raw: string): unknown {
+  const fenced = raw.match(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/);
+  const text = fenced?.[1]?.trim() ?? raw.trim();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new Error('AI 没有返回可识别的工作地图。');
+    return JSON.parse(text.slice(start, end + 1));
+  }
+}
+
+function buildSystemPrompt(workflowId: WorkflowId): string {
+  return [
+    '你是“工作地图 AI 助手”。你的唯一工作是设计和修改一张可执行的业务 Workflow 图。',
+    '不要分析数据，不要做数据血缘、SQL、业务数据查询，也不要回答普通调查问题。',
+    '你的输出必须是严格 JSON，不要输出 Markdown、解释文字或代码围栏。',
+    '',
+    'JSON 格式：',
+    '{"message":"用一句到两句话说明你改了什么","definition":{...}}',
+    '',
+    'definition 必须符合当前 Workflow 的结构：',
+    '- id 必须等于 "' + workflowId + '"；',
+    '- start 必须指向 nodes 中存在的节点；',
+    '- node.type 只能是 task、gate、review、end、stop；',
+    '- 非终点节点至少有一条 routes；终点不能有 routes；',
+    '- routes.target 必须指向存在的节点；',
+    '- 同一个节点的 outcome 不能重复；',
+    '- 每个节点都必须从 start 可到达，并最终能到达 end 或 stop；',
+    '- deterministic 节点必须有合法 completeWhen；',
+    '- visible、completion、objective 等字段要完整填写。',
+    '',
+    '修改已有地图时：',
+    '- 尽量保留已有节点 ID，只有确实需要时才新增或删除；',
+    '- 不要为了重排版修改没有必要修改的业务语义；',
+    '- 优先做小而明确的结构修改，保持路线容易理解。',
+    '',
+    '当前工作方式：' + workflowId,
+  ].join('\n');
+}
+
+function buildPrompt(
+  mode: 'generate' | 'modify',
+  userPrompt: string,
+  goal: string,
+  current: JourneyDefinition,
+): string {
+  return [
+    mode === 'generate' ? '请重新设计当前工作地图。' : '请修改当前工作地图。',
+    '用户要求：',
+    userPrompt.trim(),
+    '',
+    '这次 Investigation 的目标：',
+    goal.trim() || '未填写目标，请根据当前工作地图保持合理结构。',
+    '',
+    '当前工作地图 JSON：',
+    JSON.stringify(current, null, 2),
+    '',
+    '请只返回严格 JSON。',
+  ].join('\n');
+}
+
+export async function generateJourneyFlow(
+  name: string,
+  workflowId: WorkflowId,
+  mode: 'generate' | 'modify',
+  prompt: string,
+): Promise<{ definition: JourneyDefinition; message: string }> {
+  const snapshot = await getJourneySnapshot(name, workflowId);
+  const context = await loadWorkspaceContext(name);
+
+  const raw = await askCopilot({
+    prompt: buildPrompt(
+      mode,
+      prompt,
+      context.goal || context.userPrompt,
+      snapshot.definition,
+    ),
+    systemPrompt: buildSystemPrompt(workflowId),
+    purpose: 'journey-map',
+    workingDirectory: workspaceRoot(name),
+  });
+
+  let parsed: z.infer<typeof JourneyAiOutputSchema>;
+  try {
+    parsed = JourneyAiOutputSchema.parse(extractJson(raw));
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : 'AI 返回的工作地图格式不正确，请重试。',
+    );
+  }
+
+  if (parsed.definition.id !== workflowId) {
+    throw new Error('AI 返回的工作地图与当前工作方式不一致，请重试。');
+  }
+
+  const issues = validateJourneyDefinition(parsed.definition);
+  if (issues.length) {
+    throw new Error('AI 生成的工作地图还不能使用：\n' + issues.join('\n'));
+  }
+
+  return {
+    definition: parsed.definition,
+    message: parsed.message?.trim() || 'AI 已生成一版工作地图，请检查后保存。',
+  };
+}
