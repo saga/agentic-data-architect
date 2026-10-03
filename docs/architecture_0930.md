@@ -1979,8 +1979,9 @@ Copilot SDK default agent
       ├── platform system rules
       ├── research configuration
       ├── investigation-specific guidance
-      ├── selected Skills
-      └── configured MCP / explicit built-in tools
+      ├── capability Skills（Copilot 按任务自动发现）
+      ├── current Workflow Skill（用户选择后预加载）
+      └── Copilot 内置 MCP + 用户配置的额外 MCP
 ```
 
 ## Agent
