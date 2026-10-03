@@ -504,16 +504,16 @@ function AgentRecommendationCard(props: {
 }
 function AppInner() {
   const routeInfo = () => {
-    const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory))?\/?$/);
+    const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory|journey))?\/?$/);
     return match
-      ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' }
+      ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' | 'journey' }
       : undefined;
   };
 
   const routeSession = () => routeInfo()?.session;
-  const [page, setPage] = useState<'chat' | 'config' | 'trajectory'>(() => routeInfo()?.page ?? 'chat');
+  const [page, setPage] = useState<'chat' | 'config' | 'trajectory' | 'journey'>(() => routeInfo()?.page ?? 'chat');
 
-  const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory') => {
+  const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory' | 'journey') => {
     if (!active) return;
     const suffix = nextPage === 'chat' ? '' : '/' + nextPage;
     const nextPath = '/investigations/' + encodeURIComponent(active) + suffix;
@@ -557,8 +557,6 @@ function AppInner() {
   const [modernizationPlan, setModernizationPlan] = useState<ModernizationPlan>();
   const [assessmentPlan, setAssessmentPlan] = useState<ArchitectureAssessmentPlan>();
   const [journey, setJourney] = useState<ModernizationPlan['journey']>();
-  /** 工作地图全屏视图是否打开。*/
-  const [journeyMapOpen, setJourneyMapOpen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -1086,6 +1084,13 @@ function AppInner() {
       </div>
     );
   }
+  if (page === 'journey') {
+    return (
+      <div className="subpage-app journey-map-subpage">
+        <JourneyMap onBack={() => navigatePage('chat')} />
+      </div>
+    );
+  }
 
   return (
     <Layout className={`app-shell${resizing ? ' is-resizing' : ''}`}>
@@ -1199,7 +1204,7 @@ function AppInner() {
                 loading={loading}
                 active={Boolean(active)}
                 onChooseRoute={chooseRoute}
-                onOpenMap={() => setJourneyMapOpen(true)}
+                onOpenMap={() => navigatePage('journey')}
                 onUseDefault={() => void send('请先帮我快速建立当前问题需要的事实基础，再根据查到的证据决定下一步；不要假定必须按照固定顺序执行。')}
               />
             ) : null}
@@ -1363,7 +1368,7 @@ function AppInner() {
                       size="small"
                       icon={<FullscreenOutlined />}
                       disabled={loading}
-                      onClick={() => setJourneyMapOpen(true)}
+                      onClick={() => navigatePage('journey')}
                     >
                       展开地图
                     </Button>
@@ -1428,44 +1433,6 @@ function AppInner() {
       </Layout>
 
                   <Modal
-        className="journey-map-modal"
-        title={
-          <Flex align="center" gap={8}>
-            <span>工作地图</span>
-            {current?.context.workflow ? <Tag bordered={false}>地图骨架：{workflowOptions.find((item) => item.value === current.context.workflow)?.label}</Tag> : <Tag bordered={false}>自主调查</Tag>}
-          </Flex>
-        }
-        open={journeyMapOpen}
-        width="100%"
-        centered
-        destroyOnHidden
-        styles={{
-          container: { padding: 0, overflow: 'hidden' },
-          header: { margin: 0, padding: '14px 18px' },
-          body: { height: 'calc(100vh - 150px)', minHeight: 520 },
-        }}
-        onCancel={() => setJourneyMapOpen(false)}
-        footer={null}
-      >
-        <JourneyMap
-          journey={journey ?? modernizationPlan?.journey ?? assessmentPlan?.journey}
-          routes={current?.context.journeyPlan?.routes ?? []}
-          loading={loading}
-          onChooseRoute={chooseRoute}
-          onAskStage={(stage) => {
-            void send(
-              [
-                `请继续推进工作地图中的“${stage.title}”。`,
-                `当前阶段目标：${stage.objective}`,
-                '',
-                '请直接判断最有价值的下一步；能自动检索、检查或分析的就直接执行。',
-                '完成后更新相关 Evidence / Unknown，并告诉我这一步查清了什么，以及下一步怎么走。',
-              ].join('\n'),
-            );
-          }}
-        />
-      </Modal>
-      <Modal
         className="modernization-modal"
         title={current?.context.workflow === 'data-architecture-assessment' ? '架构评估结果' : '完整改造方案'}
         open={modernizationOpen}
