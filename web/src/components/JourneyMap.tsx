@@ -636,7 +636,7 @@ function normalizeConnection(
   ]?.id;
 
   return {
-    id: connection.source + ':' + outcome + ':' + connection.target + ':' + String(Date.now()),
+    id: connection.source + ':' + outcome + ':' + connection.target + ':' + String(outgoing.length),
     source: connection.source,
     target: connection.target,
     ...(sourceHandle ? { sourceHandle } : {}),
@@ -935,6 +935,19 @@ export function JourneyMap({
           data: { outcome },
         },
       ];
+
+      // 如果原节点已经有明确的主 success 目标，新的分支先接回该目标。
+      // 用户之后可以在边属性中改 outcome/target，而不是面对一个悬空节点。
+      if (branch && oldSuccess) {
+        nextEdges.push({
+          id: id + ':success:' + oldSuccess.target,
+          source: id,
+          target: oldSuccess.target,
+          type: EDGE_TYPE,
+          markerEnd: { type: MarkerType.ArrowClosed },
+          data: { outcome: 'success' },
+        });
+      }
     }
 
     pushHistory();
@@ -1096,10 +1109,13 @@ export function JourneyMap({
     setSelectedEdgeId(oldEdge.id);
   };
 
-  const applyNodeDraft = () => {
+  const applyNodeDraft = async () => {
     if (!selectedNode || !nodeDraft) return;
+
     pushHistory();
-    setNodes((items) => items.map((node) => (
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    const nextNodes = currentNodes.map((node) => (
       node.id === selectedNode.id
         ? {
             ...node,
@@ -1110,11 +1126,32 @@ export function JourneyMap({
               nodeType: (nodeDraft.type as WorkflowNodeType) || node.data.nodeType,
               visible: nodeDraft.visible !== false,
               completion: (nodeDraft.completion as CompletionMode) || node.data.completion,
-              completeWhen: nodeDraft.completeWhen ? String(nodeDraft.completeWhen).trim() : undefined,
+              completeWhen: nodeDraft.completeWhen
+                ? String(nodeDraft.completeWhen).trim()
+                : undefined,
             },
           }
         : node
-    )));
+    ));
+
+    const currentSnapshot = snapshotRef.current;
+    if (!currentSnapshot) return;
+    const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
+    const definition = definitionFromGraph(nextNodes, currentEdges, base);
+    const graph = graphFromDefinition(
+      definition,
+      layoutFromNodes(nextNodes),
+      currentSnapshot,
+      true,
+      setSelectedNodeId,
+      (id) => { void addNodeAfter(id, false); },
+      (id) => { void addNodeAfter(id, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      newNodeIdsRef.current,
+    );
+    setNodes(await layoutWithElk(graph.nodes, graph.edges));
+    setEdges(graph.edges);
     setValidationIssues([]);
   };
 
@@ -1154,45 +1191,35 @@ export function JourneyMap({
     setEdges(next.edges);
   };
 
-  const autoLayout = () => {
+  const autoLayout = async () => {
     if (!currentDefinition) return;
 
-    const depth = new Map<string, number>([[currentDefinition.start, 0]]);
-    const queue = [currentDefinition.start];
-    const levels = new Map<number, string[]>();
-
-    while (queue.length) {
-      const current = queue.shift() as string;
-      const node = currentDefinition.nodes.find((item) => item.id === current);
-      if (!node) continue;
-      const level = depth.get(current) ?? 0;
-      levels.set(level, [...(levels.get(level) ?? []), current]);
-      for (const route of node.routes) {
-        if (!depth.has(route.target)) {
-          depth.set(route.target, level + 1);
-          queue.push(route.target);
-        }
-      }
-    }
-
     pushHistory();
-    setNodes((items) => items.map((node) => {
-      const level = depth.get(node.id) ?? 0;
-      const siblings = levels.get(level) ?? [node.id];
-      const index = siblings.indexOf(node.id);
-      return {
-        ...node,
-        position: {
-          x: level * 310,
-          y: (index - (siblings.length - 1) / 2) * 175,
-        },
-      };
-    }));
+    const graph = graphFromDefinition(
+      currentDefinition,
+      layoutFromNodes(nodesRef.current),
+      snapshotRef.current ?? snapshot!,
+      true,
+      setSelectedNodeId,
+      (id) => { void addNodeAfter(id, false); },
+      (id) => { void addNodeAfter(id, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      newNodeIdsRef.current,
+    );
+    const laidOutNodes = await layoutWithElk(graph.nodes, graph.edges);
+    setNodes(laidOutNodes);
+    setValidationIssues([]);
+
+    requestAnimationFrame(() => {
+      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
+    });
   };
 
   useEffect(() => {
     if (!editing || !snapshot) return;
 
+    let cancelled = false;
     const sourceDefinition = usingDraft && snapshot.draft
       ? snapshot.draft.definition
       : snapshot.definition;
@@ -1200,24 +1227,47 @@ export function JourneyMap({
       ? snapshot.draft.layout
       : snapshot.layout;
 
-    const graph = graphFromDefinition(
-      sourceDefinition,
-      sourceLayout,
-      snapshot,
-      true,
-      setSelectedNodeId,
-      (id) => addNodeAfter(id, false),
-      (id) => addNodeAfter(id, true),
-      deleteNode,
-      setSelectedEdgeId,
-    );
+    const initializeGraph = async () => {
+      const graph = graphFromDefinition(
+        sourceDefinition,
+        sourceLayout,
+        snapshot,
+        true,
+        setSelectedNodeId,
+        (id) => { void addNodeAfter(id, false); },
+        (id) => { void addNodeAfter(id, true); },
+        deleteNode,
+        setSelectedEdgeId,
+        newNodeIdsRef.current,
+      );
 
-    setNodes(graph.nodes);
-    setEdges(graph.edges);
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setPast([]);
-    setFuture([]);
+      const layoutedNodes = sourceLayout.engine === 'elk'
+        ? graph.nodes
+        : await layoutWithElk(graph.nodes, graph.edges);
+
+      if (cancelled) return;
+
+      setNodes(layoutedNodes);
+      setEdges(graph.edges);
+      setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
+      setPast([]);
+      setFuture([]);
+
+      requestAnimationFrame(() => {
+        flowInstanceRef.current?.fitView({
+          padding: 0.18,
+          minZoom: 0.45,
+          maxZoom: 1.1,
+        });
+      });
+    };
+
+    void initializeGraph();
+
+    return () => {
+      cancelled = true;
+    };
   }, [editing, usingDraft, snapshot]);
 
   const definitionPayload = currentDefinition;
