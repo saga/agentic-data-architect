@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react';
-import { Flex, Segmented, Tag, Typography } from 'antd';
+import { Button, Flex, Segmented, Tag, Typography } from 'antd';
 import { RobotOutlined, UserOutlined } from '@ant-design/icons';
 import { Bubble, Sender, type BubbleListProps } from '@ant-design/x';
 
-import type { WorkflowDefinition } from './journey-map-types.js';
+import type { WorkflowChange, WorkflowDefinition } from './journey-map-types.js';
 
 export interface JourneyMapAiChatProps {
   currentDefinition?: WorkflowDefinition;
+  selectedNodeId?: string;
+  pendingAiChange?: { message: string; changes: WorkflowChange[] };
   aiEditFlow: (
     mode: 'generate' | 'modify',
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-  ) => Promise<{ message: string } | undefined>;
+    scope?: 'workflow' | 'selection',
+  ) => Promise<{ message: string; changes: WorkflowChange[] } | undefined>;
+  applyAiChanges: () => Promise<void>;
+  discardAiChanges: () => void;
 }
 
 /**
@@ -24,9 +29,16 @@ export interface JourneyMapAiChatProps {
  */
 export function JourneyMapAiChat({
   currentDefinition,
+  selectedNodeId,
+  pendingAiChange,
   aiEditFlow,
+  applyAiChanges,
+  discardAiChanges,
 }: JourneyMapAiChatProps) {
   const [mode, setMode] = useState<'modify' | 'generate'>('modify');
+  const [scope, setScope] = useState<'workflow' | 'selection'>(
+    selectedNodeId ? 'selection' : 'workflow',
+  );
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Array<{
