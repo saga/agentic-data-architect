@@ -987,8 +987,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     if (!pendingFitRef.current || !nodesInitialized || !nodes.length) return;
     pendingFitRef.current = false;
     flowInstanceRef.current?.fitView({
-      padding: 0.18,
-      minZoom: 0.45,
+      padding: 0.1,
+      minZoom: 0.2,
       maxZoom: 1.1,
     });
   }, [nodes, nodesInitialized]);
