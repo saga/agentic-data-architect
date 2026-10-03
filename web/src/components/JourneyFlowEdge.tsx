@@ -45,6 +45,19 @@ export function JourneyFlowEdge({
   const sourceTitle = (sourceNode?.data as FlowNodeData | undefined)?.title ?? source;
   const targetTitle = (targetNode?.data as FlowNodeData | undefined)?.title ?? target;
 
+  // 回退/重试等边通常会绕很远，React Flow 给出的路径中心点也会落在大片空白处。
+  // 这种边的标签贴近起点第一段横线，避免出现截图里的“游离标签”。
+  const outcome = String(data?.outcome ?? '').trim().toLowerCase();
+  const backwardRoute =
+    /(^|[-_\s])(retry|return|rollback|back|previous|prev|reopen|again)([-_\s]|$)/.test(outcome)
+    || /(重试|退回|回退|返回|回滚|重新)/.test(outcome);
+  const displayLabelX = backwardRoute
+    ? sourceX + Math.min(96, Math.max(48, Math.abs(targetX - sourceX) / 3))
+    : labelX;
+  const displayLabelY = backwardRoute
+    ? sourceY + Number(data?.labelOffsetY ?? 0)
+    : labelY + Number(data?.labelOffsetY ?? 0);
+
   return (
     <>
       <BaseEdge
@@ -67,9 +80,9 @@ export function JourneyFlowEdge({
           style={{
             transform:
               'translate(-50%, -50%) translate('
-              + labelX
+              + displayLabelX
               + 'px,'
-              + (labelY + Number(data?.labelOffsetY ?? 0))
+              + displayLabelY
               + 'px)',
             pointerEvents: data?.onSelect ? 'all' : 'none',
           }}
