@@ -19,8 +19,6 @@ const baseFacts: JourneyFacts = {
   mappingCount: 0,
   blockingValidationReady: 0,
   blockingValidationTotal: 0,
-  cutoverCriteriaDefined: false,
-  rollbackCriteriaDefined: false,
 };
 
 test('parses workflow branches and completion mode', () => {
