@@ -1596,11 +1596,19 @@ body {
 }
 
 
-/* 独立子页面：配置和 Agent 轨迹 */
+/* 独立子页面：配置和 Agent 轨迹。
+   #root 是 height:100% + overflow:hidden；antd <App> 又插了一层 div.ant-app，
+   所以两层都要占满高度，子页面自己负责滚动。
+   只写 min-height:100vh 的话内容会被 #root 直接裁掉，滚不动。 */
+#root > .ant-app {
+  height: 100%;
+}
+
 .subpage-app {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--workspace-bg, #f7f8fa);
-  overflow: auto;
 }
 
 .subpage-header {
@@ -1678,6 +1686,21 @@ body {
 
 .config-page-content .settings-card {
   margin-bottom: 16px;
+}
+
+/* 技能卡片：标题和正文上下排列（弹窗里的 .selected-skill 是横向列表项，别复用）。 */
+.config-page-content .skill-card {
+  border-radius: 10px;
+}
+
+.config-page-content .skill-card .ant-card-head {
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.config-page-content .skill-card .ant-card-body {
+  padding: 14px 16px 16px;
 }
 
 .config-page-content .settings-card > .ant-card-body {

@@ -379,21 +379,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (typeof e.data.outputTokens === 'number') event.outputTokens = e.data.outputTokens;
     if (typeof e.data.cost === 'number') event.premiumRequestCost = e.data.cost;
     if (typeof e.data.duration === 'number') event.durationMs = e.data.duration;
-    const usageData = e.data as Record<string, unknown>;
-    const promptDetails = usageData.inputTokensDetails;
-    const outputDetails = usageData.outputTokensDetails;
-    const cachedInputTokens =
-      readNumber(usageData.cachedInputTokens)
-      ?? (promptDetails && typeof promptDetails === 'object'
-        ? readNumber((promptDetails as Record<string, unknown>).cachedTokens)
-        : undefined);
-    const reasoningTokens =
-      readNumber(usageData.reasoningTokens)
-      ?? (outputDetails && typeof outputDetails === 'object'
-        ? readNumber((outputDetails as Record<string, unknown>).reasoningTokens)
-        : undefined);
-    if (cachedInputTokens !== undefined) event.details.cachedInputTokens = cachedInputTokens;
-    if (reasoningTokens !== undefined) event.details.reasoningTokens = reasoningTokens;
+    // 缓存命中和推理 token 直接读 SDK 的类型化字段（cacheReadTokens / reasoningTokens），
+    // 不要再把整个事件转成 Record 去猜字段名——那些字段在 SDK 里根本不存在。
+    if (typeof e.data.cacheReadTokens === 'number') event.details.cachedInputTokens = e.data.cacheReadTokens;
+    if (typeof e.data.reasoningTokens === 'number') event.details.reasoningTokens = e.data.reasoningTokens;
     if (typeof e.data.apiEndpoint === 'string') event.details.apiEndpoint = e.data.apiEndpoint;
     input.onTrajectory?.(event);
   });
