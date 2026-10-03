@@ -1,8 +1,7 @@
 /**
  * Workflow-aware server entrypoint。
  *
- * 旧 src/server.ts 继续维护原有业务 API；本入口在其前面增加 Workflow Editor
- * 路由，并覆盖 /journey 响应。以后如果这些 API 稳定，可以再合并回 server.ts。
+ * src/server.ts 负责当前业务 API；本入口只保留 /journey 兼容响应和服务启动逻辑。
  */
 import express, { type Response } from 'express';
 import { createServer as createHttpServer } from 'node:http';
@@ -13,13 +12,9 @@ import { config } from './config.js';
 import { createApp } from './server.js';
 import { parseRequest } from './api/schemas.js';
 import {
-  applyJourneyDefinition,
   buildJourneyAgentInstruction,
   getJourneySnapshot,
-  JourneyEditBodySchema,
   resetJourneyCustomization,
-  saveJourneyDraft,
-  validateJourneyEdit,
 } from './workflow/journey-editor.js';
 import { loadWorkspaceContext } from './investigation/workspace.js';
 import { closeConversationStore, recoverRunningConversationTurns } from './investigation/conversation.js';
@@ -68,49 +63,7 @@ function registerJourneyRoutes(app: express.Express): void {
     }
   });
 
-  /** 编辑器需要的完整 Workflow + layout + execution + draft。 */
-  app.get('/api/sessions/:name/workflow', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      res.json(await getJourneySnapshot(name, context.workflow));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 保存编辑草稿，不改变 active Workflow。 */
-  app.put('/api/sessions/:name/workflow/draft', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      const result = await saveJourneyDraft(
-        name,
-        context.workflow,
-        body.definition,
-        body.layout,
-      );
-      res.json({
-        saved: true,
-        issues: result.issues,
-        snapshot: await getJourneySnapshot(name, context.workflow),
-      });
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 只验证，不落盘。 */
+  /** 兼容旧调试入口：只验证，不落盘。 */
   app.post('/api/sessions/:name/workflow/validate', async (req, res) => {
     try {
       const name = sessionKey(String(req.params.name));
@@ -121,27 +74,6 @@ function registerJourneyRoutes(app: express.Express): void {
       }
       const body = parseRequest(JourneyEditBodySchema, req.body);
       res.json(validateJourneyEdit(body.definition, body.layout));
-    } catch (error) {
-      sendRouteError(res, error);
-    }
-  });
-
-  /** 应用时服务端再次完整验证，并创建新 Workflow version。 */
-  app.post('/api/sessions/:name/workflow/apply', async (req, res) => {
-    try {
-      const name = sessionKey(String(req.params.name));
-      const context = await loadWorkspaceContext(name);
-      if (!context.workflow) {
-        res.status(409).json({ error: '当前 Investigation 没有选择 Workflow。' });
-        return;
-      }
-      const body = parseRequest(JourneyEditBodySchema, req.body);
-      res.json(await applyJourneyDefinition(
-        name,
-        context.workflow,
-        body.definition,
-        body.layout,
-      ));
     } catch (error) {
       sendRouteError(res, error);
     }
