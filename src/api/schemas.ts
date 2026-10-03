@@ -64,4 +64,6 @@ export const JourneyAiRequestSchema = z.object({
   mode: z.enum(['generate', 'modify']),
   prompt: z.string().trim().min(1).max(4000),
   messages: z.array(JourneyAiMessageSchema).max(12).optional(),
+  /** 当前画布的未保存 Definition；服务端仍会重新用 Workflow schema 校验。 */
+  definition: z.unknown().optional(),
 }).strict();
