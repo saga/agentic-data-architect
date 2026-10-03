@@ -527,6 +527,9 @@ function AppInner() {
         ? nextGuidance
         : undefined;
 
+      const showActions = message.role === 'assistant' && index === lastAssistantIndex
+        && Boolean(guidance?.length || current?.context.journeyPlan?.routes.length);
+
       return {
         key: message.id,
         role: message.role,
@@ -534,7 +537,7 @@ function AppInner() {
           message.role === 'assistant' ? (
             <div className="assistant-message-content">
               <ChatMarkdown content={message.content} />
-              {guidance?.length || current?.context.journeyPlan?.routes.length ? (
+              {showActions ? (
                 <AssistantActionBar
                   routeOptions={current?.context.journeyPlan?.routes ?? []}
                   followUpQuestions={guidance ?? []}
