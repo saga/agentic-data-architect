@@ -635,4 +635,4 @@ export const JourneyDefinitionSchema = z.object({
     })),
     line: z.number().int().positive().optional(),
   }).strict()).min(1),
-).strict().transform((value) => value as JourneyDefinition);
+}).strict().transform((value) => value as JourneyDefinition);
