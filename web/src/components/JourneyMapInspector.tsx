@@ -1,9 +1,11 @@
 import React from 'react';
 import {
+  Badge,
   Button,
   Flex,
   Input,
   Select,
+  Tabs,
   Tag,
   Typography,
 } from 'antd';
@@ -11,6 +13,7 @@ import {
   ArrowRightOutlined,
   DeleteOutlined,
   HolderOutlined,
+  RobotOutlined,
   SaveOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
@@ -89,18 +92,13 @@ export function JourneyMapInspector({
   humanWaiting,
   applyHumanWorkflowTransition,
 }: JourneyMapInspectorProps) {
-  return (
-    <div className="journey-map-inspector">
-      <div className="journey-map-inspector-header">
-        <div>
-          <div className="journey-map-inspector-title">属性</div>
-          <Text type="secondary">
-            {selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '选择一个节点或分支'}
-          </Text>
-        </div>
-        <SettingOutlined />
-      </div>
+  // 两类内容只占用同一个右侧空间，通过 Tabs 切换，避免属性表单和 AI 同时挤在一起。
+  const [activeTab, setActiveTab] = React.useState<'properties' | 'ai'>(
+    selectedNode || selectedEdge ? 'properties' : 'ai',
+  );
 
+  const propertiesContent = (
+    <div className="journey-map-inspector-section journey-map-inspector-properties">
       {humanWaiting && selectedNode ? (
         <div className="journey-map-human-review">
           <Flex align="center" justify="space-between" gap={8}>
@@ -384,7 +382,11 @@ export function JourneyMapInspector({
           {selectedNode.data.connectionIssueText}
         </Tag>
       ) : null}
+    </div>
+  );
 
+  const aiContent = (
+    <div className="journey-map-inspector-section journey-map-inspector-ai">
       <JourneyMapAiChat
         currentDefinition={currentDefinition}
         selectedNodeId={selectedNodeId}
@@ -394,5 +396,41 @@ export function JourneyMapInspector({
         discardAiChanges={discardAiChanges}
       />
     </div>
+  );
+
+  return (
+    <aside className="journey-map-inspector" aria-label="工作地图侧栏">
+      <Tabs
+        className="journey-map-inspector-tabs"
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as 'properties' | 'ai')}
+        size="small"
+        animated={false}
+        items={[
+          {
+            key: 'properties',
+            label: (
+              <Flex align="center" gap={6}>
+                <SettingOutlined />
+                <span>属性</span>
+              </Flex>
+            ),
+            children: propertiesContent,
+          },
+          {
+            key: 'ai',
+            label: (
+              <Badge dot={Boolean(pendingAiChange)} offset={[5, -1]}>
+                <Flex align="center" gap={6}>
+                  <RobotOutlined />
+                  <span>AI</span>
+                </Flex>
+              </Badge>
+            ),
+            children: aiContent,
+          },
+        ]}
+      />
+    </aside>
   );
 }
