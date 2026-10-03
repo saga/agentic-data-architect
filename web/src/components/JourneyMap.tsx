@@ -158,10 +158,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   if (fetching) {
     return (
       <div className="journey-map-page journey-map-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="正在打开工作地图，请稍候…"
-        />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="正在打开工作地图，请稍候…" />
       </div>
     );
   }
@@ -169,13 +166,8 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   if (!snapshot) {
     return (
       <div className="journey-map-page journey-map-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="这个调查还没有固定工作方式，先到调查设置选择一种工作方式。"
-        />
-        {onBack ? (
-          <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回调查</Button>
-        ) : null}
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这个调查还没有固定工作方式，先到调查设置选择一种工作方式。" />
+        {onBack ? <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回调查</Button> : null}
       </div>
     );
   }
@@ -184,8 +176,8 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     <div
       className="journey-map-page"
       style={{
-        display: 'grid',
-        gridTemplateRows: 'auto auto minmax(0, 1fr) auto',
+        display: 'flex',
+        flexDirection: 'column',
         width: '100%',
         height: '100dvh',
         minHeight: 0,
@@ -194,9 +186,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     >
       <header className="journey-map-page-header">
         <div className="journey-map-page-header-main">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} aria-label="返回调查">
-            返回调查
-          </Button>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} aria-label="返回调查">返回调查</Button>
           <div className="journey-map-page-title-group">
             <Flex align="center" gap={8}>
               <Typography.Title level={4} style={{ margin: 0 }}>工作地图</Typography.Title>
@@ -205,13 +195,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
               </Tag>
               {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
               <Tag color={snapshot.execution.status === 'waiting' ? 'blue' : undefined}>
-                {snapshot.execution.status === 'waiting'
-                  ? '等待人工'
-                  : snapshot.execution.status === 'completed'
-                    ? '已完成'
-                    : snapshot.execution.status === 'stopped'
-                      ? '已停止'
-                      : '运行中'}
+                {snapshot.execution.status === 'waiting' ? '等待人工' : snapshot.execution.status === 'completed' ? '已完成' : snapshot.execution.status === 'stopped' ? '已停止' : '运行中'}
               </Tag>
             </Flex>
             <Text type="secondary">直接拖动节点和连线；右侧切换“属性 / AI”，调整后检查并保存。</Text>
@@ -259,9 +243,10 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 420px)',
           width: '100%',
-          height: '100%',
           minWidth: 0,
           minHeight: 0,
+          flex: '1 1 0',
+          height: 0,
           overflow: 'hidden',
         }}
       >
@@ -286,9 +271,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
               flowInstanceRef.current = instance;
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  if (nodes.length) {
-                    instance.fitView({ padding: 0.14, minZoom: 0.2, maxZoom: 1.4, duration: 0 });
-                  }
+                  if (nodes.length) instance.fitView({ padding: 0.14, minZoom: 0.2, maxZoom: 1.4, duration: 0 });
                 });
               });
             }}
@@ -366,13 +349,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
         </Flex>
         <Space size={12}>
           <Text type="secondary">Cmd/Ctrl + S 保存</Text>
-          {snapshot.execution.status === 'completed' ? (
-            <Tag color="green" bordered={false}>这条路线已经走完</Tag>
-          ) : snapshot.execution.status === 'stopped' ? (
-            <Tag color="red" bordered={false}>这条路线已停止</Tag>
-          ) : (
-            <Tag bordered={false}>正在执行</Tag>
-          )}
+          {snapshot.execution.status === 'completed' ? <Tag color="green" bordered={false}>这条路线已经走完</Tag> : snapshot.execution.status === 'stopped' ? <Tag color="red" bordered={false}>这条路线已停止</Tag> : <Tag bordered={false}>正在执行</Tag>}
         </Space>
       </footer>
     </div>
