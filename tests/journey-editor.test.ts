@@ -57,7 +57,7 @@ test('journey editor serialization round-trips semantic graph', () => {
     parsed.definition?.nodes[0]?.routes.map(({ outcome, target, condition }) => ({ outcome, target, condition })),
     [
       { outcome: 'success', target: 'review', condition: 'goal' },
-      { outcome: 'needs-input', target: 'intake', condition: undefined },
+      { outcome: 'needs-input', target: 'intake' },
     ],
   );
 });
