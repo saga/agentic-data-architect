@@ -2918,31 +2918,35 @@ completion: agent
 
 当前执行状态包含 workflowId、workflowVersion、currentNodeId、completedNodeIds 和 status。
 
-deterministic 节点由已有 Investigation 状态自动推进；agent 节点只有在 Agent 返回合法 nodeId + outcome 后才推进。
+deterministic 节点由已有 Investigation 状态自动推进；agent 节点只有在 Agent 返回合法 nodeId + outcome 后才推进。人工节点进入 waiting，由用户选择已有 outcome 推进。
 
 因此：
 
 ~~~text
 Agent 可以选择现有分支
+Human 可以推进 waiting 节点
 Agent 不能修改流程控制边界
 服务端决定是否真的推进
 ~~~
 
 ### V1.7 Editor API
 
+早期设计曾把编辑过程拆成 draft / validate / apply 多个接口。V1.8 收敛后，当前实际 API 只有：
+
 ~~~text
 GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/workflow
-PUT  /api/sessions/:name/workflow/draft
-POST /api/sessions/:name/workflow/validate
-POST /api/sessions/:name/workflow/apply
+PUT  /api/sessions/:name/workflow
+POST /api/sessions/:name/workflow/ai
+POST /api/sessions/:name/workflow/transition
 POST /api/sessions/:name/workflow/reset
-GET  /api/sessions/:name/workflow/instruction
 ~~~
+
+普通 Investigation Agent 使用的 `/workflow/instruction` 仍存在，但它只负责把当前 Workflow 控制摘要接到 Agent 请求链路，不属于编辑器 API。
 
 ### V1.7 存储边界
 
-当前 Investigation：
+V1.8 去掉了单独的 draft 文件。当前 Investigation：
 
 ~~~text
 <workspace>/<name>/workflow/
@@ -2950,21 +2954,24 @@ GET  /api/sessions/:name/workflow/instruction
   journey-meta.json
   journey-layout.json
   journey-execution.json
-  journey-draft.md
-  journey-draft-layout.json
+  journey-run-events.jsonl
 ~~~
 
-这样 Workflow、Canvas 和运行状态分别可读、可恢复、可校验，也不需要额外引入 Workflow Registry。
+编辑时的 Definition 只存在当前浏览器画布内；点击保存后才写入上述 Workflow 文件，并创建新的 Workflow version。
+
+这样 Workflow、Canvas、Execution 和运行事件分别可读、可恢复、可校验，也不需要额外引入 Workflow Registry。
 
 完整设计见 docs/journey-workflow-editor.md。
+
 ### V1.7 Editor 交互
 
 - 查看模式与编辑模式使用同一份完整 Workflow graph；锁定模式仅关闭 node/edge 编辑事件，不再通过 hidden 过滤节点或 edge。
 - 布局采用 ELK-v2：增加 node/node 与 layer 间距，并考虑编辑态节点高度，避免自动排版后节点视觉贴合。
 - 节点连接问题直接由图结构计算并显示：非 start 节点无入口、非 terminal 节点无出口、route 指向不存在节点时标红；正常的 start 无入口、terminal 无出口不报错。
 - connection Handle 在锁定模式也可见，但设置为不可交互；这样用户看到的线和编辑模式一致。
+- 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换；属性表单与工作地图 AI 不再同时占用右侧纵向空间。
 
-工作地图编辑器使用 React Flow controlled flow。节点拖动、连线、重新连接、节点属性编辑和边 outcome 编辑都直接作用于当前 draft。
+工作地图编辑器使用 React Flow controlled flow。节点拖动、连线、重新连接、节点属性编辑和边 outcome 编辑都直接作用于当前画布。
 
 布局不再使用简单的固定 x/y 分层，而采用 ELK layered layout：
 
@@ -2973,14 +2980,14 @@ GET  /api/sessions/:name/workflow/instruction
 - elk.layered.crossingMinimization.strategy = LAYER_SWEEP
 - 每个 incoming / outgoing route 使用独立 port，并固定 port order。
 
-React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。编辑器还使用 useNodesInitialized 等待节点完成实际 DOM 尺寸测量，再进行最终布局，并用轻量 collision guard 兜底。（参考 React Flow 官方 Auto Layout、ELK Multiple Handles 示例）
+React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。编辑器还使用 useNodesInitialized 等待节点完成实际 DOM 尺寸测量，再进行最终布局，并用轻量 collision guard 兜底。
 
 新建节点使用明显的橙色虚线样式，并提供两种连接方式：
 
 ~~~text
 拖 source Handle → target Handle
 或
-属性面板 → 连接到现有步骤
+属性 Tab → 连接到现有步骤
 ~~~
 
 “添加下一步”在存在主 success 路线时会插入节点，避免产生 success-1 / success-2 之类难以理解的 outcome。
