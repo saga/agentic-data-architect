@@ -9,8 +9,11 @@ import {
 import {
   AimOutlined,
   BranchesOutlined,
+  CheckCircleFilled,
+  ClockCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  LockOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import {
