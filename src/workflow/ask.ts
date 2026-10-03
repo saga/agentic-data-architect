@@ -167,7 +167,7 @@ const prompt = buildQuestionPrompt({
     scope: inv.scope,
     question: effectiveQuestion,
     contextText: questionContextText,
-    selectedRoute,
+    ...(selectedRoute ? { selectedRoute } : {}),
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
