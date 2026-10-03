@@ -1980,7 +1980,7 @@ Copilot SDK default agent
       ├── research configuration
       ├── investigation-specific guidance
       ├── capability Skills（Copilot 按任务自动发现）
-      ├── current Workflow Skill（用户选择后预加载）
+      ├── current Workflow Skill（用户选择后唯一保持可用）
       └── Copilot 内置 MCP + 用户配置的额外 MCP
 ```
 
@@ -2017,7 +2017,7 @@ skills/
 
 每个 Skill 通过 `SKILL.md` 描述能力；需要确定性计算时，可以带 `scripts/`。
 
-一次 Investigation 的 `control.json` 不保存 capability Skill 清单。Copilot 会看到技能目录及其描述，并在任务相关时加载对应 SKILL.md；只有当前 Workflow 作为用户明确选择的工作方式被预加载。
+一次 Investigation 的 `control.json` 不保存 capability Skill 清单。Copilot 会看到技能目录及其描述，并在任务相关时加载对应 SKILL.md；只有当前 Workflow 作为用户明确选择的工作方式保持唯一可用；普通 capability 仍由 Copilot 自动发现。
 
 ## 为什么现在不使用 Custom Agent
 
