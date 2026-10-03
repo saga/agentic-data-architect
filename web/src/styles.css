@@ -2469,3 +2469,159 @@ body {
 .journey-map-locked-mode .react-flow__edge {
   pointer-events: none;
 }
+
+
+/* 工作地图独立页面 --------------------------------------------------------- */
+.journey-map-subpage {
+  overflow: hidden;
+}
+
+.journey-map-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #f7f9fc;
+}
+
+.journey-map-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #e9edf3;
+  background: rgba(255,255,255,.97);
+  flex: 0 0 auto;
+}
+
+.journey-map-page-header-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.journey-map-page-title-group {
+  min-width: 0;
+}
+
+.journey-map-page-title-group > .ant-typography {
+  display: block;
+  margin-top: 2px;
+}
+
+.journey-map-ai-bar {
+  display: grid;
+  grid-template-columns: auto auto minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid #e9edf3;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.journey-map-ai-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: #1677ff;
+}
+
+.journey-map-ai-message {
+  grid-column: 1 / -1;
+  margin-left: 2px;
+  font-size: 12px;
+}
+
+.journey-map-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.journey-map-workspace .journey-map-flow-wrap {
+  min-height: 0;
+  height: 100%;
+  border-right: 1px solid #e9edf3;
+}
+
+.journey-map-workspace .journey-map-inspector {
+  min-height: 0;
+}
+
+.journey-map-page .react-flow {
+  --xy-background-color: #f7f9fc;
+  --xy-node-border-radius-default: 12px;
+  --xy-node-border-default: 1px solid #dfe5ee;
+  --xy-node-background-color-default: #ffffff;
+  --xy-node-boxshadow-default: 0 5px 18px rgba(31, 42, 55, 0.07);
+}
+
+.journey-map-page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid #e9edf3;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.journey-map-page .journey-map-validation-panel {
+  margin: 8px 14px;
+}
+
+@media (max-width: 900px) {
+  .journey-map-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .journey-map-ai-bar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .journey-map-ai-title {
+    grid-column: 1 / -1;
+  }
+
+  .journey-map-ai-bar .ant-segmented {
+    justify-self: start;
+  }
+
+  .journey-map-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, 1fr) auto;
+  }
+
+  .journey-map-workspace .journey-map-flow-wrap {
+    border-right: 0;
+    border-bottom: 1px solid #e9edf3;
+  }
+
+  .journey-map-workspace .journey-map-inspector {
+    max-height: 42vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .journey-map-ai-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .journey-map-ai-bar .ant-btn {
+    width: 100%;
+  }
+
+  .journey-map-page-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
