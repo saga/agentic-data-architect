@@ -49,7 +49,8 @@ export function JourneyFlowEdge({
   // 这种边的标签贴近起点第一段横线，避免出现截图里的“游离标签”。
   const outcome = String(data?.outcome ?? '').trim().toLowerCase();
   const backwardRoute =
-    /(^|[-_\s])(retry|return|rollback|back|previous|prev|reopen|again)([-_\s]|$)/.test(outcome)
+    targetX + 24 < sourceX
+    || /(^|[-_\s])(retry|return|rollback|back|previous|prev|reopen|again)([-_\s]|$)/.test(outcome)
     || /(重试|退回|回退|返回|回滚|重新)/.test(outcome);
   const displayLabelX = backwardRoute
     ? sourceX + Math.min(96, Math.max(48, Math.abs(targetX - sourceX) / 3))
