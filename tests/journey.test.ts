@@ -383,7 +383,7 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(incompleteLineage.currentNodeId, 'truth');
+  assert.equal(incompleteLineage.currentNodeId, 'done');
 
   const completeEnoughWithoutThreshold = buildJourneyState(
     result.definition!,
