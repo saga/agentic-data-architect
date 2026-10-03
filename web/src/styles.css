@@ -1946,9 +1946,24 @@ body {
   box-sizing: border-box;
 }
 
+/** 两个 Tab 共用同一套头部：图标 + 标题 + 标签 + 一行说明，切 Tab 时顶部节奏一致。 */
+.journey-map-inspector-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.journey-map-inspector-desc {
+  font-size: 11px;
+}
+
+/** 属性区头部后面跟表单（普通块级流），用 margin 留出与正文 gap 一致的间距。 */
+.journey-map-inspector-properties > .journey-map-inspector-head {
+  margin-bottom: 10px;
+}
+
 .journey-map-inspector-properties {
   overflow: auto;
-  padding-right: 3px;
 }
 
 .journey-map-property-id {
@@ -1988,11 +2003,7 @@ body {
   flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-}
-
-.journey-map-ai-chat-header .ant-typography {
-  font-size: 11px;
+  gap: 10px;
 }
 
 .journey-map-ai-chat-header > .ant-flex:last-child {

@@ -31,6 +31,26 @@ import type {
 
 const { Text } = Typography;
 
+const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
+  task: '任务',
+  gate: '判断点',
+  review: '评审',
+  end: '完成',
+  stop: '停止',
+};
+
+/** 两个 Tab 共用同一套标签结构（Badge 只在有未处理事项时打点），切 Tab 时表头不再跳动。 */
+function tabLabel(icon: React.ReactNode, text: string, dot: boolean) {
+  return (
+    <Badge dot={dot} offset={[5, -1]}>
+      <Flex align="center" gap={6}>
+        {icon}
+        <span>{text}</span>
+      </Flex>
+    </Badge>
+  );
+}
+
 interface JourneyMapInspectorProps {
   nodes: FlowNode[];
   selectedNode?: FlowNode;
@@ -100,6 +120,22 @@ export function JourneyMapInspector({
 
   const propertiesContent = (
     <div className="journey-map-inspector-section journey-map-inspector-properties">
+      <div className="journey-map-inspector-head">
+        <Flex align="center" gap={7}>
+          <SettingOutlined />
+          <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '属性'}</Text>
+          {selectedNode && nodeDraft?.type ? (
+            <Tag bordered={false}>{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
+          ) : null}
+          {selectedEdge && edgeDraft ? (
+            <Tag bordered={false}>{edgeDraft.outcome || '分支'}</Tag>
+          ) : null}
+        </Flex>
+        <Text type="secondary" className="journey-map-inspector-desc">
+          {selectedNode || selectedEdge ? '改完点底部按钮应用到画布上。' : '在画布上点一个节点或分支。'}
+        </Text>
+      </div>
+
       {humanWaiting && selectedNode ? (
         <div className="journey-map-human-review">
           <Flex align="center" justify="space-between" gap={8}>
@@ -327,7 +363,7 @@ export function JourneyMapInspector({
           </Button>
         </Flex>
       ) : selectedEdge && edgeDraft ? (
-        <Flex vertical gap={12}>
+        <Flex vertical gap={10}>
           <div>
             <Text type="secondary">分支结果</Text>
             <Input
@@ -436,24 +472,12 @@ export function JourneyMapInspector({
         items={[
           {
             key: 'properties',
-            label: (
-              <Flex align="center" gap={6}>
-                <SettingOutlined />
-                <span>属性</span>
-              </Flex>
-            ),
+            label: tabLabel(<SettingOutlined />, '属性', false),
             children: propertiesContent,
           },
           {
             key: 'ai',
-            label: (
-              <Badge dot={Boolean(pendingAiChange)} offset={[5, -1]}>
-                <Flex align="center" gap={6}>
-                  <RobotOutlined />
-                  <span>AI</span>
-                </Flex>
-              </Badge>
-            ),
+            label: tabLabel(<RobotOutlined />, 'AI', Boolean(pendingAiChange)),
             children: aiContent,
           },
         ]}

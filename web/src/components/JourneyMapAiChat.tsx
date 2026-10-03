@@ -119,13 +119,13 @@ export function JourneyMapAiChat({
   return (
     <section className="journey-map-ai-chat">
       <div className="journey-map-ai-chat-header">
-        <div>
+        <div className="journey-map-inspector-head">
           <Flex align="center" gap={7}>
             <RobotOutlined />
             <Typography.Text strong>工作地图 AI</Typography.Text>
             <Tag bordered={false}>{mode === 'modify' ? '修改当前图' : '重新设计'}</Tag>
           </Flex>
-          <Typography.Text type="secondary">
+          <Typography.Text type="secondary" className="journey-map-inspector-desc">
             连续对话修改，检查后点击“保存”才会成为新的 Workflow。
           </Typography.Text>
         </div>
