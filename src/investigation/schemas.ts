@@ -149,7 +149,7 @@ export const ControlResearchSchema = z.object({
 }).strict();
 export type ControlResearch = z.infer<typeof ControlResearchSchema>;
 
-/** Agent 侧 configuration 的持久化 Schema，包括 system prompt、Skills 和 MCP。 */
+/** Agent 侧 configuration 的持久化 Schema：本次调查说明、用户自配 MCP 和平台能力快照。 */
 /** 平台内置能力的固定配置；用户不能通过 Investigation Agent 配置关闭它，但每个 turn 会记录版本。 */
 export const PlatformCapabilitySettingSchema = z.object({
   name: z.string().min(1),
