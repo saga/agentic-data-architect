@@ -920,10 +920,10 @@ Agent 已经可以判断
 | unknowns <= 3 | 已移除；改为关键 discovery / lineage / source-of-truth 缺口判断 |
 | current-state = snapshot exists | 已收紧；需要存在实际数据集且不能有关键阻塞缺口 |
 | assessment-findings | 已移除“有 Current-State 就算完成”的条件 |
-| cutover = validation | 已拆开；还要求切换条件、回退条件已明确 |
+| cutover = validation | 已拆开；Cutover 改为独立人工确认步骤，不由 validation 自动完成 |
 | Source-of-Truth score | 已改名 priorityScore，明确只是调查排序 heuristic |
 | Semantic Candidate | 明确只是候选，不自动升级为已确认业务定义 |
-| datasetLineageCoverage | 已改为 datasetLineageConnectionRate；UI 改为显示“已连上线的数据集 X/Y” |
+| datasetLineageCoverage | 已改为 datasetLineageConnectionRate；UI 改为显示“已连上线的数据集 X/Y”，且该指标不直接作为关键 Gate 阻塞条件 |
 | Modernization UI | 已从主工作区移除；后端工作包能力保留 |
 | Evidence-driven work products | Target Architecture / Mapping / Architecture Decision 不再自动伪造正式结果 |
 
