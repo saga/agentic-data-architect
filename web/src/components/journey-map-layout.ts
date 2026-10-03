@@ -56,8 +56,11 @@ function nodeDimensions(node: FlowNode): { width: number; height: number } {
  * 关键点：
  * 1. 不能再硬编码 128px 高度；
  * 2. 使用 ports + FIXED_ORDER，减少多分支 crossing；
- * 3. RIGHT + ORTHOGONAL，让流程整体从左到右；
+ * 3. RIGHT 让流程整体从左到右；
  * 4. 大间距让自动排版结果首先“可读”，而不是首先“塞进画布”。
+ *
+ * 注意：React Flow 最终绘制的是自定义 SmoothStep edge，因此这里的 edgeRouting
+ * 主要帮助 ELK 评估 graph layout，不把 ELK 的 SVG path 直接拿到前端画布。
  */
 export async function layoutWithElk(
   nodes: FlowNode[],
