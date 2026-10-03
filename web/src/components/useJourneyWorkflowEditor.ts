@@ -134,6 +134,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
   const lastMeasuredNodeCountRef = useRef(0);
   const layoutRequestRef = useRef(0);
+  const relayoutAfterMeasureRef = useRef(false);
   /** 下一次节点落地后要不要把视角对准整张图。见下面那个 fitView effect。 */
   const pendingFitRef = useRef(false);
 
@@ -912,11 +913,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         newNodeIdsRef.current,
       );
 
-      const layoutedNodes = current.layout.engine === 'elk-v2'
-        ? graph.nodes
-        : await autoLayoutJourney(graph.nodes, graph.edges);
+      const shouldAutoLayout =
+        current.source !== 'custom' || current.layout.engine !== 'elk-v3';
+      const layoutedNodes = shouldAutoLayout
+        ? await autoLayoutJourney(graph.nodes, graph.edges)
+        : graph.nodes;
 
       if (cancelled) return;
+      relayoutAfterMeasureRef.current = shouldAutoLayout;
       pendingFitRef.current = true;
       setNodes(layoutedNodes);
       setEdges(graph.edges);
@@ -944,9 +948,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
    */
   useEffect(() => {
     if (!nodesInitialized || !nodes.length) return;
+    if (!relayoutAfterMeasureRef.current) return;
 
     if (lastMeasuredNodeCountRef.current === nodes.length) return;
     lastMeasuredNodeCountRef.current = nodes.length;
+    relayoutAfterMeasureRef.current = false;
 
     let cancelled = false;
 
