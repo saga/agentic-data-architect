@@ -332,7 +332,6 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
       ...baseFacts,
       currentState: {
         datasets: 10,
-        lineageConnectionRate: 0.8,
         semanticAssets: 0,
         parseFailures: 0,
       },
@@ -348,7 +347,6 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
       ...baseFacts,
       currentState: {
         datasets: 10,
-        lineageConnectionRate: 0.95,
         semanticAssets: 0,
         parseFailures: 0,
       },
@@ -380,7 +378,6 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
       ...baseFacts,
       currentState: {
         datasets: 10,
-        lineageConnectionRate: 0.95,
         semanticAssets: 1,
         parseFailures: 0,
       },
@@ -397,7 +394,6 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
       ...baseFacts,
       currentState: {
         datasets: 10,
-        lineageConnectionRate: 0.95,
         semanticAssets: 1,
         parseFailures: 0,
       },
@@ -472,7 +468,6 @@ test('assessment findings gate does not pass from current-state alone', () => {
       ...baseFacts,
       currentState: {
         datasets: 1,
-        lineageConnectionRate: 1,
         semanticAssets: 1,
         parseFailures: 0,
       },
@@ -488,7 +483,6 @@ test('assessment findings gate does not pass from current-state alone', () => {
       ...baseFacts,
       currentState: {
         datasets: 1,
-        lineageConnectionRate: 1,
         semanticAssets: 1,
         parseFailures: 0,
       },
