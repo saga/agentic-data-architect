@@ -1,16 +1,15 @@
 /**
- * Web API、SSE 和服务生命周期。
+ * Web API 和 SSE 路由。
  *
- * 本文件的注释说明职责、输入输出、状态变化和关键边界，方便后续维护。
+ * 本文件只负责应用组装；HTTP/Vite 进程生命周期由 src/server-main.ts 负责。
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { createServer as createHttpServer } from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer, type ViteDevServer } from 'vite';
+import type { ViteDevServer } from 'vite';
 import {
   AbortBodySchema,
   CreateSessionBodySchema,
@@ -656,46 +655,4 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
   });
 
   return app;
-}
-
-/** 生产 Web server 主入口：准备 Vite/静态文件、恢复异常 turn、启动 HTTP server，并注册优雅退出。 */
-async function main(): Promise<void> {
-  const dev = config.nodeEnv !== 'production';
-  let vite: ViteDevServer | undefined;
-
-  if (dev) {
-    vite = await createViteServer({
-      root: webRoot,
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-  }
-
-  const recoveredTurns = recoverRunningConversationTurns();
-  if (recoveredTurns > 0) console.warn(`Recovered ${recoveredTurns} interrupted investigation turn(s).`);
-
-  const app = createApp(vite);
-  const server = createHttpServer(app);
-  server.listen(config.port, config.host, () => {
-    console.log(
-      `Agentic Data Architect Web UI: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`,
-    );
-  });
-
-  const shutdown = async () => {
-    server.close();
-    await vite?.close();
-    closeLocalAnalytics();
-    closeConversationStore();
-    await stopClient();
-  };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
-}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
 }
