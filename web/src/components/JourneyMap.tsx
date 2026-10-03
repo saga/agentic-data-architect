@@ -1637,6 +1637,9 @@ export function JourneyMap({
             nodesDraggable={editing}
             nodesConnectable={editing}
             elementsSelectable={editing}
+            edgesReconnectable={editing}
+            connectionLineType="smoothstep"
+            connectionRadius={28}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeDragStart={() => {
