@@ -157,7 +157,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           </Tag>
         ) : null}
 
-        {          <div className="journey-flow-node-config">
+        <div className="journey-flow-node-config">
             <Tag bordered={false}>
               {data.completion === 'deterministic' ? '确定性完成' : 'Agent 判断'}
             </Tag>
@@ -170,7 +170,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               拖右侧连接点到另一个步骤左侧连接点即可连线
             </Text>
           </div>
-        ) : null}
+        </div>
       </div>
 
       {!terminal
@@ -180,7 +180,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               type="source"
               position={Position.Right}
               id={handle.id}
-          className="journey-flow-handle journey-flow-handle-edit"
+              className="journey-flow-handle journey-flow-handle-edit"
               style={handleStyle(index, data.sourceHandles.length)}
             />
           ))
