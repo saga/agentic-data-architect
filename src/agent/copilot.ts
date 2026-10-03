@@ -11,6 +11,7 @@ import { config } from '../config.js';
 import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
+import type { WorkflowId } from '../investigation/schemas.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -94,7 +95,7 @@ export interface AskInput {
   workingDirectory?: string;
   model?: string;
   /** The user-selected Workflow Skill. Other Workflow Skills are disabled to avoid route mixing. */
-  workflowSkill?: string;
+  workflowSkill?: WorkflowId;
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
