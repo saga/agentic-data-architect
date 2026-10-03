@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
+import { createLocalDataTools } from './local-data-tools.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -200,7 +201,7 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
   }
 }
 
-/** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/工具白名单并执行一次请求。 */
+/** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/本地数据工具和执行白名单。 */
 export async function askCopilot(input: AskInput): Promise<string> {
   const c = await getClient();
 
@@ -226,8 +227,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // Capability Skills stay available for Copilot's automatic task-based selection.
     // Only the other Workflow Skills are disabled so two routes are not mixed.
     disabledSkills: disabledWorkflowSkills,
+    // Local data tools are app-owned and remain constrained by Dataset Registry + DuckDB guards.
+    tools: createLocalDataTools(path.basename(workingDirectory)),
     availableTools: WORKBENCH_TOOLS,
-    ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+      ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
