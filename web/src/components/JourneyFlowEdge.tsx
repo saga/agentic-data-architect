@@ -6,53 +6,11 @@ import {
   useInternalNode,
   type EdgeProps,
 } from '@xyflow/react';
-import type { FlowEdge } from './journey-map-types.js';
+import type { FlowEdge, FlowNodeData } from './journey-map-types.js';
 
 /**
- * 自环（例如 needs-input -> 同一个步骤）不能使用普通 smooth-step 路径。
- * 否则回线会被节点自己盖住，看起来像断线。
- */
-function selfLoopPath(
-  sourceX: number,
-  sourceY: number,
-  targetX: number,
-  targetY: number,
-  nodeBottom: number | undefined,
-): [string, number, number] {
-  const gap = 28;
-  const corner = 12;
-  const right = sourceX + gap;
-  const left = targetX - gap;
-  const bottom = Math.max(
-    nodeBottom ?? 0,
-    Math.max(sourceY, targetY) + gap,
-  ) + 24;
-
-  const d = [
-    'M', sourceX, sourceY,
-    'L', right - corner, sourceY,
-    'Q', right, sourceY, right, sourceY + corner,
-    'L', right, bottom - corner,
-    'Q', right, bottom, right - corner, bottom,
-    'L', left + corner, bottom,
-    'Q', left, bottom, left, bottom - corner,
-    'L', left, targetY + corner,
-    'Q', left, targetY, left + corner, targetY,
-    'L', targetX, targetY,
-  ].join(' ');
-
-  return [d, (right + left) / 2, bottom];
-}
-
-/**
- * 自定义 Workflow edge。
- *
- * Edge 只负责：
- * - 根据 React Flow 提供的 source/target 坐标画线；
- * - 显示 outcome；
- * - 把点击 outcome 交给编辑器。
- *
- * “这条线应该去哪里”仍然来自 Workflow Definition，而不是这个组件。
+ * 工作地图边的交互重点是“这条线从哪里到哪里”。
+ * React Flow 默认只把选中的边加深，复杂工作流里不够明显，所以选中后同时标出两端节点。
  */
 export function JourneyFlowEdge({
   id,
@@ -64,26 +22,24 @@ export function JourneyFlowEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  selected = false,
   data,
 }: EdgeProps<FlowEdge>) {
   const sourceNode = useInternalNode(source);
-  const selfLoop = source === target;
+  const targetNode = useInternalNode(target);
 
-  const nodeBottom = sourceNode
-    ? sourceNode.internals.positionAbsolute.y + (sourceNode.measured.height ?? 0)
-    : undefined;
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 12,
+  });
 
-  const [path, labelX, labelY] = selfLoop
-    ? selfLoopPath(sourceX, sourceY, targetX, targetY, nodeBottom)
-    : getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: 12,
-      });
+  const sourceTitle = (sourceNode?.data as FlowNodeData | undefined)?.title ?? source;
+  const targetTitle = (targetNode?.data as FlowNodeData | undefined)?.title ?? target;
 
   return (
     <>
@@ -91,11 +47,12 @@ export function JourneyFlowEdge({
         id={id}
         path={path}
         markerEnd={MarkerType.ArrowClosed}
+        className={selected ? 'journey-flow-edge-path journey-flow-edge-path-selected' : 'journey-flow-edge-path'}
       />
 
       <EdgeLabelRenderer>
         <div
-          className="journey-flow-edge-label nodrag nopan"
+          className={selected ? 'journey-flow-edge-label journey-flow-edge-label-selected nodrag nopan' : 'journey-flow-edge-label nodrag nopan'}
           style={{
             transform:
               'translate(-50%, -50%) translate('
@@ -107,11 +64,35 @@ export function JourneyFlowEdge({
           }}
           onClick={() => data?.onSelect?.(id)}
         >
+          {selected ? (
+            <span className="journey-flow-edge-route-summary">
+              {sourceTitle} → {targetTitle}
+            </span>
+          ) : null}
           <span>{data?.outcome}</span>
           {data?.condition ? (
             <span className="journey-flow-edge-condition"> · {data.condition}</span>
           ) : null}
         </div>
+
+        {selected ? (
+          <>
+            <div
+              className="journey-flow-edge-endpoint journey-flow-edge-endpoint-source"
+              style={{ transform: 'translate(-50%, -50%) translate(' + sourceX + 'px,' + sourceY + 'px)' }}
+              aria-hidden="true"
+            >
+              <span>来源</span>
+            </div>
+            <div
+              className="journey-flow-edge-endpoint journey-flow-edge-endpoint-target"
+              style={{ transform: 'translate(-50%, -50%) translate(' + targetX + 'px,' + targetY + 'px)' }}
+              aria-hidden="true"
+            >
+              <span>目标</span>
+            </div>
+          </>
+        ) : null}
       </EdgeLabelRenderer>
     </>
   );
