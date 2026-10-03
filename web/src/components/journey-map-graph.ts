@@ -355,6 +355,8 @@ export function graphFromDefinition(
       className:
         'journey-flow-node journey-flow-node-stage '
         + STATUS_CLASS[status]
+        + ' journey-flow-node-type-' + item.type
+        + ' journey-flow-node-actor-' + item.actor
         + (!item.visible ? ' journey-flow-node-deemphasized' : '')
         + (connectionIssue ? ' journey-flow-node-connection-' + connectionIssue.severity : '')
         + (newNodeIds.has(item.id) ? ' journey-flow-node-new' : ''),
