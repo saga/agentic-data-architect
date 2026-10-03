@@ -16,10 +16,12 @@
       ↓ parse
 Workflow Definition
       ↓
-React Flow Editor
-      ↓ draft
+React Flow 工作地图
+      ├─ 人工拖拽 / 连线 / 属性编辑
+      └─ 工作地图 AI 生成 / 修改
+      ↓ 保存
 服务端 validate
-      ↓ apply
+      ↓
 Investigation Active Workflow
       ↓
 Workflow Execution
@@ -37,7 +39,7 @@ React Flow 负责交互和布局；Workflow Definition 才是语义。这样 UI�
 skills/<workflow>/SKILL.md
 ~~~
 
-用户编辑工作地图时，不修改这个文件，而是在当前 Investigation 下生成：
+用户编辑工作地图时，不修改内置 Skill，而是在当前 Investigation 下直接保存：
 
 ~~~text
 <workspace>/<investigation>/
@@ -45,9 +47,7 @@ skills/<workflow>/SKILL.md
     ├── journey.md
     ├── journey-meta.json
     ├── journey-layout.json
-    ├── journey-execution.json
-    ├── journey-draft.md
-    └── journey-draft-layout.json
+    └── journey-execution.json
 ~~~
 
 含义：
@@ -56,13 +56,10 @@ skills/<workflow>/SKILL.md
 - journey-meta.json：对应哪个内置 Workflow，以及版本号。
 - journey-layout.json：React Flow 节点位置。
 - journey-execution.json：当前执行位置、已完成节点和 Workflow version。
-- journey-draft.md：尚未应用的编辑草稿。
-- journey-draft-layout.json：草稿画布布局。
 
 没有自定义 Workflow 时，直接读取 Skill 内置 Markdown；版本为 0。
 
-用户点击“应用修改”后创建新的 Investigation Workflow version，并清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。若当前执行节点仍存在于新 Workflow，会保留当前节点和仍然存在的已完成节点；只有当前节点被删除时才回到新 Workflow 的 start。
-
+工作地图进入后就是编辑状态。人工编辑和 AI 修改都只改变当前画布；点击“保存”后，服务端验证并创建新的 Investigation Workflow version。保存成功后会清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。若当前执行节点仍存在于新 Workflow，会保留当前节点和仍然存在的已完成节点；只有当前节点被删除时才回到新 Workflow 的 start。
 ## 3. DSL：保持小，不建立 BPMN
 
 当前 DSL 仍然只有少量核心构件：
@@ -163,6 +160,24 @@ ReactFlow
 当前编辑器支持：
 
 ~~~text
+进入即编辑
+拖动节点
+添加步骤
+添加分支
+从一个节点连接到另一个节点
+重新连接已有分支
+删除节点
+删除分支
+编辑节点属性
+编辑分支 outcome
+修改分支目标
+撤销 / 重做
+自动排版
+AI 生成工作地图
+AI 修改当前工作地图
+保存
+恢复内置 Workflow
+~~~text
 拖动节点
 添加步骤
 添加分支
@@ -183,29 +198,37 @@ ReactFlow
 
 Node Toolbar 只在选中节点时出现，避免整张地图被按钮污染。
 
-## 5. Draft / Validate / Apply
+工作地图现在是独立路由 `/investigations/:name/journey`，不再使用全屏 Modal；页面打开后直接可以拖动、连线和修改属性。
 
-编辑不会直接改变当前运行 Workflow。
+## 5. Save / Validate / AI
 
-### 保存草稿
+编辑不会在浏览器里单独维护“只读版”和“草稿版”两套地图。进入工作地图后，画布就是当前编辑状态。
+
+### 保存
 
 ~~~http
-PUT /api/sessions/:name/workflow/draft
+PUT /api/sessions/:name/workflow
 ~~~
 
-保存后：
+浏览器把当前 Workflow Definition 和 layout 一起提交。服务端再次执行完整 Workflow validation；通过后才写入 `journey.md`、layout、execution，并创建新的 Workflow version。
 
-- 当前 Agent 不切换 Workflow。
-- 当前执行位置不改变。
-- 即使图存在校验问题，也可以先保存，之后继续改。
+保存失败时，画布保持当前状态，用户可以继续修正。
+
+### AI 生成 / 修改
+
+~~~http
+POST /api/sessions/:name/workflow/ai
+~~~
+
+`mode=generate` 表示重新设计整张图；`mode=modify` 表示基于当前地图做局部或结构性修改。
+
+工作地图 AI 是独立的业务能力，不参与数据分析。它不会读取 Dataset Registry、SQL、数据证据，也不会参与 Investigation 的正常执行推进。AI 只返回候选 Workflow Definition；服务端立即用与人工保存相同的 Workflow validation 检查它。
+
+AI 不直接保存。返回结果只替换当前画布，用户检查后再点击“保存”。这样“AI 修改建议”和“真正改变执行 Workflow”之间保留一个明确的确认点。
 
 ### 验证
 
-~~~http
-POST /api/sessions/:name/workflow/validate
-~~~
-
-服务端重新解析并检查：
+保存时服务端会检查：
 
 ~~~text
 1. Schema / 基本结构
@@ -222,30 +245,13 @@ POST /api/sessions/:name/workflow/validate
 12. 每个节点是否有画布位置
 ~~~
 
-### 应用
+### 恢复内置
 
 ~~~http
-POST /api/sessions/:name/workflow/apply
+POST /api/sessions/:name/workflow/reset
 ~~~
 
-Apply 时服务端再次验证，而不是相信浏览器已经验证过。
-
-验证通过后：
-
-~~~text
-draft
-  ↓
-journey.md
-  ↓
-version + 1
-  ↓
-new journey-execution.json
-  ↓
-clear Copilot session
-~~~
-
-这样不能通过直接调用 Apply API 绕过 Workflow 校验。
-
+恢复操作删除当前 Investigation 的自定义 Workflow，重新使用内置 Skill 路线，并重新建立对应的执行状态。
 ## 6. Workflow Runtime
 
 Workflow 现在真正拥有一个执行状态：
@@ -470,23 +476,19 @@ React Flow toObject()
 ~~~text
 GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/workflow
-PUT  /api/sessions/:name/workflow/draft
-POST /api/sessions/:name/workflow/validate
-POST /api/sessions/:name/workflow/apply
+PUT  /api/sessions/:name/workflow
+POST /api/sessions/:name/workflow/ai
 POST /api/sessions/:name/workflow/reset
-GET  /api/sessions/:name/workflow/instruction
 ~~~
 
 其中：
 
-- /journey：保留旧 UI 所需的简化状态。
-- /workflow：编辑器完整快照。
-- /draft：保存草稿。
-- /validate：纯校验。
-- /apply：验证后发布新版本。
-- /reset：恢复内置 Skill。
-- /instruction：检查 Agent 当前会收到的 Workflow 控制摘要。
-
+- /journey：调查页面使用的简化状态。
+- /workflow：工作地图完整快照。
+- PUT /workflow：保存当前工作地图，并创建新版本。
+- /workflow/ai：工作地图专用 AI，生成或修改 Flow。
+- /workflow/reset：恢复内置 Skill。
+- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要。
 ## 12. 与现有代码的边界
 
 ### src/workflow/journey.ts
@@ -527,7 +529,7 @@ node inspector
 edge inspector
 undo/redo
 validation UI
-draft/apply UI
+AI 操作、保存 / 恢复
 ~~~
 
 ### src/server-main.ts
@@ -596,11 +598,11 @@ SmoothStep rendering
 
 React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 label 设置 pointer-events: all，并使用 nodrag / nopan，让用户可以直接点击 outcome 编辑。（参考 React Flow 官方 EdgeLabelRenderer 文档）
 
-### 连接问题提示与锁定模式
+### 连接问题提示
 
 地图会直接在节点上标出结构性连接问题：普通节点没有入口或出口、或者存在指向不存在节点的 route，会显示红框和“需要修正连接”。`@end` / `@stop` 没有出口以及 Workflow start 没有入口属于正常情况，不会误报。
 
-锁定模式和编辑模式使用完全相同的节点、边、Handle 和布局；区别只有交互权限。锁定模式的 Handle 是可见但不可拖动的，因此用户看到的就是完整、真实的 Workflow。
+
 
 ### 新节点的交互
 
@@ -628,7 +630,7 @@ JourneyMap.tsx
   └── 页面组合与 React Flow 容器
 
 useJourneyWorkflowEditor.ts
-  └── 编辑状态、Undo/Redo、Graph mutation、Draft/Apply
+  └── 编辑状态、Undo/Redo、Graph mutation、Save / AI
 
 journey-map-types.ts
   └── Workflow / React Flow shared types
