@@ -616,14 +616,19 @@ function advanceDeterministicJourney(
     }
     if (node.completion !== 'deterministic' || !conditionPassed(node.completeWhen, facts)) break;
 
-    completed.add(node.id);
     const conditionalRoute = node.routes.find(
       (item) => item.condition && conditionPassed(item.condition, facts),
     );
     const route = conditionalRoute
-      ?? node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome))
-      ?? (node.routes.length === 1 ? node.routes[0] : undefined);
+      // 条件都没有命中时，任意第一个无条件出口都可以作为 fallback。
+      // 不要求 outcome 必须叫 success，避免 DSL 隐藏一个额外的 outcome 规则。
+      ?? node.routes.find((item) => !item.condition)
+      ?? node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome));
+
+    // 只有真正走出当前节点才算完成；自环通常表示 retry/重新处理，不应把当前节点标成 completed。
     if (!route || route.target === node.id) break;
+
+    completed.add(node.id);
     currentNodeId = route.target;
   }
 
