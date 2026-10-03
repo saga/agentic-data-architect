@@ -14,11 +14,13 @@ import {
   SaveOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
+import { JourneyMapAiChat } from './JourneyMapAiChat.js';
 import type {
   FlowEdge,
   FlowNode,
   WorkflowNodeDefinition,
   WorkflowNodeType,
+  WorkflowActor,
   CompletionMode,
 } from './journey-map-types.js';
 
@@ -29,7 +31,7 @@ interface JourneyMapInspectorProps {
   selectedNode?: FlowNode;
   selectedEdge?: FlowEdge;
   nodeDraft?: Partial<WorkflowNodeDefinition>;
-  edgeDraft?: { outcome: string; target: string };
+  edgeDraft?: { outcome: string; target: string; condition?: string };
   connectTargetId?: string;
   connectOutcome: string;
   setNodeDraft: React.Dispatch<React.SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
@@ -40,6 +42,12 @@ interface JourneyMapInspectorProps {
   applyEdgeDraft: () => Promise<void>;
   connectSelectedNode: () => Promise<void>;
   deleteSelectedEdge: () => void;
+  currentDefinition?: import('./journey-map-types.js').WorkflowDefinition;
+  aiEditFlow: (
+    mode: 'generate' | 'modify',
+    prompt: string,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ) => Promise<{ message: string } | undefined>;
 }
 
 /**
@@ -64,6 +72,8 @@ export function JourneyMapInspector({
   applyEdgeDraft,
   connectSelectedNode,
   deleteSelectedEdge,
+  currentDefinition,
+  aiEditFlow,
 }: JourneyMapInspectorProps) {
   return (
     <div className="journey-map-inspector">
@@ -119,6 +129,24 @@ export function JourneyMapInspector({
                 setNodeDraft({
                   ...nodeDraft,
                   type: value as WorkflowNodeType,
+                })}
+            />
+          </div>
+
+          <div>
+            <Text type="secondary">执行者</Text>
+            <Select
+              value={nodeDraft.actor}
+              style={{ width: '100%' }}
+              options={[
+                { value: 'agent', label: 'Agent' },
+                { value: 'human', label: '人工' },
+                { value: 'system', label: '系统' },
+              ]}
+              onChange={(value) =>
+                setNodeDraft({
+                  ...nodeDraft,
+                  actor: value as WorkflowActor,
                 })}
             />
           </div>
@@ -236,6 +264,22 @@ export function JourneyMapInspector({
             />
           </div>
 
+          <div>
+            <Text type="secondary">条件（可选）</Text>
+            <Input
+              value={edgeDraft.condition ?? ''}
+              placeholder="例如 goal / current-state"
+              onChange={(event) =>
+                setEdgeDraft({
+                  ...edgeDraft,
+                  condition: event.target.value,
+                })}
+            />
+            <Text type="secondary" className="journey-map-connect-hint">
+              仅对确定性节点参与自动路由；同一节点按 DSL 中的顺序先匹配。
+            </Text>
+          </div>
+
           <Flex gap={8}>
             <Button
               type="primary"
@@ -271,6 +315,11 @@ export function JourneyMapInspector({
           {selectedNode.data.connectionIssueText}
         </Tag>
       ) : null}
+
+      <JourneyMapAiChat
+        currentDefinition={currentDefinition}
+        aiEditFlow={aiEditFlow}
+      />
     </div>
   );
 }
