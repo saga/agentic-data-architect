@@ -3,8 +3,6 @@ import {
   Button,
   Empty,
   Flex,
-  Input,
-  Segmented,
   Space,
   Tag,
   Typography,
@@ -14,7 +12,6 @@ import {
   NodeIndexOutlined,
   PlusOutlined,
   RedoOutlined,
-  RobotOutlined,
   SaveOutlined,
   UndoOutlined,
 } from '@ant-design/icons';
@@ -54,16 +51,12 @@ export function JourneyMap(props: JourneyMapProps) {
  * 工作地图是独立的业务页面：
  * 进入后直接可以拖动、连线、修改属性、让 AI 修改流程，然后明确保存。
  *
- * AI 修改只替换当前画布，不直接写入服务端。用户检查后再点击“保存”，
- * 这样 AI 生成错误时不会悄悄改变正在执行的 Workflow。
+ * AI 对话位于右侧“属性”面板，采用 Ant Design X 的 Bubble.List + Sender。
+ * 每一轮都基于当前画布继续修改；AI 只替换当前画布，不直接写入服务端，
+ * 用户检查后再点击“保存”。
  */
 function JourneyMapCanvas({ onBack }: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
-  const [aiMode, setAiMode] = useState<'modify' | 'generate'>('modify');
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiMessage, setAiMessage] = useState('');
-
   const {
     snapshot,
     fetching,
@@ -121,22 +114,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [dirty, saveWorkflow]);
 
-  const submitAi = async () => {
-    const prompt = aiPrompt.trim();
-    if (!prompt || aiLoading) return;
 
-    setAiLoading(true);
-    setAiMessage('');
-    try {
-      const result = await aiEditFlow(aiMode, prompt);
-      if (result) {
-        setAiMessage(result.message);
-        setAiPrompt('');
-      }
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   if (fetching) {
     return (
@@ -242,51 +220,7 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
         </Flex>
       </header>
 
-      <section className="journey-map-ai-bar">
-        <div className="journey-map-ai-title">
-          <RobotOutlined />
-          <Text strong>让 AI 帮你改工作地图</Text>
-        </div>
-        <Segmented
-          value={aiMode}
-          onChange={(value) => setAiMode(value as 'modify' | 'generate')}
-          options={[
-            { value: 'modify', label: '修改当前图' },
-            { value: 'generate', label: '重新设计' },
-          ]}
-        />
-        <Input.TextArea
-          value={aiPrompt}
-          onChange={(event) => setAiPrompt(event.target.value)}
-          onPressEnter={(event) => {
-            if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
-              event.preventDefault();
-              void submitAi();
-            }
-          }}
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          placeholder={
-            aiMode === 'modify'
-              ? '例如：把“资料核对”和“业务定义”拆成两个并行步骤，最后汇总后进入评审。'
-              : '例如：把这张图重新设计成 5～7 个步骤，增加必要的确认点，减少重复检查。'
-          }
-          disabled={aiLoading}
-        />
-        <Button
-          type="primary"
-          icon={<RobotOutlined />}
-          loading={aiLoading}
-          disabled={!aiPrompt.trim()}
-          onClick={() => void submitAi()}
-        >
-          生成
-        </Button>
-        {aiMessage ? (
-          <Text type="secondary" className="journey-map-ai-message">
-            {aiMessage}
-          </Text>
-        ) : null}
-      </section>
+
 
       {validationIssues.length ? (
         <div className="journey-map-validation-panel">
@@ -376,6 +310,8 @@ function JourneyMapCanvas({ onBack }: JourneyMapProps) {
           applyEdgeDraft={applyEdgeDraft}
           connectSelectedNode={connectSelectedNode}
           deleteSelectedEdge={deleteSelectedEdge}
+          currentDefinition={currentDefinition}
+          aiEditFlow={aiEditFlow}
         />
       </div>
 
