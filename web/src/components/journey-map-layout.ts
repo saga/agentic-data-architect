@@ -337,6 +337,59 @@ function isPrimaryRoute(edge: FlowEdge): boolean {
  * - 其它分支目标放在主出口上方 / 下方，并且保持在右侧；
  * - terminal 统一放到最右边。
  */
+/**
+ * 找到“主流程”节点。
+ *
+ * 工作地图不是普通 DAG 展示：正常 success/next 路径应该形成一条水平主线，
+ * retry / rollback / 其它分支则从主线向上或向下展开。
+ *
+ * 这里不重新做一套布局，只从 ELK 的结果里确定哪些节点属于主线。
+ */
+function findMainFlowNodes(nodes: FlowNode[], edges: FlowEdge[]): Set<string> {
+  const forwardEdges = getForwardLayoutEdges(nodes, edges);
+  const incoming = new Set(forwardEdges.map((edge) => edge.target));
+
+  const roots = nodes
+    .filter((node) => !incoming.has(node.id))
+    .sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y);
+
+  const main = new Set<string>();
+  let current = roots[0]?.id;
+
+  while (current && !main.has(current)) {
+    main.add(current);
+
+    const candidates = forwardEdges
+      .filter((edge) => edge.source === current && !main.has(edge.target))
+      .sort((a, b) => {
+        const primaryDelta = Number(isPrimaryRoute(b)) - Number(isPrimaryRoute(a));
+        if (primaryDelta !== 0) return primaryDelta;
+
+        const aTarget = nodes.find((node) => node.id === a.target);
+        const bTarget = nodes.find((node) => node.id === b.target);
+        return (
+          (aTarget?.position.x ?? 0) - (bTarget?.position.x ?? 0)
+          || (aTarget?.position.y ?? 0) - (bTarget?.position.y ?? 0)
+          || a.target.localeCompare(b.target)
+        );
+      });
+
+    current = candidates[0]?.target;
+  }
+
+  return main;
+}
+
+/**
+ * 在 ELK 结果上增加工作地图自己的“阅读顺序”。
+ *
+ * 规则：
+ * - 主流程保持从左到右，并尽量处在同一条水平中线上；
+ * - 分支节点保留 ELK 计算出的上下位置，不再把所有节点压成一行；
+ * - 一个节点多个出口时，success / done / next 优先作为主出口；
+ * - retry / return / rollback 等回边不参与主流程分层；
+ * - 不再二次“碰撞排版”移动节点，ELK 已按实际尺寸提供安全间距。
+ */
 export function enforceWorkflowReadingOrder(
   nodes: FlowNode[],
   edges: FlowEdge[],
@@ -352,8 +405,6 @@ export function enforceWorkflowReadingOrder(
     grouped.set(rank, [...(grouped.get(rank) ?? []), node]);
   }
 
-  // 每一列只负责一个流程深度；Y 轴完全由我们控制，不再沿用 ELK 对 feedback edge 的
-  // 随机/拓扑副产物。这样正常流程天然是一条水平主线。
   const rankWidth = new Map<number, number>();
   for (const [rank, group] of grouped) {
     rankWidth.set(
@@ -373,64 +424,33 @@ export function enforceWorkflowReadingOrder(
     x += (rankWidth.get(rank) ?? FALLBACK_NODE_WIDTH) + LAYER_GAP;
   }
 
-  const result = nodes.map((node) => ({ ...node }));
-  const resultById = new Map(result.map((node) => [node.id, node]));
+  const elkY = new Map(nodes.map((node) => [node.id, node.position.y]));
+  const mainFlow = findMainFlowNodes(nodes, edges);
+  const mainRootId = nodes.find(
+    (node) => mainFlow.has(node.id) && (ranks.get(node.id) ?? 0) === 0,
+  )?.id;
+  const mainY = mainRootId ? (elkY.get(mainRootId) ?? 0) : (elkY.get(nodes[0].id) ?? 0);
 
-  for (let rank = 0; rank <= maxRank; rank += 1) {
-    const group = [...(grouped.get(rank) ?? [])].sort(
-      (a, b) => a.position.y - b.position.y || a.id.localeCompare(b.id),
-    );
+  const result = nodes.map((node) => ({
+    ...node,
+    position: {
+      x: rankX.get(ranks.get(node.id) ?? 0) ?? 0,
+      // 只把主流程拉成水平线；分支继续使用 ELK 的 Y，才能看到上下分叉。
+      y: mainFlow.has(node.id) ? mainY : (elkY.get(node.id) ?? mainY),
+    },
+  }));
 
-    const totalHeight =
-      group.reduce(
-        (sum, node) => sum + (dimensions.get(node.id)?.height ?? FALLBACK_NODE_HEIGHT),
-        0,
-      )
-      + Math.max(0, group.length - 1) * NODE_GAP;
-
-    let y = -totalHeight / 2;
-
-    for (const node of group) {
-      const target = resultById.get(node.id);
-      if (!target) continue;
-
-      target.position = {
-        x: rankX.get(rank) ?? 0,
-        y,
-      };
-
-      y += (dimensions.get(node.id)?.height ?? FALLBACK_NODE_HEIGHT) + NODE_GAP;
-    }
-  }
-
-  // 所有正常流程列都围绕同一条视觉中线；把最小 Y 归一到 40，便于保存和初次 fitView。
+  // 所有节点统一留出顶部安全区，便于首次 fitView 和保存/恢复。
   const minY = Math.min(...result.map((node) => node.position.y));
   const yOffset = 40 - minY;
 
-  for (const node of result) {
-    node.position = {
+  return result.map((node) => ({
+    ...node,
+    position: {
       x: node.position.x,
       y: node.position.y + yOffset,
-    };
-  }
-
-  // 正常 forward edge 的 source 必须严格位于 target 左侧。
-  // 这只是最后一道结构约束，不修改回退/重试路线。
-  const forwardEdges = getForwardLayoutEdges(nodes, edges);
-  for (const edge of forwardEdges) {
-    const source = resultById.get(edge.source);
-    const target = resultById.get(edge.target);
-    if (!source || !target) continue;
-
-    const sourceWidth = dimensions.get(edge.source)?.width ?? FALLBACK_NODE_WIDTH;
-    const minTargetX = source.position.x + sourceWidth + LAYER_GAP;
-
-    if (target.position.x < minTargetX) {
-      target.position.x = minTargetX;
-    }
-  }
-
-  return result;
+    },
+  }));
 }
 
 /**
@@ -500,6 +520,5 @@ export async function autoLayoutJourney(
   edges: FlowEdge[],
 ): Promise<FlowNode[]> {
   const layouted = await layoutWithElk(nodes, edges);
-  const ordered = enforceWorkflowReadingOrder(layouted, edges);
-  return removeNodeCollisions(ordered);
+  return enforceWorkflowReadingOrder(layouted, edges);
 }
