@@ -34,6 +34,7 @@ import {
 import {
   addEdge,
   Background,
+  ConnectionLineType,
   BackgroundVariant,
   BaseEdge,
   Controls,
@@ -543,7 +544,7 @@ function JourneyFlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
 
   return (
     <>
-      <BaseEdge id={id} path={path} markerEnd={{ type: MarkerType.ArrowClosed }} />
+      <BaseEdge id={id} path={path} markerEnd={MarkerType.ArrowClosed} />
       <EdgeLabelRenderer>
         <div
           className="journey-flow-edge-label nodrag nopan"
@@ -694,7 +695,7 @@ export function JourneyMap({
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<FlowEdge>([]);
   const nodesRef = useRef<FlowNode[]>([]);
   const edgesRef = useRef<FlowEdge[]>([]);
-  const snapshotRef = useRef<WorkflowSnapshot>();
+  const snapshotRef = useRef<WorkflowSnapshot | undefined>(undefined);
   const newNodeIdsRef = useRef<Set<string>>(new Set());
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
 
@@ -1317,6 +1318,7 @@ export function JourneyMap({
   const createStandaloneNode = async () => {
     const currentSnapshot = snapshotRef.current;
     const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
     if (!currentSnapshot) return;
 
     const id = nextId('step', new Set(currentNodes.map((node) => node.id)));
@@ -1698,7 +1700,7 @@ export function JourneyMap({
             nodesConnectable={editing}
             elementsSelectable={editing}
             edgesReconnectable={editing}
-            connectionLineType="smoothstep"
+            connectionLineType={ConnectionLineType.SmoothStep}
             connectionRadius={28}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
