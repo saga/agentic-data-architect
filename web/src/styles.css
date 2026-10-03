@@ -683,6 +683,171 @@ body {
   }
 }
 
+/* 主调查右栏：只保留当前阶段和当前事实，不做第二套控制台。 */
+.right-panel-shell {
+  min-width: 320px;
+  width: min(390px, 31vw);
+}
+
+.context-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.panel-header > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.panel-header .eyebrow {
+  display: block;
+  white-space: nowrap;
+}
+
+.right-section {
+  min-width: 0;
+  padding: 14px 2px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.right-section-heading {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.right-section-heading .ant-typography {
+  line-height: 20px;
+}
+
+.right-journey {
+  flex: 0 0 auto;
+}
+
+.right-current-state {
+  flex: 0 0 auto;
+  border-bottom: 0;
+}
+
+.journey-map {
+  position: relative;
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.journey-map-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 34px;
+}
+
+.journey-map-rail {
+  position: relative;
+  width: 20px;
+  min-height: 34px;
+}
+
+.journey-map-dot {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #c6ced9;
+  border-radius: 50%;
+  background: #fff;
+  z-index: 1;
+}
+
+.journey-map-line {
+  position: absolute;
+  top: 13px;
+  bottom: -2px;
+  left: 10px;
+  width: 1px;
+  background: #dfe5ee;
+}
+
+.journey-map-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 1px 0 10px 2px;
+}
+
+.journey-map-copy > .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 18px;
+}
+
+.journey-map-item-current .journey-map-dot {
+  width: 11px;
+  height: 11px;
+  top: 4px;
+  left: 5px;
+  border-color: #1677ff;
+  background: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.journey-map-item-current .journey-map-copy > .ant-typography:first-child {
+  color: #1677ff;
+}
+
+.journey-map-item-completed .journey-map-dot {
+  border-color: #52c41a;
+  background: #52c41a;
+}
+
+.journey-map-item-completed .journey-map-copy > .ant-typography:first-child {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.journey-map-item-locked .journey-map-dot {
+  background: #f0f2f5;
+}
+
+.journey-map-item-locked .journey-map-copy > .ant-typography:first-child {
+  color: rgba(0, 0, 0, 0.38);
+}
+
+.right-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.right-fact {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.right-fact-label {
+  font-size: 11px;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.right-fact-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+}
+
 /* 右侧栏只放当前调查的事实和工作地图摘要；配置与详细运行记录放到独立页面。 */
 .context-panel {
   padding: 16px 14px 20px;
@@ -781,10 +946,12 @@ body {
 
 @media (max-width: 760px) {
   .workflow-danger-zone {
-  border-color: #ffccc7;
-  background: #fffafa;
+    border-color: #ffccc7;
+    background: #fffafa;
+  }
 }
 
+/* The rules below are shared desktop defaults; only the small workflow-danger-zone override above is mobile-only. */
 .trajectory-page-body {
   max-width: 1280px;
   margin: 0 auto;
@@ -1440,7 +1607,20 @@ body {
 }
 
 /* 工作地图独立页面 --------------------------------------------------------- */
+.subpage-app {
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #f7f9fc;
+}
+
 .journey-map-subpage {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1467,9 +1647,22 @@ body {
 
 .journey-map-page-header-main {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.journey-map-page-header-main > .ant-btn {
+  flex: 0 0 auto;
+}
+
+.journey-map-page-header-main .journey-map-page-title-group {
+  min-width: 0;
+}
+
+.journey-map-page-header > .ant-flex {
+  flex: 0 0 auto;
 }
 
 .journey-map-page-title-group {
@@ -1478,7 +1671,9 @@ body {
 
 .journey-map-page-title-group > .ant-typography {
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 .journey-map-ai-bar {
@@ -1507,9 +1702,12 @@ body {
 
 .journey-map-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 400px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .journey-map-workspace .journey-map-flow-wrap {
