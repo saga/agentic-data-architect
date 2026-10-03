@@ -1,4 +1,4 @@
-# 当前实现状态（V1.6）
+# 当前实现状态（V1.7）
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
@@ -16,7 +16,7 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 
 V1.4 增加 Structural Analysis：Graphify 作为平台级 structural-analysis capability 运行，平台能力配置随 Control version 固定并进入 audit；Graphify graph.json 记录运行时 hash/version，source_file Evidence 把 Graphify 的结构导航结果重新接回本 Investigation 的 deterministic provenance。Graphify 不直接产生 Claim Evidence，supported 仍要求独立来源。
 
-V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工作导航：主对话区显示 Agent 根据最近一次行动、Evidence、Unknowns 生成的 0～3 条可选路线；全屏工作地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges 展示 Workflow 主线与 Agent 分支。主线位置由当前 Journey 状态决定，当前节点可直接让 Agent 继续推进；地图是只读导航视图，不允许用户编辑流程，也不引入第二套 workflow engine。
+V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工作导航：主对话区显示 Agent 根据最近一次行动、Evidence、Unknowns 生成的 0～3 条可选路线；工作地图使用 @xyflow/react 展示 Workflow 主线与 Agent 临时建议。地图可以只读查看，也可以进入编辑模式修改当前 Investigation 的 Workflow。
 
 后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
 
@@ -2845,3 +2845,115 @@ knowledge/                       .workspace/<session>/
 知识条目记录 `publishedAt`、`reviewedAt`、`sourceConfidence`、`knowledgeConfidence` 和 `timeSensitivity`，并带有 inputs / outputs / checks / cautions。Agent 每轮按 workflow 和问题用轻量确定性检索挑选少量知识；知识只进入方法参考区，不进入 Evidence。
 
 第一批知识覆盖：业务目标、Current-State、Target/Transition、数据模型与业务语义、集成方式、治理/质量/lineage、Architecture Review、Data Product，以及金融场景的 lineage 和 source authority。
+
+## V1.7 Journey Workflow Editor：工作地图成为真正的可执行 Workflow
+
+V1.7 修正了一个之前架构上的不一致：React Flow 地图展示的分支，之前并不是实际状态机的一部分；Workflow runtime 仍主要依赖节点数组顺序。
+
+当前链路：
+
+~~~text
+Skill Markdown
+    ↓
+Journey Definition
+    ↓
+React Flow Editor
+    ↓
+Investigation Workflow Draft
+    ↓
+Server-side Validation
+    ↓
+Active Workflow Version
+    ↓
+Workflow Execution
+    ↓
+Agent Turn
+~~~
+
+核心边界保持很小：
+
+- Skill 中的内置 SKILL.md 不被 UI 直接修改。
+- 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。
+- Markdown 保存流程语义，React Flow layout 单独保存，execution 单独保存。
+- Apply 前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
+- Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
+- Workflow version 改变后清除 Copilot session，避免继续使用旧的流程上下文。
+
+### V1.7 DSL 只增加 completion
+
+原有 DSL 保持不变：
+
+~~~text
+@flow / @task / @gate / @review / @end / @stop
+- success -> target
+- needs-input -> target
+- retry -> target
+~~~
+
+只新增：
+
+~~~yaml
+completion: deterministic
+~~~
+
+以及：
+
+~~~yaml
+completion: agent
+~~~
+
+兼容规则：
+
+~~~text
+有 completeWhen
+  → 默认 deterministic
+
+没有 completeWhen
+  → 默认 agent
+~~~
+
+没有引入 branch、condition、switch、loop 等新控制语法，避免 Markdown DSL 迅速变成一个流程引擎。
+
+### V1.7 Workflow Execution
+
+当前执行状态包含 workflowId、workflowVersion、currentNodeId、completedNodeIds 和 status。
+
+deterministic 节点由已有 Investigation 状态自动推进；agent 节点只有在 Agent 返回合法 nodeId + outcome 后才推进。
+
+因此：
+
+~~~text
+Agent 可以选择现有分支
+Agent 不能修改流程控制边界
+服务端决定是否真的推进
+~~~
+
+### V1.7 Editor API
+
+~~~text
+GET  /api/sessions/:name/journey
+GET  /api/sessions/:name/workflow
+PUT  /api/sessions/:name/workflow/draft
+POST /api/sessions/:name/workflow/validate
+POST /api/sessions/:name/workflow/apply
+POST /api/sessions/:name/workflow/reset
+GET  /api/sessions/:name/workflow/instruction
+~~~
+
+### V1.7 存储边界
+
+当前 Investigation：
+
+~~~text
+<workspace>/<name>/workflow/
+  journey.md
+  journey-meta.json
+  journey-layout.json
+  journey-execution.json
+  journey-draft.md
+  journey-draft-layout.json
+~~~
+
+这样 Workflow、Canvas 和运行状态分别可读、可恢复、可校验，也不需要额外引入 Workflow Registry。
+
+完整设计见 docs/journey-workflow-editor.md。
