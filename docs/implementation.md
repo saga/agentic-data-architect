@@ -20,7 +20,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 
 当前代码状态、下一步实现和边界。不重复架构理论。
 
-## 当前：V1.5
+## 当前：V1.8
 
 已经具备：
 
@@ -309,16 +309,17 @@ npm run flow:lint
 
 ## 当前未完成的主要工作
 
-- 把 Journey 的每个关卡接到真正的 deterministic action / reconciliation engine
-- 支持 Journey 分支、返工和人工确认状态持久化
-- 把 Analysis Case 接到真正的 read-only query / reconciliation engine
-- 支持列级 Source-to-Target Mapping
-- 支持人工 review / approve / reject，并保留 review history
-- 增加 Target Schema / Data Model 编辑与版本化
-- 将 Validation Plan 变成可执行的 deterministic checks
-- 根据已批准 mapping 生成 migration wave 建议
+- 把 Journey 的关键关卡逐步接到真正的 deterministic action / reconciliation engine；当前 Workflow 已负责路线、分支、waiting、版本和执行位置，但不执行具体业务动作。
+- 把 Analysis Case 接到真正的 read-only query / reconciliation engine。
+- 支持列级 Source-to-Target Mapping。
+- 支持人工 review / approve / reject，并保留 review history。
+- 增加 Target Schema / Data Model 编辑与版本化。
+- 将 Validation Plan 变成可执行的 deterministic checks。
+- 根据已批准 mapping 生成 migration wave 建议。
+- 在现有 SQLite conversation store 上补齐 application-owned Memory Archive / cursor pagination。
 
 暂时不增加 Neo4j、vector DB、multi-agent swarm、完整 ontology runtime、Temporal/BPMN、生产写工具。
+
 ## Architecture Knowledge
 
 `knowledge/` 保存跨 Investigation 可复用的 Data Architect 经验。每条知识记录来源、资料时间、最近复核时间、来源可信度和知识可信度，并区分 stable / contextual / time-sensitive。
