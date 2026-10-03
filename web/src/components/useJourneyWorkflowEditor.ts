@@ -35,6 +35,7 @@ import type {
   WorkflowDefinition,
   WorkflowNodeDefinition,
   WorkflowNodeType,
+  WorkflowActor,
   CompletionMode,
   WorkflowSnapshot,
 } from './journey-map-types.js';
@@ -54,7 +55,7 @@ interface JourneyWorkflowEditorResult {
   selectedNode?: FlowNode;
   selectedEdge?: FlowEdge;
   nodeDraft?: Partial<WorkflowNodeDefinition>;
-  edgeDraft?: { outcome: string; target: string };
+  edgeDraft?: { outcome: string; target: string; condition?: string };
   connectTargetId?: string;
   connectOutcome: string;
   validationIssues: string[];
@@ -62,7 +63,11 @@ interface JourneyWorkflowEditorResult {
   currentStage?: JourneyMapStage;
   completedCount: number;
   saveWorkflow: () => Promise<void>;
-  aiEditFlow: (mode: 'generate' | 'modify', prompt: string) => Promise<{ message: string } | undefined>;
+  aiEditFlow: (
+    mode: 'generate' | 'modify',
+    prompt: string,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ) => Promise<{ message: string } | undefined>;
   resetWorkflow: () => void;
   autoLayout: () => Promise<void>;
   createStandaloneNode: () => Promise<void>;
@@ -215,6 +220,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       objective: selectedNode.data.objective,
       visible: selectedNode.data.visible,
       completion: selectedNode.data.completion,
+      actor: selectedNode.data.actor,
       completeWhen: selectedNode.data.completeWhen,
     });
   }, [selectedNode]);
@@ -227,6 +233,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setEdgeDraft({
       outcome: selectedEdge.data?.outcome || 'success',
       target: selectedEdge.target,
+      condition: selectedEdge.data?.condition,
     });
   }, [selectedEdge]);
 
@@ -288,6 +295,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         nodeType: 'task',
         status: 'future',
         completion: 'agent',
+        actor: 'agent',
         visible: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
@@ -618,6 +626,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
               nodeType: (nodeDraft.type as WorkflowNodeType) || node.data.nodeType,
               visible: nodeDraft.visible !== false,
               completion: (nodeDraft.completion as CompletionMode) || node.data.completion,
+              actor: (nodeDraft.actor as WorkflowActor) || node.data.actor,
               completeWhen: nodeDraft.completeWhen
                 ? String(nodeDraft.completeWhen).trim()
                 : undefined,
@@ -678,6 +687,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             data: {
               ...(edge.data ?? {}),
               outcome,
+              condition: edgeDraft.condition?.trim() || undefined,
             },
           }
         : edge
@@ -749,6 +759,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         nodeType: 'task',
         status: 'future',
         completion: 'agent',
+        actor: 'agent',
         visible: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
@@ -1009,7 +1020,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   };
 
   /** 调用工作地图专用 AI。AI 只改图，不直接替用户保存。 */
-  const aiEditFlow = async (mode: 'generate' | 'modify', prompt: string) => {
+  const aiEditFlow = async (
+    mode: 'generate' | 'modify',
+    prompt: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  ) => {
     const name = sessionNameFromUrl();
     if (!name || !prompt.trim()) return undefined;
 
@@ -1019,7 +1034,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ mode, prompt: prompt.trim() }),
+          body: JSON.stringify({
+            mode,
+            prompt: prompt.trim(),
+            messages: history.slice(-12),
+          }),
         },
       );
       const body = await response.json() as {
