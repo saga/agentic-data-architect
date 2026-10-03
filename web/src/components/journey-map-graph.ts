@@ -3,7 +3,6 @@ import {
   MarkerType,
   Position,
   type Connection,
-  type Edge,
 } from '@xyflow/react';
 import {
   EDGE_TYPE,
