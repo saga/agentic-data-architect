@@ -292,7 +292,6 @@ body {
   margin-top: 14px;
 }
 
-
 /* antd v6 的 Tabs 结构是 nav / body-holder / body / content，
    和 v5 的 content-holder / tabpane 不一样；写错类名会让所有子页面一起显示、并且滚不动。 */
 .settings-tabs {
@@ -490,7 +489,6 @@ body {
   }
 }
 
-
 .chat-main {
   font-size: 14px;
 }
@@ -632,7 +630,6 @@ body {
 .bubble-list .ant-bubble-content {
   border-radius: 16px;
 }
-
 
 .composer {
   position: relative;
@@ -1181,44 +1178,7 @@ body {
   border-top: 1px solid #f0f0f0;
 }
 
-
-
 /* Full-screen interactive work map. The canvas reads as a roadmap first, graph second. */
-.journey-map-modal .ant-modal {
-  max-width: calc(100vw - 24px);
-  padding-bottom: 0;
-}
-
-.journey-map-modal .ant-modal-content {
-  height: calc(100vh - 32px);
-}
-
-.journey-map-modal .ant-modal-body {
-  padding: 0;
-  overflow: hidden;
-}
-
-.journey-map-canvas {
-  width: 100%;
-  height: 100%;
-  min-height: 520px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(22, 119, 255, 0.035), transparent 38%),
-    #f7f9fc;
-}
-
-.journey-map-canvas .react-flow {
-  --xy-background-color: #f7f9fc;
-  --xy-node-border-radius-default: 14px;
-  --xy-node-border-default: 1px solid #d9e1ec;
-  --xy-node-background-color-default: #ffffff;
-  --xy-node-boxshadow-default: 0 8px 26px rgba(31, 42, 55, 0.08);
-  --xy-edge-stroke-default: #c9d2df;
-  --xy-edge-stroke-width-default: 2;
-  --xy-background-pattern-dots-color: #d9e1ec;
-  --xy-controls-button-background-color-default: rgba(255, 255, 255, 0.94);
-  --xy-minimap-background-color: rgba(255, 255, 255, 0.94);
-}
 
 .journey-flow-node {
   border: 1px solid #d9e1ec;
@@ -1571,16 +1531,10 @@ body {
   background: #f7f9fc;
 }
 
-
 @media (max-width: 680px) {
-  .journey-map-modal .ant-modal {
-    max-width: calc(100vw - 8px);
-    margin: 4px auto;
-  }
+  
 
-  .journey-map-modal .ant-modal-content {
-    height: calc(100vh - 8px);
-  }
+  
 
   .journey-map-canvas,
   .journey-map-empty {
@@ -1594,7 +1548,6 @@ body {
   border: 0;
   opacity: 0;
 }
-
 
 /* 独立子页面：配置和 Agent 轨迹。
    #root 是 height:100% + overflow:hidden；antd <App> 又插了一层 div.ant-app，
@@ -1740,7 +1693,6 @@ body {
   display: grid;
   gap: 2px;
 }
-
 
 .workflow-danger-zone {
   border-color: #ffccc7;
@@ -1910,46 +1862,7 @@ body {
   }
 }
 
-
 /* Journey Workflow Editor -------------------------------------------------- */
-.journey-map-editor-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: #f7f9fc;
-}
-
-.journey-map-editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid #e9edf3;
-  background: rgba(255, 255, 255, 0.96);
-  flex: 0 0 auto;
-}
-
-.journey-map-editor-header .journey-map-heading-title {
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 24px;
-}
-
-.journey-map-editor-header .journey-map-heading-subtitle {
-  max-width: 720px;
-  margin-top: 2px;
-}
-
-.journey-map-draft-banner {
-  margin: 10px 14px 0;
-  padding: 8px 12px;
-  border: 1px solid #d6e4ff;
-  border-radius: 8px;
-  background: #f0f6ff;
-  flex: 0 0 auto;
-}
 
 .journey-map-validation-panel {
   margin: 10px 14px 0;
@@ -1971,14 +1884,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-}
-
-.journey-map-editor-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  gap: 0;
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 .journey-map-flow-wrap {
@@ -2168,62 +2073,10 @@ body {
   box-shadow: 0 6px 18px rgba(31, 45, 61, 0.13);
 }
 
-.journey-map-summary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 14px;
-  border-top: 1px solid #e9edf3;
-  background: #fff;
-  flex: 0 0 auto;
-}
-
-.journey-map-route-list {
-  padding: 10px 14px 12px;
-  border-top: 1px solid #e9edf3;
-  background: #fff;
-  flex: 0 0 auto;
-}
-
-.journey-map-route-list-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  color: #566275;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.journey-map-editor-mode .react-flow__node {
-  cursor: grab;
-}
-
-.journey-map-editor-mode .react-flow__node:active {
-  cursor: grabbing;
-}
-
-.journey-map-editor-mode .react-flow__edge.selected path {
-  stroke: #1677ff;
-  stroke-width: 2.5;
-}
-
-.journey-map-editor-mode .react-flow__selection {
-  background: rgba(22, 119, 255, 0.08);
-  border: 1px solid rgba(22, 119, 255, 0.35);
-}
-
 @media (max-width: 880px) {
-  .journey-map-editor-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+  
 
-  .journey-map-editor-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(420px, 1fr) auto;
-  }
+  
 
   .journey-map-flow-wrap {
     border-right: 0;
@@ -2235,12 +2088,8 @@ body {
     max-height: 42vh;
   }
 
-  .journey-map-summary-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+  
 }
-
 
 /* Workflow editor: make newly-created nodes unmistakable. */
 .journey-flow-node-new {
@@ -2318,15 +2167,10 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .journey-map-editor-body {
-    grid-template-columns: minmax(0, 1fr) 280px;
-  }
+  
 
-  .journey-map-editor-header .journey-map-heading-subtitle {
-    max-width: 500px;
-  }
+  
 }
-
 
 /* Workflow map: both locked and edit modes use the same visible graph. */
 .journey-flow-node-deemphasized {
@@ -2393,7 +2237,6 @@ body {
 .journey-map-locked-mode .react-flow__edge {
   pointer-events: none;
 }
-
 
 /* Connection diagnostics -------------------------------------------------- */
 .journey-flow-node-connection-warning {
@@ -2469,7 +2312,6 @@ body {
 .journey-map-locked-mode .react-flow__edge {
   pointer-events: none;
 }
-
 
 /* 工作地图独立页面 --------------------------------------------------------- */
 .journey-map-subpage {
