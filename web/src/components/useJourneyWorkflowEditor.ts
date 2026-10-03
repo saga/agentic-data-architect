@@ -107,7 +107,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   // nodes / edges 是 React Flow 的运行时草稿；保存时再转换回 Workflow Definition。
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
-  const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
 
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<FlowEdge>([]);
@@ -236,7 +235,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setEditing(false);
     setUsingDraft(false);
     newNodeIdsRef.current = new Set();
-    setNewNodeIds(new Set());
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
@@ -386,7 +384,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const nextNewIds = new Set(newNodeIdsRef.current);
     nextNewIds.add(id);
     newNodeIdsRef.current = nextNewIds;
-    setNewNodeIds(nextNewIds);
 
     const semanticBase = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
     const definition = definitionFromGraph(nextNodes, nextEdges, semanticBase);
@@ -698,8 +695,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
-    if (currentEdges.some((edge) => edge.source === source && edge.target === target)) {
-      message.info('这两个步骤已经有连接。点击对应连线标签可以修改 outcome。');
+    const outcome = connectOutcome.trim() || 'success';
+    if (currentEdges.some(
+      (edge) =>
+        edge.source === source
+        && edge.target === target
+        && String(edge.data?.outcome ?? '').trim().toLowerCase() === outcome.toLowerCase(),
+    )) {
+      message.info('相同的 outcome 已经连接到这个目标；可以换一个 outcome。');
       return;
     }
 
@@ -708,7 +711,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const targetNode = currentNodes.find((node) => node.id === target);
     if (!sourceNode || !targetNode) return;
 
-    const outcome = connectOutcome.trim() || 'success';
     const edge: FlowEdge = {
       id: source + ':' + outcome + ':' + target + ':' + String(
         currentEdges.filter((item) => item.source === source).length,
@@ -765,7 +767,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const nextIds = new Set(newNodeIdsRef.current);
     nextIds.add(id);
     newNodeIdsRef.current = nextIds;
-    setNewNodeIds(nextIds);
 
     const base = currentSnapshot.draft?.definition ?? currentSnapshot.definition;
     const definition = definitionFromGraph([...currentNodes, node], currentEdges, base);
