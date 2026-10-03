@@ -1909,3 +1909,334 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Journey Workflow Editor -------------------------------------------------- */
+.journey-map-editor-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #f7f9fc;
+}
+
+.journey-map-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #e9edf3;
+  background: rgba(255, 255, 255, 0.96);
+  flex: 0 0 auto;
+}
+
+.journey-map-editor-header .journey-map-heading-title {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 24px;
+}
+
+.journey-map-editor-header .journey-map-heading-subtitle {
+  max-width: 720px;
+  margin-top: 2px;
+}
+
+.journey-map-draft-banner {
+  margin: 10px 14px 0;
+  padding: 8px 12px;
+  border: 1px solid #d6e4ff;
+  border-radius: 8px;
+  background: #f0f6ff;
+  flex: 0 0 auto;
+}
+
+.journey-map-validation-panel {
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  background: #fff2f0;
+  flex: 0 0 auto;
+}
+
+.journey-map-validation-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.journey-map-validation-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.journey-map-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.journey-map-flow-wrap {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border-right: 1px solid #e9edf3;
+}
+
+.journey-map-inspector {
+  min-width: 0;
+  overflow: auto;
+  padding: 14px;
+  background: #fff;
+}
+
+.journey-map-inspector-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.journey-map-inspector-title {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.journey-map-inspector-empty {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  color: #8c96a6;
+}
+
+.journey-flow-handle {
+  opacity: 0;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.journey-flow-handle-edit {
+  opacity: 1;
+  background: #1677ff !important;
+  border: 2px solid #fff !important;
+  box-shadow: 0 0 0 1px #1677ff;
+}
+
+.journey-flow-node {
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.journey-flow-node-stage {
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dfe5ee;
+  box-shadow: 0 4px 14px rgba(31, 45, 61, 0.05);
+  overflow: visible;
+}
+
+.journey-flow-node-stage.selected,
+.journey-flow-node-stage:has(.journey-flow-handle-edit) {
+  cursor: grab;
+}
+
+.journey-flow-node-content {
+  padding: 13px 14px;
+}
+
+.journey-flow-node-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.journey-flow-node-kicker-completed {
+  color: #389e0d;
+}
+
+.journey-flow-node-kicker-current {
+  color: #1677ff;
+}
+
+.journey-flow-node-kicker-future {
+  color: #637083;
+}
+
+.journey-flow-node-kicker-locked {
+  color: #a0a7b3;
+}
+
+.journey-flow-node-type {
+  margin-left: auto;
+  color: #98a2b3;
+  font-weight: 500;
+}
+
+.journey-flow-node-title {
+  margin-top: 7px;
+  color: #182230;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 20px;
+}
+
+.journey-flow-node-subtitle {
+  margin-top: 5px;
+  color: #6c7789;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.journey-flow-node-config {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 9px;
+}
+
+.journey-flow-node-current {
+  border-color: #91caff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.08), 0 8px 24px rgba(22, 119, 255, 0.11);
+}
+
+.journey-flow-node-completed {
+  border-color: #b7eb8f;
+}
+
+.journey-flow-node-future {
+  border-color: #d9e0ea;
+}
+
+.journey-flow-node-locked {
+  border-color: #e5e8ed;
+  background: #fafafa;
+}
+
+.journey-flow-edge {
+  stroke: #9aa6b5;
+  stroke-width: 1.7;
+}
+
+.journey-flow-edge-traversed {
+  stroke: #73d13d;
+  stroke-width: 2.2;
+}
+
+.journey-flow-edge path {
+  transition: stroke 120ms ease, stroke-width 120ms ease;
+}
+
+.journey-flow-edge-label {
+  position: absolute;
+  padding: 3px 7px;
+  border: 1px solid #d9e0ea;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #586578;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  transform-origin: center;
+  box-shadow: 0 2px 7px rgba(31, 45, 61, 0.06);
+}
+
+.journey-flow-edge-label:hover {
+  color: #1677ff;
+  border-color: #91caff;
+}
+
+.journey-node-editor-toolbar {
+  padding: 3px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 6px 18px rgba(31, 45, 61, 0.13);
+}
+
+.journey-map-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border-top: 1px solid #e9edf3;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.journey-map-route-list {
+  padding: 10px 14px 12px;
+  border-top: 1px solid #e9edf3;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.journey-map-route-list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #566275;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.journey-map-editor-mode .react-flow__node {
+  cursor: grab;
+}
+
+.journey-map-editor-mode .react-flow__node:active {
+  cursor: grabbing;
+}
+
+.journey-map-editor-mode .react-flow__edge.selected path {
+  stroke: #1677ff;
+  stroke-width: 2.5;
+}
+
+.journey-map-editor-mode .react-flow__selection {
+  background: rgba(22, 119, 255, 0.08);
+  border: 1px solid rgba(22, 119, 255, 0.35);
+}
+
+@media (max-width: 880px) {
+  .journey-map-editor-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .journey-map-editor-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, 1fr) auto;
+  }
+
+  .journey-map-flow-wrap {
+    border-right: 0;
+    border-bottom: 1px solid #e9edf3;
+    min-height: 420px;
+  }
+
+  .journey-map-inspector {
+    max-height: 42vh;
+  }
+
+  .journey-map-summary-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
