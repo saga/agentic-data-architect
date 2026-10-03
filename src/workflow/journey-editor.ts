@@ -234,24 +234,40 @@ function normalizeExecution(
   }
 
   const currentNode = definition.nodes.find((node) => node.id === execution.currentNodeId);
-  const needsHuman = currentNode?.actor === 'human' && currentNode.type !== 'end' && currentNode.type !== 'stop';
-  const runId = execution.runId || definition.id + '-v' + String(version);
+  if (!currentNode) return initialJourneyExecution(definition, version);
+
+  const terminalStatus: JourneyExecution['status'] =
+    currentNode.type === 'end'
+      ? 'completed'
+      : currentNode.type === 'stop'
+        ? 'stopped'
+        : currentNode.actor === 'human'
+          ? 'waiting'
+          : 'active';
+
+  const runId = execution.runId?.trim() || definition.id + '-v' + String(version);
+  const completedNodeIds = [...new Set(
+    execution.completedNodeIds.filter((id) =>
+      definition.nodes.some((node) => node.id === id),
+    ),
+  )];
+
   const baseExecution: JourneyExecution = {
     workflowId: definition.id,
     workflowVersion: version,
     runId,
     currentNodeId: execution.currentNodeId,
-    completedNodeIds: [...execution.completedNodeIds],
-    status: needsHuman ? 'waiting' : execution.status,
+    completedNodeIds,
+    status: terminalStatus,
   };
 
-  if (needsHuman) {
+  if (terminalStatus === 'waiting') {
     return {
       ...baseExecution,
       pendingInteraction: execution.pendingInteraction ?? {
-        id: 'pending-' + runId + '-' + currentNode!.id,
-        nodeId: currentNode!.id,
-        reason: '等待人工完成“' + currentNode!.title + '”。',
+        id: 'pending-' + runId + '-' + currentNode.id,
+        nodeId: currentNode.id,
+        reason: '等待人工完成“' + currentNode.title + '”。',
         requestedAt: new Date().toISOString(),
       },
     };
@@ -387,22 +403,31 @@ export async function getJourneySnapshot(
 
   // Deterministic completion may move the current node without an Agent transition.
   // Persist that state so the next turn cannot observe an older current node.
-  if (
+  const executionChanged =
     state.execution.currentNodeId !== execution.currentNodeId
     || state.execution.status !== execution.status
     || state.execution.completedNodeIds.length !== execution.completedNodeIds.length
     || state.execution.completedNodeIds.some((id) => !execution.completedNodeIds.includes(id))
-  ) {
-    await withWorkspaceContextLock(name, async () => {
+    || JSON.stringify(state.execution.pendingInteraction ?? null)
+      !== JSON.stringify(execution.pendingInteraction ?? null);
+
+  if (executionChanged) {
+    const persisted = await withWorkspaceContextLock(name, async () => {
       const latest = await loadJourneyExecution(name, active.definition, active.version);
       if (
-        latest.currentNodeId === execution.currentNodeId
-        && latest.workflowVersion === execution.workflowVersion
+        latest.currentNodeId !== execution.currentNodeId
+        || latest.workflowVersion !== execution.workflowVersion
       ) {
-        await fs.mkdir(journeyDir(name), { recursive: true });
-        await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), state.execution);
+        return false;
       }
+      await fs.mkdir(journeyDir(name), { recursive: true });
+      await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), state.execution);
+      return true;
     });
+
+    if (persisted) {
+      await appendDeterministicAdvanceEvents(name, execution, state.execution);
+    }
   }
 
   return {
@@ -613,6 +638,71 @@ function extractWorkflowTransition(
   return typeof nodeId === 'string' && typeof outcome === 'string' && Boolean(nodeId) && Boolean(outcome)
     ? { nodeId, outcome }
     : null;
+}
+
+/**
+ * deterministic 节点也会真正推进 execution，所以这里补写最小运行事件，
+ * 保证“执行状态”和“运行轨迹”不会因为自动推进而出现缺口。
+ */
+async function appendDeterministicAdvanceEvents(
+  name: string,
+  before: JourneyExecution,
+  after: JourneyExecution,
+): Promise<void> {
+  const completedBefore = new Set(before.completedNodeIds);
+  const newlyCompleted = after.completedNodeIds.filter((id) => !completedBefore.has(id));
+
+  for (const nodeId of newlyCompleted) {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: after.runId,
+      workflowId: after.workflowId,
+      workflowVersion: after.workflowVersion,
+      type: 'node-completed',
+      timestamp: new Date().toISOString(),
+      nodeId,
+      data: { deterministic: true },
+    });
+  }
+
+  if (
+    before.status !== 'waiting'
+    && after.status === 'waiting'
+    && after.pendingInteraction
+  ) {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: after.runId,
+      workflowId: after.workflowId,
+      workflowVersion: after.workflowVersion,
+      type: 'node-waiting',
+      timestamp: new Date().toISOString(),
+      nodeId: after.pendingInteraction.nodeId,
+      data: { ...after.pendingInteraction, deterministic: true },
+    });
+  } else if (before.status !== 'completed' && after.status === 'completed') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: after.runId,
+      workflowId: after.workflowId,
+      workflowVersion: after.workflowVersion,
+      type: 'workflow-completed',
+      timestamp: new Date().toISOString(),
+      nodeId: after.currentNodeId,
+      data: { deterministic: true },
+    });
+  } else if (before.status !== 'stopped' && after.status === 'stopped') {
+    await appendJourneyRunEvent(name, {
+      id: crypto.randomUUID(),
+      runId: after.runId,
+      workflowId: after.workflowId,
+      workflowVersion: after.workflowVersion,
+      type: 'workflow-stopped',
+      timestamp: new Date().toISOString(),
+      nodeId: after.currentNodeId,
+      data: { deterministic: true },
+    });
+  }
 }
 
 /**
