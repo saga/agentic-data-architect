@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Badge,
   Button,
+  Collapse,
   Flex,
   Input,
   Select,
@@ -123,10 +124,10 @@ export function JourneyMapInspector({
       ) : null}
 
       {selectedNode && nodeDraft ? (
-        <Flex vertical gap={12}>
-          <div>
+        <Flex vertical gap={10}>
+          <div className="journey-map-property-id">
             <Text type="secondary">ID</Text>
-            <Input value={selectedNode.id} disabled />
+            <Text code>{selectedNode.id}</Text>
           </div>
 
           <div>
@@ -148,148 +149,174 @@ export function JourneyMapInspector({
             />
           </div>
 
-          <div>
-            <Text type="secondary">节点类型</Text>
-            <Select
-              value={nodeDraft.type}
-              style={{ width: '100%' }}
-              options={[
-                { value: 'task', label: '任务' },
-                { value: 'gate', label: '判断点' },
-                { value: 'review', label: '评审' },
-                { value: 'end', label: '完成' },
-                { value: 'stop', label: '停止' },
-              ]}
-              onChange={(value) =>
-                setNodeDraft({
-                  ...nodeDraft,
-                  type: value as WorkflowNodeType,
-                })}
-            />
-          </div>
+          <Collapse
+            size="small"
+            defaultActiveKey={['execution']}
+            items={[
+              {
+                key: 'execution',
+                label: '执行设置',
+                children: (
+                  <Flex vertical gap={10}>
+                    <div className="journey-map-property-grid">
+                      <div>
+                        <Text type="secondary">节点类型</Text>
+                        <Select
+                          value={nodeDraft.type}
+                          style={{ width: '100%' }}
+                          options={[
+                            { value: 'task', label: '任务' },
+                            { value: 'gate', label: '判断点' },
+                            { value: 'review', label: '评审' },
+                            { value: 'end', label: '完成' },
+                            { value: 'stop', label: '停止' },
+                          ]}
+                          onChange={(value) =>
+                            setNodeDraft({
+                              ...nodeDraft,
+                              type: value as WorkflowNodeType,
+                            })}
+                        />
+                      </div>
+                      <div>
+                        <Text type="secondary">执行者</Text>
+                        <Select
+                          value={nodeDraft.actor}
+                          style={{ width: '100%' }}
+                          options={[
+                            { value: 'agent', label: 'Agent' },
+                            { value: 'human', label: '人工' },
+                            { value: 'system', label: '系统' },
+                          ]}
+                          onChange={(value) =>
+                            setNodeDraft({
+                              ...nodeDraft,
+                              actor: value as WorkflowActor,
+                            })}
+                        />
+                      </div>
+                    </div>
 
-          <div>
-            <Text type="secondary">执行者</Text>
-            <Select
-              value={nodeDraft.actor}
-              style={{ width: '100%' }}
-              options={[
-                { value: 'agent', label: 'Agent' },
-                { value: 'human', label: '人工' },
-                { value: 'system', label: '系统' },
-              ]}
-              onChange={(value) =>
-                setNodeDraft({
-                  ...nodeDraft,
-                  actor: value as WorkflowActor,
-                })}
-            />
-          </div>
+                    <div>
+                      <Text type="secondary">完成方式</Text>
+                      <Select
+                        value={nodeDraft.completion}
+                        style={{ width: '100%' }}
+                        options={[
+                          { value: 'agent', label: 'Agent 判断结果' },
+                          { value: 'deterministic', label: '确定性条件' },
+                        ]}
+                        onChange={(value) =>
+                          setNodeDraft({
+                            ...nodeDraft,
+                            completion: value as CompletionMode,
+                          })}
+                      />
+                    </div>
 
-          <div>
-            <Text type="secondary">完成方式</Text>
-            <Select
-              value={nodeDraft.completion}
-              style={{ width: '100%' }}
-              options={[
-                { value: 'agent', label: 'Agent 判断结果' },
-                { value: 'deterministic', label: '确定性条件' },
-              ]}
-              onChange={(value) =>
-                setNodeDraft({
-                  ...nodeDraft,
-                  completion: value as CompletionMode,
-                })}
-            />
-          </div>
+                    {nodeDraft.completion === 'deterministic' ? (
+                      <div>
+                        <Text type="secondary">completeWhen</Text>
+                        <Input
+                          value={String(nodeDraft.completeWhen ?? '')}
+                          placeholder="例如 goal / current-state / validation"
+                          onChange={(event) =>
+                            setNodeDraft({
+                              ...nodeDraft,
+                              completeWhen: event.target.value,
+                            })}
+                        />
+                      </div>
+                    ) : null}
+                  </Flex>
+                ),
+              },
+              {
+                key: 'dependencies',
+                label: '依赖与产出',
+                children: (
+                  <Flex vertical gap={10}>
+                    <div>
+                      <Text type="secondary">前置成果</Text>
+                      <Input
+                        value={nodeDraft.requires?.join(', ') ?? ''}
+                        placeholder="例如 current-state, evidence"
+                        onChange={(event) =>
+                          setNodeDraft({
+                            ...nodeDraft,
+                            requires: event.target.value
+                              .split(',')
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          })}
+                      />
+                    </div>
+                    <div>
+                      <Text type="secondary">产出成果</Text>
+                      <Input
+                        value={nodeDraft.produces?.join(', ') ?? ''}
+                        placeholder="例如 target, validation"
+                        onChange={(event) =>
+                          setNodeDraft({
+                            ...nodeDraft,
+                            produces: event.target.value
+                              .split(',')
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          })}
+                      />
+                    </div>
+                  </Flex>
+                ),
+              },
+              {
+                key: 'connections',
+                label: '连接',
+                children: (
+                  <div className="journey-map-connect-box">
+                    <Text strong>连接到现有步骤</Text>
+                    <Text type="secondary">
+                      新建步骤或断开步骤可以直接在这里选择目标，不必拖线。
+                    </Text>
 
-          <div>
-            <Text type="secondary">前置成果</Text>
-            <Input
-              value={nodeDraft.requires?.join(', ') ?? ''}
-              placeholder="例如 current-state, evidence"
-              onChange={(event) =>
-                setNodeDraft({
-                  ...nodeDraft,
-                  requires: event.target.value
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean),
-                })}
-            />
-          </div>
+                    <Select
+                      value={connectTargetId}
+                      allowClear
+                      placeholder="选择目标步骤"
+                      style={{ width: '100%' }}
+                      options={nodes
+                        .filter((node) => node.id !== selectedNode.id)
+                        .map((node) => ({
+                          value: node.id,
+                          label: node.id + ' · ' + node.data.title,
+                        }))}
+                      onChange={setConnectTargetId}
+                    />
 
-          <div>
-            <Text type="secondary">产出成果</Text>
-            <Input
-              value={nodeDraft.produces?.join(', ') ?? ''}
-              placeholder="例如 target, validation"
-              onChange={(event) =>
-                setNodeDraft({
-                  ...nodeDraft,
-                  produces: event.target.value
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean),
-                })}
-            />
-          </div>
+                    <Input
+                      value={connectOutcome}
+                      placeholder="success / retry / needs-input"
+                      onChange={(event) => setConnectOutcome(event.target.value)}
+                      addonBefore="outcome"
+                    />
 
-          {nodeDraft.completion === 'deterministic' ? (
-            <div>
-              <Text type="secondary">completeWhen</Text>
-              <Input
-                value={String(nodeDraft.completeWhen ?? '')}
-                placeholder="例如 goal / current-state / validation"
-                onChange={(event) =>
-                  setNodeDraft({
-                    ...nodeDraft,
-                    completeWhen: event.target.value,
-                  })}
-              />
-            </div>
-          ) : null}
+                    <Button
+                      block
+                      icon={<ArrowRightOutlined />}
+                      disabled={!connectTargetId}
+                      onClick={() => void connectSelectedNode()}
+                    >
+                      建立连接
+                    </Button>
 
-          <div className="journey-map-connect-box">
-            <Text strong>连接到现有步骤</Text>
-            <Text type="secondary">
-              新建步骤或断开步骤可以直接在这里选择目标，不必拖线。
-            </Text>
-
-            <Select
-              value={connectTargetId}
-              allowClear
-              placeholder="选择目标步骤"
-              style={{ width: '100%' }}
-              options={nodes
-                .filter((node) => node.id !== selectedNode.id)
-                .map((node) => ({
-                  value: node.id,
-                  label: node.id + ' · ' + node.data.title,
-                }))}
-              onChange={setConnectTargetId}
-            />
-
-            <Input
-              value={connectOutcome}
-              placeholder="success / retry / needs-input"
-              onChange={(event) => setConnectOutcome(event.target.value)}
-              addonBefore="outcome"
-            />
-
-            <Button
-              block
-              icon={<ArrowRightOutlined />}
-              disabled={!connectTargetId}
-              onClick={() => void connectSelectedNode()}
-            >
-              建立连接
-            </Button>
-
-            <Text type="secondary" className="journey-map-connect-hint">
-              也可以直接拖右侧连接点 → 目标步骤左侧连接点。
-            </Text>
-          </div>
+                    <Text type="secondary" className="journey-map-connect-hint">
+                      也可以直接拖右侧连接点 → 目标步骤左侧连接点。
+                    </Text>
+                  </div>
+                ),
+              },
+            ]}
+          />
 
           <Button
             type="primary"
