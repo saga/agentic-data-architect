@@ -149,7 +149,7 @@ Archive 必须保留 `sourceRecordIds` / sequence 范围，摘要只是压缩后
 
 ## Agent / Skill / Script 原则
 
-当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。Workflow 只提供地图骨架；运行时的动态路线由 Agent 结合当前问题、Evidence、Unknowns 和用户动作生成，作为可选导引持久化，不直接驱动状态机。
+当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。Workflow 只提供地图骨架；Agent 可以在回答后给出少量下一步候选，用户点击候选后，前端发送 routeId，服务端从当前调查的真实候选中解析并作为结构化上下文交给 Agent，而不是拼一段“我选择这条路线……”的提示词。
 
 Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
@@ -183,7 +183,7 @@ Agent 自主调查
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
 - Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
 
-Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”；Journey 只用于导引，不决定唯一下一步。每轮 Agent 还可以根据用户动作、Evidence 和 Unknowns 生成 0～3 条新的动态路线，用户可以选择其中一条、自己提出另一条路线，甚至完全不按地图走；下一轮会重新规划。工作方式不是普通筛选项，首页不提供随手切换；需要在“调查配置 → 工作方式”明确选择并输入确认语句后才会切换。取消或切换 Workflow 不会重置 messages、Evidence、Findings、Discovery 或 workspace，并会丢弃旧的动态路线，避免路线与新的工作方式混用。Workflow Skill 不属于用户可编辑的普通 capability Skill 集合，而是由当前工作方式决定。
+Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”。工作方式不是首页上的普通筛选项；需要在“调查配置 → 工作方式”明确选择并输入确认语句后才会切换。Agent 的下一步候选只是调查辅助，点击后通过结构化 routeId 执行，不修改 Workflow，也不会创建第二套状态机。
 
 金融 AI-native 路线：
 
@@ -214,7 +214,7 @@ Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量
 - 工作地图可以直接拖拽节点、添加步骤、连接/重新连接分支、编辑节点和分支属性，并通过 AI 提出 Workflow Patch。
 - 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换，避免属性表单与 AI 对话同时挤占空间。
 - 编辑结果先留在当前画布；只有点击“保存”后，服务端验证通过才创建新的 Investigation Workflow version。
-- Unknowns 和 Agent 动态路线仍属于调查导航，不会绕过正式 Workflow 的执行控制。
+- Unknowns 和 Agent 下一步候选都属于调查辅助，不会绕过正式 Workflow 的执行控制；下一步候选只表示“这次可以做什么”，不代表流程已经推进。
 
 路线定义在：
 
