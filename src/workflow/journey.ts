@@ -74,9 +74,6 @@ export interface JourneyFacts {
   mappingCount: number;
   blockingValidationReady: number;
   blockingValidationTotal: number;
-  /** 只是说明切换/回退的基本条件是否已经明确，不代表已经执行切换。 */
-  cutoverCriteriaDefined: boolean;
-  rollbackCriteriaDefined: boolean;
 }
 
 export interface JourneyStage {
@@ -377,12 +374,6 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
     case 'validation':
       return facts.blockingValidationTotal > 0
         && facts.blockingValidationReady >= facts.blockingValidationTotal;
-    case 'cutover':
-      return Boolean(
-        conditionPassed('validation', facts)
-        && facts.cutoverCriteriaDefined
-        && facts.rollbackCriteriaDefined,
-      );
     case 'assessment-current-state':
       return Boolean(
         facts.currentState
