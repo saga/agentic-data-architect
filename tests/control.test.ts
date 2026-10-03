@@ -15,7 +15,6 @@ function control(): InvestigationControl {
     },
     agent: {
       systemPrompt: { version: 1, content: '' },
-      skills: [],
       mcpServers: [],
     },
     history: [],
