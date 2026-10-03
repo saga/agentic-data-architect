@@ -67,9 +67,9 @@ test('default layout gives every node a stable position', () => {
     id: 'demo',
     start: 'a',
     nodes: [
-      { id: 'a', type: 'task' as const, title: 'A', visible: true, completion: 'agent' as const, routes: [{ outcome: 'success', target: 'b' }] },
-      { id: 'b', type: 'task' as const, title: 'B', visible: true, completion: 'agent' as const, routes: [{ outcome: 'success', target: 'done' }] },
-      { id: 'done', type: 'end' as const, title: 'Done', visible: false, completion: 'agent' as const, routes: [] },
+      { id: 'a', type: 'task' as const, title: 'A', visible: true, completion: 'agent' as const, actor: 'agent' as const, routes: [{ outcome: 'success', target: 'b' }] },
+      { id: 'b', type: 'task' as const, title: 'B', visible: true, completion: 'agent' as const, actor: 'agent' as const, routes: [{ outcome: 'success', target: 'done' }] },
+      { id: 'done', type: 'end' as const, title: 'Done', visible: false, completion: 'agent' as const, actor: 'system' as const, routes: [] },
     ],
   };
 
