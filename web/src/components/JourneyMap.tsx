@@ -55,6 +55,7 @@ import {
   type Node,
   type NodeProps,
   type ReactFlowInstance,
+  useInternalNode,
   useUpdateNodeInternals,
 } from '@xyflow/react';
 
@@ -594,16 +595,71 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
   );
 }
 
-function JourneyFlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps<FlowEdge>) {
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 12,
-  });
+/** 自己连自己的分支（needs-input -> 同一步骤）走一条专门的绕行路线。
+ *
+ * 通用路径在这种情况下会从右侧出口出去、又原路折返回左侧入口，
+ * 折返的那一段和节点卡片处在同一高度，被卡片整个盖住，
+ * 屏幕上只剩下左右两截悬空的短线，看着像"连了个不存在的节点"。
+ * 所以这里让它从右边出去、绕到节点下方、再从左边回到入口，一眼能看出是"回到自己"。
+ */
+function selfLoopPath(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  nodeBottom: number | undefined,
+): [string, number, number] {
+  const gap = 28;
+  const corner = 12;
+  const right = sourceX + gap;
+  const left = targetX - gap;
+  const bottom = Math.max(nodeBottom ?? 0, Math.max(sourceY, targetY) + gap) + 24;
+
+  const d = [
+    'M', sourceX, sourceY,
+    'L', right - corner, sourceY,
+    'Q', right, sourceY, right, sourceY + corner,
+    'L', right, bottom - corner,
+    'Q', right, bottom, right - corner, bottom,
+    'L', left + corner, bottom,
+    'Q', left, bottom, left, bottom - corner,
+    'L', left, targetY + corner,
+    'Q', left, targetY, left + corner, targetY,
+    'L', targetX, targetY,
+  ].join(' ');
+
+  return [d, (right + left) / 2, bottom];
+}
+
+function JourneyFlowEdge({
+  id,
+  source,
+  target,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+}: EdgeProps<FlowEdge>) {
+  const sourceNode = useInternalNode(source);
+  const selfLoop = source === target;
+  const nodeBottom = sourceNode
+    ? sourceNode.internals.positionAbsolute.y + (sourceNode.measured.height ?? 0)
+    : undefined;
+
+  const [path, labelX, labelY] = selfLoop
+    ? selfLoopPath(sourceX, sourceY, targetX, targetY, nodeBottom)
+    : getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 12,
+      });
 
   return (
     <>
