@@ -69,7 +69,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     ``,
     ...(snapshot?.currentState
       ? [
-        `- Dataset lineage coverage: ${snapshot.currentState.coverage.datasetLineageCoverage === null ? 'n/a' : (snapshot.currentState.coverage.datasetLineageCoverage * 100).toFixed(1) + '%'}`,
+        `- 已连上线的数据集: ${snapshot.currentState.coverage.connectedDatasets}/${snapshot.currentState.coverage.datasets}`,
         `- SQL parse failures: ${snapshot.currentState.coverage.sqlParseFailures}`,
         `- Semantic assets: ${snapshot.currentState.coverage.semanticAssets}`,
         `- Source-of-truth candidates: ${snapshot.currentState.sourceOfTruthCandidates.length}`,
@@ -108,7 +108,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     `## 10. Coverage / Gaps`,
     ``,
     `- SQL parse coverage: ${sqlCoverage}`,
-    `- Lineage coverage: ${lineageCoverage}`,
+    `- 已发现血缘连接: ${lineageCoverage}`,
     `- Column lineage edges: ${columnEdges}`,
     `- Evidence: ${inv.evidence.length} total (${[...evidenceByType.entries()].map(([t, n]) => `${t}=${n}`).join(', ') || 'none'})`,
     `- Findings: ${inv.findings.length}, Claims: ${inv.claims.length}, Unknowns: ${inv.unknowns.length}`,
