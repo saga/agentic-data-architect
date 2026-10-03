@@ -585,12 +585,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       return;
     }
 
-    pushHistory();
     const removedIds = new Set(removed.map((change) => change.id));
-    const nextNodes = nodesRef.current.filter((node) => !removedIds.has(node.id));
-    const nextEdges = edgesRef.current.filter(
-      (edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target),
-    );
 
     for (const id of removedIds) {
       if (id === snapshotRef.current?.definition.start) {
@@ -598,6 +593,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         return;
       }
     }
+
+    pushHistory();
+    const nextNodes = nodesRef.current.filter((node) => !removedIds.has(node.id));
+    const nextEdges = edgesRef.current.filter(
+      (edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target),
+    );
 
     const nextNewIds = new Set(newNodeIdsRef.current);
     for (const id of removedIds) nextNewIds.delete(id);
@@ -644,6 +645,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
               completeWhen: nodeDraft.completeWhen
                 ? String(nodeDraft.completeWhen).trim()
                 : undefined,
+              requires: nodeDraft.requires,
+              produces: nodeDraft.produces,
             },
           }
         : node
@@ -806,7 +809,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       nextIds,
     );
 
-    setNodes(await autoLayoutJourney(graph.nodes, graph.edges));
+    const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
+    if (!laidOutNodes) return;
+    setNodes(laidOutNodes);
     setEdges(graph.edges);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
