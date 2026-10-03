@@ -44,19 +44,19 @@ Estate 现在已经支持 system/application、data store、dataset、column、j
 
 ## Coverage
 
-至少记录 files scanned、SQL files、parsed statements、parse failures、datasets、dataset lineage coverage、column lineage、semantic assets 和 profiled datasets。
+至少记录 files scanned、SQL files、parsed statements、parse failures、datasets、已连上线的数据集、column lineage、semantic assets 和 profiled datasets。这里的“已连上线的数据集 / connection rate”只表示有多少 dataset 出现在已发现 lineage 连接中，不表示数据真相已经确认。
 
 Coverage 是确定性事实，不是模型自己给出的置信度。
 
 ## Source-of-Truth Candidates
 
-系统可以根据名称、上下游结构、metadata、semantic context 和 evidence 给出候选。
+系统可以根据名称、上下游结构、metadata、semantic context 和 evidence 给出候选。候选上的 `priorityScore` 只是调查顺序 heuristic，不是 source-of-truth 置信度。
 
-candidate != confirmed source of truth。业务权威仍由用户确认。
+candidate != confirmed source of truth。业务权威仍由用户确认；只有确认后的业务/架构结论才进入正式工作产物。
 
 ## Semantic Candidates
 
-从 physical schema 和已有 semantic assets 形成 business concept、entity、identifier、metric、temporal dimension 等候选。
+从 physical schema 和已有 semantic assets 形成 business concept、entity、identifier、metric、temporal dimension 等候选。这些只是“可能的语义”，不会自动变成已确认业务定义。
 
 已有 Snowflake Semantic View、Data Product 或 Catalog 定义应优先作为上下文，而不是重新猜一遍。
 
