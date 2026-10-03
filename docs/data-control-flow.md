@@ -45,7 +45,7 @@ flowchart LR
     Copilot[GitHub Copilot SDK]
     Session[(Copilot Session)]
     Workspace[Investigation Workspace]
-    DuckDB[(analysis.duckdb)]
+    DuckDB[(local.duckdb)]
     Dataset[(SQLite local_datasets)]
 
     Browser -->|POST /messages/stream<br/>message + turnId| API
@@ -664,7 +664,7 @@ Capability Skill 不再保存为 Investigation 的“启用清单”。Copilot �
 
 Copilot 使用 mode: "copilot-cli"，因为当前产品是个人本机 Agent，需要保留 Copilot CLI 的 ambient skills、工具和内置 MCP。
 
-本地数据工具由应用显式注册。它们通过 Dataset Registry 和 DuckDB 查询当前 workspace 数据，并把分析结果写成 Evidence；Agent 没有直接打开 analysis.duckdb 或任意本地文件的工具。
+本地数据工具由应用显式注册。它们通过 Dataset Registry 和 DuckDB 查询当前 workspace 数据，并把分析结果写成 Evidence；Agent 没有直接打开 local.duckdb 或任意本地文件的工具。
 
 HTTP MCP 的 headers 与 URL 一样从配置中解析环境变量后传入 runtime；secret 本身不写入 `control.json`。
 
@@ -692,7 +692,7 @@ local_describe / sample / profile / query
       Claim / Finding
 ~~~
 
-每个 Investigation 一个 analysis.duckdb；同一进程内的操作在单个 connection 上串行化。大数据不复制进 SQLite，query 结果只返回受控行数。
+每个 Investigation 一个 local.duckdb；同一进程内的操作在单个 connection 上串行化。大数据不复制进 SQLite，query 结果只返回受控行数。
 
 local_query 只允许 SELECT / WITH，禁止多语句、ATTACH、COPY、INSTALL、LOAD、文件读取函数、网络和其它数据库 scanner。
 
