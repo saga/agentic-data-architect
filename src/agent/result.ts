@@ -31,16 +31,6 @@ export const AgentAnswerSchema = z.object({
   routeOptions: z.array(JourneyRouteOptionSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
-  workflow: z.object({
-    nodeId: z.string(),
-    outcome: z.string(),
-  }).strict().optional().transform((value) => {
-    if (!value?.nodeId.trim() || !value.outcome.trim()) return undefined;
-    return {
-      nodeId: value.nodeId.trim(),
-      outcome: value.outcome.trim(),
-    };
-  }),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
@@ -96,7 +86,6 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       unknowns: ['模型没有返回合法 JSON，需要重问或收紧提示词'],
       followUpQuestions: [],
       routeOptions: [],
-      workflow: undefined,
       warnings: ['这次回答没有返回可解析的结构化结果，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
@@ -110,7 +99,6 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
       unknowns: ['模型返回的结构化结果不符合预期，需要重问或收紧提示词'],
       followUpQuestions: [],
       routeOptions: [],
-      workflow: undefined,
       warnings: ['这次回答不符合结构化结果 Schema，系统只保存了原始回答，没有保存 Claims。'],
       droppedEvidenceRefs,
     };
