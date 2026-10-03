@@ -136,7 +136,8 @@ export function JourneyMapInspector({
         </Text>
       </div>
 
-      {humanWaiting && selectedNode ? (
+      <div className="journey-map-inspector-properties-scroll">
+        {humanWaiting && selectedNode ? (
         <div className="journey-map-human-review">
           <Flex align="center" justify="space-between" gap={8}>
             <Text strong>等待人工处理</Text>
@@ -445,6 +446,7 @@ export function JourneyMapInspector({
           {selectedNode.data.connectionIssueText}
         </Tag>
       ) : null}
+      </div>
     </div>
   );
 
@@ -467,8 +469,9 @@ export function JourneyMapInspector({
         className="journey-map-inspector-tabs"
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as 'properties' | 'ai')}
-        size="small"
+        size="middle"
         animated={false}
+        tabBarGutter={24}
         items={[
           {
             key: 'properties',
