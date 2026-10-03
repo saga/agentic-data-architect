@@ -332,8 +332,6 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
     mappingCount: 0,
     blockingValidationReady: 0,
     blockingValidationTotal: 0,
-    cutoverCriteriaDefined: false,
-    rollbackCriteriaDefined: false,
   };
 }
 
