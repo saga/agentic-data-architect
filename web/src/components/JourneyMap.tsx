@@ -1414,7 +1414,7 @@ export function JourneyMap({
     return () => {
       cancelled = true;
     };
-  }, [editing, usingDraft, snapshot]);
+  }, [editing, usingDraft, snapshot?.version]);
 
   const definitionPayload = currentDefinition;
   const layoutPayload = layoutFromNodes(nodes);
@@ -1459,7 +1459,7 @@ export function JourneyMap({
       if (!response.ok) throw new Error(body.error || response.statusText);
       setValidationIssues(body.issues ?? []);
       if (body.snapshot) setSnapshot(body.snapshot);
-      setUsingDraft(true);
+      // 当前画布本身就是刚保存的草稿，不重新装载，避免保存后清空撤销栈和选中状态。
       message.success(body.issues?.length ? '草稿已保存，但还有校验问题。' : 'Workflow 草稿已保存。');
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
