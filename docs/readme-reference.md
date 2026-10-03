@@ -47,6 +47,13 @@ npm run dev
     discovery/
     reports/
     artifacts/
+    workflow/
+      journey.md
+      journey-meta.json
+      journey-layout.json
+      journey-execution.json
+      journey-draft.md
+      journey-draft-layout.json
 ~~~
 
 context.json 保存当前调查状态，不保存完整多轮聊天正文。
@@ -63,7 +70,7 @@ shared/ 保存跨 session 可以复用的研究资料。
 - `financial-ai-native-architecture`
 - `data-architecture-assessment`
 
-Workflow 只是当前 Investigation 的可选工作方法，不是 Investigation 类型。用户可以在调查过程中切换或取消路线，但需要在“调查配置 → 工作方式”执行明确的调整确认；context、消息、Evidence、Findings 和 workspace 状态不会因此重置，旧的动态路线会被丢弃并重新规划。
+Workflow 只是当前 Investigation 的工作方法，不是 Investigation 类型。内置 Workflow 来自 Skill；进入全屏工作地图后可以复制为 Investigation 级自定义 Workflow，拖动节点、添加步骤和分支、修改 outcome，并在服务端验证通过后应用。工作方式本身的切换仍需要在“调查配置 → 工作方式”执行明确确认；Workflow Editor 的 draft/apply 不会修改内置 Skill。
 
 ## API
 
@@ -78,6 +85,12 @@ POST /api/sessions/:name/messages/stream
 PATCH /api/sessions/:name/workflow
 POST /api/sessions/:name/messages/abort
 GET  /api/sessions/:name/journey
+GET  /api/sessions/:name/workflow
+PUT  /api/sessions/:name/workflow/draft
+POST /api/sessions/:name/workflow/validate
+POST /api/sessions/:name/workflow/apply
+POST /api/sessions/:name/workflow/reset
+GET  /api/sessions/:name/workflow/instruction
 GET  /api/sessions/:name/modernization
 GET  /api/sessions/:name/assessment
 GET  /api/sessions/:name/report
@@ -156,3 +169,26 @@ npm run flow:lint
 - [evaluation.md](evaluation.md)
 - [implementation.md](implementation.md)
 - [current-state-intelligence.md](current-state-intelligence.md)
+
+
+## Workflow Editor
+
+完整设计见 `docs/journey-workflow-editor.md`。核心规则：
+
+~~~text
+内置 SKILL.md
+    ↓
+Journey Definition
+    ↓
+React Flow 编辑
+    ↓
+Draft
+    ↓
+服务端 Validate
+    ↓
+Apply 新版本
+    ↓
+Workflow Execution
+~~~
+
+Canvas layout 与 Workflow 语义分开保存；Agent 只能选择当前节点已有的 outcome，服务端验证后才推进。
