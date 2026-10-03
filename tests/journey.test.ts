@@ -449,46 +449,51 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
   assert.equal(oneCriticalGap.currentNodeId, 'investigate');
 });
 
-test('cutover requires validation plus explicit cutover and rollback criteria', () => {
+test('cutover is an explicit human review after validation', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
-    'start -> cutover',
+    'start -> validation',
     '',
-    '## @task cutover',
+    '## @task validation',
     'completion: deterministic',
-    'completeWhen: cutover',
+    'completeWhen: validation',
+    '- success -> cutover',
+    '',
+    '## @review cutover',
+    'actor: human',
+    '- approved -> done',
+    '- rollback -> investigate',
+    '',
+    '## @task investigate',
+    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
   ].join('\n'));
 
   assert.ok(result.definition);
-
-  const blocked = buildJourneyState(
-    result.definition!,
-    {
-      ...baseFacts,
-      blockingValidationReady: 2,
-      blockingValidationTotal: 2,
-      cutoverCriteriaDefined: true,
-      rollbackCriteriaDefined: false,
-    },
-    initialJourneyExecution(result.definition!),
-  );
-  assert.equal(blocked.currentNodeId, 'cutover');
-
+  const execution = initialJourneyExecution(result.definition!);
   const ready = buildJourneyState(
     result.definition!,
     {
       ...baseFacts,
-      blockingValidationReady: 2,
-      blockingValidationTotal: 2,
-      cutoverCriteriaDefined: true,
-      rollbackCriteriaDefined: true,
+      blockingValidationReady: 1,
+      blockingValidationTotal: 1,
     },
-    initialJourneyExecution(result.definition!),
+    execution,
   );
-  assert.equal(ready.currentNodeId, 'done');
+
+  assert.equal(ready.currentNodeId, 'cutover');
+  assert.equal(ready.execution.status, 'waiting');
+
+  const approved = applyJourneyTransition(
+    result.definition!,
+    ready.execution,
+    'cutover',
+    'approved',
+  );
+  assert.equal(approved.currentNodeId, 'done');
+  assert.equal(approved.status, 'completed');
 });
 
 test('assessment findings gate does not pass from current-state alone', () => {
