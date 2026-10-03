@@ -254,7 +254,7 @@ skills/legacy-modernization/SKILL.md
 - Agent：根据证据选择调查动作并解释结果。
 - Human：确认业务定义、范围和例外。
 
-Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；Legacy Modernization 的完整方案通过 `GET /api/sessions/:name/modernization` 提供，Data Architecture Assessment 的评估结果通过 `GET /api/sessions/:name/assessment` 提供。
+Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评。当前 Gate 不使用任意 lineage 百分比或 Unknown 数量阈值；Source-of-Truth 候选、Semantic Candidate 也只是调查辅助。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；Legacy Modernization 的完整方案通过 `GET /api/sessions/:name/modernization` 提供，Data Architecture Assessment 的评估结果通过 `GET /api/sessions/:name/assessment` 提供。
 
 Markdown Workflow 的基本检查可以运行：
 
@@ -264,7 +264,7 @@ npm run flow:lint
 
 
 
-当前已经从 Current-State Discovery 进入完整 modernization 工作包：
+当前已经从 Current-State Discovery 进入完整 modernization 工作包；工作产物以证据为准，不因为生成了 draft 就视为完成：
 
 1. **Current-State Intelligence**
    - metadata / dataset / column
