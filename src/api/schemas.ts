@@ -70,3 +70,10 @@ export const JourneyAiRequestSchema = z.object({
   scope: z.enum(['workflow', 'selection']).default('workflow'),
   selectedNodeId: z.string().trim().min(1).optional(),
 }).strict();
+
+
+/** 人工完成 waiting Workflow 节点时提交的 outcome。 */
+export const JourneyTransitionBodySchema = z.object({
+  nodeId: z.string().trim().min(1),
+  outcome: z.string().trim().min(1),
+}).strict();
