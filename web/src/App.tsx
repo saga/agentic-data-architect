@@ -26,6 +26,7 @@ import {
   InfoCircleOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  SendOutlined,
   SettingOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
