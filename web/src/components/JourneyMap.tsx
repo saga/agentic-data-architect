@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   App as AntApp,
   Button,
@@ -103,6 +103,8 @@ interface WorkflowDefinition {
 interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
+  /** 画布布局算法；旧数据没有此字段时，编辑器会自动升级到 ELK 布局。 */
+  engine?: 'elk';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -156,6 +158,9 @@ interface FlowNodeData extends Record<string, unknown> {
   completeWhen?: string;
   visible: boolean;
   editing: boolean;
+  isNew?: boolean;
+  sourceHandles: Array<{ id: string; label: string }>;
+  targetHandles: Array<{ id: string; label: string }>;
   onSelect?: (id: string) => void;
   onAddStep?: (id: string) => void;
   onAddBranch?: (id: string) => void;
@@ -199,6 +204,29 @@ function sessionNameFromUrl(): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
+const elk = new ELK();
+
+function sourceHandleId(nodeId: string, index: number): string {
+  return nodeId + '-out-' + String(index);
+}
+
+function targetHandleId(nodeId: string, index: number): string {
+  return nodeId + '-in-' + String(index);
+}
+
+interface HandleSpec {
+  id: string;
+  label: string;
+}
+
+function handleStyle(index: number, total: number): React.CSSProperties {
+  const top = ((index + 1) / (total + 1)) * 100;
+  return {
+    top: String(top) + '%',
+    transform: 'translateY(-50%)',
+  };
+}
+
 function stageStatus(snapshot: WorkflowSnapshot, id: string): JourneyMapStage['status'] {
   if (snapshot.state.completedNodeIds.includes(id)) return 'completed';
   if (snapshot.state.currentNodeId === id) return 'current';
@@ -216,10 +244,45 @@ function graphFromDefinition(
   onAddBranch?: (id: string) => void,
   onDelete?: (id: string) => void,
   onSelectEdge?: (id: string) => void,
+  newNodeIds: Set<string> = new Set(),
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const incoming = new Map<string, Array<{ source: string; outcome: string; id: string }>>();
+  const outgoing = new Map<string, Array<{ target: string; outcome: string; id: string }>>();
+
+  for (const node of definition.nodes) {
+    node.routes.forEach((route, index) => {
+      const id = node.id + ':' + route.outcome + ':' + route.target + ':' + String(index);
+      outgoing.set(node.id, [
+        ...(outgoing.get(node.id) ?? []),
+        { target: route.target, outcome: route.outcome, id },
+      ]);
+      incoming.set(route.target, [
+        ...(incoming.get(route.target) ?? []),
+        { source: node.id, outcome: route.outcome, id },
+      ]);
+    });
+  }
+
   const nodes: FlowNode[] = definition.nodes.map((item) => {
     const status = stageStatus(snapshot, item.id);
     const position = layout.nodes[item.id] ?? { x: 0, y: 0 };
+    const sourceHandles: HandleSpec[] = (outgoing.get(item.id) ?? []).map((route, index) => ({
+      id: sourceHandleId(item.id, index),
+      label: route.outcome,
+    }));
+    const targetHandles: HandleSpec[] = (incoming.get(item.id) ?? []).map((route, index) => ({
+      id: targetHandleId(item.id, index),
+      label: route.outcome,
+    }));
+
+    // A node with no incoming/outgoing route still needs one usable handle in edit mode.
+    if (!sourceHandles.length && item.type !== 'end' && item.type !== 'stop') {
+      sourceHandles.push({ id: sourceHandleId(item.id, 0), label: '新分支' });
+    }
+    if (!targetHandles.length) {
+      targetHandles.push({ id: targetHandleId(item.id, 0), label: '入口' });
+    }
+
     return {
       id: item.id,
       type: 'journey',
@@ -237,33 +300,53 @@ function graphFromDefinition(
         completeWhen: item.completeWhen,
         visible: item.visible,
         editing,
+        isNew: newNodeIds.has(item.id),
+        sourceHandles,
+        targetHandles,
         onSelect: onSelectNode,
         onAddStep,
         onAddBranch,
         onDelete,
       },
       hidden: !editing && !item.visible,
-      className: 'journey-flow-node journey-flow-node-stage ' + STATUS_CLASS[status],
-      style: { width: item.type === 'end' || item.type === 'stop' ? 178 : 236 },
+      className:
+        'journey-flow-node journey-flow-node-stage '
+        + STATUS_CLASS[status]
+        + (newNodeIds.has(item.id) ? ' journey-flow-node-new' : ''),
+      style: {
+        width: item.type === 'end' || item.type === 'stop' ? 178 : 236,
+      },
     };
   });
 
-  const visibleIds = new Set(nodes.filter((node) => !node.hidden).map((node) => node.id));
+  const visibleIds = new Set(
+    nodes.filter((node) => !node.hidden).map((node) => node.id),
+  );
   const edges: FlowEdge[] = [];
 
   for (const node of definition.nodes) {
     for (const [index, route] of node.routes.entries()) {
       if (!editing && (!visibleIds.has(node.id) || !visibleIds.has(route.target))) continue;
+
       const sourceCompleted = snapshot.state.completedNodeIds.includes(node.id);
       const isCurrent = snapshot.state.currentNodeId === node.id;
+      const targetIncoming = incoming.get(route.target) ?? [];
+      const incomingIndex = targetIncoming.findIndex(
+        (edge) => edge.id === node.id + ':' + route.outcome + ':' + route.target + ':' + String(index),
+      );
+
       edges.push({
         id: node.id + ':' + route.outcome + ':' + route.target + ':' + String(index),
         source: node.id,
         target: route.target,
+        sourceHandle: sourceHandleId(node.id, index),
+        targetHandle: targetHandleId(route.target, Math.max(0, incomingIndex)),
         type: EDGE_TYPE,
         markerEnd: { type: MarkerType.ArrowClosed },
         animated: isCurrent,
-        className: 'journey-flow-edge' + (sourceCompleted ? ' journey-flow-edge-traversed' : ''),
+        className:
+          'journey-flow-edge'
+          + (sourceCompleted ? ' journey-flow-edge-traversed' : ''),
         data: {
           outcome: route.outcome,
           onSelect: onSelectEdge,
@@ -275,25 +358,100 @@ function graphFromDefinition(
   return { nodes, edges };
 }
 
+/**
+ * ELK 的 layered 布局比固定 x/y 更适合当前 Workflow：
+ * - 按流程方向从左到右分层
+ * - 计算节点间距
+ * - 配合明确的 source/target ports 减少边交叉
+ * - ORTHOGONAL routing 让分支更容易绕开节点
+ */
+async function layoutWithElk(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): Promise<FlowNode[]> {
+  const layouted = await elk.layout({
+    id: 'journey-root',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': 'RIGHT',
+      'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.spacing.nodeNode': '60',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '90',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '45',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '30',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+    },
+    children: nodes.map((node) => ({
+      id: node.id,
+      width: Number(node.style?.width ?? 236),
+      height: node.data.nodeType === 'end' || node.data.nodeType === 'stop' ? 90 : 128,
+      ports: [
+        ...node.data.targetHandles.map((handle) => ({
+          id: handle.id,
+          properties: { side: 'WEST' },
+        })),
+        ...node.data.sourceHandles.map((handle) => ({
+          id: handle.id,
+          properties: { side: 'EAST' },
+        })),
+      ],
+      properties: {
+        'org.eclipse.elk.portConstraints': 'FIXED_ORDER',
+      },
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.sourceHandle ?? edge.source],
+      targets: [edge.targetHandle ?? edge.target],
+    })),
+  }).then((result) => result.children ?? []);
+
+  const positions = new Map(layouted.map((node) => [node.id, {
+    x: node.x ?? 0,
+    y: node.y ?? 0,
+  }]));
+
+  return nodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id) ?? node.position,
+  }));
+}
+
+
 function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
   const meta = STATUS_META[data.status];
   const terminal = data.nodeType === 'end' || data.nodeType === 'stop';
+  const targetHandles = data.targetHandles;
+  const sourceHandles = data.sourceHandles;
 
   return (
     <>
-      <Handle type="target" position={Position.Left} className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'} />
+      {targetHandles.map((handle, index) => (
+        <Tooltip title={data.editing ? '把其他步骤连到这里' : undefined} key={handle.id}>
+          <Handle
+            type="target"
+            position={Position.Left}
+            id={handle.id}
+            className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+            style={handleStyle(index, targetHandles.length)}
+          />
+        </Tooltip>
+      ))}
+
       {data.editing ? (
         <NodeToolbar isVisible={selected} position={Position.Top} offset={10} className="journey-node-editor-toolbar">
           <Space size={4}>
-            <Tooltip title="编辑节点">
+            <Tooltip title="编辑节点属性">
               <Button size="small" icon={<EditOutlined />} onClick={() => data.onSelect?.(id)} />
             </Tooltip>
             {!terminal ? (
               <>
-                <Tooltip title="添加下一步">
+                <Tooltip title="在当前成功出口后插入一步">
                   <Button size="small" icon={<PlusOutlined />} onClick={() => data.onAddStep?.(id)} />
                 </Tooltip>
-                <Tooltip title="添加分支">
+                <Tooltip title="添加一条独立分支">
                   <Button size="small" icon={<BranchesOutlined />} onClick={() => data.onAddBranch?.(id)} />
                 </Tooltip>
               </>
@@ -312,21 +470,43 @@ function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
           <span className="journey-flow-node-type">{NODE_TYPE_LABEL[data.nodeType]}</span>
         </div>
         <div className="journey-flow-node-title">{data.title}</div>
-        <div className="journey-flow-node-subtitle">{data.objective || '未设置步骤目标'}</div>
+        <div className="journey-flow-node-subtitle">
+          {data.objective || '未设置步骤目标'}
+        </div>
+
+        {data.isNew ? (
+          <Tag color="warning" className="journey-flow-node-new-tag">
+            新建步骤
+          </Tag>
+        ) : null}
+
         {data.editing ? (
           <div className="journey-flow-node-config">
-            <Tag bordered={false}>{data.completion === 'deterministic' ? '确定性完成' : 'Agent 判断'}</Tag>
-            {data.completeWhen ? <Text type="secondary">条件：{data.completeWhen}</Text> : null}
+            <Tag bordered={false}>
+              {data.completion === 'deterministic' ? '确定性完成' : 'Agent 判断'}
+            </Tag>
+            {data.completeWhen ? (
+              <Text type="secondary">条件：{data.completeWhen}</Text>
+            ) : null}
+            <Text type="secondary" className="journey-flow-connect-hint">
+              右侧圆点拖到其他步骤左侧圆点即可连接
+            </Text>
           </div>
         ) : null}
       </div>
 
       {!terminal ? (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
-        />
+        sourceHandles.map((handle, index) => (
+          <Tooltip title={data.editing ? '从这里拖线到其他步骤' : undefined} key={handle.id}>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={handle.id}
+              className={data.editing ? 'journey-flow-handle journey-flow-handle-edit' : 'journey-flow-handle'}
+              style={handleStyle(index, sourceHandles.length)}
+            />
+          </Tooltip>
+        ))
       ) : null}
     </>
   );
