@@ -1,7 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildModernizationGaps } from '../src/analysis/gap.js';
-import { ModernizationPlanSchema } from '../src/model/modernization.js';
+import {
+  ArchitectureDecisionSchema,
+  ModernizationPlanSchema,
+  SourceToTargetMappingSchema,
+  TargetArchitectureSchema,
+} from '../src/model/modernization.js';
 
 describe('Modernization workbench', () => {
   it('turns current-state coverage and findings into explicit gaps', () => {
@@ -106,4 +111,62 @@ describe('Modernization workbench', () => {
     });
     assert.equal(result.success, true);
   });
+});
+
+
+test('does not treat empty draft work products as confirmed design', () => {
+  const target = TargetArchitectureSchema.parse({
+    id: 'target-1',
+    type: 'target_architecture',
+    title: '目标架构（待设计）',
+    status: 'draft',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    evidenceIds: [],
+    findingIds: [],
+    decisionIds: [],
+    principles: [],
+    components: [],
+    openQuestions: ['明确业务范围'],
+  });
+  assert.equal(target.components.length, 0);
+
+  assert.throws(() => TargetArchitectureSchema.parse({
+    ...target,
+    status: 'approved',
+  }));
+
+  assert.throws(() => ArchitectureDecisionSchema.parse({
+    id: 'decision-1',
+    type: 'architecture_decision',
+    title: '测试决定',
+    status: 'approved',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    evidenceIds: [],
+    findingIds: [],
+    decisionIds: [],
+    context: '测试上下文',
+    options: ['方案 A', '方案 B'],
+    decision: '方案 A',
+    rationale: '测试依据',
+    tradeoffs: [],
+  }));
+
+  assert.throws(() => SourceToTargetMappingSchema.parse({
+    id: 'mapping-1',
+    type: 'source_to_target',
+    title: '测试 Mapping',
+    status: 'approved',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    evidenceIds: [],
+    findingIds: [],
+    decisionIds: [],
+    sourceAsset: 'legacy_position',
+    targetAsset: 'position',
+  }));
 });
