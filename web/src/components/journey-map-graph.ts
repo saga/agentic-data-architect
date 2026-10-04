@@ -14,7 +14,7 @@ import {
   NEW_SOURCE_HANDLE_ID,
   NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
-import { buildRetryGroups, classifyJourneyEdge } from './journey-map-visuals.js';
+import { classifyJourneyEdge } from './journey-map-visuals.js';
 
 /** 给已有出口生成稳定的 source port ID。 */
 export function sourceHandleId(nodeId: string, index: number): string {
@@ -422,7 +422,6 @@ export function graphFromDefinition(
         produces: item.produces,
         visible: item.visible,
         isNew: newNodeIds.has(item.id),
-        retryGroupIds: [],
         sourceHandles,
         targetHandles,
         ...(connectionIssue
@@ -466,20 +465,6 @@ export function graphFromDefinition(
         },
       });
     });
-  }
-
-  const retryGroups = buildRetryGroups(nodes, edges);
-
-  for (const group of retryGroups) {
-    for (const nodeId of group.nodeIds) {
-      const node = nodes.find((item) => item.id === nodeId);
-      if (!node) continue;
-
-      node.data.retryGroupIds = [
-        ...(node.data.retryGroupIds ?? []),
-        group.id,
-      ];
-    }
   }
 
   return { nodes, edges };
