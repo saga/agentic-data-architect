@@ -907,7 +907,7 @@ function AppInner() {
             showIcon
             closable
             icon={<InfoCircleOutlined />}
-            message="每个调查都有自己的资料和设置。"
+            title="每个调查都有自己的资料和设置。"
             onClose={() => {
               setShowLeftTip(false);
               try { localStorage.setItem('ada.tip.left', 'dismissed'); } catch {}
@@ -1206,7 +1206,7 @@ function AppInner() {
         onOk={createSession}
         okButtonProps={{ disabled: !newSessionName.trim() }}
       >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <Input
             autoFocus
             value={newSessionName}
@@ -1234,7 +1234,7 @@ function AppInner() {
             className="modal-tip"
             type="info"
             showIcon
-            message="默认自主调查。路线是可选的工作方法；开始后不会在首页随手切换，确需改变时到“调查配置 → 工作方式”执行明确调整。"
+            title="默认自主调查。路线是可选的工作方法；开始后不会在首页随手切换，确需改变时到“调查配置 → 工作方式”执行明确调整。"
           />
         </Space>
       </Modal>
