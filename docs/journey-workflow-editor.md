@@ -135,7 +135,7 @@ Port 只负责连接和交互；用户选中连线后，在右侧“属性”查
 - 成功：绿色实线。
 - 失败：红色实线。
 - 其它普通分支：灰色实线。
-- retry：优先不画 retry 线。
+- retry：灰色虚线回线；如果目标在上游，沿画布外侧 return lane 绕行。
 
 成功边固定走 bottom → top，失败边走 right → left，其它分支由 X6 Manhattan router 自然寻找路径；统一使用 rounded connector，避免折线过硬。X6 自带 top/right/bottom/left 均匀分布 Port，因此不需要自己计算 Port 像素位置。
 
@@ -156,7 +156,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 
 - rank：决定主流程上下层级。
 - lane：决定左右分支位置。
-- retry 不参与布局排名；它只用于生成视觉分组。
+- retry 不参与布局排名，但仍保留为真实 Edge 并单独走 return lane。
 - back edge：其它循环关系仍由图结构识别。
 - collision guard：最后只做一次简单矩形碰撞保护。
 
@@ -227,20 +227,28 @@ WorkflowChange[]
 
 AI 生成的 Definition 与人工编辑走同一套 validation。
 
-## 9. Retry 视觉分组
+## 9. Retry / Failed 语义
 
-retry 仍然是 Workflow DSL 中真实存在的 outcome，不会从语义层删除。
+retry 不是 BPMN 的标准 outcome，而是这个 Workflow DSL 的业务结果。工作地图不把它转换成额外的节点或分组语义。
 
-当存在：
+推荐的表达方式是：
 
 ~~~text
-A → B → C
-C --retry--> A
+A ── success ──► B
+B ── failed  ──► Failure Review
+Failure Review ── retry ──► A
 ~~~
 
-画布不再额外画一条 C → A 的回线，而是把 A / B / C 作为一个浅灰虚线组显示。
+其中：
 
-这样既保留 Workflow 的真实 retry 语义，又不会让一条回线横穿工作地图。retry group 只存在于画布渲染层，不保存成新的 Workflow 节点，也不改变执行逻辑。
+- success：绿色实线。
+- failed / error / rejected：红色实线。
+- retry / rework / rollback：灰色虚线。
+- 其它 outcome：灰色实线。
+
+连线上不直接显示文字。选中连接后，右侧“属性”显示真实 outcome、来源、目标和 condition。
+
+retry 线不会删除 Workflow 中真实存在的 retry 关系；只是使用画布外侧的 return lane 绕行，避免穿过其它节点。这样业务语义和视觉表达是一致的，也比用 Retry Group 更容易理解。
 
 ## 10. 当前刻意不做
 
