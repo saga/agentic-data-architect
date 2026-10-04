@@ -365,7 +365,7 @@ export function graphFromDefinition(
     const status = stageStatus(snapshot, item.id);
     const sourceRoutes = outgoing.get(item.id) ?? [];
     const targetRoutes = incoming.get(item.id) ?? [];
-    const terminal = item.type === 'end' || item.type === 'stop';
+    const terminal = item.type === 'end';
     const waiting = snapshot.execution.status === 'waiting'
       && snapshot.execution.currentNodeId === item.id;
 
@@ -402,12 +402,8 @@ export function graphFromDefinition(
         objective: item.objective,
         nodeType: item.type,
         status,
-        completion: item.completion,
         actor: item.actor,
         completeWhen: item.completeWhen,
-        requires: item.requires,
-        produces: item.produces,
-        visible: item.visible,
         isNew: newNodeIds.has(item.id),
         sourceHandles,
         targetHandles,
@@ -447,8 +443,7 @@ export function graphFromDefinition(
         data: {
           outcome: route.outcome,
           kind: classifyJourneyEdge(route.outcome),
-          ...(route.condition ? { condition: route.condition } : {}),
-          onSelect: onSelectEdge,
+           onSelect: onSelectEdge,
         },
       });
     });
