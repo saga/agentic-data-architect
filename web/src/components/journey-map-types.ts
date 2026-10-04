@@ -83,13 +83,6 @@ export interface WorkflowRunEvent {
   };
 }
 
-export interface WorkflowAnalysisIssue {
-  severity: 'warning' | 'error';
-  code: string;
-  nodeId?: string;
-  message: string;
-}
-
 export interface WorkflowExecution {
   workflowId: string;
   workflowVersion: number;
@@ -118,8 +111,7 @@ export interface WorkflowSnapshot {
   layout: WorkflowLayout;
   execution: WorkflowExecution;
   state: WorkflowState;
-  analysis: WorkflowAnalysisIssue[];
-  events: WorkflowRunEvent[];
+   events: WorkflowRunEvent[];
 }
 
 export type JourneyEdgeKind = 'success' | 'fail' | 'retry' | 'other';
