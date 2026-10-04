@@ -86,16 +86,19 @@ export function InvestigationConfigPage(props:{
           <Title level={4}>Agent 指导</Title>
           <Card title='Agent 权限' className='settings-card'>
             <Paragraph type='secondary'>决定 Agent 执行命令、读写文件或调用需要确认的工具时，是否先向你确认。</Paragraph>
-            <Radio.Group
-              value={draft.agent.permissionMode}
-              optionType='button'
-              buttonStyle='solid'
+            <div className='permission-mode-control'>
+              <Radio.Group
+                value={draft.agent.permissionMode}
+                optionType='button'
+                buttonStyle='solid'
               options={[
-                { value:'permission', label:'按需确认（当前）' },
+                { value:'permission', label:'按需确认' },
                 { value:'allow_all', label:'Allow All Access from Agent' },
               ]}
-              onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
-            />
+                onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
+              />
+              <Tag color='blue'>当前：{draft.agent.permissionMode==='allow_all'?'Allow All Access from Agent':'按需确认'}</Tag>
+            </div>
             {draft.agent.permissionMode==='allow_all' ? (
               <Alert
                 style={{marginTop:12}}
