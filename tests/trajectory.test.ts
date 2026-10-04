@@ -154,3 +154,48 @@ test('user input request and completion use the same runtime request id', () => 
   assert.equal(summary.state, 'completed');
   assert.equal(summary.pendingUserInputCount, 0);
 });
+
+
+test('trajectory checkpoints can be listed without affecting runtime state', () => {
+  const events: TrajectoryEvent[] = [
+    event({
+      id: 'checkpoint-1',
+      turnId: 'turn-4',
+      timestamp: '2026-10-04T13:00:00.000Z',
+      type: 'checkpoint',
+      name: '阶段小结：Position 来源',
+      status: 'completed',
+      details: {
+        execution: 0,
+        title: 'Position 来源',
+        summary: '已经确认 Position 主来源及批处理入口。',
+        confirmed: ['PositionSnapshot 是主要输入表。'],
+        evidenceIds: ['ev-1', 'ev-2'],
+        unknowns: ['Market Value 的计算位置'],
+        nextStep: '继续追踪 Market Value 的转换逻辑。',
+      },
+    }),
+    event({
+      id: 'checkpoint-2',
+      turnId: 'turn-4',
+      timestamp: '2026-10-04T13:05:00.000Z',
+      type: 'checkpoint',
+      name: '阶段小结：Market Value',
+      status: 'completed',
+      details: {
+        execution: 1,
+        title: 'Market Value',
+        summary: '已经找到从 Position 到 Market Value 的主要转换。',
+        confirmed: ['转换发生在 valuation service。'],
+        evidenceIds: ['ev-3'],
+        unknowns: [],
+      },
+    }),
+  ];
+
+  const { listTrajectoryCheckpoints } = await import('../src/investigation/trajectory.js');
+  const checkpoints = listTrajectoryCheckpoints(events);
+  assert.equal(checkpoints.length, 2);
+  assert.equal(checkpoints[0]?.execution, 0);
+  assert.equal(checkpoints[1]?.title, 'Market Value');
+});
