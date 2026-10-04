@@ -184,7 +184,8 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
       name,
       userPrompt: seed.userPrompt ?? seed.goal ?? '',
       workflow: seed.workflow ?? null,
-      goal: seed.goal ?? '',
+      // 创建 Investigation 时没有单独的 goal 输入，因此第一句任务描述就是 goal。
+      goal: seed.goal?.trim() || seed.userPrompt?.trim() || '',
       scope: seed.scope ?? [],
       systems: seed.systems ?? [],
       questions: [],
@@ -229,7 +230,8 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     userPrompt: raw.userPrompt ?? '',
     // 新 context 缺失 workflow 时兼容旧数据；显式 null 必须保留为自主调查。
     workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
-    goal: raw.goal ?? '',
+    // 旧版本可能只保存了 userPrompt；这里把它恢复成研究目标，避免 Agent 看到“目标未设置”。
+    goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
     questions: raw.questions ?? [],
