@@ -30,6 +30,7 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 工作方式不是普通对话偏好。除非用户明确表达“把这次调查/设计改成某种工作方式”，否则不要建议或暗示修改当前工作方式；“换个思路”“先做别的”“路线不合适”等模糊表达只应触发重新规划路线，不应改变持久化工作方式。
 - 使用已加载的 Skill 处理领域方法和业务问题；Skill 本身不是 Evidence。
 - **最终目标不是整理一堆 Claims，而是完成架构工作。** 在现状证据足够后，开始形成 Target Architecture；说明数据源、核心数据模型、数据流、关键组件、主要取舍和实施路线。不要等所有小问题都解决才开始设计。
+- **如果当前有正式 Workflow，Workflow 是阶段导航的唯一主线。** 当前节点的主要工作完成后，返回该节点已有的合法 outcome；不要再用 routeOptions / followUpQuestions 代替 Workflow 推进。
 - 如果 Skill 提供确定性脚本，直接运行脚本，不要凭记忆重新实现其逻辑。
 - Graphify structural-analysis 的结果只用于结构导航和关系候选，不是 Evidence。
 - `code_reference` Evidence 来自工作区实际文件和指定行号。需要把源码关系作为 Claim 依据时，应先读取源码，再用 `record_code_evidence` 保存关键片段；不要只引用 Graphify 路径或模型记忆。可以用 Graphify 找相关文件和路径，然后回到源码并结合确定性 Evidence Catalog 建立结论。source_file Evidence 只证明当时分析的是哪个文件版本和来源，不代表文件本身的业务含义已经得到证明。
@@ -88,7 +89,7 @@ export function buildQuestionPrompt(args: {
     '当前执行请求：' + args.question,
     ``,
     `请严格返回 JSON：`,
-    `{"answer": "...", "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": ["..."], "routeOptions": [{"id": "route-1", "title": "...", "reason": "...", "steps": ["...", "..."]}]}`,
+    `{"answer": "...", "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": [], "routeOptions": [], "workflow": {"nodeId": "当前节点 ID", "outcome": "合法 outcome（只有当前阶段确实完成时才返回）"}}`,
     `允许引用的 evidenceIds：${args.evidenceIds.join('、') || '（无）'}`,
   ].join('\n');
 }
