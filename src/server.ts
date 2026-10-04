@@ -231,7 +231,13 @@ app.post('/api/sessions', async (req, res) => {
   app.post('/api/sessions/:name/permissions/respond', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(PermissionResponseBodySchema, req.body);
-    const handled = await respondToCopilotPermission(name, body.turnId, body.requestId, body.allowed);
+    const handled = await respondToCopilotPermission(
+      name,
+      body.turnId,
+      body.requestId,
+      body.allowed,
+      body.scope,
+    );
     if (!handled) {
       res.status(404).json({ error: '这个权限请求已经处理、已结束，或不属于当前执行。' });
       return;
