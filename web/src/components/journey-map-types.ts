@@ -1,9 +1,7 @@
 /** DSL 中允许出现的 Workflow 节点类型；只取 BPMN 里最有价值的一小部分语义。 */
-export type WorkflowNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
+export type WorkflowNodeType = 'task' | 'review' | 'end';
 
-/** 节点如何判断“这一阶段完成”。 */
-export type CompletionMode = 'deterministic' | 'agent';
-export type WorkflowActor = 'agent' | 'human' | 'system';
+export type WorkflowActor = 'agent' | 'human';
 
 export interface JourneyMapStage {
   id: string;
@@ -11,8 +9,7 @@ export interface JourneyMapStage {
   objective: string;
   status: 'completed' | 'current' | 'locked' | 'future';
   nodeType: string;
-  unlocked: boolean;
-}
+ }
 
 export interface JourneyMapRoute {
   id: string;
@@ -24,9 +21,7 @@ export interface JourneyMapRoute {
 export interface JourneyRouteDefinition {
   outcome: string;
   target: string;
-  /** 可选确定性条件；命中后优先使用该出口。 */
-  condition?: string;
-  line?: number;
+   line?: number;
 }
 
 export interface WorkflowNodeDefinition {
@@ -34,13 +29,8 @@ export interface WorkflowNodeDefinition {
   type: WorkflowNodeType;
   title: string;
   objective?: string;
-  visible: boolean;
-  completion: CompletionMode;
   actor: WorkflowActor;
   completeWhen?: string;
-  tools?: string[];
-  requires?: string[];
-  produces?: string[];
   routes: JourneyRouteDefinition[];
   line?: number;
 }
@@ -50,8 +40,8 @@ export type WorkflowChange =
   | { type: 'add-node'; node: WorkflowNodeDefinition }
   | { type: 'update-node'; nodeId: string; patch: Partial<Omit<WorkflowNodeDefinition, 'id' | 'routes' | 'line'>> }
   | { type: 'remove-node'; nodeId: string }
-  | { type: 'add-route'; nodeId: string; route: { outcome: string; target: string; condition?: string } }
-  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string; condition?: string | null } }
+  | { type: 'add-route'; nodeId: string; route: { outcome: string; target: string } }
+  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string } }
   | { type: 'remove-route'; nodeId: string; outcome: string };
 
 export interface WorkflowDefinition {
@@ -63,8 +53,7 @@ export interface WorkflowDefinition {
 export interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
-  /** 自动布局算法版本；旧 elk* 值继续兼容历史布局。 */
-  engine?: 'workflow-v1' | 'elk' | 'elk-v2' | 'elk-v3' | 'elk-v4' | 'elk-v5';
+  engine?: 'workflow-v1';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -107,7 +96,7 @@ export interface WorkflowExecution {
   runId: string;
   currentNodeId: string;
   completedNodeIds: string[];
-  status: 'active' | 'waiting' | 'completed' | 'stopped';
+  status: 'active' | 'waiting' | 'completed';
   pendingInteraction?: WorkflowPendingInteraction;
 }
 
@@ -153,12 +142,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   objective?: string;
   nodeType: WorkflowNodeType;
   status: JourneyMapStage['status'];
-  completion: CompletionMode;
   actor: WorkflowActor;
   completeWhen?: string;
-  requires?: string[];
-  produces?: string[];
-  visible: boolean;
   isNew?: boolean;
   selected?: boolean;
   sourceHandles: HandleSpec[];
@@ -183,8 +168,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
   /** 仅用于工作地图视觉；真实业务语义仍以 outcome 为准。 */
   kind?: JourneyEdgeKind;
-  condition?: string;
-  onSelect?: (id: string) => void;
+   onSelect?: (id: string) => void;
 }
 
 export interface FlowEdge {
