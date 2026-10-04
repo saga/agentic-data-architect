@@ -89,6 +89,10 @@ interface InvestigationControl {
   agent: {
     permissionMode: 'permission' | 'allow_all';
     displayName: string;
+    avatarPath?: string;
+    avatarMimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
+    avatarWidth: number;
+    avatarHeight: number;
     systemPrompt: {
       version: number;
       content: string;
@@ -362,8 +366,8 @@ function AssistantAvatar(props: {
   sessionName: string;
   control: InvestigationControl;
 }) {
-  const width = Math.max(40, props.control.agent.avatarWidth || 200);
-  const height = Math.max(40, props.control.agent.avatarHeight || 400);
+  const width = Math.max(40, props.control.agent.avatarWidth || 180);
+  const height = Math.max(40, props.control.agent.avatarHeight || 240);
   const displayWidth = 34;
   const displayHeight = Math.max(34, Math.min(68, Math.round(displayWidth * height / width)));
   return (
