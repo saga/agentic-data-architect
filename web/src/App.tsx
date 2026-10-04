@@ -922,7 +922,6 @@ function AppInner() {
               : !streamingReasoning ? <Text type="secondary">助手正在整理答案，请稍候…</Text> : null}
           </div>
         ),
-        footer: undefined,
       });
     }
     return items;
