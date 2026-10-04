@@ -162,7 +162,7 @@ export const ControlAgentSchema = z.object({
   /** permission = 每次危险工具操作由前端确认；allow_all = 每次请求自动批准。 */
   permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
   /** 本轮 Agent 自己认为阶段完成后，最多再自动推进多少阶段；0 表示不自动续跑。 */
-  autoContinuationTurns: z.number().int().min(0).max(6).default(2),
+  autoContinuationTurns: z.number().int().min(0).max(6).default(4),
   /** 对话中显示的助手名称；默认“秘书”，只影响展示和复制文本，不参与 Agent 推理。 */
   displayName: z.string().trim().min(1).max(40).default('秘书'),
   /** 兼容旧版的单头像路径；新配置使用 avatarPaths。 */
