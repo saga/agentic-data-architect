@@ -1600,6 +1600,40 @@ body {
   font-weight: 600;
 }
 
+/* outcome 不再浮在 edge 中间；它固定在 source handle 外侧，因此永远随节点一起缩放/移动。 */
+.journey-flow-source-label {
+  position: absolute;
+  right: -8px;
+  z-index: 6;
+  transform: translate(100%, -50%);
+  max-width: 72px;
+  overflow: hidden;
+  color: #66758a;
+  font-size: 10px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  text-shadow:
+    -1px 0 #fff,
+    1px 0 #fff,
+    0 -1px #fff,
+    0 1px #fff;
+}
+
+.journey-flow-node-current .journey-flow-source-label {
+  color: #1677ff;
+}
+
+.journey-flow-node-completed .journey-flow-source-label {
+  color: #5b8c00;
+}
+
+.journey-flow-node-locked .journey-flow-source-label {
+  color: #8c98a8;
+}
+
 .journey-flow-handle-edit {
   width: 11px !important;
   height: 11px !important;
