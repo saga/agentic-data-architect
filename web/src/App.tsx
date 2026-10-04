@@ -30,6 +30,7 @@ import {
   SendOutlined,
   SettingOutlined,
   ToolOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import {
   Attachments,
@@ -78,6 +79,7 @@ interface InvestigationControl {
   };
   agent: {
     permissionMode: 'permission' | 'allow_all';
+    displayName: string;
     systemPrompt: {
       version: number;
       content: string;
@@ -585,6 +587,27 @@ function AppInner() {
     };
   }, [resizing]);
 
+  /** 把当前对话复制成可直接留档的文本；每条消息都带说话人和时间，避免导出后分不清是谁说的。 */
+  const copyConversation = async () => {
+    const messages = current?.messages ?? [];
+    if (!messages.length) return;
+
+    const assistantName = current?.control.agent.displayName?.trim() || '秘书';
+    const content = messages
+      .map((message) => {
+        const speaker = message.role === 'assistant' ? assistantName : '我';
+        return `${speaker} · ${formatTime(message.capturedAt)}\n${message.content}`;
+      })
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setTurnStatus('对话已复制，可直接粘贴到文档或消息中。');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '复制对话失败，请检查浏览器剪贴板权限。');
+    }
+  };
+
   const bubbleItems = useMemo(() => {
     const messages = current?.messages ?? [];
     const lastAssistantIndex = messages.reduce(
@@ -605,6 +628,10 @@ function AppInner() {
         content:
           message.role === 'assistant' ? (
             <div className="assistant-message-content">
+              <ChatMessageMeta
+                speaker={current?.control.agent.displayName?.trim() || '秘书'}
+                capturedAt={message.capturedAt}
+              />
               <ChatMarkdown content={message.content} />
               {showActions ? (
                 <AssistantActionBar
@@ -612,17 +639,16 @@ function AppInner() {
                   followUpQuestions={guidance ?? []}
                   loading={loading}
                   onSelectRoute={(routeId) => void send(undefined, routeId)}
-                  onAsk={(question) => void send(question)}
+                  onAsk={(question) => void send(question, undefined, true)}
                 />
               ) : null}
             </div>
           ) : (
-            <Typography.Text>{message.content}</Typography.Text>
+            <div className="user-message-content">
+              <ChatMessageMeta speaker="我" capturedAt={message.capturedAt} />
+              <Typography.Text>{message.content}</Typography.Text>
+            </div>
           ),
-        footer:
-          message.role === 'assistant'
-            ? <Text type="secondary">{formatTime(message.capturedAt)}</Text>
-            : undefined,
       };
     });
 
@@ -720,7 +746,7 @@ function AppInner() {
     }
   };
 
-  const send = async (text?: string, routeId?: string) => {
+  const send = async (text?: string, routeId?: string, guided = false) => {
     const selectedRoute = routeId
       ? current?.context.journeyPlan?.routes.find((route) => route.id === routeId)
       : undefined;
@@ -773,7 +799,7 @@ function AppInner() {
       const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(routeId ? { routeId, turnId } : { message, turnId }),
+        body: JSON.stringify(routeId ? { routeId, turnId } : { message, guided, turnId }),
         signal: controller.signal,
       });
 
@@ -1079,6 +1105,15 @@ function AppInner() {
               <Tag className="workspace-status" variant="filled" icon={loading ? <LoadingOutlined spin /> : undefined}>
                 {loading ? turnStatus : '可以继续提问'}
               </Tag>
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                disabled={!current?.messages.length}
+                onClick={() => void copyConversation()}
+              >
+                复制对话
+              </Button>
               <Button type="text" size="small" icon={<ToolOutlined />} onClick={() => navigatePage('trajectory')}>
                 Agent 轨迹
               </Button>
