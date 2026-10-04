@@ -629,6 +629,7 @@ function AppInner() {
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
+    setCheckpoints(result.checkpoints ?? []);
     setJourney(journeyResult.journey ?? undefined);
 
     const existing = result.context.inputs
@@ -1511,9 +1512,9 @@ function AppInner() {
               </div>
             )}
 
-            {current.checkpoints.length ? (
+            {checkpoints.length ? (
               <div className="checkpoint-list" aria-label="阶段小结">
-                {current.checkpoints.slice(-4).map((checkpoint, index, items) => (
+                {checkpoints.slice(-4).map((checkpoint, index, items) => (
                   <Card
                     key={checkpoint.id}
                     size="small"
