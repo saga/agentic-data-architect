@@ -4,8 +4,8 @@
  * 这里故意不把 DuckDB 做成整个应用的主数据库：
  * - SQLite 继续保存应用状态、对话、Dataset Registry 和分析运行记录；
  * - 每个 Investigation 有自己的 analysis.duckdb，负责分析计算；
- * - 原始 CSV/JSON/JSONL/Parquet 文件仍保留在 workspace 中；
- * - Agent 只能通过受限 local_* 工具使用已登记的数据集。
+ * - 原始 CSV/JSON/JSONL/Parquet/XLSX 文件仍保留在 workspace 中；
+ * - Agent 只能通过受限 local_* 工具使用已登记的数据集；分析结果继续绑定 Dataset 版本和 Evidence。
  *
  * 这样做的好处是“应用状态”和“数据分析”互不抢职责，而且整个工作台仍然是
  * 单机、单用户、无需数据库服务的本地应用。
@@ -854,6 +854,9 @@ class LocalDuckDBEngine {
       const started = Date.now();
       const reader = await this.connection.runAndReadAll(statement);
       const rows = reader.getRowObjectsJson() as Record<string, unknown>[];
+      const explainDatasets = listLocalDatasets(this.sessionName)
+        .filter((item) => safeSql.includes(item.relation));
+      const explainDataset = explainDatasets.length === 1 ? explainDatasets[0] : undefined;
       const result: LocalQueryResult = {
         columns: reader.columnNames(),
         rows: rows.slice(0, 50),
@@ -862,8 +865,15 @@ class LocalDuckDBEngine {
         sql: statement,
         analysisRunId: '',
         evidenceId: '',
+        ...(explainDataset ? {
+          dataset: {
+            id: explainDataset.id,
+            version: explainDataset.version,
+            sha256: explainDataset.sha256,
+          },
+        } : {}),
       };
-      return this.recordResult('explain', statement, undefined, result, started);
+      return this.recordResult('explain', statement, explainDataset, result, started);
     });
   }
   async transform(
