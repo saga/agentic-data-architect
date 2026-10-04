@@ -127,7 +127,7 @@ function eventDetail(event: TrajectoryEvent) {
     const cached = typeof event.details.cachedInputTokens === 'number' ? event.details.cachedInputTokens : undefined;
     const reasoning = typeof event.details.reasoningTokens === 'number' ? event.details.reasoningTokens : undefined;
     return (
-      <Space direction="vertical" size={4}>
+      <Space orientation="vertical" size={4}>
         <Flex wrap gap={6}>
           {event.model ? <Tag>{event.model}</Tag> : null}
           <Tag>输入 {formatTokens(event.inputTokens ?? 0)}</Tag>
@@ -259,7 +259,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
         <Alert
           type="info"
           showIcon
-          message="本轮没有记录到模型调用"
+          title="本轮没有记录到模型调用"
           description="如果这是旧的执行记录，运行时细节可能还没有被采集；从下一轮开始会记录模型调用、Token、工具调用和上下文整理。"
         />
       ) : null}
