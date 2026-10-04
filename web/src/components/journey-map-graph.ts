@@ -199,7 +199,7 @@ export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
 
   return {
     version: 1,
-    engine: 'workflow-v1',
+    engine: 'workflow-v2',
     nodes: result,
   };
 }
