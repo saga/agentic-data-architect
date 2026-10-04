@@ -9,7 +9,7 @@ import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
-import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, getRunningConversationTurn, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
+import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, getRunningConversationTurn, listConversationMessages, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import {
   appendAuditEvent,
   buildResearchConfigPrompt,
@@ -138,16 +138,23 @@ const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
     inventory: snapshot?.inventory ?? null,
   });
   // 历史对话只作为 conversation context，不提升成 Evidence，避免旧模型回答污染当前事实来源。
-const priorConversation = searchConversation(investigationName, effectiveQuestion, {
-    limit: 6,
-    beforeRowId: userMessage.rowId,
-  });
+  // “继续/接着/下一步”属于续聊动作，不适合走 FTS：中文短词很可能没有足够 trigram。
+  // 即使 Copilot Session 因重启或运行时异常无法恢复，也要依靠 durable SQLite 对话继续工作。
+  const isContinuationRequest = /^(继续|接着|下一步|继续查|继续调查|往下查|然后呢)[。！!？?\s]*$/i.test(effectiveQuestion.trim());
+  const priorConversation = isContinuationRequest
+    ? listConversationMessages(investigationName, 8).filter((item) => item.id !== userMessage.id).slice(-6)
+    : searchConversation(investigationName, effectiveQuestion, {
+        limit: 6,
+        beforeRowId: userMessage.rowId,
+      });
   const conversationText = priorConversation.length > 0
     ? [
         '## Relevant conversation history',
-        'The following earlier messages were retrieved by full-text search. Treat them as conversation context, not as evidence; current evidence and verified findings take precedence.',
+        isContinuationRequest
+          ? 'This is a continuation request. Use the recent durable conversation below as context; it is conversation context, not evidence.'
+          : 'The following earlier messages were retrieved by full-text search. Treat them as conversation context, not as evidence; current evidence and verified findings take precedence.',
         '',
-        ...priorConversation.slice().reverse().map((item) => {
+        ...priorConversation.map((item) => {
           const excerpt = item.content.length > 1200 ? item.content.slice(0, 1200) + '…' : item.content;
           return `[${item.role}] ${excerpt}`;
         }),
