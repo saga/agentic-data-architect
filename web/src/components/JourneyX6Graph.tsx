@@ -19,6 +19,7 @@ export interface JourneyX6GraphProps {
   edges: FlowEdge[];
   selectedNodeId?: string;
   selectedEdgeId?: string;
+  fitViewRequest: number;
   onNodeClick: (id: string) => void;
   onEdgeClick: (id: string) => void;
   onBlankClick: () => void;
@@ -47,6 +48,7 @@ export function JourneyX6Graph({
   edges,
   selectedNodeId,
   selectedEdgeId,
+  fitViewRequest,
   onNodeClick,
   onEdgeClick,
   onBlankClick,
@@ -70,7 +72,6 @@ export function JourneyX6Graph({
     onDeleteSelected,
   });
   const lastStructureKeyRef = useRef('');
-  const lastPositionKeyRef = useRef('');
 
   callbacksRef.current = {
     onNodeClick,
@@ -105,18 +106,6 @@ export function JourneyX6Graph({
         })),
       }),
     [nodes, edges],
-  );
-
-  const positionKey = useMemo(
-    () =>
-      JSON.stringify(
-        nodes.map((node) => ({
-          id: node.id,
-          x: node.position.x,
-          y: node.position.y,
-        })),
-      ),
-    [nodes],
   );
 
   /**
@@ -442,15 +431,7 @@ export function JourneyX6Graph({
 
     lastStructureKeyRef.current = structureKey;
     rebuildGraphStructure();
-
-    requestAnimationFrame(() => {
-      graph.zoomToFit({
-        padding: 40,
-        minScale: 0.2,
-        maxScale: 1.1,
-      });
-    });
-  }, [structureKey, selectedNodeId, selectedEdgeId]);
+  }, [structureKey]);
 
   /**
    * 普通节点属性、选择状态、位置变化只更新现有 X6 cell。
@@ -513,10 +494,21 @@ export function JourneyX6Graph({
       );
     }
 
-    if (positionKey !== lastPositionKeyRef.current) {
-      lastPositionKeyRef.current = positionKey;
-    }
-  }, [nodes, edges, positionKey, selectedNodeId, selectedEdgeId]);
+  }, [nodes, edges, selectedNodeId, selectedEdgeId]);
+
+  /** 只处理 editor 明确发出的 fit 请求；普通拖动不会触发缩放。 */
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph || !fitViewRequest) return;
+
+    requestAnimationFrame(() => {
+      graph.zoomToFit({
+        padding: 40,
+        minScale: 0.2,
+        maxScale: 1.1,
+      });
+    });
+  }, [fitViewRequest]);
 
   return (
     <>
