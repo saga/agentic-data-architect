@@ -8,7 +8,7 @@ import {
 } from '@antv/x6';
 import {
   NEW_SOURCE_HANDLE_ID,
-  TARGET_HANDLE_ID,
+  NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
 import type {
   FlowEdge,
@@ -162,8 +162,12 @@ export function JourneyX6Graph({
       },
     },
     items: [
+      ...node.data.targetHandles.map((handle) => ({
+        id: handle.id,
+        group: 'input',
+      })),
       {
-        id: TARGET_HANDLE_ID,
+        id: NEW_TARGET_HANDLE_ID,
         group: 'input',
       },
       ...node.data.sourceHandles.map((handle) => ({
