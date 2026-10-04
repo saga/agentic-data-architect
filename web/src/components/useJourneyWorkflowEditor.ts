@@ -25,6 +25,7 @@ import type {
   WorkflowActor,
   CompletionMode,
   WorkflowSnapshot,
+  JOURNEY_NODE_SIZE,
 } from './journey-map-types.js';
 
 /** 从 URL 取得当前 Investigation 名称。页面路由本身就是唯一上下文来源。 */
@@ -302,8 +303,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         x: source.position.x + 360,
         y: source.position.y + (branch ? 180 : 0),
       },
-      width: 236,
-      height: 210,
+      width: JOURNEY_NODE_SIZE.regular.width,
+      height: JOURNEY_NODE_SIZE.regular.height,
       data: {
         title: branch ? '新的分支步骤' : '新的下一步',
         objective: '填写这一步要解决的问题。',
