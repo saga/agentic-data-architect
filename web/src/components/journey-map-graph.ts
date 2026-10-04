@@ -11,6 +11,7 @@ import {
   type WorkflowNodeDefinition,
   type WorkflowSnapshot,
   JOURNEY_NODE_SIZE,
+  NEW_SOURCE_HANDLE_ID,
   NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
 import { buildRetryGroups, classifyJourneyEdge } from './journey-map-visuals.js';
