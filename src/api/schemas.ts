@@ -26,6 +26,13 @@ export const UpdateConfigBodySchema = z.object({
   agent: ControlAgentSchema,
 }).strict();
 
+/** 主对话框修改模型和 Auto 选择方式时使用的轻量请求 Schema。 */
+export const UpdateAgentModelBodySchema = z.object({
+  model: z.string().trim().min(1).max(200),
+  /** null 表示恢复 Copilot 的默认 Auto 选择；只有 model=auto 时才会生效。 */
+  autoTier: z.enum(['efficiency', 'balance', 'intelligence', 'fast']).nullable().optional(),
+}).strict();
+
 /** 发送 Agent 问题或选择一个下一步动作；两者都走同一条执行通道。 */
 export const MessageBodySchema = z.object({
   message: z.string().trim().min(1).optional(),
