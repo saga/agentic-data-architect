@@ -33,6 +33,8 @@ const { Title, Text, Paragraph } = Typography;
  * 更早的轮次统一放进一个可展开的折叠区，避免对话很长以后需要滚动很久才能看到最新执行。
  */
 const RECENT_TURN_COUNT = 5;
+/** 每轮默认只展示最新事件；更早事件按需展开。 */
+const RECENT_EVENT_COUNT = 30;
 
 interface TrajectoryEvent {
   id: string;
@@ -372,6 +374,10 @@ function eventDetail(event: TrajectoryEvent) {
 }
 
 function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: TrajectoryEvent[] }) {
+  const [showOlderEvents, setShowOlderEvents] = useState(false);
+  const visibleEvents = events.filter((event) => event.type !== 'intent').slice().reverse();
+  const recentEvents = visibleEvents.slice(0, RECENT_EVENT_COUNT);
+  const olderEvents = visibleEvents.slice(RECENT_EVENT_COUNT);
   const summary = turn.summary;
 
   return (
@@ -405,9 +411,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
 
       <Timeline
         className="trajectory-turn-timeline"
-        items={events
-          .filter((event) => event.type !== 'intent')
-          .map((event) => {
+        items={recentEvents.map((event) => {
             const marker = eventMarker(event);
             return {
               label: formatTime(event.timestamp),
@@ -434,6 +438,45 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
             };
           })}
       />
+
+      {olderEvents.length > 0 ? (
+        <Collapse
+          ghost
+          className="trajectory-older-event-collapse"
+          activeKey={showOlderEvents ? ['older-events'] : []}
+          onChange={(keys) => setShowOlderEvents(keys.includes('older-events'))}
+          items={[{
+            key: 'older-events',
+            label: showOlderEvents ? `更早的 ${olderEvents.length} 个事件` : `更早的 ${olderEvents.length} 个事件（已折叠）`,
+            children: (
+              <Timeline
+                className="trajectory-turn-timeline trajectory-turn-timeline--older"
+                items={olderEvents.map((event) => {
+                  const marker = eventMarker(event);
+                  return {
+                    label: formatTime(event.timestamp),
+                    color: eventColor(event),
+                    dot: event.type === 'model_call' ? <RobotOutlined /> : event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> : event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> : event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> : undefined,
+                    children: (
+                      <div className={`trajectory-event-row${marker ? ` trajectory-event-row--${marker}` : ''}`}>
+                        <Flex justify="space-between" align="center" gap={12} wrap>
+                          <Flex align="center" gap={6} wrap>
+                            {marker === 'error' ? <Tag color="red">异常</Tag> : null}
+                            {marker === 'warning' ? <Tag color="orange">需处理</Tag> : null}
+                            <Text strong>{eventLabel(event)}</Text>
+                          </Flex>
+                          {event.durationMs !== undefined ? <Text type="secondary">{formatDuration(event.durationMs)}</Text> : null}
+                        </Flex>
+                        {eventDetail(event)}
+                      </div>
+                    ),
+                  };
+                })}
+              />
+            ),
+          }]}
+        />
+      ) : null}
 
       {!events.some((event) => event.type === 'model_call') ? (
         <Alert
