@@ -9,6 +9,7 @@ import { execFile as execFileCallback } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { defineTool } from '@github/copilot-sdk';
 import * as z from 'zod';
 import { config } from '../config.js';
 import { appendContextInput } from '../investigation/workspace.js';
@@ -62,8 +63,6 @@ async function cloneRepository(repository: GitHubRepository, targetDir: string):
   await fs.mkdir(path.dirname(targetDir), { recursive: true });
   const env = { ...process.env };
 
-  // 只在当前本机已经配置 GITHUB_TOKEN 时给 git clone 增加认证；
-  // 不把 token 写进仓库 URL、日志或 Evidence。
   if (config.githubToken) {
     const auth = Buffer.from('x-access-token:' + config.githubToken, 'utf8').toString('base64');
     env.GIT_CONFIG_COUNT = '1';
@@ -79,8 +78,6 @@ async function cloneRepository(repository: GitHubRepository, targetDir: string):
     );
     return;
   } catch (gitError) {
-    // 本机可能只有 GitHub CLI 登录态，没有 GITHUB_TOKEN 环境变量。
-    // 这种情况下让 gh 自己处理认证；如果 gh 也不可用，再把原始 git 错误抛给上层。
     await fs.rm(targetDir, { recursive: true, force: true });
     try {
       await execFile(
