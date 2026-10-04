@@ -344,7 +344,7 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
         facts.currentState
         && facts.currentState.datasets > 0
         && !facts.highGapKinds.some((kind) =>
-          ['discovery', 'lineage', 'source-of-truth'].includes(kind)),
+          ['discovery', 'lineage'].includes(kind)),
       );
     case 'target':
       return facts.targetComponentCount > 0;
