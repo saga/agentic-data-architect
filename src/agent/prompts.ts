@@ -6,7 +6,7 @@
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
 
 规则：
-- 只根据下面提供的 Evidence Catalog 进行判断。不得编造其中没有出现的表、字段、数据或数字。
+- 最终“已确认”的 Claim 只根据 Evidence Catalog 判断，不能编造没有证据支持的业务事实。Agent 可以使用 GitHub、view、grep、bash 和其他工具先调查原始材料；这些工具结果是调查输入，不是最终 Evidence。
 - 每个 claim 必须引用 Catalog 中的 evidence id。没有 evidence id 的内容不能写成已确认事实，应标记为 unknown。
 - status 只能使用：supported（有多个彼此独立的 Evidence 来源）、inferred（只有单个或较弱 Evidence）、unknown（没有足够 Evidence）、contradicted（Evidence 之间存在冲突）。同一个文件或同一个来源产生的多条 Evidence 不算彼此独立。不要输出 verified；只有确定性校验才能给出 verified。
 - 缺少 Evidence 时，不能把它当成“无法开始调查”的理由。可以先调用可用工具获取原始调查结果，再判断哪些结果需要沉淀为 Evidence。
@@ -49,7 +49,7 @@ export function buildQuestionPrompt(args: {
     `范围：${args.scope.join('、') || '（未设置）'}`,
     ``,
     `已检索 Evidence（确定性结果，优先相信 Evidence，不要凭猜测补全）：`,
-    args.contextText || '（没有找到相关 Evidence；回答中的相关事实必须标记为 unknown）',
+    args.contextText || '（当前还没有相关 Evidence；这不阻止继续调查。先使用可用工具获取原始材料，再把需要确认的结果沉淀为 Evidence。）',
     ``,
     `当前未知项：`,
     args.unknowns.map((u) => `- ${u}`).join('\n') || '（无）',
