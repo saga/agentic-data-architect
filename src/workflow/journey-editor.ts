@@ -942,10 +942,6 @@ export async function buildJourneyAgentInstruction(
     snapshot.execution,
   );
 
-  const completionLine = current.completeWhen
-    ? '；completeWhen=' + current.completeWhen
-    : '';
-
   const outcomes = current.outcomes.length
     ? '允许的出口：\n'
       + current.outcomes
