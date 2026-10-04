@@ -154,7 +154,7 @@ function getRegistryDatabase(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS local_analysis_runs (
       id TEXT PRIMARY KEY,
       session_name TEXT NOT NULL,
-      operation TEXT NOT NULL CHECK (operation IN ('catalog','describe','sample','profile','query','transform','export')),
+      operation TEXT NOT NULL CHECK (operation IN ('catalog','describe','sample','profile','query','transform','export','explain','reconcile')),
       dataset_id TEXT,
       sql TEXT NOT NULL,
       sql_hash TEXT NOT NULL,
