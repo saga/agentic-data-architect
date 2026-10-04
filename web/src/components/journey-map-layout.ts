@@ -6,10 +6,8 @@ const elk = new ELK();
 /**
  * Workflow 节点的“保守估计高度”。
  *
- * React Flow 12 的真实尺寸在 measured.width / measured.height 中；
- * 但第一次布局时节点还可能没有完成测量。
- * 因此这里永远使用一个足够保守的 fallback，避免 ELK 按“小卡片”排版，
- * React Flow 真正渲染后卡片变高，最终彼此压住。
+ * X6 的 React node 使用固定画布尺寸；第一次布局时不能依赖浏览器尚未完成的实际 DOM 高度。
+ * 因此这里使用保守的节点尺寸，保证 ELK 先得到稳定、可复现的布局。
  */
 const FALLBACK_NODE_WIDTH = 236;
 const FALLBACK_NODE_HEIGHT = 180;
