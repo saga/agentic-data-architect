@@ -132,7 +132,7 @@ export function JourneyMap(props: JourneyMapProps) {
                       ? '等待人工'
                       : snapshot.execution.status === 'completed'
                         ? '已完成'
-                        : snapshot.execution.status === 'stopped'
+                        : false
                           ? '已停止'
                           : '运行中'}
                   </Tag>
@@ -280,7 +280,7 @@ export function JourneyMap(props: JourneyMapProps) {
           <footer className="journey-map-page-footer">
             <Flex align="center" gap={8} wrap>
               <Text strong>{currentStage?.title ?? '当前步骤'}</Text>
-              <Tag bordered={false}>
+              <Tag variant="filled">
                 {completedCount}/
                 {Math.max(
                   currentDefinition?.nodes.filter((node) => node.visible).length ?? 0,
@@ -296,15 +296,13 @@ export function JourneyMap(props: JourneyMapProps) {
             <Space size={12}>
               <Text type="secondary">Cmd/Ctrl + S 保存</Text>
               {snapshot.execution.status === 'completed' ? (
-                <Tag color="green" bordered={false}>
+                <Tag color="green" variant="filled">
                   这条路线已经走完
                 </Tag>
               ) : snapshot.execution.status === 'stopped' ? (
-                <Tag color="red" bordered={false}>
-                  这条路线已停止
-                </Tag>
+                
               ) : (
-                <Tag bordered={false}>正在执行</Tag>
+                <Tag variant="filled">正在执行</Tag>
               )}
             </Space>
           </footer>
