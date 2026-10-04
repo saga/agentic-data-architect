@@ -95,9 +95,6 @@ export interface WorkflowExecution {
 
 export interface WorkflowState {
   workflowId: string;
-  currentNodeId: string;
-  completedNodeIds: string[];
-  unlockedNodeIds: string[];
   stages: JourneyMapStage[];
   execution: WorkflowExecution;
 }
