@@ -299,9 +299,15 @@ activeAfterExecution.phase = 'committing';
   const claims = toClaims(parsed, () => nextId('c'));
   inv.claims.push(...claims);
   if (!inv.questions.includes(effectiveQuestion)) inv.questions.push(effectiveQuestion);
-  for (const u of parsed.unknowns) {
-    if (!inv.unknowns.includes(u)) inv.unknowns.push(u);
-  }
+  // unknowns 表示“当前这一刻最值得保留的事实缺口”，不是历史累计日志。
+  // 每轮直接用模型重新整理后的结果替换，避免几十轮之后变成 40+ 条过时待查项。
+  const currentUnknowns = [...new Set(
+    parsed.unknowns
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .filter((item) => item.length <= 500),
+  )].slice(0, 12);
+  inv.unknowns = currentUnknowns;
 
   const answer = parsed.answer || raw.slice(0, 2000);
   await saveInvestigation(inv);
