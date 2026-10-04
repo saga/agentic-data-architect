@@ -31,7 +31,7 @@ export const WORKFLOW_LAYOUT_ENGINE = 'workflow-v1' as const;
 
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
   const terminal =
-    node.data.nodeType === 'end' || node.data.nodeType === 'stop';
+    node.data.nodeType === 'end';
   const defaults = terminal
     ? JOURNEY_NODE_SIZE.terminal
     : JOURNEY_NODE_SIZE.regular;
