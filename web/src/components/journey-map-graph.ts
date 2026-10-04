@@ -13,6 +13,7 @@ import {
   JOURNEY_NODE_SIZE,
   NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
+import { buildRetryGroups, classifyJourneyEdge } from './journey-map-visuals.js';
 
 /** 给已有出口生成稳定的 source port ID。 */
 export function sourceHandleId(nodeId: string, index: number): string {
@@ -383,17 +384,20 @@ export function graphFromDefinition(
     const sourceHandles: HandleSpec[] = sourceRoutes.map((route, index) => ({
       id: sourceHandleId(item.id, index),
       label: route.outcome,
+      kind: classifyJourneyEdge(route.outcome),
     }));
 
     const targetHandles: HandleSpec[] = targetRoutes.length
       ? targetRoutes.map((route, index) => ({
           id: targetHandleId(item.id, index),
           label: route.outcome,
+          kind: classifyJourneyEdge(route.outcome),
         }))
       : [
           {
             id: targetHandleId(item.id, 0),
             label: '入口',
+            kind: 'other',
           },
         ];
 
@@ -417,6 +421,7 @@ export function graphFromDefinition(
         produces: item.produces,
         visible: item.visible,
         isNew: newNodeIds.has(item.id),
+        retryGroupIds: [],
         sourceHandles,
         targetHandles,
         ...(connectionIssue
@@ -454,11 +459,26 @@ export function graphFromDefinition(
         targetHandle: targetHandleId(route.target, Math.max(0, incomingIndex)),
         data: {
           outcome: route.outcome,
+          kind: classifyJourneyEdge(route.outcome),
           ...(route.condition ? { condition: route.condition } : {}),
           onSelect: onSelectEdge,
         },
       });
     });
+  }
+
+  const retryGroups = buildRetryGroups(nodes, edges);
+
+  for (const group of retryGroups) {
+    for (const nodeId of group.nodeIds) {
+      const node = nodes.find((item) => item.id === nodeId);
+      if (!node) continue;
+
+      node.data.retryGroupIds = [
+        ...(node.data.retryGroupIds ?? []),
+        group.id,
+      ];
+    }
   }
 
   return { nodes, edges };
