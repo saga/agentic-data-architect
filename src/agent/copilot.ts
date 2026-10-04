@@ -99,7 +99,12 @@ export interface AskInput {
   /** When provided, the same resumable Copilot session is reused across turns/processes. */
   sessionId?: string;
   workingDirectory?: string;
+  /** 当前 Investigation 使用的模型；默认 Auto。 */
   model?: string;
+  /** model=auto 时的路由偏好。 */
+  autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
+  /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
+  onReasoningDelta?: (delta: string) => void;
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
   workflowSkill?: WorkflowId;
   /** 工作地图 AI 使用独立的最小 Agent 能力，不带数据分析工具。 */
@@ -341,9 +346,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
     ...(input.mcpServers ?? {}),
   };
+  const selectedModel = input.model ?? config.model;
 
   const sessionConfig: CreateSessionConfig = {
-    model: input.model ?? config.model,
+    model: selectedModel,
+    ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
     // Allow All Access 使用 SDK 官方 approveAll；默认 permission 模式不注册 handler，
     // 这样 permission.requested 会停在 pending，等待本工作台前端明确批准或拒绝。
     ...(input.permissionMode === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
@@ -450,8 +457,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
     type: 'turn_start',
     name: 'Agent 本轮开始',
     status: 'started',
-    model: input.model ?? config.model,
-    details: { sessionId: session.sessionId },
+    model: selectedModel,
+    details: {
+      sessionId: session.sessionId,
+      ...(input.autoTier ? { autoTier: input.autoTier } : {}),
+    },
   });
 
   let content = '';
@@ -477,7 +487,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,
         workflowInstruction,
-        model: input.model ?? config.model,
+        model: selectedModel,
+        ...(input.autoTier ? { autoTier: input.autoTier } : {}),
         workingDirectory,
         workflowSkill: input.workflowSkill ?? null,
         permissionMode: input.permissionMode ?? 'permission',
@@ -521,10 +532,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
       input.onTrajectory?.({ type: 'intent', name: 'Agent 意图', status: 'info', details: { intent, mappedStatus: status } });
     }
   });
-  const offReasoning = session.on('assistant.reasoning_delta', () => {
-    // 只刷新运行态，不把隐藏推理文本写入 trajectory。
+  const offReasoning = session.on('assistant.reasoning_delta', (e) => {
+    // Copilot SDK 把可展示的 reasoning 以增量事件送到宿主；只转发给当前回答，
+    // 不写 trajectory / run recorder，避免把模型内部过程变成长期审计材料。
+    const delta = typeof e.data.deltaContent === 'string' ? e.data.deltaContent : '';
+    if (!delta) return;
     markActivity('assistant.reasoning', '模型正在分析');
     input.onStatus?.('助手正在分析你的问题，请稍候…');
+    input.onReasoningDelta?.(delta);
   });
 
   const offAssistantTurnEnd = session.on('assistant.turn_end', (e) => {
