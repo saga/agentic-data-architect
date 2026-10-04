@@ -4,7 +4,7 @@ import { Alert } from 'antd';
 import { App } from './App';
 import './styles.css';
 
-/** 页面刷新后恢复 Investigation 的运行态；这里只显示真实 active turn，不读取历史 running 标记。 */
+/** 页面刷新后恢复 Investigation 的运行态；只读取当前 Node.js 进程的 live active turn。 */
 function ExecutionRecovery() {
   const [running, setRunning] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -17,12 +17,10 @@ function ExecutionRecovery() {
 
     const readStatus = async () => {
       try {
-        const response = await window.fetch(`/api/sessions/${encodeURIComponent(session)}/trajectory?limit=20`);
+        const response = await window.fetch(`/api/sessions/${encodeURIComponent(session)}/execution`);
         if (!response.ok) return;
-        const payload = await response.json() as { summary?: { state?: string } | null };
-        // trajectory 是历史记录，不是进程级 execution heartbeat；aborted/completed/failed
-        // 都不会显示“仍在执行”。只有服务端明确保留 running 时才显示。
-        const next = payload.summary?.state === 'running';
+        const payload = await response.json() as { running?: boolean };
+        const next = payload.running === true;
         runningRef.current = next;
         setRunning(next);
         if (!next) setVisible(true);
@@ -32,7 +30,7 @@ function ExecutionRecovery() {
     };
 
     void readStatus();
-    const timer = window.setInterval(() => void readStatus(), 1500);
+    const timer = window.setInterval(() => void readStatus(), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -42,7 +40,7 @@ function ExecutionRecovery() {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
       if (runningRef.current && /\/api\/sessions\/[^/]+\/messages\/stream(?:$|\?)/.test(url)) {
         while (runningRef.current) {
-          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
         }
       }
       return originalFetch(input, init);
