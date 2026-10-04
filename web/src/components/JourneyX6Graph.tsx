@@ -275,7 +275,7 @@ export function JourneyX6Graph({
           const targetNode = nodes.find((node) => node.id === edge.target);
           const backward =
             sourceNode && targetNode
-              ? targetNode.position.x <= sourceNode.position.x
+              ? targetNode.position.y <= sourceNode.position.y
               : false;
           const selected = edge.id === selectedEdgeId;
 
@@ -287,12 +287,12 @@ export function JourneyX6Graph({
               return Boolean(source && target && target.position.x <= source.position.x);
             }).length;
 
-          const minY = Math.min(...nodes.map((node) => node.position.y));
-          const maxY = Math.max(
+          const minX = Math.min(...nodes.map((node) => node.position.x));
+          const maxX = Math.max(
             ...nodes.map(
               (node) =>
-                node.position.y
-                + (node.height ?? JOURNEY_NODE_SIZE.regular.height),
+                node.position.x
+                + (node.width ?? JOURNEY_NODE_SIZE.regular.width),
             ),
           );
 
@@ -330,23 +330,24 @@ export function JourneyX6Graph({
           };
 
           if (backward) {
-            const useBottom = backwardIndex % 2 === 1;
+            const useRight = backwardIndex % 2 === 0;
             const laneIndex = Math.floor(backwardIndex / 2);
-            const lane = useBottom
-              ? maxY + 56 + laneIndex * 30
-              : minY - 56 - laneIndex * 30;
+            const lane = useRight
+              ? maxX + 56 + laneIndex * 30
+              : minX - 56 - laneIndex * 30;
 
-            const sourceX =
-              (sourceNode?.position.x ?? 0)
-              + (sourceNode?.width ?? JOURNEY_NODE_SIZE.regular.width)
-              + 28;
-            const targetX = (targetNode?.position.x ?? 0) - 28;
+            const sourceY =
+              (sourceNode?.position.y ?? 0)
+              + (sourceNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2;
+            const targetY =
+              (targetNode?.position.y ?? 0)
+              + (targetNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2;
 
             return {
               ...edgeConfigBase,
               vertices: [
-                { x: sourceX, y: lane },
-                { x: targetX, y: lane },
+                { x: lane, y: sourceY },
+                { x: lane, y: targetY },
               ],
               router: {
                 name: 'orth',
