@@ -5,7 +5,6 @@ import {
   MiniMap,
   Selection,
   Snapline,
-  type Node,
 } from '@antv/x6';
 import type {
   FlowEdge,
@@ -357,12 +356,10 @@ export function JourneyX6Graph({
     }
 
     graph.on('node:click', ({ node }) => {
-      graph.resetSelection(node);
       callbacksRef.current.onNodeClick(node.id);
     });
 
     graph.on('edge:click', ({ edge }) => {
-      graph.resetSelection(edge);
       callbacksRef.current.onEdgeClick(edge.id);
     });
 
