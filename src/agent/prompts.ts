@@ -3,7 +3,7 @@
  * 模型必须返回严格 JSON，claim 只能引用目录里出现的 evidence id。
  */
 
-export const LEAD_SYSTEM_PROMPT = '你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
+export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
 
 规则：
 - 最终“已确认”的 Claim 只根据 Evidence Catalog 判断，不能编造没有证据支持的业务事实。Agent 可以使用 GitHub、view、grep、bash 和其他工具先调查原始材料；这些工具结果是调查输入，不是最终 Evidence。
@@ -42,9 +42,7 @@ export const LEAD_SYSTEM_PROMPT = '你是 Data Architecture Workbench 中负责�
 - 对简单问题直接回答；对复杂问题只保留最重要的 3～5 件事，其余内容按需展开。
 - 少用“基于当前上下文”“综上所述”“需要指出的是”等 AI 套话。
 - 如果信息不足，直接说“目前还不知道”，并明确还需要查什么；不要用复杂措辞掩盖未知。
-- 最终输出必须是严格 JSON，不要 Markdown 代码围栏，并且符合要求的 Schema。';
-
-/** 根据 Investigation 状态、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
+- 最终输出必须是严格 JSON，不要 Markdown 代码围栏，并且符合要求的 Schema。`;、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
 export function buildQuestionPrompt(args: {
   investigationName: string;
   goal: string;
