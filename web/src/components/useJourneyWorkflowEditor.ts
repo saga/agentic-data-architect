@@ -49,6 +49,7 @@ interface JourneyWorkflowEditorResult {
   currentDefinition?: WorkflowDefinition;
   currentStage?: JourneyMapStage;
   completedCount: number;
+  fitViewRequest: number;
   saveWorkflow: () => Promise<void>;
   aiEditFlow: (
     prompt: string,
@@ -104,6 +105,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
   const [connectOutcome, setConnectOutcome] = useState('success');
+  // 只在打开地图、自动排版或结构变化后请求一次全图适配，拖动节点时不自动缩放。
+  const [fitViewRequest, setFitViewRequest] = useState(0);
 
   // Workflow 运行时草稿完全与图引擎解耦。
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
@@ -264,6 +267,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     setNodes(layoutedNodes);
     setEdges(graph.edges);
+    setFitViewRequest((value) => value + 1);
     setValidationIssues([]);
 
     return { nodes: layoutedNodes, edges: graph.edges };
@@ -421,6 +425,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     setNodes(laidOutNodes);
     setEdges(graph.edges);
+    setFitViewRequest((value) => value + 1);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
@@ -701,6 +706,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     setNodes(laidOutNodes);
     setEdges(graph.edges);
+    setFitViewRequest((value) => value + 1);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
@@ -758,6 +764,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     setNodes(laidOutNodes);
     setEdges(graph.edges);
+    setFitViewRequest((value) => value + 1);
     setValidationIssues([]);
   };
 
@@ -822,6 +829,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
       setNodes(layoutedNodes);
       setEdges(graph.edges);
+      setFitViewRequest((value) => value + 1);
       setSelectedNodeId(undefined);
       setSelectedEdgeId(undefined);
       setPast([]);
@@ -983,6 +991,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       newNodeIdsRef.current = new Set();
       setNodes(layoutedNodes);
       setEdges(graph.edges);
+      setFitViewRequest((value) => value + 1);
       setSelectedNodeId(undefined);
       setSelectedEdgeId(undefined);
       setValidationIssues([]);
@@ -1119,6 +1128,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       : undefined,
     currentStage,
     completedCount,
+    fitViewRequest,
     saveWorkflow,
     aiEditFlow,
     applyAiChanges,
