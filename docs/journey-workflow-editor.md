@@ -126,7 +126,7 @@ Workflow Definition 不依赖 X6 类型，因此以后即使替换画布实现�
 - 其它分支：向另一侧展开。
 - retry：保留真实 Port 和 Edge，使用灰色虚线回线。
 
-Port 只负责连接和交互；用户选中连线后，在右侧“属性”查看真实 outcome、目标和 condition。
+Port 只负责连接和交互；用户选中连线后，在右侧“属性”查看真实 outcome、目标。
 
 ### Edge
 
@@ -160,7 +160,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 - back edge：其它循环关系仍由图结构识别。
 - collision guard：最后只做一次简单矩形碰撞保护。
 
-旧的 elk / elk-v2 ... elk-v5 layout 值继续可读，新保存的自动布局统一写 workflow-v1。
+布局只使用 workflow-v1；不再保留旧 ELK layout engine 的 schema 值。
 
 ## 6. 自动排版规则
 
@@ -246,7 +246,7 @@ Failure Review ── retry ──► A
 - retry / rework / rollback：灰色虚线。
 - 其它 outcome：灰色实线。
 
-连线上不直接显示文字。选中连接后，右侧“属性”显示真实 outcome、来源、目标和 condition。
+连线上不直接显示文字。选中连接后，右侧“属性”显示真实 outcome、来源和目标。
 
 retry 线不会删除 Workflow 中真实存在的 retry 关系；只是使用画布外侧的 return lane 绕行，避免穿过其它节点。这样业务语义和视觉表达是一致的，也比视觉分组更容易理解。
 
