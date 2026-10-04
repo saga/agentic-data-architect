@@ -426,7 +426,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
                 </div>
               ),
             };
-          })}}
+          })}
       />
 
       {!events.some((event) => event.type === 'model_call') ? (
