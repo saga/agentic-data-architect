@@ -35,10 +35,7 @@ import {
   type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
-import {
-  analyzeJourneyWorkflow,
-  type JourneyAnalysisIssue,
-} from './journey-edit.js';
+
 
 const JOURNEY_DIR = 'workflow';
 const ACTIVE_FILE = 'journey.md';
@@ -88,8 +85,7 @@ export interface JourneySnapshot {
   layout: JourneyLayout;
   execution: JourneyExecution;
   state: JourneyState;
-  analysis: JourneyAnalysisIssue[];
-  events: JourneyRunEvent[];
+   events: JourneyRunEvent[];
 }
 
 function journeyDir(name: string): string {
@@ -200,8 +196,7 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
     for (const route of node.routes) {
       lines.push(
-        '- ' + route.outcome + ' -> ' + route.target
-        + (route.condition ? ' if ' + route.condition : ''),
+        '- ' + route.outcome + ' -> ' + route.target,
       );
     }
     lines.push('');
@@ -235,11 +230,9 @@ function normalizeExecution(
   const terminalStatus: JourneyExecution['status'] =
     currentNode.type === 'end'
       ? 'completed'
-      : currentNode.type === 'stop'
-        ? 'stopped'
-        : currentNode.actor === 'human'
-          ? 'waiting'
-          : 'active';
+      : currentNode.actor === 'human'
+        ? 'waiting'
+        : 'active';
 
   const runId = execution.runId?.trim() || definition.id + '-v' + String(version);
   const completedNodeIds = [...new Set(
@@ -376,7 +369,7 @@ export async function loadJourneyExecution(
     runId: z.string().optional(),
     currentNodeId: z.string(),
     completedNodeIds: z.array(z.string()),
-    status: z.enum(['active', 'waiting', 'completed', 'stopped']),
+    status: z.enum(['active', 'waiting', 'completed']),
     pendingInteraction: z.object({
       id: z.string(),
       nodeId: z.string(),
@@ -397,7 +390,6 @@ export async function getJourneySnapshot(
   const execution = await loadJourneyExecution(name, active.definition, active.version);
   const facts = await buildJourneyFacts(name);
   const state = buildJourneyState(active.definition, facts, execution);
-  const analysis = analyzeJourneyWorkflow(active.definition);
 
   // Deterministic completion may move the current node without an Agent transition.
   // Persist that state so the next turn cannot observe an older current node.
@@ -440,8 +432,7 @@ export async function getJourneySnapshot(
     layout: active.layout,
     execution: state.execution,
     state,
-    analysis,
-    events,
+     events,
   };
 }
 
@@ -453,15 +444,13 @@ export function validateJourneyEdit(
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const layout = JourneyLayoutSchema.parse(layoutInput);
   const issues = validateJourneyDefinition(definition);
-  const warnings = analyzeJourneyWorkflow(definition).map((item) => item.message);
-
+ 
   for (const node of definition.nodes) {
     if (!layout.nodes[node.id]) issues.push('节点缺少画布位置：' + node.id);
   }
 
   return {
     issues: [...new Set(issues)],
-    warnings: [...new Set(warnings)],
   };
 }
 
@@ -507,9 +496,7 @@ export async function saveJourneyDefinition(
       completedNodeIds: preservedCompleted,
       status: preservedNode?.type === 'end'
         ? 'completed'
-        : preservedNode?.type === 'stop'
-          ? 'stopped'
-          : preservedNode?.actor === 'human'
+        : preservedNode?.actor === 'human'
             ? 'waiting'
             : 'active',
     };
@@ -691,17 +678,6 @@ async function appendDeterministicAdvanceEvents(
       nodeId: after.currentNodeId,
       data: { deterministic: true },
     });
-  } else if (before.status !== 'stopped' && after.status === 'stopped') {
-    await appendJourneyRunEvent(name, {
-      id: crypto.randomUUID(),
-      runId: after.runId,
-      workflowId: after.workflowId,
-      workflowVersion: after.workflowVersion,
-      type: 'workflow-stopped',
-      timestamp: new Date().toISOString(),
-      nodeId: after.currentNodeId,
-      data: { deterministic: true },
-    });
   }
 }
 
@@ -747,16 +723,6 @@ async function appendJourneyTransitionEvents(
       workflowId: next.workflowId,
       workflowVersion: next.workflowVersion,
       type: 'workflow-completed',
-      timestamp: new Date().toISOString(),
-      nodeId: next.currentNodeId,
-    });
-  } else if (next.status === 'stopped') {
-    await appendJourneyRunEvent(name, {
-      id: crypto.randomUUID(),
-      runId: next.runId,
-      workflowId: next.workflowId,
-      workflowVersion: next.workflowVersion,
-      type: 'workflow-stopped',
       timestamp: new Date().toISOString(),
       nodeId: next.currentNodeId,
     });
@@ -985,7 +951,7 @@ export async function buildJourneyAgentInstruction(
       + current.outcomes
         .map((item) =>
           '- ' + item.outcome + ' -> ' + item.target
-          + (item.condition ? ' [condition=' + item.condition + ']' : ''),
+
         )
         .join('\n')
     : '当前节点没有可用出口；请不要自行推进 Workflow。';
@@ -999,7 +965,7 @@ export async function buildJourneyAgentInstruction(
     '节点类型：' + current.type,
     '执行者：' + current.actor,
     '节点目标：' + current.objective,
-    '完成方式：' + current.completion + completionLine,
+    ...(current.completeWhen ? ['确定性条件：' + current.completeWhen] : []),
     ...(current.actor === 'human'
       ? ['这是人工步骤：Agent 不应假装已经完成，应等待用户确认或补充结果。']
       : []),
