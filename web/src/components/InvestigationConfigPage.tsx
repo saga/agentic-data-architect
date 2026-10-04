@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
