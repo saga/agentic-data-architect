@@ -92,6 +92,7 @@ interface InvestigationControl {
     avatarPath?: string;
     avatarPaths?: string[];
     avatarMimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
+    autoContinuationTurns: number;
     avatarWidth: number;
     avatarHeight: number;
     systemPrompt: {
