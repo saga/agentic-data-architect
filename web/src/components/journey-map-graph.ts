@@ -435,7 +435,6 @@ export function graphFromDefinition(
               connectionIssueText: connectionIssue.text,
             }
           : {}),
-        ...(waiting ? { waiting: true } : {}),
         onAddStep,
         onAddBranch,
         onDelete,
