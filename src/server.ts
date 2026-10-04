@@ -568,16 +568,22 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       return;
     }
 
+    const avatarFile = path.join(workspaceRoot(name), 'assistant', 'avatar.png');
     try {
-      await fs.access(path.join(workspaceRoot(name), 'assistant', 'avatar.png'));
-    } catch {
-      res.status(404).end();
-      return;
+      // 直接读取并返回 Buffer，避免 Express sendFile 在不同本地开发环境下再次做文件路径解析。
+      // 这样也把“检查文件存在”和“实际读取文件”合并成一次 I/O，避免 TOCTOU 问题。
+      const buffer = await fs.readFile(avatarFile);
+      res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
+      res.setHeader('Content-Length', buffer.byteLength);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.end(buffer);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        res.status(404).end();
+        return;
+      }
+      throw error;
     }
-
-    res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(path.join(workspaceRoot(name), 'assistant', 'avatar.png'));
   });
 
   app.get('/api/sessions/:name/datasets', async (req, res) => {
