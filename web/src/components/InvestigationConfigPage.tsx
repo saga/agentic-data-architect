@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -244,6 +244,26 @@ export function InvestigationConfigPage(props:{
                  <Text type='secondary'>默认 180 × 240。修改尺寸后，下一次裁剪按新的比例处理。</Text>
                </div>
              </Flex>
+           </Card>
+           <Card title='自动继续' className='settings-card'>
+            <Paragraph type='secondary'>Agent 完成一个阶段后，可以继续自动调查。这里控制一轮最多自动再推进几个阶段；设置为 0 表示每个阶段完成后都等你下一次输入。</Paragraph>
+            <Flex align='center' gap={12} wrap>
+              <Select
+                value={draft.agent.autoContinuationTurns}
+                style={{width:220}}
+                options={[
+                  {value:0,label:'0：不自动继续'},
+                  {value:1,label:'1：继续 1 个阶段'},
+                  {value:2,label:'2：继续 2 个阶段（默认）'},
+                  {value:3,label:'3：继续 3 个阶段'},
+                  {value:4,label:'4：继续 4 个阶段'},
+                  {value:5,label:'5：继续 5 个阶段'},
+                  {value:6,label:'6：继续 6 个阶段'},
+                ]}
+                onChange={value=>update(next=>{next.agent.autoContinuationTurns=value;})}
+              />
+              <Text type='secondary'>只影响本轮调查的连续执行，不绕过权限确认，也不会无限运行。</Text>
+            </Flex>
            </Card>
            <Card title='Agent 权限' className='settings-card'>
             <Paragraph type='secondary'>决定 Agent 执行命令、读写文件或调用需要确认的工具时，是否先向你确认。</Paragraph>
