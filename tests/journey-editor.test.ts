@@ -48,8 +48,8 @@ test('journey editor serialization round-trips semantic graph', () => {
 
   assert.equal(parsed.issues.length, 0);
   assert.ok(parsed.definition);
-  assert.equal(parsed.definition?.nodes[0]?.completion, 'deterministic');
-  assert.equal(parsed.definition?.nodes[0]?.actor, 'system');
+  assert.equal(parsed.definition?.nodes[0]?.completeWhen, 'goal');
+  assert.equal(parsed.definition?.nodes[0]?.actor, 'agent');
   assert.deepEqual(
     parsed.definition?.nodes[0]?.routes.map(({ outcome, target }) => ({ outcome, target })),
     [
@@ -82,15 +82,15 @@ test('selection-scoped Workflow AI cannot connect a new node to an unrelated nod
     'start -> intake',
     '',
     '## @task intake',
-    'completion: agent',
+
     '- success -> review',
     '',
     '## @task review',
-    'completion: agent',
+
     '- success -> done',
     '',
     '## @task unrelated',
-    'completion: agent',
+
     '- success -> done',
     '',
     '## @end done',
