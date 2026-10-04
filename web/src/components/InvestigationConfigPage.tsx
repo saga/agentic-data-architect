@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Divider, Empty, Flex, Input, Radio, Select, Space, Tag, Typography } from 'antd';
-import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined } from '@ant-design/icons';
+import ImgCrop from 'antd-img-crop';
+import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Typography, Upload } from 'antd';
+import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -35,6 +36,7 @@ export function InvestigationConfigPage(props:{
   const [saving,setSaving]=useState(false);
   const [workflowTarget,setWorkflowTarget]=useState<ConfigWorkflow>();
   const [confirmText,setConfirmText]=useState('');
+  const [avatarUploading,setAvatarUploading]=useState(false);
 
   useEffect(()=>setDraft(clone(props.control)),[props.control]);
   const update=(mutator:(next:ConfigPageControl)=>void)=>setDraft(prev=>{const next=clone(prev);mutator(next);return next;});
@@ -51,6 +53,65 @@ export function InvestigationConfigPage(props:{
       setDraft(data.control);
       await props.onSaved(data.control);
     }finally{setSaving(false);}
+  };
+
+  /** 将裁剪器输出再压缩成当前配置的精确像素尺寸，保证头像文件不会因为原图太大而失控。 */
+  const resizeAvatarToTarget = async (file: File): Promise<File> => {
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('无法读取裁剪后的头像。'));
+        image.src = sourceUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = draft.agent.avatarWidth;
+      canvas.height = draft.agent.avatarHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('当前浏览器不支持头像图片处理。');
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((value) => {
+          if (value) resolve(value);
+          else reject(new Error('无法生成头像文件。'));
+        }, 'image/png');
+      });
+      return new File([blob], 'avatar.png', { type: 'image/png' });
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
+  };
+
+  /** 接收 antd-img-crop 已经完成裁剪的文件，再上传到当前 Investigation。 */
+  const handleAvatarBeforeUpload = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      const resized = await resizeAvatarToTarget(file);
+      const body = new FormData();
+      body.append('file', resized, 'avatar.png');
+
+      const response = await fetch(
+        `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar`,
+        { method: 'POST', body },
+      );
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || response.statusText);
+      }
+
+      const data = await response.json() as { control: ConfigPageControl };
+      setDraft(clone(data.control));
+      await props.onSaved(data.control);
+    } finally {
+      setAvatarUploading(false);
+    }
+
+    return false;
   };
 
   const mutateMcp=(index:number, patch:Partial<ConfigPageControl['agent']['mcpServers'][number]>)=>update(next=>{next.agent.mcpServers[index]={...next.agent.mcpServers[index],...patch};});
@@ -94,6 +155,79 @@ export function InvestigationConfigPage(props:{
                placeholder='例如：秘书'
                onChange={e=>update(next=>{next.agent.displayName=e.target.value;})}
              />
+           </Card>
+           <Card title='头像' className='settings-card'>
+             <Flex align='center' gap={18} wrap>
+               <Avatar
+                 shape='square'
+                 src={
+                   draft.agent.avatarPath
+                     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
+                     : undefined
+                 }
+                 icon={<PictureOutlined />}
+                 style={{
+                   width: 96,
+                   height: 96,
+                   flex: '0 0 auto',
+                   objectFit: 'cover',
+                 }}
+               />
+               <div style={{minWidth:260,flex:'1 1 320px'}}>
+                 <Paragraph type='secondary'>上传大图后，先在裁剪框里拖动、缩放和裁剪；保存时会严格输出为当前设定的像素尺寸。</Paragraph>
+                 <Flex gap={8} wrap>
+                   <ImgCrop
+                     aspect={draft.agent.avatarWidth / draft.agent.avatarHeight}
+                     zoomSlider
+                     rotationSlider
+                     showReset
+                     quality={1}
+                     modalTitle='裁剪助手头像'
+                     modalOk='使用此头像'
+                     modalCancel='取消'
+                     showGrid
+                   >
+                     <Upload
+                       accept='image/png,image/jpeg,image/webp'
+                       maxCount={1}
+                       showUploadList={false}
+                       beforeUpload={(file) => {
+                         void handleAvatarBeforeUpload(file);
+                         return false;
+                       }}
+                     >
+                       <Button icon={<UploadOutlined />} loading={avatarUploading}>
+                         {draft.agent.avatarPath ? '更换头像' : '上传头像'}
+                       </Button>
+                     </Upload>
+                   </ImgCrop>
+                 </Flex>
+               </div>
+             </Flex>
+             <Divider style={{margin:'18px 0 14px'}} />
+             <Flex gap={12} wrap>
+               <div>
+                 <div className='field-label'>输出宽度（像素）</div>
+                 <InputNumber
+                   min={40}
+                   max={800}
+                   value={draft.agent.avatarWidth}
+                   onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 200);})}
+                 />
+               </div>
+               <div>
+                 <div className='field-label'>输出高度（像素）</div>
+                 <InputNumber
+                   min={40}
+                   max={1200}
+                   value={draft.agent.avatarHeight}
+                   onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 400);})}
+                 />
+               </div>
+               <div style={{alignSelf:'end',paddingBottom:4}}>
+                 <Text type='secondary'>默认 200 × 400。修改尺寸后，下一次裁剪按新的比例处理。</Text>
+               </div>
+             </Flex>
            </Card>
            <Card title='Agent 权限' className='settings-card'>
             <Paragraph type='secondary'>决定 Agent 执行命令、读写文件或调用需要确认的工具时，是否先向你确认。</Paragraph>
