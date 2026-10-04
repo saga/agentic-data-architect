@@ -21,6 +21,8 @@ let starting: Promise<CopilotClient> | null = null;
 
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
 const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
+const AGENT_EXECUTION_TIMEOUT = /^Timeout after \d+ms waiting for agent execution$/;
+const USER_INPUT_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for user input$/;
 const WORKFLOW_SKILL_NAMES = ['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'];
 
 // Keep the host tool surface intentionally small; the CLI-like runtime provides
@@ -348,6 +350,38 @@ export async function askCopilot(input: AskInput): Promise<string> {
   };
   const selectedModel = input.model ?? config.model;
 
+  /**
+   * sendAndWait 的 SDK timeout 只负责最终兜底；真正的“执行 6 分钟上限”
+   * 和“等待用户回答 1 小时上限”由宿主自己分开计时。
+   *
+   * 这样 Agent 一旦调用 ask_user，6 分钟执行计时器会暂停，改用独立的
+   * USER_INPUT_WAIT_TIMEOUT_MS。用户回答后再重新开始一次执行计时。
+   */
+  let waitMode: 'execution' | 'user_input' = 'execution';
+  let waitTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let rejectWaitTimeout: ((error: Error) => void) | undefined;
+  let pendingUserInputWaits = 0;
+
+  const armWaitTimeout = (mode: 'execution' | 'user_input'): void => {
+    waitMode = mode;
+    if (waitTimeoutId !== undefined) clearTimeout(waitTimeoutId);
+
+    const timeoutMs = mode === 'user_input'
+      ? config.userInputWaitTimeoutMs
+      : config.turnTimeoutMs;
+
+    waitTimeoutId = setTimeout(() => {
+      rejectWaitTimeout?.(
+        new Error(
+          mode === 'user_input'
+            ? `Timeout after ${timeoutMs}ms waiting for user input`
+            : `Timeout after ${timeoutMs}ms waiting for agent execution`,
+        ),
+      );
+    }, timeoutMs);
+    waitTimeoutId.unref?.();
+  };
+
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
@@ -379,6 +413,22 @@ export async function askCopilot(input: AskInput): Promise<string> {
      */
     onUserInputRequest: async (request) => {
       const requestId = randomUUID();
+      pendingUserInputWaits += 1;
+      armWaitTimeout('user_input');
+
+      input.onStatus?.('Agent 正在等待你的回答。');
+      input.onTrajectory?.({
+        type: 'status',
+        name: '等待你的回答',
+        status: 'waiting',
+        details: {
+          requestId,
+          waitingOn: 'user_input',
+          waitingStartedAt: new Date().toISOString(),
+          waitTimeoutMs: config.userInputWaitTimeoutMs,
+        },
+      });
+
       return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
         pendingCopilotUserInputs.set(requestId, {
           sessionName: investigationName,
@@ -392,8 +442,21 @@ export async function askCopilot(input: AskInput): Promise<string> {
           resolve,
           reject,
         });
-        input.onStatus?.('Agent 正在等待你的回答。');
-      });
+      }).then(
+        (response) => {
+          pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
+          if (pendingUserInputWaits === 0) {
+            armWaitTimeout('execution');
+            input.onStatus?.('已收到你的回答，助手继续处理，请稍候…');
+          }
+          return response;
+        },
+        (error) => {
+          pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
+          if (pendingUserInputWaits === 0) armWaitTimeout('execution');
+          throw error;
+        },
+      );
     },
     workingDirectory,
     systemMessage: {
@@ -971,10 +1034,42 @@ export async function askCopilot(input: AskInput): Promise<string> {
         });
       }
 
-      const final = await session.sendAndWait(
-        { prompt: continuationPrompt },
-        config.turnTimeoutMs,
-      );
+      let timedOutError: Error | undefined;
+      const waitTimeoutPromise = new Promise<never>((_, reject) => {
+        rejectWaitTimeout = reject;
+        armWaitTimeout(waitMode);
+      });
+
+      let final;
+      try {
+        final = await Promise.race([
+          session.sendAndWait(
+            { prompt: continuationPrompt },
+            Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs),
+          ),
+          waitTimeoutPromise,
+        ]);
+      } catch (error) {
+        if (error instanceof Error && (
+          AGENT_EXECUTION_TIMEOUT.test(error.message)
+          || USER_INPUT_WAIT_TIMEOUT.test(error.message)
+        )) {
+          timedOutError = error;
+          try {
+            await session.abort();
+          } catch {
+            /* ignore */
+          }
+        }
+        throw error;
+      } finally {
+        if (waitTimeoutId !== undefined) {
+          clearTimeout(waitTimeoutId);
+          waitTimeoutId = undefined;
+        }
+        rejectWaitTimeout = undefined;
+      }
+      if (timedOutError) throw timedOutError;
       finalContent = final?.data.content || content;
       await runRecorder?.write('model_response', {
         execution,
@@ -1050,16 +1145,32 @@ export async function askCopilot(input: AskInput): Promise<string> {
     return finalContent;
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    const timedOut = TURN_TIMEOUT.test(errorMessage);
-    markActivity(timedOut ? 'timeout' : 'error', timedOut ? '等待 Session 完成超时' : 'Agent 执行失败');
+    const sdkTimedOut = TURN_TIMEOUT.test(errorMessage);
+    const executionTimedOut = AGENT_EXECUTION_TIMEOUT.test(errorMessage);
+    const userInputTimedOut = USER_INPUT_WAIT_TIMEOUT.test(errorMessage);
+    const timedOut = sdkTimedOut || executionTimedOut || userInputTimedOut;
+    const timeoutLabel = userInputTimedOut
+      ? '等待用户回答超时'
+      : executionTimedOut
+        ? 'Agent 执行超时'
+        : sdkTimedOut
+          ? '等待 Session 完成超时'
+          : '';
+    markActivity(timedOut ? 'timeout' : 'error', timedOut ? timeoutLabel : 'Agent 执行失败');
     input.onTrajectory?.({
       type: 'error',
-      name: timedOut ? 'Agent 等待超时' : 'Agent 执行失败',
+      name: timedOut
+        ? timeoutLabel
+        : 'Agent 执行失败',
       status: 'failed',
       details: {
         error: errorMessage,
         elapsedMs: Date.now() - turnStartedAt,
-        timeoutMs: config.turnTimeoutMs,
+        timeoutMs: executionTimedOut ? config.turnTimeoutMs : sdkTimedOut ? Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs) : undefined,
+        ...(userInputTimedOut ? { userInputWaitTimeoutMs: config.userInputWaitTimeoutMs } : {}),
+        ...(timedOut ? {
+          timeoutKind: userInputTimedOut ? 'user_input' : sdkTimedOut ? 'session_idle' : 'execution',
+        } : {}),
         lastActivityAt,
         lastActivityType,
         lastActivity,
@@ -1091,6 +1202,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     await runRecorder?.write('run_finished', { elapsedMs: Date.now() - turnStartedAt });
     await runRecorder?.close();
     clearInterval(heartbeat);
+    if (waitTimeoutId !== undefined) clearTimeout(waitTimeoutId);
+    waitTimeoutId = undefined;
+    rejectWaitTimeout = undefined;
     for (const [requestId, pending] of pendingCopilotPermissions) {
       if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
     }
