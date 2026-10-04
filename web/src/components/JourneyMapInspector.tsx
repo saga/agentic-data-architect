@@ -80,8 +80,11 @@ interface JourneyMapInspectorProps {
 /**
  * 右侧属性面板。
  *
- * 把“节点编辑”和“分支编辑”从主画布组件里拆出来，
- * 这样 JourneyMap.tsx 不再同时承担 Graph、状态、表单和 React Flow rendering。
+ * 把“节点编辑”和“分支编辑”从主画布组件里拆出来。
+ * 当前选中什么、Draft 如何保存由 editor hook 管理；Inspector 只负责输入和触发保存。
+ *
+ * Edge 的真实 outcome/target 在这里编辑，画布不常驻显示这些文字，
+ * 这样地图可以保持简洁，同时不会丢失 Workflow 语义。
  */
 export function JourneyMapInspector({
   nodes,
