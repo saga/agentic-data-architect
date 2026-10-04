@@ -503,30 +503,35 @@ export async function askCopilot(input: AskInput): Promise<string> {
       (typeof request.toolName === 'string' && request.toolName.trim()) ||
       ('需要确认 ' + kind);
     pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
-    pendingCopilotPermissions.set(requestId, {
-      sessionName: investigationName,
-      turnId: input.turnId ?? '',
-      sessionId: session.sessionId,
-      requestId,
-      kind,
-      requestedAt: new Date().toISOString(),
-      ...(typeof request.intention === 'string' ? { intention: request.intention } : {}),
-      ...(typeof request.fullCommandText === 'string' ? { fullCommandText: redactTrajectoryValue(request.fullCommandText) as string } : {}),
-      ...(typeof request.fileName === 'string' ? { fileName: request.fileName } : {}),
-      ...(typeof request.path === 'string' ? { path: request.path } : {}),
-      ...(typeof request.serverName === 'string' ? { serverName: request.serverName } : {}),
-      ...(typeof request.toolName === 'string' ? { toolName: request.toolName } : {}),
-      ...(typeof request.toolTitle === 'string' ? { toolTitle: request.toolTitle } : {}),
-      ...(typeof request.readOnly === 'boolean' ? { readOnly: request.readOnly } : {}),
-      ...(typeof request.managedApprovalRequired === 'boolean' ? { managedApprovalRequired: request.managedApprovalRequired } : {}),
-      respond: async (allowed) => {
-        await session.rpc.permissions.handlePendingPermissionRequest({
-          requestId,
-          result: allowed ? { kind: 'approve-once' } : { kind: 'reject' },
-        });
-      },
-    });
-    markActivity('permission', '等待确认：' + kind);
+    // 只有逐次确认模式才把请求放到工作台待处理列表；Allow All 由 SDK 自动处理。
+    if (input.permissionMode !== 'allow_all') {
+      pendingCopilotPermissions.set(requestId, {
+        sessionName: investigationName,
+        turnId: input.turnId ?? '',
+        sessionId: session.sessionId,
+        requestId,
+        kind,
+        requestedAt: new Date().toISOString(),
+        ...(typeof request.intention === 'string' ? { intention: request.intention } : {}),
+        ...(typeof request.fullCommandText === 'string' ? { fullCommandText: redactTrajectoryValue(request.fullCommandText) as string } : {}),
+        ...(typeof request.fileName === 'string' ? { fileName: request.fileName } : {}),
+        ...(typeof request.path === 'string' ? { path: request.path } : {}),
+        ...(typeof request.serverName === 'string' ? { serverName: request.serverName } : {}),
+        ...(typeof request.toolName === 'string' ? { toolName: request.toolName } : {}),
+        ...(typeof request.toolTitle === 'string' ? { toolTitle: request.toolTitle } : {}),
+        ...(typeof request.readOnly === 'boolean' ? { readOnly: request.readOnly } : {}),
+        ...(typeof request.managedApprovalRequired === 'boolean' ? { managedApprovalRequired: request.managedApprovalRequired } : {}),
+        respond: async (allowed) => {
+          await session.rpc.permissions.handlePendingPermissionRequest({
+            requestId,
+            result: allowed ? { kind: 'approve-once' } : { kind: 'reject' },
+          });
+        },
+      });
+    }
+    markActivity(input.permissionMode === 'allow_all' ? 'permission' : 'permission', input.permissionMode === 'allow_all'
+      ? 'Agent 自动批准操作'
+      : '等待确认：' + kind);
     input.onStatus?.('这一步需要你的确认，请在提示出现后继续操作。');
     input.onTrajectory?.({
       type: 'permission',
