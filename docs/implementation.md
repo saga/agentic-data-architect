@@ -13,7 +13,7 @@ Browser
                            ↘ Skills / Skill scripts
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 `@xyflow/react` 的 custom nodes、NodeToolbar、Panel、MiniMap 和 animated edges；完整工作地图由 Workflow Definition 驱动，使用 ELK 做自动排版，并由浏览器实际测量节点尺寸后再次布局。地图不是第二套 Workflow Engine，Workflow 语义和执行状态仍由服务端负责。
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 AntV X6 的 React shape、Port、Edge、Selection、Snapline 和 MiniMap；完整工作地图由 Workflow Definition 驱动，使用 ELK 做自动排版。X6 负责画布、连接桩、路由、连线、缩放和交互，地图不是第二套 Workflow Engine，Workflow 语义和执行状态仍由服务端负责。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
@@ -210,7 +210,7 @@ Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量
 
 工作地图现在既是导航视图，也是 Investigation Workflow 的编辑入口。当前实现：
 - 主对话区继续使用 `context.journeyPlan.routes` 作为 Agent 的临时调查建议；这些建议不直接改变 Workflow 状态。
-- 完整工作地图使用 `@xyflow/react` 展示 Workflow Definition、执行状态、分支和结构问题。
+- 完整工作地图使用 AntV X6 展示 Workflow Definition、执行状态、分支和结构问题。
 - 工作地图可以直接拖拽节点、添加步骤、连接/重新连接分支、编辑节点和分支属性，并通过 AI 提出 Workflow Patch。
 - 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换，避免属性表单与 AI 对话同时挤占空间。
 - 编辑结果先留在当前画布；只有点击“保存”后，服务端验证通过才创建新的 Investigation Workflow version。
