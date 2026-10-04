@@ -80,3 +80,77 @@ test('trajectory overall metrics include history but runtime state only follows 
   assert.equal(summary.totalTokens, 120);
   assert.equal(summary.model, 'gpt-6-luna');
 });
+
+test('recoverable tool failure does not make the completed turn look failed', () => {
+  const events: TrajectoryEvent[] = [
+    event({
+      turnId: 'turn-2',
+      timestamp: '2026-10-04T11:00:00.000Z',
+      type: 'tool_call',
+      name: '调用工具 #1',
+      status: 'started',
+      details: { toolCallId: 'tool-1' },
+    }),
+    event({
+      turnId: 'turn-2',
+      timestamp: '2026-10-04T11:00:01.000Z',
+      type: 'tool_result',
+      name: '工具失败后返回',
+      status: 'failed',
+      details: { toolCallId: 'tool-1', error: 'temporary failure' },
+    }),
+    event({
+      turnId: 'turn-2',
+      timestamp: '2026-10-04T11:00:02.000Z',
+      type: 'turn_end',
+      name: 'Agent 本轮结束',
+      status: 'completed',
+      details: {},
+    }),
+  ];
+
+  const summary = summarizeTrajectory(events);
+  assert.ok(summary);
+  assert.equal(summary.state, 'completed');
+  assert.equal(summary.waitingOn, undefined);
+  assert.equal(summary.pendingToolCount, 0);
+});
+
+test('user input request and completion use the same runtime request id', () => {
+  const events: TrajectoryEvent[] = [
+    event({
+      turnId: 'turn-3',
+      timestamp: '2026-10-04T12:00:00.000Z',
+      type: 'user_input_requested',
+      name: 'Agent 请求用户输入',
+      status: 'waiting',
+      details: {
+        requestId: 'runtime-ui-1',
+        question: '请选择环境',
+      },
+    }),
+    event({
+      turnId: 'turn-3',
+      timestamp: '2026-10-04T12:00:02.000Z',
+      type: 'user_input_completed',
+      name: '用户输入已提供',
+      status: 'completed',
+      details: {
+        requestId: 'runtime-ui-1',
+      },
+    }),
+    event({
+      turnId: 'turn-3',
+      timestamp: '2026-10-04T12:00:03.000Z',
+      type: 'turn_end',
+      name: 'Agent 本轮结束',
+      status: 'completed',
+      details: {},
+    }),
+  ];
+
+  const summary = summarizeTrajectory(events);
+  assert.ok(summary);
+  assert.equal(summary.state, 'completed');
+  assert.equal(summary.pendingUserInputCount, 0);
+});
