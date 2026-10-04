@@ -2,7 +2,7 @@
  * 工作地图编辑器的服务端存储边界。
  *
  * 内置 Skill 只提供初始路线；用户修改后直接保存到 Investigation workspace。
- * React Flow 的坐标只属于画布布局，不进入 Workflow 语义。
+ * X6 的坐标只属于画布布局，不进入 Workflow 语义。
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -56,7 +56,7 @@ export const JourneyLayoutSchema = z.object({
   version: z.literal(1),
   nodes: z.record(z.string(), JourneyLayoutNodeSchema),
   /** 当前使用的自动布局算法；旧 layout 可以没有这个字段。 */
-  engine: z.enum(['elk', 'elk-v2', 'elk-v3', 'elk-v4', 'elk-v5']).optional(),
+  engine: z.enum(['workflow-v1', 'elk', 'elk-v2', 'elk-v3', 'elk-v4', 'elk-v5']).optional(),
   viewport: z.object({
     x: z.number().finite(),
     y: z.number().finite(),
@@ -176,7 +176,7 @@ export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayo
     });
   }
 
-  return { version: 1, nodes };
+  return { version: 1, engine: 'workflow-v1', nodes };
 }
 
 /** 序列化成可人工阅读、可重新 parse 的 Workflow Markdown。 */
