@@ -119,46 +119,25 @@ Workflow Definition 不依赖 X6 类型，因此以后即使替换画布实现�
 
 ### Port
 
-每个已有 route 都有稳定 source Port / target Port。
+采用 X6 Agent Flow 类似的方向性 Port，不再在节点或连线旁显示 outcome 文案：
 
-source Port 的 label 就是 outcome，例如：
+- success / 主流程：从节点底部出去，下一步从顶部进入。
+- fail：从右侧出去，从目标步骤左侧进入。
+- 其它分支：向另一侧展开。
+- retry：不再创建可见 retry Port，由 retry group 表示。
 
-~~~text
-┌──────────────────┐
-│ 找到数据真相      │──────── success
-│                  │──────── needs-input
-└──────────────────┘
-~~~
-
-这样 outcome 始终跟着出口，不使用独立的 HTML edge label。
-
-X6 原生提供 Port Label，并支持 right / outside 等位置。 
+Port 只负责连接和交互；用户选中连线后，在右侧“属性”查看真实 outcome、目标和 condition。
 
 ### Edge
 
-普通前进边使用：
+连线只承担关系本身，不显示文字：
 
-~~~text
-source Port
-    ↓
-manhattan router
-    ↓
-rounded connector
-    ↓
-arrow
-~~~
+- 成功：绿色实线。
+- 失败：红色实线。
+- 其它普通分支：灰色实线。
+- retry：优先不画 retry 线。
 
-X6 的 manhattan 是带障碍规避能力的正交路由；rounded connector 负责拐角圆角。
-
-回退 / 循环边不让 router 自由穿过整张图，而是放到顶部或底部的 return lane：
-
-~~~text
-source ─────┐
-            │
-            └──────────────── target
-~~~
-
-回退边使用略淡的虚线，正常边使用实线。
+成功边固定走 bottom → top，失败边走 right → left，其它分支由 X6 Manhattan router 自然寻找路径；统一使用 rounded connector，避免折线过硬。X6 自带 top/right/bottom/left 均匀分布 Port，因此不需要自己计算 Port 像素位置。
 
 ## 5. 为什么不用 ELK
 
@@ -175,9 +154,10 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 
 现在使用 workflow-v1：
 
-- rank：决定从左到右的列。
-- lane：决定主线、上分支、下分支。
-- back edge：只由图结构识别，不看 retry / rollback 字符串。
+- rank：决定主流程上下层级。
+- lane：决定左右分支位置。
+- retry 不参与布局排名；它只用于生成视觉分组。
+- back edge：其它循环关系仍由图结构识别。
 - collision guard：最后只做一次简单矩形碰撞保护。
 
 旧的 elk / elk-v2 ... elk-v5 layout 值继续可读，新保存的自动布局统一写 workflow-v1。
@@ -189,19 +169,27 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 主流程默认纵向向下；分支向左右展开。长 Workflow 因此自然占用二维空间，而不是被压成一条很长的横线：
 
 ~~~text
-                ┌──────────────┐
-                         │ 补充资料      │
-                         └──────┬───────┘
-                                │
-┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐
-│ 接到任务 │ → │ 看清旧系 │ → │ 找到数据 │ → │ 查关键问│
-└────────┘   └────────┘   └────────┘   └────────┘
-                                   │
-                        ┌──────────┘
-                        ↓
-                   ┌──────────────┐
-                   │ 重新调查      │
-                   └──────────────┘
+                         ┌──────────┐
+                         │ 失败分支  │
+                         └────┬─────┘
+                              │
+                     ┌────────▼────────┐
+                     │ 查关键问题       │
+                     └────────┬────────┘
+                              │
+                         ┌────▼────┐
+                         │ 找到数据 │
+                         └────┬────┘
+                              │
+                         ┌────▼────┐
+                         │ 看清旧系 │
+                         └────┬────┘
+                              │
+                         ┌────▼────┐
+                         │ 接到任务 │
+                         └─────────┘
+
+       retry 关系不再拉一条回线，而是用一个浅灰虚线组框住需要重复处理的步骤。
 ~~~
 
 主线只是视觉概念，不是第二套 Workflow。
@@ -239,7 +227,22 @@ WorkflowChange[]
 
 AI 生成的 Definition 与人工编辑走同一套 validation。
 
-## 9. 当前刻意不做
+## 9. Retry 视觉分组
+
+retry 仍然是 Workflow DSL 中真实存在的 outcome，不会从语义层删除。
+
+当存在：
+
+~~~text
+A → B → C
+C --retry--> A
+~~~
+
+画布不再额外画一条 C → A 的回线，而是把 A / B / C 作为一个浅灰虚线组显示。
+
+这样既保留 Workflow 的真实 retry 语义，又不会让一条回线横穿工作地图。retry group 只存在于画布渲染层，不保存成新的 Workflow 节点，也不改变执行逻辑。
+
+## 10. 当前刻意不做
 
 不引入：
 
