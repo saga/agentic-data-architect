@@ -999,6 +999,8 @@ export async function buildJourneyAgentInstruction(
     snapshot.definition,
     snapshot.execution,
   );
+  const context = await loadWorkspaceContext(name);
+  const overallGoal = context.goal.trim() || context.userPrompt.trim();
 
   const outcomes = current.outcomes.length
     ? '允许的出口：\n'
@@ -1015,6 +1017,8 @@ export async function buildJourneyAgentInstruction(
     '当前 Investigation 有一条真正会影响执行位置的 Workflow，不是仅供参考的路线图。',
     'Workflow 节点和出口由服务端校验；Agent 不能自行发明 nodeId 或 outcome。',
     '',
+    '整个 Investigation 要完成的任务：' + (overallGoal || '（未设置）'),
+    '不要把当前节点当成一个独立问题；它只是整个架构任务中的当前阶段。只要整体任务还有重要工作没有完成，就继续推进。',
     '当前节点：' + current.nodeId + '（' + current.title + '）',
     '节点类型：' + current.type,
     '执行者：' + current.actor,
@@ -1027,6 +1031,7 @@ export async function buildJourneyAgentInstruction(
     outcomes,
     '',
     '调查动作与 Workflow 推进是两件事：即使当前节点的 completeWhen 尚未满足，也可以先调查并收集事实；只有真正满足条件并选择了合法出口时，才返回 workflow 字段。',
+    '少量 open question 不等于当前阶段失败；如果还有其它重要工作可以完成，应继续推进。',
     '{"workflow":{"nodeId":"当前节点 ID","outcome":"允许的 outcome"}}',
     '如果这轮没有完成当前节点，或者不能可靠判断出口，不要返回 workflow 字段，不要猜。',
     '需要用户补充信息时，不要猜；应由当前 Workflow 中真实存在的人工步骤或 outcome 决定。',
