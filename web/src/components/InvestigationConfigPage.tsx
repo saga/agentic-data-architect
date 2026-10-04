@@ -254,9 +254,9 @@ export function InvestigationConfigPage(props:{
                 options={[
                   {value:0,label:'0：不自动继续'},
                   {value:1,label:'1：继续 1 个阶段'},
-                  {value:2,label:'2：继续 2 个阶段（默认）'},
+                  {value:2,label:'2：继续 2 个阶段'},
                   {value:3,label:'3：继续 3 个阶段'},
-                  {value:4,label:'4：继续 4 个阶段'},
+                  {value:4,label:'4：继续 4 个阶段（默认）'},
                   {value:5,label:'5：继续 5 个阶段'},
                   {value:6,label:'6：继续 6 个阶段'},
                 ]}
