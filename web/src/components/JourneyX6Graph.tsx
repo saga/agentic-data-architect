@@ -261,7 +261,7 @@ export function JourneyX6Graph({
               : JOURNEY_NODE_SIZE.regular.width
           ),
           height: node.height ?? (
-            node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+            node.data.nodeType === 'end'
               ? JOURNEY_NODE_SIZE.terminal.height
               : JOURNEY_NODE_SIZE.regular.height
           ),
