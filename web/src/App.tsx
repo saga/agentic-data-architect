@@ -685,7 +685,11 @@ function AppInner() {
         ? nextGuidance
         : undefined;
 
-      const showActions = message.role === 'assistant' && index === lastAssistantIndex
+      // 选了正式 Workflow 后，工作地图负责主导航；这里不再额外给一组可能互相冲突的小路线。
+      // 没有 Workflow 的自主调查才显示 Agent 临时生成的少量建议。
+      const showActions = !current?.context.workflow
+        && message.role === 'assistant'
+        && index === lastAssistantIndex
         && Boolean(guidance?.length || current?.context.journeyPlan?.routes.length);
 
       return {
