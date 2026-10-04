@@ -16,7 +16,7 @@ V1.3 开始把项目从 Current-State Discovery 扩展成 Legacy Modernization W
 
 V1.4 增加 Structural Analysis：Graphify 作为平台级 structural-analysis capability 运行，平台能力配置随 Control version 固定并进入 audit；Graphify graph.json 记录运行时 hash/version，source_file Evidence 把 Graphify 的结构导航结果重新接回本 Investigation 的 deterministic provenance。Graphify 不直接产生 Claim Evidence，supported 仍要求独立来源。
 
-V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工作导航：主对话区显示 Agent 根据最近一次行动、Evidence、Unknowns 生成的 0～3 个可选下一步；用户点击后发送结构化 routeId，由服务端重新校验当前候选。工作地图使用 @xyflow/react 展示 Workflow 主线；地图可以只读查看，也可以进入编辑模式修改当前 Investigation 的 Workflow。
+V1.5 把 Investigation 的导航交互从右侧步骤列表提升为真正的工作导航：主对话区显示 Agent 根据最近一次行动、Evidence、Unknowns 生成的 0～3 个可选下一步；用户点击后发送结构化 routeId，由服务端重新校验当前候选。工作地图使用 AntV X6 展示 Workflow 主线；地图可以只读查看，也可以进入编辑模式修改当前 Investigation 的 Workflow。
 
 后续再逐步增加更细的 Data Analysis / Reconciliation / Migration Waves / Dual Run / Cutover。
 
@@ -292,7 +292,7 @@ skills/data-architecture-assessment/SKILL.md
 
 运行时位于 `src/workflow/assessment.ts`。它复用已有 Current-State、Finding、Gap Analysis 和 Evidence，不重新做一套 discovery engine；生成的评估结果保存为 `reports/architecture-assessment.json`。
 
-右侧工作区只保留紧凑 Journey 导引和当前事实；下一步候选直接出现在最近一条 Agent 回答下面。需要查看或编辑完整路线时打开全屏 React Flow 工作地图。
+右侧工作区只保留紧凑 Journey 导引和当前事实；下一步候选直接出现在最近一条 Agent 回答下面。需要查看或编辑完整路线时打开全屏 X6 工作地图。
 
 ## Legacy Modernization Workflow
 
@@ -2848,7 +2848,7 @@ knowledge/                       .workspace/<session>/
 
 ## V1.7 Journey Workflow Editor：工作地图成为真正的可执行 Workflow
 
-V1.7 修正了一个之前架构上的不一致：React Flow 地图展示的分支，之前并不是实际状态机的一部分；Workflow runtime 仍主要依赖节点数组顺序。
+V1.7 修正了一个之前架构上的不一致：图地图展示的分支，之前并不是实际状态机的一部分；Workflow runtime 仍主要依赖节点数组顺序。
 
 当前链路：
 
@@ -2857,7 +2857,7 @@ Skill Markdown
     ↓
 Journey Definition
     ↓
-React Flow Editor
+X6 Workflow Editor
     ↓
 Investigation Workflow Draft
     ↓
@@ -2873,7 +2873,7 @@ Agent Turn
 核心边界保持很小：
 
 - Skill 中的内置 SKILL.md 不被 UI 直接修改。
-- 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。React Flow 只编辑这份 Investigation 草稿，不修改内置 Skill。
+- 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。X6 只编辑这份 Investigation 草稿，不修改内置 Skill。
 - Markdown 保存流程语义，React Flow layout 单独保存，execution 单独保存。
 - Apply 前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
 - Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
@@ -2971,7 +2971,7 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 - connection Handle 在锁定模式也可见，但设置为不可交互；这样用户看到的线和编辑模式一致。
 - 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换；属性表单与工作地图 AI 不再同时占用右侧纵向空间。
 
-工作地图编辑器使用 React Flow controlled flow。节点拖动、连线、重新连接、节点属性编辑和边 outcome 编辑都直接作用于当前画布。
+工作地图编辑器使用 X6 Graph。节点拖动、Port 连线、重新连接、节点属性编辑和分支 outcome 编辑都直接作用于当前画布。
 
 布局不再使用简单的固定 x/y 分层，而采用 ELK layered layout：
 
@@ -2980,7 +2980,7 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 - elk.layered.crossingMinimization.strategy = LAYER_SWEEP
 - 每个 incoming / outgoing route 使用独立 port，并固定 port order。
 
-React Flow 官方同时提供 Dagre、ELK 和 dynamic layout 示例；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。编辑器还使用 useNodesInitialized 等待节点完成实际 DOM 尺寸测量，再进行最终布局，并用轻量 collision guard 兜底。
+X6 负责画布和连接交互，ELK 继续负责自动排版；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。图引擎与 Workflow 语义通过 engine-neutral graph adapter 隔离。
 
 新建节点使用明显的橙色虚线样式，并提供两种连接方式：
 
@@ -2999,7 +2999,7 @@ Journey Map 不再由一个组件同时负责 React Flow rendering、Graph 转�
 
 ```text
 JourneyMap
-  → 页面组合 / React Flow
+  → 页面组合 / X6
 
 useJourneyWorkflowEditor
   → 编辑状态 / Undo / Graph mutation / Draft Apply
