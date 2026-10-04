@@ -173,22 +173,22 @@ npm run flow:lint
 
 ## Workflow Editor
 
-完整设计见 `docs/journey-workflow-editor.md`。编辑器使用 React Flow controlled flow + ELK layered layout；每条 route 使用独立 Handle，尽量减少线路交叉和重叠。核心规则：
+完整设计见 `docs/journey-workflow-editor.md`。工作地图使用 AntV X6，Workflow Definition 与画布布局分开保存。自动排版使用项目内置的 workflow-v1，不依赖 ELK。
+
+核心边界：
 
 ~~~text
 内置 SKILL.md
     ↓
-Journey Definition
-    ↓
-React Flow 编辑
-    ↓
-Draft
-    ↓
-服务端 Validate
-    ↓
-Apply 新版本
-    ↓
-Workflow Execution
+Workflow Definition
+    ├─ @flow / @task / @review / @end
+    ├─ title / objective / actor / completeWhen
+    └─ outcome -> target
+          ↓
+engine-neutral Graph
+          ↓
+X6
 ~~~
 
-Canvas layout 与 Workflow 语义分开保存；Agent 只能选择当前节点已有的 outcome，服务端验证后才推进。
+Workflow 负责高层工作阶段；Agent 在阶段内部自由调查。completeWhen 的业务含义由宿主 facts/evaluator 决定。retry 是普通真实 Edge，不创建 Group 或特殊节点。Execution 保存真实当前节点和完成状态，UI stages 只是投影。
+
