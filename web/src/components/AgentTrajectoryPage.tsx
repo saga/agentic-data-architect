@@ -28,6 +28,12 @@ import {
 
 const { Title, Text, Paragraph } = Typography;
 
+/**
+ * 轨迹页只把最近几轮作为主视图。
+ * 更早的轮次统一放进一个可展开的折叠区，避免对话很长以后需要滚动很久才能看到最新执行。
+ */
+const RECENT_TURN_COUNT = 5;
+
 interface TrajectoryEvent {
   id: string;
   turnId: string;
@@ -441,6 +447,26 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
   );
 }
 
+/**
+ * 统一生成某一轮的折叠项，保证“最近轮次”和“更早轮次”使用完全一致的摘要信息。
+ */
+function turnCollapseItem(turn: TrajectoryTurnSummary, turnEvents: Map<string, TrajectoryEvent[]>) {
+  return {
+    key: turn.turnId,
+    label: (
+      <Flex justify="space-between" align="center" gap={12} wrap>
+        <span className="trajectory-collapse-question">{turn.userQuestion || '本轮 Agent 执行'}</span>
+        <Space size={6} wrap>
+          <Tag>Token {formatTokens(turn.summary.totalTokens)}</Tag>
+          <Tag>模型 {turn.modelCalls}</Tag>
+          <Tag>工具 {turn.toolCalls}</Tag>
+        </Space>
+      </Flex>
+    ),
+    children: <TurnCard turn={turn} events={turnEvents.get(turn.turnId) ?? []} />,
+  };
+}
+
 export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => void }) {
   const [events, setEvents] = useState<TrajectoryEvent[]>([]);
   const [summary, setSummary] = useState<TrajectorySummary | null>(null);
@@ -519,6 +545,11 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
   const contextEvents = events.filter((event) => event.type === 'status' && event.name === '上下文占用');
   const latestContext = contextEvents.at(-1);
 
+  // 页面按“最新 → 最旧”展示。只保留最近几轮作为一级列表，避免历史很长时页面不断变高。
+  const recentTurns = useMemo(() => displayTurns.slice().reverse().slice(0, RECENT_TURN_COUNT), [displayTurns]);
+  const olderTurns = useMemo(() => displayTurns.slice().reverse().slice(RECENT_TURN_COUNT), [displayTurns]);
+  const latestTurnId = recentTurns[0]?.turnId;
+
   return (
     <div className="trajectory-page-shell">
       <header className="subpage-header">
@@ -578,21 +609,20 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
 
             <Collapse
               className="trajectory-turn-list"
-              defaultActiveKey={displayTurns.length ? [displayTurns.at(-1)!.turnId] : []}
-              items={displayTurns.slice().reverse().map((turn) => ({
-                key: turn.turnId,
-                label: (
-                  <Flex justify="space-between" align="center" gap={12} wrap>
-                    <span className="trajectory-collapse-question">{turn.userQuestion || '本轮 Agent 执行'}</span>
-                    <Space size={6} wrap>
-                      <Tag>Token {formatTokens(turn.summary.totalTokens)}</Tag>
-                      <Tag>模型 {turn.modelCalls}</Tag>
-                      <Tag>工具 {turn.toolCalls}</Tag>
-                    </Space>
-                  </Flex>
-                ),
-                children: <TurnCard turn={turn} events={turnEvents.get(turn.turnId) ?? []} />,
-              }))}
+              defaultActiveKey={latestTurnId ? [latestTurnId] : []}
+              items={[
+                ...recentTurns.map((turn) => turnCollapseItem(turn, turnEvents)),
+                ...(olderTurns.length > 0 ? [{
+                  key: "older-turns",
+                  label: <Text type="secondary">更早的 {olderTurns.length} 轮</Text>,
+                  children: (
+                    <Collapse
+                      className="trajectory-older-turn-list"
+                      items={olderTurns.map((turn) => turnCollapseItem(turn, turnEvents))}
+                    />
+                  ),
+                }] : []),
+              ]}
             />
           </>
         )}
