@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Button, Flex, Space, Tag, Tooltip, Typography } from 'antd';
 import {
   AimOutlined,
@@ -12,7 +12,7 @@ import {
   UserOutlined,
   ApiOutlined,
 } from '@ant-design/icons';
-import { Node } from '@antv/x6';
+import type { Node } from '@antv/x6';
 import { register } from '@antv/x6-react-shape';
 import type { FlowNodeData, JourneyMapStage, WorkflowNodeType } from './journey-map-types.js';
 
@@ -49,7 +49,7 @@ interface JourneyX6NodeProps {
  * X6 节点内容。
  *
  * X6 负责节点位置、端口、边和 viewport；这里仅负责业务卡片的 React UI。
- * outcome 不放进节点里，而是交给 X6 原生 Edge label，避免 React Flow 式坐标同步问题。
+ * outcome 不再是悬浮 EdgeLabel，而是 X6 原生 Port Label，跟随对应出口连接桩定位。
  */
 export function JourneyX6Node({ node }: JourneyX6NodeProps) {
   const data = node.getData<FlowNodeData>();
@@ -57,20 +57,18 @@ export function JourneyX6Node({ node }: JourneyX6NodeProps) {
   const terminal = data.nodeType === 'end' || data.nodeType === 'stop';
   const selected = Boolean(data.selected);
 
-  const className = useMemo(() => {
-    return [
-      'journey-x6-node',
-      'journey-flow-node',
-      'journey-flow-node-stage',
-      'journey-flow-node-' + data.status,
-      'journey-flow-node-type-' + data.nodeType,
-      'journey-flow-node-actor-' + data.actor,
-      data.connectionIssue ? 'journey-flow-node-connection-' + data.connectionIssue : '',
-      data.isNew ? 'journey-flow-node-new' : '',
-      selected ? 'journey-x6-node-selected' : '',
-      data.visible ? '' : 'journey-flow-node-deemphasized',
-    ].filter(Boolean).join(' ');
-  }, [data, selected]);
+  const className = [
+    'journey-x6-node',
+    'journey-flow-node',
+    'journey-flow-node-stage',
+    'journey-flow-node-' + data.status,
+    'journey-flow-node-type-' + data.nodeType,
+    'journey-flow-node-actor-' + data.actor,
+    data.connectionIssue ? 'journey-flow-node-connection-' + data.connectionIssue : '',
+    data.isNew ? 'journey-flow-node-new' : '',
+    selected ? 'journey-x6-node-selected' : '',
+    data.visible ? '' : 'journey-flow-node-deemphasized',
+  ].filter(Boolean).join(' ');
 
   if (terminal) {
     return (
