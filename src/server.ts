@@ -643,7 +643,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       undefined,
       body.turnId,
       undefined,
-      selectedRoute ? { selectedRoute } : undefined,
+      selectedRoute ? { selectedRoute } : body.guided ? { selectedGuidance: message } : undefined,
     );
     res.json(result);
   });
