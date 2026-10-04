@@ -943,7 +943,7 @@ function AppInner() {
               <Text strong className="topbar-label">调查工作区</Text>
             </div>
             <Space>
-              <Tag className="workspace-status" bordered={false} icon={loading ? <LoadingOutlined spin /> : undefined}>
+              <Tag className="workspace-status" variant="filled" icon={loading ? <LoadingOutlined spin /> : undefined}>
                 {loading ? turnStatus : '可以继续提问'}
               </Tag>
               <Button type="text" size="small" icon={<ToolOutlined />} onClick={() => navigatePage('trajectory')}>
@@ -954,7 +954,7 @@ function AppInner() {
               </Button>
               {current?.context.unknowns.length ? (
                 <Tag
-                  bordered={false}
+                  variant="filled"
                   color="orange"
                   className="clickable-status-tag"
                   role="button"
@@ -1079,7 +1079,7 @@ function AppInner() {
             </div>
           </div>
 
-          <Divider type="vertical" className="content-divider" />
+          <Divider orientation="vertical" className="content-divider" />
 
           <div
             className="right-panel-shell"
@@ -1115,7 +1115,7 @@ function AppInner() {
                   <Flex className="right-section-heading" justify="space-between" align="center">
                     <Space size={6}>
                       <Text strong>地图导引</Text>
-                      <Tag bordered={false}>{current?.context.workflow ? '当前 Workflow' : '自主调查'}</Tag>
+                      <Tag variant="filled">{current?.context.workflow ? '当前 Workflow' : '自主调查'}</Tag>
                     </Space>
                     <Button
                       type="link"
@@ -1243,7 +1243,7 @@ function AppInner() {
         title={
           <Flex align="center" gap={8}>
             <span>待查内容</span>
-            <Tag bordered={false} color="orange">{current?.context.unknowns.length ?? 0} 项</Tag>
+            <Tag variant="filled" color="orange">{current?.context.unknowns.length ?? 0} 项</Tag>
           </Flex>
         }
         open={unknownsOpen}
