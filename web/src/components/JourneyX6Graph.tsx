@@ -416,9 +416,12 @@ export function JourneyX6Graph({
         sourceConnectionPoint: 'boundary',
         targetConnectionPoint: 'boundary',
         router: {
-          name: 'orth',
+          name: 'manhattan',
           args: {
-            padding: 24,
+            step: 16,
+            padding: 18,
+            startDirections: ['right'],
+            endDirections: ['left'],
           },
         },
         connector: {
