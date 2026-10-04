@@ -12,9 +12,8 @@ import { config } from '../config.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { parseSkillManifest } from '../skills/catalog.js';
 
-export type JourneyNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
-export type JourneyCompletionMode = 'deterministic' | 'agent';
-export type JourneyActor = 'agent' | 'human' | 'system';
+export type JourneyNodeType = 'task' | 'review' | 'end';
+export type JourneyActor = 'agent' | 'human';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 
 export interface JourneyRoute {
@@ -30,18 +29,10 @@ export interface JourneyNode {
   type: JourneyNodeType;
   title: string;
   objective?: string | undefined;
-  visible: boolean;
-  /** deterministic 有明确 completeWhen；agent 由 Agent 选择 outcome。 */
-  completion: JourneyCompletionMode;
-  /** 主要执行者：Agent、人或系统；默认不改变现有 Workflow 行为。 */
+  /** 主要执行者；默认是 Agent，@review 默认是人工。 */
   actor: JourneyActor;
+  /** 存在 completeWhen 时由已有事实自动推进；否则等待 Agent/人工选择 outcome。 */
   completeWhen?: string | undefined;
-  /** 提示性工具标签，不决定 Agent 实际可用工具、MCP 权限或授权边界。 */
-  tools?: string[] | undefined;
-  /** 这一步依赖的前置成果；只是轻量数据依赖声明，不执行变量解析。 */
-  requires?: string[] | undefined;
-  /** 这一步产出的工作成果；供后续步骤理解依赖关系。 */
-  produces?: string[] | undefined;
   routes: JourneyRoute[];
   line?: number | undefined;
 }
@@ -99,7 +90,6 @@ export type JourneyRunEventType =
   | 'node-waiting'
   | 'node-failed'
   | 'workflow-completed'
-  | 'workflow-stopped'
   | 'transition-rejected';
 
 export interface JourneyRunEvent {
@@ -127,7 +117,7 @@ export interface JourneyExecution {
   runId: string;
   currentNodeId: string;
   completedNodeIds: string[];
-  status: 'active' | 'waiting' | 'completed' | 'stopped';
+  status: 'active' | 'waiting' | 'completed';
   pendingInteraction?: JourneyPendingInteraction | undefined;
 }
 
@@ -171,34 +161,19 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       type: current.type,
       title: current.attrs.title || current.title,
       objective: current.attrs.objective,
-      visible: current.attrs.visible !== 'false',
-      completion: current.attrs.completion === 'agent' || current.attrs.completion === 'deterministic'
-        ? current.attrs.completion
-        : current.attrs.completeWhen
-          ? 'deterministic'
-          : 'agent',
-      actor: current.attrs.actor === 'human' || current.attrs.actor === 'system'
-        ? current.attrs.actor
+      actor: current.attrs.actor === 'human'
+        ? 'human'
         : current.type === 'review'
           ? 'human'
           : 'agent',
       completeWhen: current.attrs.completeWhen,
-      tools: current.attrs.tools
-        ? current.attrs.tools.split(',').map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      requires: current.attrs.requires
-        ? current.attrs.requires.split(',').map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      produces: current.attrs.produces
-        ? current.attrs.produces.split(',').map((item) => item.trim()).filter(Boolean)
-        : undefined,
       routes: current.routes,
       line: current.line,
     });
     current = undefined;
   };
 
-  const headingPattern = /^##\s+@(flow|task|gate|review|end|stop)\s+([A-Za-z0-9._:-]+)\s*$/;
+  const headingPattern = /^##\s+@(flow|task|review|end)\s+([A-Za-z0-9._:-]+)\s*$/;
   const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)(?:\s+if\s+([A-Za-z0-9._:-]+))?\s*$/;
   const attrPattern = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*?)\s*$/;
 
@@ -407,17 +382,13 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
     if (nodeMap.has(node.id)) issues.push('重复的 workflow node：' + node.id);
     nodeMap.set(node.id, node);
 
-    if (node.actor !== 'agent' && node.actor !== 'human' && node.actor !== 'system') {
+    if (node.actor !== 'agent' && node.actor !== 'human') {
       issues.push(node.id + ' 使用了未知 actor：' + node.actor);
-    }
-
-    if (node.completion === 'deterministic' && !node.completeWhen && node.type !== 'end' && node.type !== 'stop') {
-      issues.push(node.id + ' 使用 deterministic completion，但没有 completeWhen。');
     }
     if (node.completeWhen && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(node.completeWhen)) {
       issues.push(node.id + ' 使用了未知 completeWhen：' + node.completeWhen);
     }
-    if ((node.type === 'end' || node.type === 'stop') && node.completeWhen) {
+    if (node.type === 'end' && node.completeWhen) {
       issues.push(node.id + ' 是终点节点，不需要 completeWhen。');
     }
   }
@@ -446,7 +417,7 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
       incoming.set(route.target, [...(incoming.get(route.target) ?? []), node.id]);
     }
 
-    if (node.type === 'end' || node.type === 'stop') {
+    if (node.type === 'end') {
       if (node.routes.length) issues.push(node.id + ' 是终点节点，不能继续连出分支。');
     } else if (!node.routes.length) {
       issues.push(node.id + ' 没有任何出口。请至少连接一个 outcome。');
@@ -470,7 +441,7 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
   }
 
   const terminals = definition.nodes
-    .filter((node) => node.type === 'end' || node.type === 'stop')
+    .filter((node) => node.type === 'end')
     .map((node) => node.id);
   if (!terminals.length) issues.push('Workflow 至少需要一个 @end 或 @stop 终点。');
 
@@ -556,11 +527,9 @@ export function applyJourneyTransition(
     && target.type !== 'stop';
   const nextStatus: JourneyExecution['status'] = target.type === 'end'
     ? 'completed'
-    : target.type === 'stop'
-      ? 'stopped'
-      : waitingForHuman
-        ? 'waiting'
-        : 'active';
+    : waitingForHuman
+      ? 'waiting'
+      : 'active';
 
   const { pendingInteraction: _pendingInteraction, ...executionWithoutPending } = execution;
   return {
@@ -603,11 +572,6 @@ function advanceDeterministicJourney(
       pendingInteraction = undefined;
       break;
     }
-    if (node.type === 'stop') {
-      status = 'stopped';
-      pendingInteraction = undefined;
-      break;
-    }
     if (node.actor === 'human') {
       status = 'waiting';
       pendingInteraction = pendingInteraction ?? {
@@ -618,16 +582,10 @@ function advanceDeterministicJourney(
       };
       break;
     }
-    if (node.completion !== 'deterministic' || !conditionPassed(node.completeWhen, facts)) break;
+    if (!node.completeWhen || !conditionPassed(node.completeWhen, facts)) break;
 
-    const conditionalRoute = node.routes.find(
-      (item) => item.condition && conditionPassed(item.condition, facts),
-    );
-    const route = conditionalRoute
-      // 条件都没有命中时，任意第一个无条件出口都可以作为 fallback。
-      // 不要求 outcome 必须叫 success，避免 DSL 隐藏一个额外的 outcome 规则。
-      ?? node.routes.find((item) => !item.condition)
-      ?? node.routes.find((item) => ['success', 'pass', 'done'].includes(item.outcome));
+    // completeWhen 满足后，按 DSL 中写下的第一个出口继续。
+    const route = node.routes[0];
 
     // 只有真正走出当前节点才算完成；自环通常表示 retry/重新处理，不应把当前节点标成 completed。
     if (!route || route.target === node.id) break;
@@ -677,9 +635,7 @@ export function buildJourneyState(
 
   const advanced = advanceDeterministicJourney(definition, baseExecution, facts);
   const completed = new Set(advanced.completedNodeIds);
-  const visibleNodes = definition.nodes.filter(
-    (node) => node.visible && node.type !== 'stop',
-  );
+  const visibleNodes = definition.nodes;
 
   let displayCurrentId = advanced.currentNodeId;
   if (!visibleNodes.some((node) => node.id === displayCurrentId)) {
@@ -708,7 +664,6 @@ export function buildJourneyState(
       objective: node.objective || node.title,
       status,
       nodeType: node.type,
-      unlocked: status !== 'locked',
     };
   });
 
@@ -756,16 +711,11 @@ export const JourneyRouteSchema = z.object({
 
 export const JourneyNodeSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(['task', 'gate', 'review', 'end', 'stop']),
+  type: z.enum(['task', 'review', 'end']),
   title: z.string().min(1),
   objective: z.string().optional(),
-  visible: z.boolean(),
-  completion: z.enum(['deterministic', 'agent']),
-  actor: z.enum(['agent', 'human', 'system']).default('agent'),
+  actor: z.enum(['agent', 'human']).default('agent'),
   completeWhen: z.string().optional(),
-  tools: z.array(z.string()).optional(),
-  requires: z.array(z.string()).optional(),
-  produces: z.array(z.string()).optional(),
   routes: z.array(JourneyRouteSchema),
   line: z.number().int().positive().optional(),
 }).strict();
