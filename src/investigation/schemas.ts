@@ -161,6 +161,8 @@ export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySetting
 export const ControlAgentSchema = z.object({
   /** permission = 每次危险工具操作由前端确认；allow_all = 每次请求自动批准。 */
   permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
+  /** 对话中显示的助手名称；默认“秘书”，只影响展示和复制文本，不参与 Agent 推理。 */
+  displayName: z.string().trim().min(1).max(40).default('秘书'),
   systemPrompt: z.object({
     version: z.number().int().positive(),
     content: z.string(),
