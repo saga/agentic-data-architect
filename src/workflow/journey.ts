@@ -120,9 +120,6 @@ export interface JourneyExecution {
 
 export interface JourneyState {
   workflowId: string;
-  currentNodeId: string;
-  completedNodeIds: string[];
-  unlockedNodeIds: string[];
   stages: JourneyStage[];
   execution: JourneyExecution;
 }
@@ -660,9 +657,6 @@ export function buildJourneyState(
 
   return {
     workflowId: definition.id,
-    currentNodeId: advanced.currentNodeId,
-    completedNodeIds: [...completed],
-    unlockedNodeIds: [...new Set([...completed, ...reachable])],
     stages,
     execution: advanced,
   };
