@@ -671,16 +671,9 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const heartbeat = setInterval(() => send('heartbeat', { timestamp: new Date().toISOString() }), 15000);
     heartbeat.unref?.();
 
-    // A disconnected browser behaves like Stop while execution is cancelable.
-    // The commit phase intentionally ignores late cancellation.
-    const onClose = () => {
-      if (!finished) {
-        requestAbort(name, turnId);
-        void abortCopilotTurn(turnId);
-      }
-    };
-    res.on('close', onClose);
-
+    // SSE 只是实时显示通道，浏览器切页、刷新或短暂断线不能意外终止 Agent。
+    // 真正的 Stop 必须由显式的 /messages/abort 请求触发；新的页面可以继续通过
+    // trajectory / pending-interaction API 查看运行态。
     try {
       const result = await answerQuestion(
         name,
@@ -699,7 +692,6 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       res.end();
     } finally {
       clearInterval(heartbeat);
-      res.off('close', onClose);
     }
   });
 
