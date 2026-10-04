@@ -123,6 +123,10 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
     agent: {
       permissionMode: control.agent.permissionMode,
       displayName: control.agent.displayName,
+      ...(control.agent.avatarPath ? { avatarPath: control.agent.avatarPath } : {}),
+      ...(control.agent.avatarMimeType ? { avatarMimeType: control.agent.avatarMimeType } : {}),
+      avatarWidth: control.agent.avatarWidth,
+      avatarHeight: control.agent.avatarHeight,
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
       mcpServers: control.agent.mcpServers.map((item) => ({
@@ -319,6 +323,10 @@ async function updateInvestigationControlImpl(
     agent: {
       permissionMode: next.agent.permissionMode,
       displayName: next.agent.displayName.trim().slice(0, 40),
+      ...(next.agent.avatarPath ? { avatarPath: next.agent.avatarPath } : {}),
+      ...(next.agent.avatarMimeType ? { avatarMimeType: next.agent.avatarMimeType } : {}),
+      avatarWidth: normalizeAvatarDimension(next.agent.avatarWidth, current.agent.avatarWidth, 40, 800),
+      avatarHeight: normalizeAvatarDimension(next.agent.avatarHeight, current.agent.avatarHeight, 40, 1200),
       // Platform capabilities are controlled by the application, not the per-Investigation UI.
       // Custom MCP servers remain user-configurable for this Investigation.
       platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
@@ -348,6 +356,13 @@ async function updateInvestigationControlImpl(
   if (promptChanged) changed.push('guidance');
   if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
   if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
+  if (current.agent.displayName !== control.agent.displayName) changed.push('displayName');
+  if (
+    current.agent.avatarPath !== control.agent.avatarPath
+    || current.agent.avatarMimeType !== control.agent.avatarMimeType
+    || current.agent.avatarWidth !== control.agent.avatarWidth
+    || current.agent.avatarHeight !== control.agent.avatarHeight
+  ) changed.push('avatar');
 
   await appendAuditEvent(name, {
     actor: 'user',
@@ -358,6 +373,12 @@ async function updateInvestigationControlImpl(
       changed,
       guidanceVersion: control.agent.systemPrompt.version,
       permissionMode: control.agent.permissionMode,
+      displayName: control.agent.displayName,
+      avatar: {
+        configured: Boolean(control.agent.avatarPath),
+        width: control.agent.avatarWidth,
+        height: control.agent.avatarHeight,
+      },
       mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
     },
