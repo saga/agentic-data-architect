@@ -329,6 +329,25 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // 这样 permission.requested 会停在 pending，等待本工作台前端明确批准或拒绝。
     ...(input.permissionMode === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
     /**
+     * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
+     * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
+     */
+    onMcpAuthRequest: async (request) => {
+      input.onStatus?.(`MCP ${request.serverName} 需要登录授权，当前工作台暂不支持 OAuth。`);
+      input.onTrajectory?.({
+        type: 'status',
+        name: 'MCP 需要登录授权',
+        status: 'failed',
+        details: {
+          requestId: request.requestId,
+          serverName: request.serverName,
+          serverUrl: redactTrajectoryValue(request.serverUrl),
+          reason: request.reason,
+        },
+      });
+      return { kind: 'cancelled' as const };
+    },
+    /**
      * ask_user 必须由宿主提供异步 handler。
      * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
      */
@@ -767,14 +786,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const pending = pendingUserInputs.get(e.data.requestId);
     const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
     pendingUserInputs.delete(e.data.requestId);
-    const hostRequest = [...pendingCopilotUserInputs.values()].find(
-      (item) => item.sessionName === investigationName
-        && item.turnId === (input.turnId ?? '')
-        && item.question === pending?.question,
-    );
-    if (hostRequest) {
-      pendingCopilotUserInputs.delete(hostRequest.requestId);
-    }
     markActivity('user_input_completed', '用户输入已提供');
     input.onTrajectory?.({
       type: 'user_input_completed',
