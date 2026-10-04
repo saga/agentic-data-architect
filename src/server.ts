@@ -24,7 +24,7 @@ import {
   parseRequest,
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
-import { answerQuestion, requestAbort } from './workflow/ask.js';
+import { answerQuestion, getActiveInvestigationTurn, requestAbort } from './workflow/ask.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
 import {
@@ -207,6 +207,36 @@ app.post('/api/sessions', async (req, res) => {
   });
 
 
+  /**
+   * 当前 Investigation 的 live execution state。
+   * trajectory.jsonl 是历史记录，不能用来判断“现在是否还在跑”。
+   */
+  app.get('/api/sessions/:name/execution', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const active = getActiveInvestigationTurn(name);
+    if (!active) {
+      res.json({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
+      return;
+    }
+    const pendingPermissions = listPendingCopilotPermissions(name);
+    const pendingUserInputs = listPendingCopilotUserInputs(name);
+    const state = active.phase === 'committing'
+      ? 'committing'
+      : pendingPermissions.length > 0
+        ? 'waiting_permission'
+        : pendingUserInputs.length > 0
+          ? 'waiting_user_input'
+          : 'running';
+    res.json({
+      state,
+      running: true,
+      turnId: active.turnId,
+      phase: active.phase,
+      pendingPermissionCount: pendingPermissions.length,
+      pendingUserInputCount: pendingUserInputs.length,
+    });
+  });
+
   app.get('/api/sessions/:name/trajectory', async (req, res) => {
     const name = sessionKey(req.params.name);
     const turnId = typeof req.query.turnId === 'string' ? req.query.turnId : undefined;
@@ -218,7 +248,22 @@ app.post('/api/sessions', async (req, res) => {
     const summary = summarizeTrajectory(events);
     const turns = summarizeTrajectoryTurns(events);
     const conversationTurns = listConversationTurns(name, 200);
-    res.json({ events, summary, turns, conversationTurns });
+    const conversationStatus = new Map(conversationTurns.map((turn) => [turn.turnId, turn.status]));
+    const normalizedTurns = turns.map((turn) => {
+      const status = conversationStatus.get(turn.turnId);
+      if (status === 'aborted' && turn.summary.state !== 'completed') {
+        return {
+          ...turn,
+          summary: {
+            ...turn.summary,
+            state: 'aborted' as const,
+            finishedAt: turn.summary.finishedAt ?? turn.summary.lastActivityAt,
+          },
+        };
+      }
+      return turn;
+    });
+    res.json({ events, summary, turns: normalizedTurns, conversationTurns });
   });
 
   /** 返回当前 Investigation 正在等待用户处理的 Agent 权限请求。 */
