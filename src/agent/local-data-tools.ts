@@ -8,6 +8,7 @@ import { defineTool } from '@github/copilot-sdk';
 import pathModule from 'node:path';
 import * as z from 'zod';
 import { runDiscovery } from '../workflow/discover.js';
+import { createGitHubResearchTool } from './research-github.js';
 import { loadInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import {
@@ -26,6 +27,7 @@ import {
 
 export function createLocalDataTools(sessionName: string) {
   return [
+    createGitHubResearchTool(sessionName),
     defineTool('project_discover', {
       description: '扫描当前 Investigation workspace 中的代码、SQL、配置和数据目录，生成一次完整的 Discovery 快照、SQL lineage、基础 findings 和可引用 Evidence。第一次分析一个陌生 legacy 项目时优先调用。',
       parameters: z.object({
