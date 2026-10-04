@@ -223,11 +223,25 @@ interface Message {
   capturedAt: string;
 }
 
+interface InvestigationCheckpoint {
+  id: string;
+  turnId: string;
+  timestamp: string;
+  execution: number;
+  title: string;
+  summary: string;
+  confirmed: string[];
+  evidenceIds: string[];
+  unknowns: string[];
+  nextStep?: string;
+}
+
 interface SessionData {
   context: SessionContext;
   control: InvestigationControl;
   recentAudit: AuditEvent[];
   messages: Message[];
+  checkpoints: InvestigationCheckpoint[];
   currentState?: {
     coverage: {
       datasets: number;
@@ -551,6 +565,8 @@ function AppInner() {
   const [pendingUserInputs, setPendingUserInputs] = useState<PendingUserInput[]>([]);
   const [userInputDrafts, setUserInputDrafts] = useState<Record<string, string>>({});
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
+  // 阶段小结不是运行日志：只保留少量最近结果，避免主聊天区再次变成流水账。
+  const [checkpoints, setCheckpoints] = useState<InvestigationCheckpoint[]>([]);
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -604,6 +620,7 @@ function AppInner() {
       setValue('');
       setNextGuidance([]);
       setJourney(undefined);
+      setCheckpoints([]);
       setAttachmentsOpen(false);
     }
     const [result, journeyResult] = await Promise.all([
@@ -717,6 +734,7 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
+    setCheckpoints([]);
     setNextGuidance([]);
     setJourney(undefined);
     setPendingPermissions([]);
@@ -1094,6 +1112,17 @@ function AppInner() {
           const status = (data as { status?: unknown }).status;
           if (typeof status === 'string' && status.trim()) {
             setTurnStatus(status.trim());
+          }
+          return;
+        }
+        if (event === 'checkpoint') {
+          const checkpoint = data as InvestigationCheckpoint;
+          if (checkpoint && typeof checkpoint.id === 'string' && typeof checkpoint.title === 'string') {
+            setCheckpoints((items) => [
+              ...items.filter((item) => item.id !== checkpoint.id),
+              checkpoint,
+            ].slice(-20));
+            setTurnStatus('已形成阶段小结：' + checkpoint.title);
           }
           return;
         }
@@ -1481,6 +1510,43 @@ function AppInner() {
                 </div>
               </div>
             )}
+
+            {current.checkpoints.length ? (
+              <div className="checkpoint-list" aria-label="阶段小结">
+                {current.checkpoints.slice(-4).map((checkpoint, index, items) => (
+                  <Card
+                    key={checkpoint.id}
+                    size="small"
+                    className={`checkpoint-card${index === items.length - 1 ? ' checkpoint-card--latest' : ''}`}
+                    title={
+                      <Flex align="center" gap={8}>
+                        <Text strong>阶段小结</Text>
+                        <Text type="secondary">{checkpoint.title}</Text>
+                      </Flex>
+                    }
+                  >
+                    <div className="checkpoint-summary">{checkpoint.summary}</div>
+                    {checkpoint.confirmed.length ? (
+                      <div className="checkpoint-detail">
+                        <Text type="secondary">已确认</Text>
+                        {checkpoint.confirmed.slice(0, 4).map((item) => <div key={item}>· {item}</div>)}
+                      </div>
+                    ) : null}
+                    <div className="checkpoint-meta">
+                      <Text type="secondary">
+                        Evidence {checkpoint.evidenceIds.length} 条
+                        {checkpoint.unknowns.length ? ` · 未确认 ${checkpoint.unknowns.length} 项` : ''}
+                      </Text>
+                    </div>
+                    {checkpoint.nextStep ? (
+                      <div className="checkpoint-next-step">
+                        <Text type="secondary">下一步：</Text>{checkpoint.nextStep}
+                      </div>
+                    ) : null}
+                  </Card>
+                ))}
+              </div>
+            ) : null}
 
             {error ? (
               <Card size="small" className="error-card">
