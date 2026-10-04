@@ -125,7 +125,7 @@ export function JourneyX6Graph({
    * - success：从底部出去、从顶部进入，形成清晰的主流程；
    * - fail：从右侧出去、从左侧进入；
    * - 其它分支：从左侧出去、从右侧进入；
-   * - retry：从左侧出去、从左侧进入，并沿画布最外侧走灰色虚线回线。
+   * - retry：从左侧出去、从左侧进入，并沿画布最外侧走灰色虚线回线；它仍是真实 Workflow Edge。
    *
    * X6 自带 top/right/bottom/left 均匀分布 Port 的布局能力，
    * 不需要自己计算每个 Port 的像素位置。
@@ -134,12 +134,7 @@ export function JourneyX6Graph({
     const terminal =
       node.data.nodeType === 'end' || node.data.nodeType === 'stop';
 
-    const visibleSources = node.data.sourceHandles.filter(
-      (handle) => handle.kind !== 'retry',
-    );
-    const visibleTargets = node.data.targetHandles.filter(
-      (handle) => handle.kind !== 'retry',
-    );
+    // retry 也是真实 Workflow Edge，不能从 Port 中隐藏；它只是采用不同的视觉路由。
 
     const portAttrs = {
       circle: {
@@ -251,8 +246,6 @@ export function JourneyX6Graph({
 
     graph.batchUpdate(() => {
       graph.clearCells();
-
-      graph.addNodes(retryGroups);
 
       graph.addNodes(
         nodes.map((node) => ({
@@ -669,21 +662,29 @@ export function JourneyX6Graph({
       const selected = edge.id === selectedEdgeId;
       const kind: JourneyEdgeKind =
         edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
-      if (kind === 'retry') {
-        cell.setVisible(false);
-        continue;
-      }
-
       const stroke =
         kind === 'success'
           ? '#52c41a'
           : kind === 'fail'
             ? '#ff4d4f'
-            : '#9aa7b7';
+            : kind === 'retry'
+              ? '#8c99a8'
+              : '#9aa7b7';
 
       cell.setVisible(true);
       cell.attr('line/stroke', stroke);
-      cell.attr('line/strokeOpacity', selected ? 1 : kind === 'success' ? 0.82 : kind === 'fail' ? 0.86 : 0.66);
+      cell.attr(
+        'line/strokeOpacity',
+        selected
+          ? 1
+          : kind === 'success'
+            ? 0.82
+            : kind === 'fail'
+              ? 0.86
+              : kind === 'retry'
+                ? 0.86
+                : 0.66,
+      );
       cell.attr('line/strokeWidth', selected ? 3 : 2);
       cell.attr('line/targetMarker', {
         name: 'block',
@@ -692,10 +693,39 @@ export function JourneyX6Graph({
         fill: stroke,
         stroke,
       });
-      cell.attr(
-        'line/strokeDasharray',
-        kind === 'retry' ? '7 5' : undefined,
-      );
+      cell.attr('line/strokeDasharray', kind === 'retry' ? '7 5' : undefined);
+
+      // retry 使用显式回线，节点拖动/自动排版后也要同步回线的折点。
+      if (kind === 'retry') {
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        const targetNode = nodes.find((node) => node.id === edge.target);
+        const retryEdgeIndex = edges
+          .slice(0, edges.indexOf(edge))
+          .filter(
+            (candidate) =>
+              (candidate.data?.kind ?? classifyJourneyEdge(candidate.data?.outcome))
+                === 'retry',
+          ).length;
+        const laneX =
+          Math.min(...nodes.map((node) => node.position.x))
+          - 72
+          - Math.floor(retryEdgeIndex / 2) * 28;
+
+        cell.setVertices([
+          {
+            x: laneX,
+            y:
+              (sourceNode?.position.y ?? 0)
+              + (sourceNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2,
+          },
+          {
+            x: laneX,
+            y:
+              (targetNode?.position.y ?? 0)
+              + (targetNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2,
+          },
+        ]);
+      }
     }
 
   }, [nodes, edges, selectedNodeId, selectedEdgeId]);
