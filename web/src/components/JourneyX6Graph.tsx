@@ -21,40 +21,6 @@ import { classifyJourneyEdge } from './journey-map-visuals.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
 
-function retryGroupGeometry(members: FlowNode[]) {
-  if (!members.length) return undefined;
-
-  const minX = Math.min(...members.map((node) => node.position.x));
-  const minY = Math.min(...members.map((node) => node.position.y));
-  const maxX = Math.max(
-    ...members.map(
-      (node) =>
-        node.position.x
-        + (node.width
-          ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
-            ? JOURNEY_NODE_SIZE.terminal.width
-            : JOURNEY_NODE_SIZE.regular.width)),
-    ),
-  );
-  const maxY = Math.max(
-    ...members.map(
-      (node) =>
-        node.position.y
-        + (node.height
-          ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
-            ? JOURNEY_NODE_SIZE.terminal.height
-            : JOURNEY_NODE_SIZE.regular.height)),
-    ),
-  );
-
-  return {
-    x: minX - 28,
-    y: minY - 28,
-    width: maxX - minX + 56,
-    height: maxY - minY + 56,
-  };
-}
-
 export interface JourneyX6GraphProps {
   nodes: FlowNode[];
   edges: FlowEdge[];
@@ -141,7 +107,6 @@ export function JourneyX6Graph({
             id: handle.id,
             kind: handle.kind,
           })),
-          retryGroupIds: node.data.retryGroupIds ?? [],
         })),
         edges: edges.map((edge) => ({
           id: edge.id,
@@ -160,7 +125,7 @@ export function JourneyX6Graph({
    * - success：从底部出去、从顶部进入，形成清晰的主流程；
    * - fail：从右侧出去、从左侧进入；
    * - 其它分支：从左侧出去、从右侧进入；
-   * - retry：不再创建可见 Port，改用画布上的 retry group。
+   * - retry：从左侧出去、从左侧进入，并在画布最外侧走灰色虚线回线。
    *
    * X6 自带 top/right/bottom/left 均匀分布 Port 的布局能力，
    * 不需要自己计算每个 Port 的像素位置。
@@ -244,9 +209,11 @@ export function JourneyX6Graph({
           group:
             handle.kind === 'success'
               ? 'inputTop'
-              : handle.kind === 'fail'
+              : handle.kind === 'retry'
                 ? 'inputLeft'
-                : 'inputRight',
+                : handle.kind === 'fail'
+                  ? 'inputLeft'
+                  : 'inputRight',
         })),
         {
           id: NEW_TARGET_HANDLE_ID,
@@ -257,9 +224,11 @@ export function JourneyX6Graph({
           group:
             handle.kind === 'success'
               ? 'outputBottom'
-              : handle.kind === 'fail'
-                ? 'outputRight'
-                : 'outputLeft',
+              : handle.kind === 'retry'
+                ? 'outputLeft'
+                : handle.kind === 'fail'
+                  ? 'outputRight'
+                  : 'outputLeft',
         })),
         ...(terminal
           ? []
@@ -278,52 +247,7 @@ export function JourneyX6Graph({
     const graph = graphRef.current;
     if (!graph) return;
 
-    const visibleEdges = edges.filter(
-      (edge) => (edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome)) !== 'retry',
-    );
-
-    const retryGroupMap = new Map<string, FlowNode[]>();
-    for (const node of nodes) {
-      for (const groupId of node.data.retryGroupIds ?? []) {
-        retryGroupMap.set(groupId, [
-          ...(retryGroupMap.get(groupId) ?? []),
-          node,
-        ]);
-      }
-    }
-
-    const retryGroups = [...retryGroupMap.entries()]
-      .map(([id, members]) => {
-        const geometry = retryGroupGeometry(members);
-        if (!geometry) return undefined;
-
-        return {
-          id,
-          shape: 'rect',
-          ...geometry,
-          zIndex: 0,
-          attrs: {
-            body: {
-              rx: 18,
-              ry: 18,
-              fill: '#f5f7fa',
-              fillOpacity: 0.58,
-              stroke: '#9aa8b8',
-              strokeWidth: 1.5,
-              strokeDasharray: '8 6',
-              pointerEvents: 'none',
-            },
-            label: {
-              text: '',
-            },
-          },
-          data: {
-            retryGroup: true,
-            retryGroupId: id,
-          },
-        };
-      })
-      .filter(Boolean);
+    const visibleEdges = edges;
 
     graph.batchUpdate(() => {
       graph.clearCells();
@@ -365,18 +289,22 @@ export function JourneyX6Graph({
             success: {
               stroke: '#52c41a',
               opacity: 0.82,
+              dash: undefined,
             },
             fail: {
               stroke: '#ff4d4f',
               opacity: 0.86,
+              dash: undefined,
+            },
+            retry: {
+              stroke: '#8c99a8',
+              opacity: 0.86,
+              dash: '7 5',
             },
             other: {
               stroke: '#9aa7b7',
               opacity: 0.66,
-            },
-            retry: {
-              stroke: '#9aa7b7',
-              opacity: 0,
+              dash: undefined,
             },
           }[kind];
 
@@ -403,6 +331,7 @@ export function JourneyX6Graph({
                 strokeOpacity: selected ? 1 : style.opacity,
                 strokeLinejoin: 'round',
                 strokeLinecap: 'round',
+                ...(style.dash ? { strokeDasharray: style.dash } : {}),
                 targetMarker: {
                   name: 'block',
                   width: selected ? 10 : 8,
@@ -440,6 +369,39 @@ export function JourneyX6Graph({
                   padding: 18,
                   startDirections: ['right'],
                   endDirections: ['left'],
+                },
+              },
+            };
+          }
+
+          if (kind === 'retry') {
+            const sourceNode = nodes.find((node) => node.id === edge.source);
+            const targetNode = nodes.find((node) => node.id === edge.target);
+            const minX = Math.min(
+              ...nodes.map((node) => node.position.x),
+            );
+            const laneX = minX - 72;
+
+            return {
+              ...edgeConfig,
+              vertices: [
+                {
+                  x: laneX,
+                  y:
+                    (sourceNode?.position.y ?? 0)
+                    + (sourceNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2,
+                },
+                {
+                  x: laneX,
+                  y:
+                    (targetNode?.position.y ?? 0)
+                    + (targetNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2,
+                },
+              ],
+              router: {
+                name: 'orth',
+                args: {
+                  padding: 18,
                 },
               },
             };
@@ -562,7 +524,6 @@ export function JourneyX6Graph({
     }
 
     graph.on('node:click', ({ node }) => {
-      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       callbacksRef.current.onNodeClick(node.id);
     });
 
@@ -585,13 +546,11 @@ export function JourneyX6Graph({
     });
 
     graph.on('node:selected', ({ node }) => {
-      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       const data = node.getData<FlowNodeData>();
       node.setData({ ...data, selected: true });
     });
 
     graph.on('node:unselected', ({ node }) => {
-      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       const data = node.getData<FlowNodeData>();
       node.setData({ ...data, selected: false });
     });
@@ -624,13 +583,6 @@ export function JourneyX6Graph({
     graph.bindKey(['delete', 'backspace'], () => {
       const selected = graph.getSelectedCells();
       for (const cell of selected) {
-        if (
-          cell.isNode()
-          && cell.getData<Record<string, unknown>>()?.retryGroup
-        ) {
-          continue;
-        }
-
         callbacksRef.current.onDeleteSelected(
           cell.id,
           cell.isEdge() ? 'edge' : 'node',
@@ -704,19 +656,6 @@ export function JourneyX6Graph({
       }
     }
 
-    const retryGroupIds = new Set(
-      nodes.flatMap((node) => node.data.retryGroupIds ?? []),
-    );
-
-    for (const groupId of retryGroupIds) {
-      const cell = graph.getCellById(groupId);
-      const geometry = retryGroupGeometry(nodes.filter((node) => node.data.retryGroupIds?.includes(groupId)));
-      if (!cell?.isNode() || !geometry) continue;
-
-      cell.position(geometry.x, geometry.y);
-      cell.resize(geometry.width, geometry.height);
-    }
-
     for (const edge of edges) {
       const cell = graph.getCellById(edge.id);
       if (!cell?.isEdge()) continue;
@@ -747,6 +686,10 @@ export function JourneyX6Graph({
         fill: stroke,
         stroke,
       });
+      cell.attr(
+        'line/strokeDasharray',
+        kind === 'retry' ? '7 5' : undefined,
+      );
     }
 
   }, [nodes, edges, selectedNodeId, selectedEdgeId]);
