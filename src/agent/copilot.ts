@@ -107,6 +107,8 @@ export interface AskInput {
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
+  /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
+  onStageResult?: (result: { content: string; execution: number }) => void;
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
   workflowSkill?: WorkflowId;
   /** 工作地图 AI 使用独立的最小 Agent 能力，不带数据分析工具。 */
@@ -1071,6 +1073,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }
       if (timedOutError) throw timedOutError;
       finalContent = final?.data.content || content;
+      input.onStageResult?.({ content: finalContent, execution });
       await runRecorder?.write('model_response', {
         execution,
         response: finalContent,
