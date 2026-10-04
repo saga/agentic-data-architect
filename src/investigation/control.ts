@@ -48,6 +48,12 @@ function auditFile(name: string): string {
 }
 
 /** 清理字符串数组：去空格、去空值、去重复，为配置保存提供稳定输入。 */
+function normalizeAvatarDimension(value: unknown, fallback: number, min: number, max: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
 function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))];
@@ -90,6 +96,8 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     agent: {
       permissionMode: 'permission',
       displayName: '秘书',
+      avatarWidth: 200,
+      avatarHeight: 400,
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
@@ -156,6 +164,14 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
         : '秘书',
+      ...(typeof agent.avatarPath === 'string' && agent.avatarPath.trim()
+        ? { avatarPath: agent.avatarPath.trim() }
+        : {}),
+      ...(agent.avatarMimeType === 'image/png' || agent.avatarMimeType === 'image/jpeg' || agent.avatarMimeType === 'image/webp'
+        ? { avatarMimeType: agent.avatarMimeType }
+        : {}),
+      avatarWidth: normalizeAvatarDimension(agent.avatarWidth, 200, 40, 800),
+      avatarHeight: normalizeAvatarDimension(agent.avatarHeight, 400, 40, 1200),
       platformCapabilities: config.graphifyEnabled
         ? [{
             name: 'graphify-structural-analysis',
