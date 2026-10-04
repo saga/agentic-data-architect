@@ -57,7 +57,7 @@ export function buildQuestionPrompt(args: {
       ? [
           '用户刚刚从界面选择了一个下一步调查动作。它已经是用户确认的选择，不要把它当成普通建议：',
           JSON.stringify(args.selectedRoute),
-          '请执行这个选择；如果其中某一步在当前证据下无法继续，说明阻塞原因并选择实际可执行的下一步。',
+          '请执行这个选择；它代表用户已经确认的调查动作，不是让你重新讨论路线。即使当前 Workflow 的 deterministic completeWhen 尚未满足，也可以先完成调查并收集证据；只有真正满足条件后才推进 Workflow。若当前选择需要 project_discover，应直接调用它。',
           '',
         ]
       : []),
