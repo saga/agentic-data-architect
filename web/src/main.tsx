@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import { Alert } from 'antd';
 import { App } from './App';
 import './styles.css';
 
 /** 页面刷新后恢复 Investigation 的运行态；避免前端误以为可以立即发起第二个 turn。 */
 function ExecutionRecovery() {
   const [running, setRunning] = useState(false);
+  const [visible, setVisible] = useState(true);
   const runningRef = useRef(false);
 
   useEffect(() => {
@@ -21,6 +23,7 @@ function ExecutionRecovery() {
         const next = payload.summary?.state === 'running' || payload.summary?.state === 'waiting';
         runningRef.current = next;
         setRunning(next);
+        if (!next) setVisible(true);
       } catch {
         // 刷新或服务重启瞬间读取失败时，不阻塞正常聊天。
       }
@@ -48,15 +51,18 @@ function ExecutionRecovery() {
     return () => { window.fetch = originalFetch; };
   }, []);
 
-  if (!running) return null;
+  if (!running || !visible) return null;
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
-      height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#fff7e6', borderBottom: '1px solid #ffd591',
-      color: '#874d00', fontSize: 13,
-    }}>
-      上一轮任务仍在执行，刷新后已恢复运行状态。现在发送的问题会在上一轮完成后自动继续。
+    <div style={{ padding: '8px 16px 0' }}>
+      <Alert
+        type="warning"
+        showIcon
+        closable
+        onClose={() => setVisible(false)}
+        message="上一轮任务仍在执行"
+        description="刷新后已恢复运行状态。现在发送的问题会在上一轮完成后自动继续。"
+      />
     </div>
   );
 }
