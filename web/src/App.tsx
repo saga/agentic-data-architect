@@ -129,6 +129,17 @@ interface PendingPermission {
   managedApprovalRequired?: boolean;
 }
 
+interface PendingUserInput {
+  sessionName: string;
+  turnId: string;
+  sessionId: string;
+  requestId: string;
+  question: string;
+  choices: string[];
+  allowFreeform: boolean;
+  requestedAt: string;
+}
+
 type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
 
 const workflowOptions = [
@@ -420,6 +431,8 @@ function AppInner() {
   const [loading, setLoading] = useState(false);
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
+  const [pendingUserInputs, setPendingUserInputs] = useState<PendingUserInput[]>([]);
+  const [userInputDrafts, setUserInputDrafts] = useState<Record<string, string>>({});
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
@@ -496,13 +509,21 @@ function AppInner() {
     setAttachments(existing);
   };
 
-  /** 拉取当前 Agent 正在等待的权限请求；权限只存在进程运行态，不写入调查配置。 */
-  const loadPendingPermissions = async (key: string) => {
+  /** 拉取当前 Agent 正在等待的权限/用户输入请求；这些都是短暂运行态，不写入调查配置。 */
+  const loadPendingInteractions = async (key: string) => {
     try {
-      const result = await getJson<{ permissions: PendingPermission[] }>(
-        `/api/sessions/${encodeURIComponent(key)}/permissions`,
-      );
-      if (key === activeRef.current) setPendingPermissions(result.permissions);
+      const [permissionResult, inputResult] = await Promise.all([
+        getJson<{ permissions: PendingPermission[] }>(
+          `/api/sessions/${encodeURIComponent(key)}/permissions`,
+        ),
+        getJson<{ requests: PendingUserInput[] }>(
+          `/api/sessions/${encodeURIComponent(key)}/user-inputs`,
+        ),
+      ]);
+      if (key === activeRef.current) {
+        setPendingPermissions(permissionResult.permissions);
+        setPendingUserInputs(inputResult.requests);
+      }
     } catch {
       // Agent 未运行或服务刚重启时这里可能暂时不可用，不打断主对话。
     }
@@ -510,10 +531,10 @@ function AppInner() {
 
   useEffect(() => {
     if (!active) return;
-    void loadPendingPermissions(active);
+    void loadPendingInteractions(active);
     if (!loading) return;
     const timer = window.setInterval(() => {
-      if (!document.hidden) void loadPendingPermissions(active);
+      if (!document.hidden) void loadPendingInteractions(active);
     }, 1000);
     return () => window.clearInterval(timer);
   }, [active, loading]);
@@ -536,6 +557,8 @@ function AppInner() {
     setNextGuidance([]);
     setJourney(undefined);
     setPendingPermissions([]);
+    setPendingUserInputs([]);
+    setUserInputDrafts({});
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -649,6 +672,39 @@ function AppInner() {
       setTurnStatus(allowed ? '已允许这次操作，助手继续处理…' : '已拒绝这次操作，助手会继续处理…');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法处理权限请求');
+    }
+  };
+
+  /** 把回答提交给当前 ask_user 请求；按钮选择和自由输入共用一个接口。 */
+  const respondToUserInput = async (
+    request: PendingUserInput,
+    answer: string,
+    wasFreeform: boolean,
+  ) => {
+    if (request.sessionName !== active || !answer.trim()) return;
+    try {
+      await getJson<{ ok: true }>(
+        `/api/sessions/${encodeURIComponent(request.sessionName)}/user-inputs/respond`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            turnId: request.turnId,
+            requestId: request.requestId,
+            answer: answer.trim(),
+            wasFreeform,
+          }),
+        },
+      );
+      setPendingUserInputs((items) => items.filter((item) => item.requestId !== request.requestId));
+      setUserInputDrafts((drafts) => {
+        const next = { ...drafts };
+        delete next[request.requestId];
+        return next;
+      });
+      setTurnStatus('已回答 Agent，助手继续处理…');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法提交 Agent 的问题');
     }
   };
 
@@ -1130,6 +1186,62 @@ function AppInner() {
                               拒绝
                             </Button>
                           </Space>
+                        </Flex>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+            {pendingUserInputs.length ? (
+              <div className="pending-user-input-list">
+                {pendingUserInputs.map((request) => {
+                  const draft = userInputDrafts[request.requestId] ?? '';
+                  return (
+                    <Alert
+                      key={request.requestId}
+                      type="info"
+                      showIcon
+                      title="Agent 需要你的回答"
+                      description={
+                        <Flex vertical gap={8}>
+                          <Text>{request.question}</Text>
+                          {request.choices.length ? (
+                            <Flex wrap gap={6}>
+                              {request.choices.map((choice) => (
+                                <Button
+                                  key={choice}
+                                  size="small"
+                                  onClick={() => void respondToUserInput(request, choice, false)}
+                                >
+                                  {choice}
+                                </Button>
+                              ))}
+                            </Flex>
+                          ) : null}
+                          {request.allowFreeform ? (
+                            <Space.Compact style={{ width: '100%' }}>
+                              <Input
+                                value={draft}
+                                onChange={(event) => setUserInputDrafts((values) => ({
+                                  ...values,
+                                  [request.requestId]: event.target.value,
+                                }))}
+                                onPressEnter={(event) => {
+                                  event.preventDefault();
+                                  void respondToUserInput(request, draft, true);
+                                }}
+                                placeholder="输入你的回答"
+                              />
+                              <Button
+                                type="primary"
+                                disabled={!draft.trim()}
+                                onClick={() => void respondToUserInput(request, draft, true)}
+                              >
+                                提交
+                              </Button>
+                            </Space.Compact>
+                          ) : null}
                         </Flex>
                       }
                     />
