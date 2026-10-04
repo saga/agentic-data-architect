@@ -411,6 +411,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
 
       <Timeline
         className="trajectory-turn-timeline"
+        titleSpan="20%"
         items={recentEvents.map((event) => {
             const marker = eventMarker(event);
             return {
@@ -451,6 +452,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
             children: (
               <Timeline
                 className="trajectory-turn-timeline trajectory-turn-timeline--older"
+                titleSpan="20%"
                 items={olderEvents.map((event) => {
                   const marker = eventMarker(event);
                   return {
