@@ -27,6 +27,9 @@ const LANE_GAP = 300;
 const CANVAS_PADDING = 56;
 const COLLISION_GAP = 36;
 
+// 主线轻微左右摆动，避免默认自动排版退化成一条直线；值是 lane 列号，不改变 Workflow 语义。
+const MAIN_LANE_PATTERN = [0, 1, 0, -1, 0, -1, 0, 1] as const;
+
 export const WORKFLOW_LAYOUT_ENGINE = 'workflow-v2' as const;
 
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
