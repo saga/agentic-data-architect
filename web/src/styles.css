@@ -1081,7 +1081,152 @@ body {
   padding: 48px;
 }
 
-/* 独立子页面：配置和 Agent 轨迹。\n   #root 是 height:100% + overflow:hidden；antd <App> 又插了一层 div.ant-app，\n   所以两层都要占满高度，子页面自己负责滚动。\n   这里是桌面端基础布局；移动端规则继续在下方覆盖。 */\n#root > .ant-app {\n  height: 100%;\n}\n\n.subpage-app {\n  height: 100%;\n  overflow-y: auto;\n  overflow-x: hidden;\n  background: var(--workspace-bg, #f7f8fa);\n}\n\n.subpage-header {\n  position: sticky;\n  top: 0;\n  z-index: 5;\n  min-height: 64px;\n  padding: 0 28px;\n  background: rgba(255,255,255,.96);\n  border-bottom: 1px solid #edf0f3;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  backdrop-filter: blur(8px);\n}\n\n.config-page-shell,\n.trajectory-page-shell {\n  min-height: 100vh;\n}\n\n.config-page-body {\n  display: flex;\n  min-height: calc(100vh - 64px);\n}\n\n.config-page-nav {\n  width: 220px;\n  flex: 0 0 220px;\n  padding: 24px 14px;\n  background: #fff;\n  border-right: 1px solid #edf0f3;\n}\n\n.config-page-nav button {\n  width: 100%;\n  border: 0;\n  background: transparent;\n  border-radius: 8px;\n  min-height: 42px;\n  margin-bottom: 4px;\n  padding: 0 14px;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  text-align: left;\n  color: #59636e;\n  cursor: pointer;\n  font-size: 14px;\n}\n\n.config-page-nav button:hover {\n  background: #f5f7fa;\n  color: #1677ff;\n}\n\n.config-page-nav button.active {\n  background: #eaf3ff;\n  color: #1677ff;\n  font-weight: 600;\n}\n\n.config-page-content {\n  min-width: 0;\n  flex: 1;\n  padding: 32px clamp(24px, 5vw, 72px);\n}\n\n.config-page-content .settings-page {\n  max-width: 980px;\n  margin: 0 auto;\n  overflow: visible;\n  padding: 0 0 48px;\n}\n\n.config-page-content .settings-card {\n  margin-bottom: 16px;\n}\n\n/* 技能卡片：标题和正文上下排列（弹窗里的 .selected-skill 是横向列表项，别复用）。 */\n.config-page-content .skill-card {\n  border-radius: 10px;\n}\n\n.config-page-content .skill-card .ant-card-head {\n  min-height: 44px;\n  padding: 0 16px;\n  border-bottom: 1px solid #f0f0f0;\n}\n\n.config-page-content .skill-card .ant-card-body {\n  padding: 14px 16px 16px;\n}\n\n.config-page-content .settings-card > .ant-card-body {\n  padding: 20px;\n}\n\n.mcp-card label,\n.mcp-card .ant-form-item {\n  display: block;\n  margin-top: 14px;\n}\n\n.mcp-card label {\n  color: #59636e;\n  font-size: 13px;\n}\n\n.mcp-card label > .ant-input,\n.mcp-card label > .ant-select {\n  margin-top: 6px;\n}\n\n.mcp-grid {\n  display: grid;\n  grid-template-columns: 1fr 180px;\n  gap: 14px;\n  margin-top: 14px;\n}\n\n.mcp-builtins {\n  display: grid;\n  gap: 12px;\n  margin-bottom: 12px;\n}\n\n.mcp-builtins > div {\n  display: grid;\n  gap: 2px;\n}\n\n@media (max-width: 760px) {
+/* 独立子页面：配置和 Agent 轨迹。
+   #root 是 height:100% + overflow:hidden；antd <App> 又插了一层 div.ant-app，
+   所以两层都要占满高度，子页面自己负责滚动。
+   这里是桌面端基础布局；移动端规则继续在下方覆盖。 */
+#root > .ant-app {
+  height: 100%;
+}
+
+.subpage-app {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--workspace-bg, #f7f8fa);
+}
+
+.subpage-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 64px;
+  padding: 0 28px;
+  background: rgba(255,255,255,.96);
+  border-bottom: 1px solid #edf0f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(8px);
+}
+
+.config-page-shell,
+.trajectory-page-shell {
+  min-height: 100vh;
+}
+
+.config-page-body {
+  display: flex;
+  min-height: calc(100vh - 64px);
+}
+
+.config-page-nav {
+  width: 220px;
+  flex: 0 0 220px;
+  padding: 24px 14px;
+  background: #fff;
+  border-right: 1px solid #edf0f3;
+}
+
+.config-page-nav button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  min-height: 42px;
+  margin-bottom: 4px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: #59636e;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.config-page-nav button:hover {
+  background: #f5f7fa;
+  color: #1677ff;
+}
+
+.config-page-nav button.active {
+  background: #eaf3ff;
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.config-page-content {
+  min-width: 0;
+  flex: 1;
+  padding: 32px clamp(24px, 5vw, 72px);
+}
+
+.config-page-content .settings-page {
+  max-width: 980px;
+  margin: 0 auto;
+  overflow: visible;
+  padding: 0 0 48px;
+}
+
+.config-page-content .settings-card {
+  margin-bottom: 16px;
+}
+
+/* 技能卡片：标题和正文上下排列（弹窗里的 .selected-skill 是横向列表项，别复用）。 */
+.config-page-content .skill-card {
+  border-radius: 10px;
+}
+
+.config-page-content .skill-card .ant-card-head {
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.config-page-content .skill-card .ant-card-body {
+  padding: 14px 16px 16px;
+}
+
+.config-page-content .settings-card > .ant-card-body {
+  padding: 20px;
+}
+
+.mcp-card label,
+.mcp-card .ant-form-item {
+  display: block;
+  margin-top: 14px;
+}
+
+.mcp-card label {
+  color: #59636e;
+  font-size: 13px;
+}
+
+.mcp-card label > .ant-input,
+.mcp-card label > .ant-select {
+  margin-top: 6px;
+}
+
+.mcp-grid {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.mcp-builtins {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mcp-builtins > div {
+  display: grid;
+  gap: 2px;
+}
+
+@media (max-width: 760px) {
   .subpage-header {
     padding: 0 14px;
   }
