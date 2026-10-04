@@ -15,7 +15,9 @@ import type {
   FlowEdge,
   FlowNode,
   FlowNodeData,
+  JourneyEdgeKind,
 } from './journey-map-types.js';
+import { classifyJourneyEdge } from './journey-map-visuals.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
 
@@ -99,8 +101,13 @@ export function JourneyX6Graph({
           sourceHandles: node.data.sourceHandles.map((handle) => ({
             id: handle.id,
             label: handle.label,
+            kind: handle.kind,
           })),
-          targetHandles: node.data.targetHandles.map((handle) => handle.id),
+          targetHandles: node.data.targetHandles.map((handle) => ({
+            id: handle.id,
+            kind: handle.kind,
+          })),
+          retryGroupIds: node.data.retryGroupIds ?? [],
         })),
         edges: edges.map((edge) => ({
           id: edge.id,
@@ -108,17 +115,21 @@ export function JourneyX6Graph({
           target: edge.target,
           sourceHandle: edge.sourceHandle,
           targetHandle: edge.targetHandle,
+          kind: edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome),
         })),
       }),
     [nodes, edges],
   );
 
   /**
-   * 构造一个节点的 X6 Port。
+   * Agent Flow 风格的方向性 Port：
+   * - success：从底部出去、从顶部进入，形成清晰的主流程；
+   * - fail：从右侧出去、从左侧进入；
+   * - 其它分支：从左侧出去、从右侧进入；
+   * - retry：不再创建可见 Port，改用画布上的 retry group。
    *
-   * X6 原生支持 Port Label，并提供 right/outside 等定位算法：
-   * success / retry / need-input 因此成为“出口自己的标签”，
-   * 而不是 EdgeLabelRenderer 那种独立悬浮元素。
+   * X6 自带 top/right/bottom/left 均匀分布 Port 的布局能力，
+   * 不需要自己计算每个 Port 的像素位置。
    */
   const buildPorts = (node: FlowNode) => {
     const terminal =
@@ -126,114 +137,114 @@ export function JourneyX6Graph({
     const size = terminal
       ? JOURNEY_NODE_SIZE.terminal
       : JOURNEY_NODE_SIZE.regular;
-    const newPortY = size.height - 18;
+
+    const visibleSources = node.data.sourceHandles.filter(
+      (handle) => handle.kind !== 'retry',
+    );
+    const visibleTargets = node.data.targetHandles.filter(
+      (handle) => handle.kind !== 'retry',
+    );
+
+    const portAttrs = {
+      circle: {
+        r: 4,
+        magnet: true,
+        fill: '#fff',
+        stroke: '#8da0b5',
+        strokeWidth: 1.5,
+        opacity: 0.96,
+      },
+    };
 
     return {
-    groups: {
-      input: {
-        position: 'left',
-        attrs: {
-          circle: {
-            r: 7,
-            magnet: 'passive',
-            fill: 'transparent',
-            stroke: 'transparent',
-            opacity: 0,
-          },
+      groups: {
+        inputTop: {
+          position: 'top',
+          attrs: { circle: { ...portAttrs.circle, magnet: 'passive' } },
         },
-      },
-      output: {
-        position: 'right',
-        attrs: {
-          circle: {
-            r: 7,
-            magnet: true,
-            fill: 'transparent',
-            stroke: 'transparent',
-            opacity: 0,
-          },
+        inputLeft: {
+          position: 'left',
+          attrs: { circle: { ...portAttrs.circle, magnet: 'passive' } },
         },
-        label: {
+        inputRight: {
+          position: 'right',
+          attrs: { circle: { ...portAttrs.circle, magnet: 'passive' } },
+        },
+        outputBottom: {
+          position: 'bottom',
+          attrs: portAttrs,
+        },
+        outputLeft: {
+          position: 'left',
+          attrs: portAttrs,
+        },
+        outputRight: {
+          position: 'right',
+          attrs: portAttrs,
+        },
+        newInput: {
           position: {
-            name: 'right',
-            args: {
-              x: 7,
-              attrs: {
-                text: {
-                  fill: '#69788b',
-                  fontSize: 10,
-                  fontWeight: 600,
-                },
-              },
+            name: 'absolute',
+            args: { x: '50%', y: 0 },
+          },
+          attrs: {
+            circle: {
+              r: 8,
+              magnet: 'passive',
+              fill: 'transparent',
+              stroke: 'transparent',
+              opacity: 0,
+            },
+          },
+        },
+        newOutput: {
+          position: {
+            name: 'absolute',
+            args: { x: '50%', y: size.height },
+          },
+          attrs: {
+            circle: {
+              r: 8,
+              magnet: true,
+              fill: 'transparent',
+              stroke: 'transparent',
+              opacity: 0,
             },
           },
         },
       },
-      newInput: {
-        position: {
-          name: 'absolute',
-          args: { x: 0, y: newPortY },
+      items: [
+        ...visibleTargets.map((handle) => ({
+          id: handle.id,
+          group:
+            handle.kind === 'success'
+              ? 'inputTop'
+              : handle.kind === 'fail'
+                ? 'inputLeft'
+                : 'inputRight',
+        })),
+        {
+          id: NEW_TARGET_HANDLE_ID,
+          group: 'newInput',
         },
-        attrs: {
-          circle: {
-            r: 7,
-            magnet: 'passive',
-            fill: 'transparent',
-            stroke: 'transparent',
-            opacity: 0,
-          },
-        },
-      },
-      newOutput: {
-        position: {
-          name: 'absolute',
-          args: { x: size.width, y: newPortY },
-        },
-        attrs: {
-          circle: {
-            r: 7,
-            magnet: true,
-            fill: 'transparent',
-            stroke: 'transparent',
-            opacity: 0,
-          },
-        },
-      },
-    },
-    items: [
-      ...node.data.targetHandles.map((handle) => ({
-        id: handle.id,
-        group: 'input',
-      })),
-      {
-        id: NEW_TARGET_HANDLE_ID,
-        group: 'newInput',
-      },
-      ...node.data.sourceHandles.map((handle) => ({
-        id: handle.id,
-        group: 'output',
-        attrs: {
-          text: {
-            text: handle.label,
-          },
-        },
-      })),
-      ...(node.data.nodeType === 'end' || node.data.nodeType === 'stop'
-        ? []
-        : [
-            {
-              // 单独提供一个透明的“新分支”出口。它不是 Workflow route，
-              // 所以不会出现在属性面板或人工 transition 选项里。
-              id: NEW_SOURCE_HANDLE_ID,
-              group: 'newOutput',
-              attrs: {
-                text: {
-                  text: '',
-                },
+        ...visibleSources.map((handle) => ({
+          id: handle.id,
+          group:
+            handle.kind === 'success'
+              ? 'outputBottom'
+              : handle.kind === 'fail'
+                ? 'outputRight'
+                : 'outputLeft',
+        })),
+        ...(terminal
+          ? []
+          : [
+              {
+                id: NEW_SOURCE_HANDLE_ID,
+                group: 'newOutput',
               },
-            },
-          ]),
-    ],
+            ]),
+      ],
     };
   };
 
@@ -242,8 +253,78 @@ export function JourneyX6Graph({
     const graph = graphRef.current;
     if (!graph) return;
 
+    const visibleEdges = edges.filter(
+      (edge) => (edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome)) !== 'retry',
+    );
+
+    const retryGroupMap = new Map<string, FlowNode[]>();
+    for (const node of nodes) {
+      for (const groupId of node.data.retryGroupIds ?? []) {
+        retryGroupMap.set(groupId, [
+          ...(retryGroupMap.get(groupId) ?? []),
+          node,
+        ]);
+      }
+    }
+
+    const retryGroups = [...retryGroupMap.entries()].map(([id, members]) => {
+      const minX = Math.min(...members.map((node) => node.position.x));
+      const minY = Math.min(...members.map((node) => node.position.y));
+      const maxX = Math.max(
+        ...members.map(
+          (node) =>
+            node.position.x
+            + (node.width
+              ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+                ? JOURNEY_NODE_SIZE.terminal.width
+                : JOURNEY_NODE_SIZE.regular.width)),
+        ),
+      );
+      const maxY = Math.max(
+        ...members.map(
+          (node) =>
+            node.position.y
+            + (node.height
+              ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+                ? JOURNEY_NODE_SIZE.terminal.height
+                : JOURNEY_NODE_SIZE.regular.height)),
+        ),
+      );
+
+      return {
+        id,
+        shape: 'rect',
+        x: minX - 28,
+        y: minY - 28,
+        width: maxX - minX + 56,
+        height: maxY - minY + 56,
+        zIndex: 0,
+        attrs: {
+          body: {
+            rx: 18,
+            ry: 18,
+            fill: '#f5f7fa',
+            fillOpacity: 0.58,
+            stroke: '#9aa8b8',
+            strokeWidth: 1.5,
+            strokeDasharray: '8 6',
+            pointerEvents: 'none',
+          },
+          label: {
+            text: '',
+          },
+        },
+        data: {
+          retryGroup: true,
+          retryGroupId: id,
+        },
+      };
+    });
+
     graph.batchUpdate(() => {
       graph.clearCells();
+
+      graph.addNodes(retryGroups);
 
       graph.addNodes(
         nodes.map((node) => ({
@@ -261,6 +342,7 @@ export function JourneyX6Graph({
               ? JOURNEY_NODE_SIZE.terminal.height
               : JOURNEY_NODE_SIZE.regular.height
           ),
+          zIndex: 10,
           data: {
             ...node.data,
             selected: node.id === selectedNodeId,
@@ -270,33 +352,31 @@ export function JourneyX6Graph({
       );
 
       graph.addEdges(
-        edges.map((edge) => {
-          const sourceNode = nodes.find((node) => node.id === edge.source);
-          const targetNode = nodes.find((node) => node.id === edge.target);
-          const backward =
-            sourceNode && targetNode
-              ? targetNode.position.y <= sourceNode.position.y
-              : false;
+        visibleEdges.map((edge) => {
+          const kind: JourneyEdgeKind =
+            edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
           const selected = edge.id === selectedEdgeId;
 
-          const backwardIndex = edges
-            .slice(0, edges.indexOf(edge))
-            .filter((item) => {
-              const source = nodes.find((node) => node.id === item.source);
-              const target = nodes.find((node) => node.id === item.target);
-              return Boolean(source && target && target.position.x <= source.position.x);
-            }).length;
+          const style = {
+            success: {
+              stroke: '#52c41a',
+              opacity: 0.82,
+            },
+            fail: {
+              stroke: '#ff4d4f',
+              opacity: 0.86,
+            },
+            other: {
+              stroke: '#9aa7b7',
+              opacity: 0.66,
+            },
+            retry: {
+              stroke: '#9aa7b7',
+              opacity: 0,
+            },
+          }[kind];
 
-          const minX = Math.min(...nodes.map((node) => node.position.x));
-          const maxX = Math.max(
-            ...nodes.map(
-              (node) =>
-                node.position.x
-                + (node.width ?? JOURNEY_NODE_SIZE.regular.width),
-            ),
-          );
-
-          const edgeConfigBase = {
+          const edgeConfig = {
             id: edge.id,
             shape: 'edge',
             source: {
@@ -309,62 +389,65 @@ export function JourneyX6Graph({
             },
             connector: {
               name: 'rounded',
-              args: { radius: 10 },
+              args: { radius: 12 },
             },
             labels: [],
             attrs: {
               line: {
-                stroke: selected ? '#1677ff' : backward ? '#8b98a8' : '#99a6b5',
-                strokeWidth: selected ? 2.8 : 1.8,
+                stroke: style.stroke,
+                strokeWidth: selected ? 3 : 2,
+                strokeOpacity: selected ? 1 : style.opacity,
                 strokeLinejoin: 'round',
                 strokeLinecap: 'round',
-                ...(backward ? { strokeDasharray: '6 4', opacity: 0.78 } : {}),
                 targetMarker: {
                   name: 'block',
                   width: selected ? 10 : 8,
                   height: selected ? 7 : 6,
+                  fill: style.stroke,
+                  stroke: style.stroke,
                 },
               },
             },
             data: edge.data,
           };
 
-          if (backward) {
-            const useRight = backwardIndex % 2 === 0;
-            const laneIndex = Math.floor(backwardIndex / 2);
-            const lane = useRight
-              ? maxX + 56 + laneIndex * 30
-              : minX - 56 - laneIndex * 30;
-
-            const sourceY =
-              (sourceNode?.position.y ?? 0)
-              + (sourceNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2;
-            const targetY =
-              (targetNode?.position.y ?? 0)
-              + (targetNode?.height ?? JOURNEY_NODE_SIZE.regular.height) / 2;
-
+          if (kind === 'success') {
             return {
-              ...edgeConfigBase,
-              vertices: [
-                { x: lane, y: sourceY },
-                { x: lane, y: targetY },
-              ],
+              ...edgeConfig,
               router: {
-                name: 'orth',
-                args: { padding: 18 },
+                name: 'manhattan',
+                args: {
+                  step: 16,
+                  padding: 18,
+                  startDirections: ['bottom'],
+                  endDirections: ['top'],
+                },
+              },
+            };
+          }
+
+          if (kind === 'fail') {
+            return {
+              ...edgeConfig,
+              router: {
+                name: 'manhattan',
+                args: {
+                  step: 16,
+                  padding: 18,
+                  startDirections: ['right'],
+                  endDirections: ['left'],
+                },
               },
             };
           }
 
           return {
-            ...edgeConfigBase,
+            ...edgeConfig,
             router: {
               name: 'manhattan',
               args: {
                 step: 16,
                 padding: 18,
-                startDirections: ['right'],
-                endDirections: ['left'],
               },
             },
           };
@@ -412,8 +495,6 @@ export function JourneyX6Graph({
         allowPort: true,
         allowMulti: 'withPort',
         highlight: true,
-        sourceAnchor: 'right',
-        targetAnchor: 'left',
         sourceConnectionPoint: 'boundary',
         targetConnectionPoint: 'boundary',
         router: {
@@ -421,8 +502,6 @@ export function JourneyX6Graph({
           args: {
             step: 16,
             padding: 18,
-            startDirections: ['right'],
-            endDirections: ['left'],
           },
         },
         connector: {
@@ -591,6 +670,7 @@ export function JourneyX6Graph({
         || data.visible !== node.data.visible
         || data.connectionIssue !== node.data.connectionIssue
         || data.connectionIssueText !== node.data.connectionIssueText
+        || JSON.stringify(data.retryGroupIds ?? []) !== JSON.stringify(node.data.retryGroupIds ?? [])
         || data.selected !== (node.id === selectedNodeId)
       ) {
         cell.setData(
@@ -615,22 +695,31 @@ export function JourneyX6Graph({
       if (!cell?.isEdge()) continue;
 
       const selected = edge.id === selectedEdgeId;
-      cell.attr(
-        'line/stroke',
-        selected ? '#1677ff' : '#aab6c5',
-      );
-      cell.attr(
-        'line/strokeWidth',
-        selected ? 3 : 1.8,
-      );
-      cell.attr(
-        'line/targetMarker',
-        {
-          name: 'block',
-          width: selected ? 10 : 8,
-          height: selected ? 7 : 6,
-        },
-      );
+      const kind: JourneyEdgeKind =
+        edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
+      if (kind === 'retry') {
+        cell.setVisible(false);
+        continue;
+      }
+
+      const stroke =
+        kind === 'success'
+          ? '#52c41a'
+          : kind === 'fail'
+            ? '#ff4d4f'
+            : '#9aa7b7';
+
+      cell.setVisible(true);
+      cell.attr('line/stroke', stroke);
+      cell.attr('line/strokeOpacity', selected ? 1 : kind === 'success' ? 0.82 : kind === 'fail' ? 0.86 : 0.66);
+      cell.attr('line/strokeWidth', selected ? 3 : 2);
+      cell.attr('line/targetMarker', {
+        name: 'block',
+        width: selected ? 10 : 8,
+        height: selected ? 7 : 6,
+        fill: stroke,
+        stroke,
+      });
     }
 
   }, [nodes, edges, selectedNodeId, selectedEdgeId]);
