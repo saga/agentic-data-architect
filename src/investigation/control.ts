@@ -95,6 +95,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     },
     agent: {
       permissionMode: 'permission',
+      autoContinuationTurns: 2,
       displayName: '秘书',
       avatarWidth: 180,
       avatarHeight: 240,
@@ -122,6 +123,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
     },
     agent: {
       permissionMode: control.agent.permissionMode,
+      autoContinuationTurns: control.agent.autoContinuationTurns,
       displayName: control.agent.displayName,
       ...(control.agent.avatarPath ? { avatarPath: control.agent.avatarPath } : {}),
       ...(control.agent.avatarPaths?.length ? { avatarPaths: [...control.agent.avatarPaths] } : {}),
@@ -166,6 +168,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     },
     agent: {
       permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
+      autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 2, 0, 6),
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
         : '秘书',
@@ -326,6 +329,7 @@ async function updateInvestigationControlImpl(
     },
     agent: {
       permissionMode: next.agent.permissionMode,
+      autoContinuationTurns: normalizeAvatarDimension(next.agent.autoContinuationTurns, current.agent.autoContinuationTurns, 0, 6),
       displayName: next.agent.displayName.trim().slice(0, 40),
       ...(next.agent.avatarPath ? { avatarPath: next.agent.avatarPath } : {}),
       ...(next.agent.avatarMimeType ? { avatarMimeType: next.agent.avatarMimeType } : {}),
@@ -360,6 +364,7 @@ async function updateInvestigationControlImpl(
   if (promptChanged) changed.push('guidance');
   if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
   if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
+  if (current.agent.autoContinuationTurns !== control.agent.autoContinuationTurns) changed.push('autoContinuation');
   if (current.agent.displayName !== control.agent.displayName) changed.push('displayName');
   if (
     current.agent.avatarPath !== control.agent.avatarPath
@@ -377,6 +382,7 @@ async function updateInvestigationControlImpl(
       changed,
       guidanceVersion: control.agent.systemPrompt.version,
       permissionMode: control.agent.permissionMode,
+      autoContinuationTurns: control.agent.autoContinuationTurns,
       displayName: control.agent.displayName,
       avatar: {
         configured: Boolean(control.agent.avatarPath),
@@ -424,6 +430,7 @@ export function buildResearchConfigPrompt(control: InvestigationControl): string
   const lines = [
     '## Investigation configuration',
     'Treat this configuration as user-provided task constraints, not as evidence.',
+    'Automatic continuation is controlled by the UI setting; when enabled, use extra stages to advance the overall investigation rather than repeat a blocked small step.',
   ];
 
   if (control.research.githubRepositories.length) {
