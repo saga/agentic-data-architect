@@ -243,9 +243,9 @@ function absoluteDatasetPath(sessionName: string, relativePath: string, allowMis
     throw new Error('本地数据路径超出当前 Investigation workspace。');
   }
 
-  // 防止 workspace 内的符号链接把 Agent 带到 workspace 外读取数据。
+  const realRoot = fsSync.realpathSync(root);
   if (!allowMissing) {
-    const realRoot = fsSync.realpathSync(root);
+    // 输入文件必须检查最终 realpath，防止 workspace 内的符号链接指向外部文件。
     const realPath = fsSync.realpathSync(resolved);
     if (realPath !== realRoot && !realPath.startsWith(realRoot + path.sep)) {
       throw new Error('本地数据路径不能通过符号链接离开当前 Investigation workspace。');
@@ -253,6 +253,16 @@ function absoluteDatasetPath(sessionName: string, relativePath: string, allowMis
     return realPath;
   }
 
+  // 输出文件可能尚不存在，只检查它最近的已存在父目录，防止 exports/parquet
+  // 本身是指向 workspace 外部的符号链接。
+  let existingParent = resolved;
+  while (!fsSync.existsSync(existingParent) && path.dirname(existingParent) !== existingParent) {
+    existingParent = path.dirname(existingParent);
+  }
+  const realParent = fsSync.realpathSync(existingParent);
+  if (realParent !== realRoot && !realParent.startsWith(realRoot + path.sep)) {
+    throw new Error('本地数据输出路径不能通过符号链接离开当前 Investigation workspace。');
+  }
   return resolved;
 }
 
