@@ -168,9 +168,9 @@ export const ControlAgentSchema = z.object({
   /** 头像 MIME 类型，服务端读取文件时用于返回正确 Content-Type。 */
   avatarMimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']).optional(),
   /** 头像目标宽度；同时决定裁剪比例和最终图片像素宽度。 */
-  avatarWidth: z.number().int().min(40).max(800).default(200),
+  avatarWidth: z.number().int().min(40).max(800).default(180),
   /** 头像目标高度；同时决定裁剪比例和最终图片像素高度。 */
-  avatarHeight: z.number().int().min(40).max(1200).default(400),
+  avatarHeight: z.number().int().min(40).max(1200).default(240),
   systemPrompt: z.object({
     version: z.number().int().positive(),
     content: z.string(),
