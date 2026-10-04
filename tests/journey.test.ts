@@ -76,8 +76,8 @@ test('deterministic retry self-loop does not mark the node completed', () => {
     baseFacts,
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(state.currentNodeId, 'check');
-  assert.deepEqual(state.completedNodeIds, []);
+  assert.equal(state.execution.currentNodeId, 'check');
+  assert.deepEqual(state.execution.completedNodeIds, []);
 });
 
 test('allows a retry cycle when the graph still has an exit to done', () => {
@@ -123,8 +123,8 @@ test('journey state follows execution and facts, not node array order', () => {
   const initial = initialJourneyExecution(result.definition!);
   const state = buildJourneyState(result.definition!, baseFacts, initial);
 
-  assert.deepEqual(state.completedNodeIds, ['intake']);
-  assert.equal(state.currentNodeId, 'investigate');
+  assert.deepEqual(state.execution.completedNodeIds, ['intake']);
+  assert.equal(state.execution.currentNodeId, 'investigate');
   assert.equal(state.stages.find((stage) => stage.id === 'investigate')?.status, 'current');
   assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
@@ -158,8 +158,6 @@ test('preserves an execution position across a graph edit when the node still ex
         id: 'extra',
         type: 'task' as const,
         title: '额外检查',
-        visible: true,
-        completion: 'agent' as const,
         actor: 'agent' as const,
         routes: [{ outcome: 'success', target: 'done' }],
       },
