@@ -283,8 +283,6 @@ export function JourneyMap(props: JourneyMapProps) {
                 <Tag color="green" variant="filled">
                   这条路线已经走完
                 </Tag>
-              ) : snapshot.execution.status === 'stopped' ? (
-                
               ) : (
                 <Tag variant="filled">正在执行</Tag>
               )}
