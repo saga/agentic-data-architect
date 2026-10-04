@@ -89,6 +89,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     },
     agent: {
       permissionMode: 'permission',
+      displayName: '秘书',
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
@@ -113,6 +114,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
     },
     agent: {
       permissionMode: control.agent.permissionMode,
+      displayName: control.agent.displayName,
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
       mcpServers: control.agent.mcpServers.map((item) => ({
@@ -151,6 +153,9 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     },
     agent: {
       permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
+      displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
+        ? agent.displayName.trim().slice(0, 40)
+        : '秘书',
       platformCapabilities: config.graphifyEnabled
         ? [{
             name: 'graphify-structural-analysis',
