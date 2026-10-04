@@ -76,7 +76,7 @@ test('deterministic retry self-loop does not mark the node completed', () => {
     baseFacts,
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(state.execution.execution.currentNodeId, 'check');
+  assert.equal(state.execution.currentNodeId, 'check');
   assert.deepEqual(state.execution.completedNodeIds, []);
 });
 
@@ -167,11 +167,11 @@ test('preserves an execution position across a graph edit when the node still ex
   const next = {
     ...execution,
     workflowVersion: 2,
-    currentNodeId: execution.execution.currentNodeId,
+    currentNodeId: execution.currentNodeId,
     completedNodeIds: execution.completedNodeIds.filter((id) => edited.nodes.some((node) => node.id === id)),
   };
 
-  assert.equal(next.execution.currentNodeId, 'target');
+  assert.equal(next.currentNodeId, 'target');
   assert.deepEqual(next.completedNodeIds, ['investigate']);
 });
 
@@ -199,11 +199,11 @@ test('applies only an actual outgoing workflow outcome', () => {
   );
 
   const retry = applyJourneyTransition(result.definition!, initial, 'investigate', 'retry');
-  assert.equal(retry.execution.currentNodeId, 'investigate');
+  assert.equal(retry.currentNodeId, 'investigate');
   assert.deepEqual(retry.completedNodeIds, []);
 
   const success = applyJourneyTransition(result.definition!, initial, 'investigate', 'success');
-  assert.equal(success.execution.currentNodeId, 'target');
+  assert.equal(success.currentNodeId, 'target');
   assert.deepEqual(success.completedNodeIds, ['investigate']);
 });
 
@@ -400,7 +400,7 @@ test('cutover is an explicit human review after validation', () => {
     'cutover',
     'approved',
   );
-  assert.equal(approved.execution.currentNodeId, 'done');
+  assert.equal(approved.currentNodeId, 'done');
   assert.equal(approved.status, 'completed');
 });
 
