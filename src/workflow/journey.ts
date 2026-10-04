@@ -370,7 +370,16 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
   }
 }
 
-/** 校验 Workflow 图；允许 retry/rollback 环，但所有节点必须最终可到达终点。 */
+/**
+ * 校验 Workflow 图本身，不校验业务结果。
+ *
+ * 保存前必须通过这里，避免出现三类最常见的问题：
+ * - 连到了不存在的节点；
+ * - 从 start 根本走不到某一步；
+ * - 某个回路只能无限重试、永远到不了 @end。
+ *
+ * retry / rollback 可以是正常的回边，只要这张图仍然存在到 @end 的有效路径。
+ */
 export function validateJourneyDefinition(definition: JourneyDefinition): string[] {
   const issues: string[] = [];
   const nodeMap = new Map<string, JourneyNode>();
@@ -465,7 +474,12 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
   return [...new Set(issues)];
 }
 
-/** 为 Workflow 版本建立执行状态。 */
+/**
+ * 创建一个与 Workflow version 绑定的执行快照。
+ *
+ * Execution 只记录“现在在哪一步”和“哪些步骤已经走过”，不保存 Agent 对话、
+ * Tool 状态或 X6 对象。人工步骤进入 waiting，并留下 pendingInteraction 供 UI 展示。
+ */
 export function initialJourneyExecution(
   definition: JourneyDefinition,
   workflowVersion = 0,
@@ -492,7 +506,12 @@ export function initialJourneyExecution(
   };
 }
 
-/** 从当前节点选择 outcome；不存在的 outcome 永远不能推进状态机。 */
+/**
+ * 从当前节点沿已声明的 outcome 推进。
+ *
+ * 调用方只能选择当前节点已经声明的出口，不能直接指定 target。
+ * 这保证 Agent 返回的 Workflow 控制信息只能落在服务端已经定义的图结构里。
+ */
 export function applyJourneyTransition(
   definition: JourneyDefinition,
   execution: JourneyExecution,
@@ -549,6 +568,13 @@ export function applyJourneyTransition(
   };
 }
 
+/**
+ * 根据当前 facts 连续推进可以自动完成的节点。
+ *
+ * 只从 execution.currentNodeId 开始，不扫描整个图，也不让 Agent 自己决定 deterministic
+ * 节点是否完成。每次只走当前节点的第一个 route；若没有 route、条件不满足或形成自环，就停在原地。
+ * 额外的 guard 防止错误 Workflow 因回路无限执行。
+ */
 function advanceDeterministicJourney(
   definition: JourneyDefinition,
   execution: JourneyExecution,
