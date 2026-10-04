@@ -63,6 +63,7 @@ export async function answerQuestion(
   options?: {
     selectedRoute?: JourneyRouteOption;
     selectedGuidance?: string;
+    onReasoningDelta?: (delta: string) => void;
   },
 ): Promise<AnswerSummary> {
   const selectedRoute = options?.selectedRoute;
@@ -239,6 +240,8 @@ export async function answerQuestion(
         inv.copilotConfigurationVersion = control.version;
       },
       workingDirectory: workspaceRoot(inv.name),
+      model: control.agent.model,
+      ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
       ...(inv.workflow ? { workflowSkill: inv.workflow } : {}),
       platformCapabilities: control.agent.platformCapabilities,
       permissionMode: control.agent.permissionMode,
@@ -247,6 +250,7 @@ export async function answerQuestion(
       ...(onDelta ? { onDelta } : {}),
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
+      ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
