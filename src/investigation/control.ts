@@ -95,7 +95,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     },
     agent: {
       permissionMode: 'permission',
-      autoContinuationTurns: 2,
+      autoContinuationTurns: 4,
       displayName: '秘书',
       avatarWidth: 180,
       avatarHeight: 240,
@@ -168,7 +168,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     },
     agent: {
       permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
-      autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 2, 0, 6),
+      autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 4, 0, 6),
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
         : '秘书',
