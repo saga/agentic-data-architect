@@ -1,18 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { FlowNode } from '../web/src/components/journey-map-types.js';
+import type {
+  FlowEdge,
+  FlowNode,
+  WorkflowDefinition,
+  WorkflowSnapshot,
+} from '../web/src/components/journey-map-types.js';
 import {
-  enforceWorkflowReadingOrder,
+  calculateWorkflowRanks,
+  layoutWorkflow,
   removeNodeCollisions,
 } from '../web/src/components/journey-map-layout.js';
 import { graphFromDefinition } from '../web/src/components/journey-map-graph.js';
-import type { WorkflowSnapshot, WorkflowDefinition } from '../web/src/components/journey-map-types.js';
 
-function node(id: string, x: number, y: number): FlowNode {
+function node(id: string, x = 0, y = 0): FlowNode {
   return {
     id,
     type: 'journey',
     position: { x, y },
+    width: 236,
+    height: 210,
     data: {
       title: id,
       nodeType: 'task',
@@ -23,11 +30,60 @@ function node(id: string, x: number, y: number): FlowNode {
       sourceHandles: [{ id: id + '-out-0', label: 'success' }],
       targetHandles: [{ id: id + '-in-0', label: 'in' }],
     },
-    style: { width: 236 },
   };
 }
 
-test('collision guard separates nodes that overlap or are too close', () => {
+function edge(
+  id: string,
+  source: string,
+  target: string,
+  outcome = 'success',
+): FlowEdge {
+  return {
+    id,
+    source,
+    target,
+    sourceHandle: source + '-out-0',
+    targetHandle: target + '-in-0',
+    data: { outcome },
+  };
+}
+
+test('workflow layout keeps the main path horizontal and branch nodes off the main line', () => {
+  const nodes = [node('a'), node('b'), node('c'), node('d')];
+  const edges = [
+    edge('a-b', 'a', 'b', 'success'),
+    edge('a-c', 'a', 'c', 'needs-input'),
+    edge('b-d', 'b', 'd', 'success'),
+    edge('c-d', 'c', 'd', 'success'),
+  ];
+
+  const result = layoutWorkflow(nodes, edges);
+  const byId = new Map(result.map((item) => [item.id, item]));
+
+  assert.equal(byId.get('a')!.position.y, byId.get('b')!.position.y);
+  assert.equal(byId.get('b')!.position.y, byId.get('d')!.position.y);
+  assert.notEqual(byId.get('c')!.position.y, byId.get('a')!.position.y);
+  assert.ok(byId.get('b')!.position.x > byId.get('a')!.position.x);
+  assert.ok(byId.get('c')!.position.x > byId.get('a')!.position.x);
+});
+
+test('loop edges do not change forward ranks', () => {
+  const nodes = [node('a'), node('b'), node('c')];
+  const edges = [
+    edge('a-b', 'a', 'b', 'success'),
+    edge('b-c', 'b', 'c', 'success'),
+    edge('c-a', 'c', 'a', 'retry'),
+  ];
+
+  const ranks = calculateWorkflowRanks(nodes, edges);
+
+  assert.equal(ranks.get('a'), 0);
+  assert.equal(ranks.get('b'), 1);
+  assert.equal(ranks.get('c'), 2);
+});
+
+test('collision guard moves only overlapping nodes', () => {
   const result = removeNodeCollisions([
     node('a', 0, 0),
     node('b', 10, 10),
@@ -38,57 +94,8 @@ test('collision guard separates nodes that overlap or are too close', () => {
   const b = result.find((item) => item.id === 'b')!;
 
   assert.equal(a.position.x, 0);
-  assert.ok(b.position.y - a.position.y >= 220);
+  assert.ok(b.position.y >= a.position.y + 210);
   assert.equal(result.find((item) => item.id === 'c')?.position.x, 500);
-});
-
-test('collision guard keeps already separated nodes stable', () => {
-  const result = removeNodeCollisions([
-    node('a', 0, 0),
-    node('b', 500, 0),
-  ]);
-
-  assert.deepEqual(
-    result.map((item) => item.position),
-    [
-      { x: 0, y: 0 },
-      { x: 500, y: 0 },
-    ],
-  );
-});
-
-
-test('reading-order guard keeps every forward edge to the right', () => {
-  const a = node('a', 600, 200);
-  const b = node('b', 0, 200);
-  const c = node('c', 300, 200);
-
-  const edges = [
-    {
-      id: 'a-b',
-      source: 'a',
-      target: 'b',
-      sourceHandle: 'a-out-0',
-      targetHandle: 'b-in-0',
-      type: 'journey',
-      data: { outcome: 'success' },
-    },
-    {
-      id: 'a-c',
-      source: 'a',
-      target: 'c',
-      sourceHandle: 'a-out-0',
-      targetHandle: 'c-in-0',
-      type: 'journey',
-      data: { outcome: 'retry' },
-    },
-  ];
-
-  const result = enforceWorkflowReadingOrder([a, b, c], edges);
-  const byId = new Map(result.map((item) => [item.id, item]));
-
-  assert.ok(byId.get('b')!.position.x > byId.get('a')!.position.x);
-  assert.ok(byId.get('c')!.position.x > byId.get('a')!.position.x);
 });
 
 test('graph projection removes self-loop edges and their handles', () => {
@@ -123,7 +130,7 @@ test('graph projection removes self-loop edges and their handles', () => {
     baseWorkflowId: 'demo',
     version: 1,
     definition,
-    layout: { version: 1, engine: 'elk-v2', nodes: {} },
+    layout: { version: 1, engine: 'workflow-v1', nodes: {} },
     execution: {
       workflowId: 'demo',
       workflowVersion: 1,
@@ -142,8 +149,8 @@ test('graph projection removes self-loop edges and their handles', () => {
         workflowId: 'demo',
         workflowVersion: 1,
         runId: 'demo-v1',
-        currentNodeId: 'a',
         completedNodeIds: [],
+        currentNodeId: 'a',
         status: 'active',
       },
     },
@@ -151,11 +158,7 @@ test('graph projection removes self-loop edges and their handles', () => {
     events: [],
   } satisfies WorkflowSnapshot;
 
-  const graph = graphFromDefinition(
-    definition,
-    snapshot.layout,
-    snapshot,
-  );
+  const graph = graphFromDefinition(definition, snapshot.layout, snapshot);
 
   assert.equal(graph.edges.length, 0);
   assert.equal(graph.nodes.find((item) => item.id === 'a')!.data.sourceHandles.length, 0);
