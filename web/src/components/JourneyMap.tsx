@@ -75,6 +75,7 @@ export function JourneyMap(props: JourneyMapProps) {
     deleteSelectedCell,
     beginNodeDrag,
     onNodeMoved,
+    fitViewRequest,
   } = editor;
 
   return (
@@ -234,6 +235,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 edges={edges}
                 selectedNodeId={selectedNode?.id}
                 selectedEdgeId={selectedEdge?.id}
+                fitViewRequest={fitViewRequest}
                 onNodeClick={onNodeClick}
                 onEdgeClick={onEdgeClick}
                 onBlankClick={clearSelection}
