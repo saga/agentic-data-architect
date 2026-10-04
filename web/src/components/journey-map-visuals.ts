@@ -1,6 +1,4 @@
-import type { FlowEdge, FlowNode } from './journey-map-types.js';
-
-export type JourneyEdgeKind = 'success' | 'fail' | 'retry' | 'other';
+import type { FlowEdge, FlowNode, JourneyEdgeKind } from './journey-map-types.js';
 
 const SUCCESS_PATTERNS = [
   'success',
