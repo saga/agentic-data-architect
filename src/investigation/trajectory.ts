@@ -8,7 +8,7 @@ export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
   timestamp: z.string().datetime(),
-  type: z.enum(['user_input','turn_start','intent','model_call','tool_call','tool_result','permission','compaction','turn_end','error','status']),
+  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','status']),
   name: z.string().min(1),
   status: z.enum(['started','completed','failed','waiting','info']).optional(),
   durationMs: z.number().nonnegative().optional(),
@@ -37,6 +37,16 @@ export const TrajectorySummarySchema = z.object({
     totalNanoAiu: z.number().nonnegative().optional(),
   }).strict()).default({}),
   eventCount: z.number().int().nonnegative().default(0),
+  state: z.enum(['running', 'waiting', 'completed', 'failed']).default('running'),
+  waitingOn: z.enum(['permission', 'user_input', 'tool', 'model', 'session']).optional(),
+  lastActivityAt: z.string().datetime().optional(),
+  lastActivity: z.string().optional(),
+  lastActivityType: z.string().optional(),
+  idleObserved: z.boolean().default(false),
+  assistantTurnEnded: z.boolean().default(false),
+  pendingToolCount: z.number().int().nonnegative().default(0),
+  pendingPermissionCount: z.number().int().nonnegative().default(0),
+  pendingUserInputCount: z.number().int().nonnegative().default(0),
 }).strict();
 export type TrajectorySummary = z.infer<typeof TrajectorySummarySchema>;
 
@@ -188,6 +198,7 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
     || event.type === 'error'
   );
   const finishedAt = completionEvent?.timestamp;
+  const diagnostics = deriveTrajectoryDiagnostics(events);
   return TrajectorySummarySchema.parse({
     turnId: first.turnId,
     startedAt: first.timestamp,
@@ -203,7 +214,94 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
     ...(totalPremiumRequestCost !== undefined ? { totalPremiumRequestCost } : {}),
     models,
     eventCount: events.length,
+    ...diagnostics,
   });
+}
+
+function deriveTrajectoryDiagnostics(events: TrajectoryEvent[]): {
+  state: TrajectorySummary['state'];
+  waitingOn?: TrajectorySummary['waitingOn'];
+  lastActivityAt?: string;
+  lastActivity?: string;
+  lastActivityType?: string;
+  idleObserved: boolean;
+  assistantTurnEnded: boolean;
+  pendingToolCount: number;
+  pendingPermissionCount: number;
+  pendingUserInputCount: number;
+} {
+  const pendingTools = new Set<string>();
+  const pendingPermissions = new Set<string>();
+  const pendingUserInputs = new Set<string>();
+  let lastActivityAt: string | undefined;
+  let lastActivity: string | undefined;
+  let lastActivityType: string | undefined;
+  let idleObserved = false;
+  let assistantTurnEnded = false;
+  let failed = false;
+
+  for (const event of events) {
+    lastActivityAt = event.timestamp;
+    lastActivityType = event.type;
+    lastActivity = event.name;
+
+    if (event.type === 'tool_call' && event.status === 'started') {
+      const id = event.details.toolCallId;
+      if (typeof id === 'string' && id) pendingTools.add(id);
+    }
+    if (event.type === 'tool_result') {
+      const id = event.details.toolCallId;
+      if (typeof id === 'string' && id) pendingTools.delete(id);
+    }
+
+    if (event.type === 'permission' && event.status === 'waiting') {
+      const id = typeof event.details.requestId === 'string' ? event.details.requestId : event.id;
+      pendingPermissions.add(id);
+    }
+    if (event.type === 'permission_completed') {
+      const id = typeof event.details.requestId === 'string' ? event.details.requestId : '';
+      if (id) pendingPermissions.delete(id);
+    }
+
+    if (event.type === 'user_input_requested' && event.status === 'waiting') {
+      const id = typeof event.details.requestId === 'string' ? event.details.requestId : event.id;
+      pendingUserInputs.add(id);
+    }
+    if (event.type === 'user_input_completed') {
+      const id = typeof event.details.requestId === 'string' ? event.details.requestId : '';
+      if (id) pendingUserInputs.delete(id);
+    }
+
+    if (event.type === 'assistant_turn_end') assistantTurnEnded = true;
+    if (event.type === 'session_idle') idleObserved = true;
+    if (event.type === 'error' || event.type === 'session_error' || event.status === 'failed') failed = true;
+  }
+
+  let state: TrajectorySummary['state'];
+  if (failed) state = 'failed';
+  else if (idleObserved || events.some((event) => event.type === 'turn_end')) state = 'completed';
+  else if (pendingPermissions.size > 0 || pendingUserInputs.size > 0) state = 'waiting';
+  else state = 'running';
+
+  const waitingOn: TrajectorySummary['waitingOn'] =
+    pendingPermissions.size > 0 ? 'permission' :
+    pendingUserInputs.size > 0 ? 'user_input' :
+    pendingTools.size > 0 ? 'tool' :
+    state === 'running' ? 'model' :
+    undefined;
+
+  return {
+    state,
+    ...(waitingOn ? { waitingOn } : {}),
+    ...(lastActivityAt ? { lastActivityAt } : {}),
+    ...(lastActivity ? { lastActivity } : {}),
+    ...(lastActivityType ? { lastActivityType } : {}),
+    idleObserved,
+    assistantTurnEnded,
+    pendingToolCount: pendingTools.size,
+    pendingPermissionCount: pendingPermissions.size,
+    pendingUserInputCount: pendingUserInputs.size,
+  };
 }
 
 function totalFromUsage(usage: unknown, field: 'inputTokens' | 'outputTokens' | 'totalTokens', fallback: number): number {
