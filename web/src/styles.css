@@ -1444,7 +1444,7 @@ body {
 /* X6 / Agent Flow node ------------------------------------------------------ */
 /*
  * 工作地图不再沿用旧的“状态卡片”视觉。
- * 节点保持轻量白卡，状态只用一个小点表示；真正的成功/失败/重试语义由连线和 retry group 表达。
+ * 节点保持轻量白卡，状态只用一个小点表示；真正的成功/失败/重试语义由连线表达。
  */
 .journey-flow-node {
   position: static;
@@ -1678,7 +1678,7 @@ body {
   white-space: nowrap;
 }
 
-/* 工作地图中的 retry 不再使用 edge line；X6 group 背景由 JourneyX6Graph 动态生成。 */
+/* retry 使用真实 Edge；视觉上采用灰色虚线回线，不使用额外 Group 语义。 */
 
 /* Connection diagnostics -------------------------------------------------- */
 .journey-flow-node-connection-warning {
