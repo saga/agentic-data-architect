@@ -7,7 +7,7 @@ import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilo
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
-import { parseAgentAnswer, toClaims } from '../agent/result.js';
+import { extractAgentCheckpoint, parseAgentAnswer, toClaims, type AgentCheckpoint } from '../agent/result.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
 import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, getRunningConversationTurn, listConversationMessages, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
@@ -64,6 +64,8 @@ export async function answerQuestion(
     selectedRoute?: JourneyRouteOption;
     selectedGuidance?: string;
     onReasoningDelta?: (delta: string) => void;
+    /** 阶段小结完成后立即推送给主聊天区。 */
+    onCheckpoint?: (checkpoint: AgentCheckpoint & { turnId: string; execution: number; createdAt: string }) => void;
   },
 ): Promise<AnswerSummary> {
   const selectedRoute = options?.selectedRoute;
@@ -250,6 +252,27 @@ export async function answerQuestion(
       ...(onDelta ? { onDelta } : {}),
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
+      onStageResult: ({ content, execution }) => {
+        const checkpoint = extractAgentCheckpoint(content);
+        if (!checkpoint) return;
+        const createdAt = new Date().toISOString();
+        recordTrajectory({
+          type: 'checkpoint',
+          name: '阶段小结：' + checkpoint.title,
+          status: 'completed',
+          details: {
+            execution,
+            ...checkpoint,
+          },
+        });
+        options?.onCheckpoint?.({
+          ...checkpoint,
+          turnId,
+          execution,
+          createdAt,
+        });
+        onStatus?.('阶段小结：' + checkpoint.title);
+      },
       ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
