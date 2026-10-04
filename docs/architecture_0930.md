@@ -2959,32 +2959,21 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 
 ### V1.7 Editor 交互
 
-- 完整 Workflow graph 统一由 AntV X6 绘制；Port 本身透明，只有需要表达分支语义的 source Port Label 显示 success / retry / need-input。
-- 布局继续采用 ELK-v5：主流程保持左→右，分支保留上下展开，不再用第二套碰撞算法把节点重新压成一行。
-- 节点连接问题直接由图结构计算并显示：非 start 节点无入口、非 terminal 节点无出口、route 指向不存在节点时标红；正常的 start 无入口、terminal 无出口不报错。
-- X6 原生 Port 是真实连接热区但视觉透明；新建连线使用独立的 hidden source / target port，避免重复连接桩和多入口场景受限。
-- 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换；属性表单与工作地图 AI 不再同时占用右侧纵向空间。
+- 完整 Workflow graph 统一由 AntV X6 绘制；Port 只承担连接，不把 outcome 文案常驻画在画布上。
+- 节点、Edge 和属性修改都先作用于当前画布，再统一转换回 Workflow Definition。
+- 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换；属性面板显示当前节点或当前 Edge 的真实语义。
+- retry 保留为真实 Workflow Edge，视觉上使用灰色虚线外侧回线，不创建 Group、隐藏节点或第二套控制结构。
+- 服务端保存前检查 start、route target、重复 outcome、不可达节点以及无法到达 @end 的循环。
 
-工作地图编辑器使用 X6 Graph。节点拖动、Port 连线、重新连接、节点属性编辑和分支 outcome 编辑都直接作用于当前画布。
+自动排版使用项目自己的 workflow-v1：
 
-布局不再使用简单的固定 x/y 分层，而采用 ELK layered layout：
+- 主流程默认纵向向下。
+- 同层分支横向展开。
+- retry 回线不参与正常向下的 rank，而是走画布外侧 return lane。
+- 最后做一次简单的节点碰撞保护，不引入通用布局服务。
 
-- elk.direction = RIGHT
-- elk.edgeRouting = ORTHOGONAL
-- elk.layered.crossingMinimization.strategy = LAYER_SWEEP
-- 每个 incoming / outgoing route 使用独立 Port，并由 X6 原生 Port Label 表达出口 outcome；连接线使用 X6 orth router + rounded connector。
+X6 负责 Graph 编辑、Port、Edge、Selection、Snapline 和 MiniMap；Workflow runtime 不依赖 X6。
 
-X6 负责画布和连接交互，ELK 继续负责自动排版；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。图引擎与 Workflow 语义通过 engine-neutral graph adapter 隔离。
-
-新建节点使用明显的橙色虚线样式，并提供两种连接方式：
-
-~~~text
-从节点右侧出口区域拖到目标步骤
-或
-属性 Tab → 连接到现有步骤
-~~~
-
-“添加下一步”在存在主 success 路线时会插入节点，避免产生 success-1 / success-2 之类难以理解的 outcome。
 ### V1.8 Journey Map 前端重构
 
 Journey Map 现在把图引擎与 Workflow 业务状态彻底分开，X6 不进入 Workflow DSL。
