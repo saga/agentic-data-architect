@@ -6,11 +6,14 @@ import {
   Selection,
   Snapline,
 } from '@antv/x6';
+import {
+  NEW_SOURCE_HANDLE_ID,
+  TARGET_HANDLE_ID,
+} from './journey-map-types.js';
 import type {
   FlowEdge,
   FlowNode,
   FlowNodeData,
-  NEW_SOURCE_HANDLE_ID,
 } from './journey-map-types.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
@@ -151,7 +154,6 @@ export function JourneyX6Graph({
                   fill: '#69788b',
                   fontSize: 10,
                   fontWeight: 600,
-                  pointerEvents: 'none',
                 },
               },
             },
@@ -161,7 +163,7 @@ export function JourneyX6Graph({
     },
     items: [
       {
-        id: '__in__',
+        id: TARGET_HANDLE_ID,
         group: 'input',
       },
       ...node.data.sourceHandles.map((handle) => ({
