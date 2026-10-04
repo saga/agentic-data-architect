@@ -34,7 +34,7 @@ const { Title, Text, Paragraph } = Typography;
  */
 const RECENT_TURN_COUNT = 5;
 /** 每轮默认只展示最新事件；更早事件按需展开。 */
-const RECENT_EVENT_COUNT = 30;
+const RECENT_EVENT_COUNT = 60;
 
 interface TrajectoryEvent {
   id: string;
