@@ -27,7 +27,7 @@ const LANE_GAP = 300;
 const CANVAS_PADDING = 56;
 const COLLISION_GAP = 36;
 
-export const WORKFLOW_LAYOUT_ENGINE = 'workflow-v1' as const;
+export const WORKFLOW_LAYOUT_ENGINE = 'workflow-v2' as const;
 
 function nodeDimensions(node: FlowNode): { width: number; height: number } {
   const terminal =
