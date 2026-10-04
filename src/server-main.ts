@@ -33,9 +33,12 @@ async function main(): Promise<void> {
     });
   }
 
-  const recoveredTurns = recoverRunningConversationTurns();
-  if (recoveredTurns > 0) {
-    console.warn('Recovered ' + recoveredTurns + ' interrupted investigation turn(s).');
+  // 持久化数据库里的 running 只代表“上一次进程曾经开始过”，不能代表新进程仍有
+  // 一个真实的 active turn。Copilot session 目前没有在这里做自动 resume，因此启动时
+  // 必须把遗留 running turn 收敛为 aborted，前端才能正确显示“已中断”而不是“仍在执行”。
+  const interruptedTurns = recoverRunningConversationTurns();
+  if (interruptedTurns > 0) {
+    console.warn('Marked ' + interruptedTurns + ' stale investigation turn(s) as interrupted after server restart.');
   }
 
   const app = createApp(vite);
