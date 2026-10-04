@@ -114,6 +114,8 @@ export interface AskInput {
   onSessionId?: (sessionId: string) => void;
   turnId?: string;
   shouldAbort?: () => boolean;
+  /** 本轮 Agent 结束后最多自动再推进多少阶段；0 表示不自动续跑。 */
+  autoContinuationTurns?: number;
 }
 
 // turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
@@ -875,19 +877,19 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * 返回就直接结束整个 Investigation turn，所以 Agent 很容易查一两步
      * 就把“下一步”交给用户。
      *
-     * 这里先采用一个很小、可控的自动续跑窗口：首轮结束后，最多再主动
-     * 推进两轮。仍然复用同一个 Session，因此上下文、工具、Skills 和已经
-     * 找到的资料都保留；如果 Agent 真正需要用户选择/输入/权限，SDK 仍然
-     * 会在 sendAndWait 内等待，不会绕过人工控制。
+     * 首轮结束后是否继续、继续多少阶段由 Investigation 配置决定。仍然复用
+     * 同一个 Session，因此上下文、工具、Skills 和已经找到的资料都保留；如果
+     * Agent 真正需要用户选择/输入/权限，SDK 仍然会在 sendAndWait 内等待，
+     * 不会绕过人工控制。
      *
-     * 这不是永久 while(true)：先用固定上限验证“长运行感”是否明显改善，
-     * 避免一次小改动把 Agent 变成不可控的无限循环。
+     * 运行时仍保留 6 次自动续跑的硬上限，防止配置异常导致无限循环；UI 正常
+     * 只提供这个范围内的选项。
      */
-    const AUTO_CONTINUATION_TURNS = 2;
+    const autoContinuationTurns = Math.min(6, Math.max(0, Math.round(input.autoContinuationTurns ?? 2)));
     let finalContent = '';
     let continuationPrompt = input.prompt;
 
-    for (let execution = 0; execution <= AUTO_CONTINUATION_TURNS; execution += 1) {
+    for (let execution = 0; execution <= autoContinuationTurns; execution += 1) {
       if (input.shouldAbort?.()) {
         await session.abort();
         throw new Error('Turn aborted.');
@@ -902,7 +904,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           status: 'started',
           details: {
             execution,
-            maxAutomaticContinuations: AUTO_CONTINUATION_TURNS,
+            maxAutomaticContinuations: autoContinuationTurns,
           },
         });
       }
