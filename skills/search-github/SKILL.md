@@ -16,7 +16,7 @@ metadata:
 1. 直接使用 GitHub Tool，通过 repository URL/API 读取。
 2. Clone 到当前 session 的 `.workspace/<session-name>/artifacts/github/<owner>__<repo>/`，再用本地 `rg` / `find` / `git` 深入检查。
 
-大仓库、跨文件搜索、需要反复检查时优先本地 clone；小范围检查优先 GitHub Tool。
+大仓库、跨文件搜索、需要反复检查时优先本地 clone；小范围检查优先 GitHub Tool。用户已经指定 repository 时，不要要求用户先执行 CLI discover：Agent 可以先用 GitHub Tool 调查；如果需要完整代码扫描，使用可用的 git/bash 能力自行 clone 到当前 Investigation workspace，再调用 project_discover。
 
 ## 保存研究结果
 
@@ -38,6 +38,7 @@ metadata:
 ## 纪律
 
 - GitHub 代码是实现证据，不是业务真相。
+- GitHub / view / grep / bash 的原始结果可以用于当前调查推理；需要作为最终 Claim 的依据时，必须通过 Discovery 或其他确定性能力沉淀为 Evidence。
 - README / architecture doc 是文档证据。
 - Issue / PR 是讨论证据，要记录状态和时间。
 - 不把完整内部源码复制到 shared 文档；保留路径、函数、行号或最小必要片段。
