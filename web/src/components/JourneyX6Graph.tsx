@@ -21,10 +21,7 @@ import { classifyJourneyEdge } from './journey-map-visuals.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
 
-function retryGroupGeometry(nodes: FlowNode[], groupId: string) {
-  const members = nodes.filter((node) =>
-    node.data.retryGroupIds?.includes(groupId),
-  );
+function retryGroupGeometry(members: FlowNode[]) {
   if (!members.length) return undefined;
 
   const minX = Math.min(...members.map((node) => node.position.x));
@@ -82,7 +79,7 @@ export interface JourneyX6GraphProps {
  * X6 只负责节点、Port、Edge、缩放、选择和连线交互。
  *
  * 特别重要：
- * - outcome 是 X6 Port Label，而不是悬浮 HTML 标签；
+ * - outcome 不在画布上显示，只保存在 Edge data，并在选中连线后由右侧属性面板展示；
  * - 节点移动只更新 X6 自己的位置，不重建整张图；
  * - 只有节点/边的结构真正变化时才重新同步结构，避免拖动时闪烁；
  * - source/target Port 本身透明，只作为真实连接热区。
@@ -306,7 +303,7 @@ export function JourneyX6Graph({
 
     const retryGroups = [...retryGroupMap.entries()]
       .map(([id, members]) => {
-        const geometry = retryGroupGeometry(members, id);
+        const geometry = retryGroupGeometry(members);
         if (!geometry) return undefined;
 
         return {
@@ -722,7 +719,7 @@ export function JourneyX6Graph({
 
     for (const groupId of retryGroupIds) {
       const cell = graph.getCellById(groupId);
-      const geometry = retryGroupGeometry(nodes, groupId);
+      const geometry = retryGroupGeometry(nodes.filter((node) => node.data.retryGroupIds?.includes(groupId)));
       if (!cell?.isNode() || !geometry) continue;
 
       cell.position(geometry.x, geometry.y);
