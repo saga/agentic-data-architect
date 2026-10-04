@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import type { Node } from '@antv/x6';
 import { register } from '@antv/x6-react-shape';
+import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
 import type { FlowNodeData, JourneyMapStage, WorkflowNodeType } from './journey-map-types.js';
 
 const { Text } = Typography;
@@ -188,8 +189,8 @@ export function JourneyX6Node({ node }: JourneyX6NodeProps) {
 /** X6 React Shape 的固定注册入口。 */
 register({
   shape: JOURNEY_X6_SHAPE,
-  width: 236,
-  height: 210,
+  width: JOURNEY_NODE_SIZE.regular.width,
+  height: JOURNEY_NODE_SIZE.regular.height,
   effect: ['data'],
   component: JourneyX6Node,
 });
