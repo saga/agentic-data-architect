@@ -249,7 +249,12 @@ export function definitionFromGraph(
   };
 }
 
-/** 把 Workflow Definition 中明显的断连问题转换成画布即时提示。 */
+/**
+ * 把 Workflow Definition 中明显的结构问题转换成画布即时提示。
+ *
+ * 这里只做“用户编辑时马上能看懂”的轻量检查；真正保存仍由服务端的
+ * validateJourneyDefinition() 再做一次完整校验。这样 UI 提示不会成为唯一校验来源。
+ */
 function findConnectionIssues(
   definition: WorkflowDefinition,
 ): Map<string, { severity: 'error' | 'warning'; text: string }> {
@@ -338,8 +343,9 @@ function findConnectionIssues(
 /**
  * 把 Workflow Definition 投影成引擎无关的 Graph。
  *
- * X6 的实际端口由 JourneyX6Graph 再映射，但业务层仍保存 sourceHandles/targetHandles，
- * 方便属性面板和人工 transition 使用。
+ * 这里把业务节点/route 转成“画布需要知道的最小数据”，但不引入任何 X6 类型。
+ * sourceHandles / targetHandles 只是帮助 X6 找到连接热区；真正的业务关系仍然是
+ * source + target + outcome。修改图引擎时，通常只需要替换这一层之后的渲染适配。
  */
 export function graphFromDefinition(
   definition: WorkflowDefinition,
