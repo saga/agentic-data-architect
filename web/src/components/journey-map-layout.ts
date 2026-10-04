@@ -214,8 +214,14 @@ export function findMainFlowNodes(
 }
 
 /**
- * 从主线分出的分支左右交错。
- * 分支继续向下时尽量继承父节点 lane，因此不会每一层重新洗牌。
+ * 把主流程做成轻微 S 型；分支始终贴着自己的主线父节点向外展开。
+ *
+ * lane 只是视觉列编号：
+ * - 主线使用 MAIN_LANE_PATTERN；
+ * - 分支优先落在父节点 lane 的外侧；
+ * - 同一 rank 已被占用时，再向外找空 lane。
+ *
+ * 不把“左边/右边”写进 Workflow，也不根据 outcome 名称决定布局。
  */
 function assignLanes(
   nodes: FlowNode[],
@@ -243,43 +249,59 @@ function assignLanes(
     usedByRank.set(rank, used);
   };
 
+  const mainLane = (rank: number): number =>
+    MAIN_LANE_PATTERN[rank % MAIN_LANE_PATTERN.length] ?? 0;
+
+  // 先把主线固定成稳定的 S 型轨迹。
   for (const node of nodes) {
-    if (mainFlow.has(node.id)) reserve(node.id, 0);
+    if (mainFlow.has(node.id)) reserve(node.id, mainLane(ranks.get(node.id) ?? 0));
   }
 
-  const freeLane = (used: Set<number>, preferred: number): number => {
-    if (!used.has(preferred)) return preferred;
+  /**
+   * 找离父 lane 最近、但在当前层不冲突的列。
+   * preferredSide=true 表示优先向父节点右侧展开，否则向左侧展开。
+   */
+  const freeLane = (
+    used: Set<number>,
+    parentLane: number,
+    preferredSide: 'left' | 'right',
+  ): number => {
+    const direction = preferredSide === 'right' ? 1 : -1;
 
-    const sign = preferred < 0 ? -1 : 1;
     for (let distance = 1; distance < 100; distance += 1) {
-      const candidate = sign * (Math.abs(preferred) + distance);
+      const candidate = parentLane + direction * distance;
       if (!used.has(candidate)) return candidate;
     }
 
-    return sign * 100;
+    for (let distance = 1; distance < 100; distance += 1) {
+      const candidate = parentLane - direction * distance;
+      if (!used.has(candidate)) return candidate;
+    }
+
+    return parentLane + direction * 100;
   };
 
-  // 主线分支先固定 lane，保证同一个分叉点左右稳定。
+  // 主线直接分出的第一层分支，固定在主线外侧，避免左右抖动。
   for (const node of nodes) {
     if (!mainFlow.has(node.id)) continue;
 
     const candidates = (outgoing.get(node.id) ?? [])
-      .filter((edge) => !isPrimaryRoute(edge))
+      .filter((edge) => !isPrimaryRoute(edge) && !mainFlow.has(edge.target))
       .sort((a, b) => a.target.localeCompare(b.target) || a.id.localeCompare(b.id));
 
-    candidates.forEach((edge, index) => {
-      const magnitude = Math.floor(index / 2) + 1;
-      const preferred = index % 2 === 0 ? -magnitude : magnitude;
-
-      if (mainFlow.has(edge.target)) return;
-
+    for (const [index, edge] of candidates.entries()) {
       const rank = ranks.get(edge.target) ?? 0;
       const used = usedByRank.get(rank) ?? new Set<number>();
-      const lane = freeLane(used, preferred);
+      const parentLane = lanes.get(node.id) ?? 0;
+
+      // 第一支放外侧，第二支再放更外一列；同一分叉点的结构保持稳定。
+      const preferredSide = index % 2 === 0 ? 'left' : 'right';
+      const lane = freeLane(used, parentLane, preferredSide);
       reserve(edge.target, lane);
-    });
+    }
   }
 
+  // 分支链继续沿用父节点附近的 lane，不让每一层重新洗牌。
   const grouped = new Map<number, FlowNode[]>();
   for (const node of nodes) {
     const rank = ranks.get(node.id) ?? 0;
@@ -296,10 +318,15 @@ function assignLanes(
         .map((edge) => lanes.get(edge.source))
         .find((lane): lane is number => lane !== undefined);
 
-      const preferred = parentLane ?? -1;
+      const anchorLane = parentLane ?? mainLane(rank);
       const used = usedByRank.get(rank) ?? new Set<number>();
-      const lane = freeLane(used, preferred);
-      reserve(node.id, lane);
+      const preferredSide: 'left' | 'right' =
+        anchorLane <= 0 ? 'left' : 'right';
+
+      reserve(
+        node.id,
+        freeLane(used, anchorLane, preferredSide),
+      );
     }
   }
 
@@ -342,7 +369,23 @@ export function removeNodeCollisions(nodes: FlowNode[]): FlowNode[] {
   return result;
 }
 
-/** Workflow 自动布局：列 = rank，行 = lane。 */
+/**
+ * Workflow 自动布局：纵向阅读，但主线做轻微 S 型摆动，分支向两侧“长出来”。
+ *
+ * 视觉上看起来更像工作地图，而不是 BPMN 式的一根长线：
+ *
+ *          [A]
+ *             ↓
+ *                  [B]
+ *             ↓
+ *          [C]      ↙ branch
+ *        ↙
+ *      [D]
+ *         ↓
+ *            [E]
+ *
+ * 成功出口仍然从底部到顶部，因此不需要改变 X6 Port 语义。
+ */
 export function layoutWorkflow(
   nodes: FlowNode[],
   edges: FlowEdge[],
@@ -353,8 +396,6 @@ export function layoutWorkflow(
   const mainFlow = findMainFlowNodes(nodes, edges);
   const lanes = assignLanes(nodes, edges, ranks, mainFlow);
 
-  // 主流程沿纵向阅读：rank 越大越靠下；分支在主线左右展开。
-  // 长工作流因此不会再被压成一条横向长线。
   const laidOut = nodes.map((node) => {
     const rank = ranks.get(node.id) ?? 0;
     const lane = lanes.get(node.id) ?? 0;
