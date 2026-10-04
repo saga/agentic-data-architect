@@ -229,6 +229,17 @@ body {
   margin-bottom: 10px;
 }
 
+.pending-user-input-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pending-user-input-list .ant-alert,
+.pending-permission-list .ant-alert {
+  border-radius: 10px;
+}
+
 .pending-permission-list .ant-alert {
   border-radius: 10px;
 }
