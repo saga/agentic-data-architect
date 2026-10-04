@@ -694,7 +694,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         (delta) => send('delta', { delta }),
         turnId,
         (status) => send('status', { status }),
-        selectedRoute ? { selectedRoute } : undefined,
+        selectedRoute ? { selectedRoute } : body.guided ? { selectedGuidance: message } : undefined,
       );
       send('completed', result);
       finished = true;
