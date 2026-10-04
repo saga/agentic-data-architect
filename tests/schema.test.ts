@@ -50,6 +50,7 @@ test('Agent output uses schema defaults and evidence ownership validation', () =
 test('API request bodies are schema validated before workflow code', () => {
   assert.deepEqual(parseRequest(MessageBodySchema, { message: ' hello ', turnId: 't1' }), {
     message: 'hello',
+    guided: false,
     turnId: 't1',
   });
   assert.throws(
