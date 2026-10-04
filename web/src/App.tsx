@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   App as AntApp,
@@ -43,13 +43,20 @@ import {
   XProvider,
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
-import { JourneyMap } from './components/JourneyMap';
-import { InvestigationConfigPage } from './components/InvestigationConfigPage';
-import { AgentTrajectoryPage } from './components/AgentTrajectoryPage';
+// 这些页面不是首页聊天首屏必需内容，懒加载可以把 X6 / 轨迹 / 配置相关代码拆出去，避免首页主 chunk 过大。
+const JourneyMap = lazy(() => import('./components/JourneyMap').then((module) => ({ default: module.JourneyMap })));
+const InvestigationConfigPage = lazy(() => import('./components/InvestigationConfigPage').then((module) => ({ default: module.InvestigationConfigPage })));
+const AgentTrajectoryPage = lazy(() => import('./components/AgentTrajectoryPage').then((module) => ({ default: module.AgentTrajectoryPage })));
 import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
 const { Sider, Header, Content } = Layout;
+
+const pageLoadingFallback = (
+  <div className="subpage-app" style={{ display: 'grid', placeItems: 'center' }}>
+    <Text type="secondary">正在打开页面…</Text>
+  </div>
+);
 const { Text, Title, Paragraph } = Typography;
 
 interface SessionSummary {
@@ -1054,8 +1061,9 @@ function AppInner() {
 
   if (page === 'config') {
     return (
-      <div className="subpage-app">
-        <InvestigationConfigPage
+      <Suspense fallback={pageLoadingFallback}>
+        <div className="subpage-app">
+          <InvestigationConfigPage
           sessionName={active}
           control={current.control}
           workflow={current.context.workflow ?? ''}
@@ -1066,22 +1074,25 @@ function AppInner() {
           onSaved={async () => {
             await loadSession(active);
           }}
-        />
-      </div>
+          />
+        </div>
+      </Suspense>
     );
   }
 
   if (page === 'trajectory') {
     return (
-      <div className="subpage-app">
-        <AgentTrajectoryPage sessionName={active} onBack={() => navigatePage('chat')} />
+      <Suspense fallback={pageLoadingFallback}>
+        <div className="subpage-app">
+          <AgentTrajectoryPage sessionName={active} onBack={() => navigatePage('chat')} />
       </div>
     );
   }
   if (page === 'journey') {
     return (
-      <div className="subpage-app journey-map-subpage">
-        <JourneyMap onBack={() => navigatePage('chat')} />
+      <Suspense fallback={pageLoadingFallback}>
+        <div className="subpage-app journey-map-subpage">
+          <JourneyMap onBack={() => navigatePage('chat')} />
       </div>
     );
   }
