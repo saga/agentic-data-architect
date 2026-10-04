@@ -12,16 +12,17 @@ import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
  * 工作地图不是任意 DAG，而是“主流程 + 少量分支 + 少量回退”的工作流。
  *
  * 布局规则：
- * 1. 沿 Workflow start 的前向边计算 rank，rank 决定左右列。
+ * 1. 沿 Workflow start 的前向边计算 rank，rank 决定上下层级。
  * 2. success / done / pass 等主出口组成中间主线。
- * 3. 其它分支进入主线的上下 lane。
- * 4. 循环/回退边不参与 rank，避免把整张图拉成斜线。
+ * 3. 其它分支进入主线的左右 lane。
+ * 4. 循环/回退边不参与 rank，避免把整张图拉成长斜线。
  * 5. 最后只做一次简单矩形碰撞保护。
  */
 
-const COLUMN_GAP = 96;
-const MAIN_Y = 220;
-const LANE_GAP = 272;
+const MAIN_X = 420;
+const MAIN_Y = 56;
+const ROW_GAP = 272;
+const LANE_GAP = 376;
 const CANVAS_PADDING = 56;
 const COLLISION_GAP = 36;
 
@@ -211,8 +212,8 @@ export function findMainFlowNodes(
 }
 
 /**
- * 从主线分出的分支上下交错。
- * 分支继续向右时尽量继承父节点 lane，因此不会每一列重新洗牌。
+ * 从主线分出的分支左右交错。
+ * 分支继续向下时尽量继承父节点 lane，因此不会每一层重新洗牌。
  */
 function assignLanes(
   nodes: FlowNode[],
@@ -256,7 +257,7 @@ function assignLanes(
     return sign * 100;
   };
 
-  // 主线分支先固定 lane，保证同一个分叉点上下稳定。
+  // 主线分支先固定 lane，保证同一个分叉点左右稳定。
   for (const node of nodes) {
     if (!mainFlow.has(node.id)) continue;
 
@@ -350,32 +351,16 @@ export function layoutWorkflow(
   const mainFlow = findMainFlowNodes(nodes, edges);
   const lanes = assignLanes(nodes, edges, ranks, mainFlow);
 
-  const rankWidths = new Map<number, number>();
-  for (const node of nodes) {
-    const rank = ranks.get(node.id) ?? 0;
-    rankWidths.set(
-      rank,
-      Math.max(rankWidths.get(rank) ?? 0, nodeDimensions(node).width),
-    );
-  }
-
-  const rankX = new Map<number, number>();
-  let x = CANVAS_PADDING;
-  const maxRank = Math.max(...Array.from(rankWidths.keys()), 0);
-
-  for (let rank = 0; rank <= maxRank; rank += 1) {
-    rankX.set(rank, x);
-    x += (rankWidths.get(rank) ?? JOURNEY_NODE_SIZE.regular.width) + COLUMN_GAP;
-  }
-
+  // 主流程沿纵向阅读：rank 越大越靠下；分支在主线左右展开。
+  // 长工作流因此不会再被压成一条横向长线。
   const laidOut = nodes.map((node) => {
     const rank = ranks.get(node.id) ?? 0;
     const lane = lanes.get(node.id) ?? 0;
 
     return copyNode(
       node,
-      rankX.get(rank) ?? CANVAS_PADDING,
-      lane === 0 ? MAIN_Y : MAIN_Y + lane * LANE_GAP,
+      MAIN_X + lane * LANE_GAP,
+      MAIN_Y + rank * ROW_GAP,
     );
   });
 
