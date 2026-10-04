@@ -223,6 +223,20 @@ body {
   text-align: left;
 }
 
+.pending-permission-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pending-permission-list .ant-alert {
+  border-radius: 10px;
+}
+
+.pending-permission-list .ant-alert-message {
+  width: 100%;
+}
+
 .composer {
   padding: 12px 24px 18px;
   border-top: 1px solid #f0f0f0;
