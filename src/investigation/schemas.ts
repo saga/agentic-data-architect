@@ -163,8 +163,10 @@ export const ControlAgentSchema = z.object({
   permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
   /** 对话中显示的助手名称；默认“秘书”，只影响展示和复制文本，不参与 Agent 推理。 */
   displayName: z.string().trim().min(1).max(40).default('秘书'),
-  /** 头像文件在当前 Investigation workspace 内的相对路径；没有设置头像时省略。 */
+  /** 兼容旧版的单头像路径；新配置使用 avatarPaths。 */
   avatarPath: z.string().trim().min(1).optional(),
+  /** 秘书头像文件列表；可以上传任意数量，回复时由前端随机选择。 */
+  avatarPaths: z.array(z.string().trim().min(1)).optional(),
   /** 头像 MIME 类型，服务端读取文件时用于返回正确 Content-Type。 */
   avatarMimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']).optional(),
   /** 头像目标宽度；同时决定裁剪比例和最终图片像素宽度。 */
