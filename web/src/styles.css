@@ -241,6 +241,62 @@ body {
   text-align: left;
 }
 
+.checkpoint-list {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0 28px 10px;
+}
+
+.checkpoint-card {
+  border-color: #e8edf3;
+  border-radius: 10px;
+}
+
+.checkpoint-card--latest {
+  border-color: #91caff;
+}
+
+.checkpoint-card .ant-card-head {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.checkpoint-card .ant-card-head-title {
+  padding: 9px 0;
+  font-size: 12px;
+}
+
+.checkpoint-card .ant-card-body {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px 11px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.checkpoint-summary {
+  color: rgba(0, 0, 0, 0.78);
+}
+
+.checkpoint-detail {
+  display: grid;
+  gap: 2px;
+  color: rgba(0, 0, 0, 0.68);
+}
+
+.checkpoint-meta {
+  font-size: 11px;
+}
+
+.checkpoint-next-step {
+  padding-top: 6px;
+  border-top: 1px solid #f0f2f5;
+  color: rgba(0, 0, 0, 0.72);
+}
+
 .pending-permission-list {
   display: grid;
   gap: 8px;
