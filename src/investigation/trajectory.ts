@@ -242,7 +242,7 @@ function deriveTrajectoryDiagnostics(events: TrajectoryEvent[]): {
   let lastActivityType: string | undefined;
   let idleObserved = false;
   let assistantTurnEnded = false;
-  let failed = false;
+  let terminalFailure = false;
 
   for (const event of events) {
     lastActivityAt = event.timestamp;
@@ -278,11 +278,13 @@ function deriveTrajectoryDiagnostics(events: TrajectoryEvent[]): {
 
     if (event.type === 'assistant_turn_end') assistantTurnEnded = true;
     if (event.type === 'session_idle') idleObserved = true;
-    if (event.type === 'error' || event.type === 'session_error' || event.status === 'failed') failed = true;
+    // 工具失败、单次上下文整理失败并不一定终止整轮；Agent 可能捕获后继续。
+    // 只有 turn-level error / session.error 才把整轮标成 failed。
+    if (event.type === 'error' || event.type === 'session_error') terminalFailure = true;
   }
 
   let state: TrajectorySummary['state'];
-  if (failed) state = 'failed';
+  if (terminalFailure) state = 'failed';
   else if (idleObserved || events.some((event) => event.type === 'turn_end')) state = 'completed';
   else if (pendingPermissions.size > 0 || pendingUserInputs.size > 0) state = 'waiting';
   else state = 'running';
