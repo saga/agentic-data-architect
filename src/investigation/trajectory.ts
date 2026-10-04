@@ -37,7 +37,7 @@ export const TrajectorySummarySchema = z.object({
     totalNanoAiu: z.number().nonnegative().optional(),
   }).strict()).default({}),
   eventCount: z.number().int().nonnegative().default(0),
-  state: z.enum(['running', 'waiting', 'completed', 'failed']).default('running'),
+  state: z.enum(['running', 'waiting', 'completed', 'failed', 'aborted']).default('running'),
   waitingOn: z.enum(['permission', 'user_input', 'tool', 'model', 'session']).optional(),
   lastActivityAt: z.string().datetime().optional(),
   lastActivity: z.string().optional(),
@@ -128,8 +128,7 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
   // 否则第一轮曾经 timeout / waiting permission，会把后来已经成功完成的轮次误报成异常。
   const latestTurnId = events.at(-1)!.turnId;
   const latestTurnEvents = events.filter((event) => event.turnId === latestTurnId);
-  const first = events[0]!;
-  const last = events.at(-1)!;
+  const first = latestTurnEvents[0] ?? events[0]!;
   const usageObject = usage && typeof usage === 'object'
     ? usage as Record<string, unknown>
     : undefined;
@@ -204,7 +203,7 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
   const finishedAt = completionEvent?.timestamp;
   const diagnostics = deriveTrajectoryDiagnostics(latestTurnEvents);
   return TrajectorySummarySchema.parse({
-    turnId: first.turnId,
+    turnId: latestTurnId,
     startedAt: first.timestamp,
     ...(finishedAt ? {
       finishedAt,
