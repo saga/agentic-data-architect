@@ -90,6 +90,7 @@ interface InvestigationControl {
     permissionMode: 'permission' | 'allow_all';
     displayName: string;
     avatarPath?: string;
+    avatarPaths?: string[];
     avatarMimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
     avatarWidth: number;
     avatarHeight: number;
@@ -368,28 +369,22 @@ function ChatMessageMeta(props: { speaker: string; capturedAt: string }) {
 function AssistantAvatar(props: {
   sessionName: string;
   control: InvestigationControl;
+  avatarPath?: string;
 }) {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
-  // 聊天区按配置尺寸显示；配置 300 × 300 就实际显示 300 × 300。
-  // 上传文件的像素尺寸和聊天区展示尺寸是同一组配置，避免“配置很大但界面被偷偷缩小”的误解。
-  const displayWidth = width;
-  const displayHeight = height;
+  const avatarPath = props.avatarPath ?? props.control.agent.avatarPath;
+  const avatarId = avatarPath?.split('/').pop()?.replace(/\\.png$/i, '');
   return (
     <Avatar
       shape="square"
       src={
-        props.control.agent.avatarPath
-          ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
+        avatarId
+          ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
           : undefined
       }
       icon={<RobotOutlined />}
-      style={{
-        width: displayWidth,
-        height: displayHeight,
-        objectFit: 'cover',
-        flex: '0 0 auto',
-      }}
+      style={{ width, height, objectFit: 'cover', flex: '0 0 auto' }}
     />
   );
 }
@@ -458,6 +453,21 @@ function AppInner() {
 
   const routeSession = () => routeInfo()?.session;
   const [page, setPage] = useState<'chat' | 'config' | 'trajectory' | 'journey'>(() => routeInfo()?.page ?? 'chat');
+  // 每条回复固定一个随机头像；配置或消息刷新时只为尚未分配的消息抽取一次，避免流式渲染过程中头像跳变。
+  const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const avatarPaths = current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
+    if (!avatarPaths.length) return;
+    const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
+    setAssistantAvatarByMessage((previous) => {
+      const next = { ...previous };
+      for (const message of assistantMessages) {
+        if (!next[message.id]) next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
+      }
+      return next;
+    });
+  }, [current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
+
 
   const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory' | 'journey') => {
     if (!active) return;
@@ -681,7 +691,7 @@ function AppInner() {
         role: message.role,
         ...(message.role === 'assistant'
           ? {
-              avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
+              avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} avatarPath={assistantAvatarByMessage[message.id]} />,
               // Bubble 的 avatar 外层默认有自己的尺寸；这里一起覆盖，否则大头像会被外层压缩。
               styles: {
                 avatar: {
@@ -726,6 +736,7 @@ function AppInner() {
         key: 'streaming-assistant',
         role: 'assistant',
         avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
+        // 流式回答还没有持久化 message.id；显示当前配置中的随机头像即可。
         // 流式回答也必须同步调整 Bubble 的 avatar 外层尺寸。
         styles: {
           avatar: {
@@ -750,7 +761,7 @@ function AppInner() {
       });
     }
     return items;
-  }, [active, current?.context.journeyPlan?.routes, current?.messages, loading, nextGuidance, streamingAnswer]);
+  }, [active, assistantAvatarByMessage, current?.context.journeyPlan?.routes, current?.messages, loading, nextGuidance, streamingAnswer]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
