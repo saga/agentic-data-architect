@@ -130,24 +130,6 @@ interface PendingCopilotPermission {
   toolTitle?: string;
   readOnly?: boolean;
   managedApprovalRequired?: boolean;
-}
-
-interface PendingCopilotPermission {
-  sessionName: string;
-  turnId: string;
-  sessionId: string;
-  requestId: string;
-  kind: string;
-  requestedAt: string;
-  intention?: string;
-  fullCommandText?: string;
-  fileName?: string;
-  path?: string;
-  serverName?: string;
-  toolName?: string;
-  toolTitle?: string;
-  readOnly?: boolean;
-  managedApprovalRequired?: boolean;
   respond: (allowed: boolean) => Promise<void>;
 }
 
