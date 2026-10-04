@@ -124,7 +124,7 @@ Workflow Definition 不依赖 X6 类型，因此以后即使替换画布实现�
 - success / 主流程：从节点底部出去，下一步从顶部进入。
 - fail：从右侧出去，从目标步骤左侧进入。
 - 其它分支：向另一侧展开。
-- retry：不再创建可见 retry Port，由 retry group 表示。
+- retry：保留真实 Port 和 Edge，使用灰色虚线回线。
 
 Port 只负责连接和交互；用户选中连线后，在右侧“属性”查看真实 outcome、目标和 condition。
 
@@ -189,7 +189,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
                          │ 接到任务 │
                          └─────────┘
 
-       retry 关系不再拉一条回线，而是用一个浅灰虚线组框住需要重复处理的步骤。
+       retry 关系直接用灰色虚线回线表示，并沿画布外侧 return lane 绕行。
 ~~~
 
 主线只是视觉概念，不是第二套 Workflow。
@@ -248,7 +248,7 @@ Failure Review ── retry ──► A
 
 连线上不直接显示文字。选中连接后，右侧“属性”显示真实 outcome、来源、目标和 condition。
 
-retry 线不会删除 Workflow 中真实存在的 retry 关系；只是使用画布外侧的 return lane 绕行，避免穿过其它节点。这样业务语义和视觉表达是一致的，也比用 Retry Group 更容易理解。
+retry 线不会删除 Workflow 中真实存在的 retry 关系；只是使用画布外侧的 return lane 绕行，避免穿过其它节点。这样业务语义和视觉表达是一致的，也比视觉分组更容易理解。
 
 ## 10. 当前刻意不做
 
