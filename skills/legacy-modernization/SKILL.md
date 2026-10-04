@@ -50,8 +50,6 @@ start -> intake
 title: 接到任务
 objective: 明确这次为什么改、改什么、范围在哪里，以及当前已经有哪些资料。
 completeWhen: goal
-completion: deterministic
-tools: read,url
 
 先判断：
 
@@ -64,15 +62,12 @@ tools: read,url
 如果输入不足，不要停在“信息不足”。主动问一个最关键的问题，并把问题放进回答后的输入入口。
 
 - success -> estate-map
-- needs-input -> intake
 
 ## @task estate-map
 
 title: 看清旧系统
 objective: 建立系统地图：数据集、来源、SQL/ETL、主要数据流和下游使用方。
 completeWhen: current-state
-completion: deterministic
-tools: read,url
 
 优先做：
 
@@ -83,15 +78,12 @@ tools: read,url
 5. 不要因为看到了少量表就开始设计新架构。
 
 - success -> data-truth
-- needs-input -> estate-map
 
 ## @task data-truth
 
 title: 找到数据真相
 objective: 确认数据从哪里来、代表什么、哪个来源最可信，以及数据质量有哪些实际问题。
 completeWhen: data-truth
-completion: deterministic
-tools: read,url
 
 重点检查：
 
@@ -105,26 +97,13 @@ tools: read,url
 
 发现业务定义缺失时，主动问一个具体问题，例如“这个字段的 A / R / P 各代表什么？”而不是“请提供更多信息”。
 
-- success -> data-truth-gate
-- needs-input -> data-truth
-
-## @gate data-truth-gate
-completion: agent
-
-title: 数据真相 Gate
-visible: false
-objective: 判断是否已经有足够证据进入关键问题调查。
-
-- pass -> investigate
-- retry -> data-truth
+- success -> investigate
 
 ## @task investigate
 
 title: 查关键问题
 objective: 一次解决一个真正影响迁移的业务问题，把证据、SQL、ETL、数据和业务定义串起来。
 completeWhen: investigation
-completion: deterministic
-tools: read,url
 
 每个问题都走：
 
@@ -143,15 +122,12 @@ profiling / 对比
 Web Search 只在本地代码、目录和内部资料无法解释问题时使用。
 
 - success -> current-state
-- needs-input -> investigate
 
 ## @task current-state
 
 title: 定下现状
 objective: 把已经查清楚的 source、lineage、business rules、semantic context 和主要问题整理成当前系统的完整说明。
 completeWhen: current-state-ready
-completion: deterministic
-tools: read,url
 
 Current State 至少回答：
 
@@ -163,26 +139,13 @@ Current State 至少回答：
 - 哪些问题还没解决
 - 哪些结论有冲突
 
-- success -> current-state-gate
-- needs-input -> investigate
-
-## @gate current-state-gate
-completion: agent
-
-title: 现状 Gate
-visible: false
-objective: 没有关键 discovery / lineage / source-of-truth 阻塞时，才允许开始目标方案设计。
-
-- pass -> target
-- retry -> investigate
+- success -> target
 
 ## @task target
 
 title: 设计新方案
 objective: 在旧系统已经说清楚以后，确定新的数据怎么接、怎么整理、业务定义放哪里、怎么管。
 completeWhen: target
-completion: deterministic
-tools: read,url
 
 设计内容：
 
@@ -199,15 +162,12 @@ tools: read,url
 目标方案只是草案时，不要把它当成已经完成。
 
 - success -> mapping
-- needs-input -> target
 
 ## @task mapping
 
 title: 新旧对应
 objective: 把旧数据对应到新数据，并把 transformation、business rule、validation rule 写清楚。
 completeWhen: mapping
-completion: deterministic
-tools: read,url
 
 每条 mapping 至少说明：
 
@@ -222,15 +182,12 @@ tools: read,url
 遇到不能自动确定的映射，回到 investigate，而不是猜。
 
 - success -> validation
-- needs-input -> investigate
 
 ## @task validation
 
 title: 验证结果
 objective: 证明目标系统和旧系统在关键业务结果上可以对得上，并提前定义切换条件。
 completeWhen: validation
-completion: deterministic
-tools: read,url
 
 至少覆盖：
 
@@ -247,14 +204,11 @@ tools: read,url
 发现差异后回到 investigate，先找原因再继续。
 
 - success -> cutover
-- needs-input -> investigate
 
 ## @review cutover
 
 title: 切换确认
 objective: 验证已经完成后，由负责人确认切换条件、回退方案和运行准备，再进入实际切换；工作台不会把“生成了一份计划”当成已经切换完成。
-actor: human
-tools: read,url
 
 - approved -> done
 - rollback -> investigate
@@ -262,5 +216,4 @@ tools: read,url
 ## @end done
 
 title: 完成
-visible: false
 objective: Modernization Journey 正常结束。
