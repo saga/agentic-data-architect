@@ -375,14 +375,15 @@ function AssistantAvatar(props: {
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
   const avatarPath = props.avatarPath ?? props.control.agent.avatarPath;
   const avatarId = avatarPath?.split('/').pop()?.replace(/\\.png$/i, '');
+  const avatarUrl = avatarPath === 'assistant/avatar.png'
+    ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
+    : avatarId
+      ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
+      : undefined;
   return (
     <Avatar
       shape="square"
-      src={
-        avatarId
-          ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
-          : undefined
-      }
+      src={avatarUrl}
       icon={<RobotOutlined />}
       style={{ width, height, objectFit: 'cover', flex: '0 0 auto' }}
     />
