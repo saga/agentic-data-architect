@@ -124,7 +124,7 @@ test('journey state follows execution and facts, not node array order', () => {
   const state = buildJourneyState(result.definition!, baseFacts, initial);
 
   assert.deepEqual(state.execution.completedNodeIds, ['intake']);
-  assert.equal(state.execution.execution.currentNodeId, 'investigate');
+  assert.equal(state.execution.currentNodeId, 'investigate');
   assert.equal(state.stages.find((stage) => stage.id === 'investigate')?.status, 'current');
   assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
