@@ -181,8 +181,11 @@ function eventDetail(event: TrajectoryEvent) {
           <Tag>输入 {formatTokens(event.inputTokens ?? 0)}</Tag>
           <Tag>输出 {formatTokens(event.outputTokens ?? 0)}</Tag>
           <Tag>合计 {formatTokens((event.inputTokens ?? 0) + (event.outputTokens ?? 0))}</Tag>
+          {typeof event.details.newInputTokens === 'number' ? <Tag>新增输入 {formatTokens(event.details.newInputTokens)}</Tag> : null}
           {event.premiumRequestCost !== undefined ? <Tag>Premium Request Cost {formatCost(event.premiumRequestCost)}</Tag> : null}
           {event.durationMs !== undefined ? <Tag>{formatDuration(event.durationMs)}</Tag> : null}
+          {typeof event.details.contextPercentAtCall === 'number' ? <Tag>调用时上下文 {event.details.contextPercentAtCall}%</Tag> : null}
+          {typeof event.details.availableToolCount === 'number' ? <Tag>可用工具 {event.details.availableToolCount}</Tag> : null}
           {typeof event.details.finishReason === 'string' ? <Tag>结束 {event.details.finishReason}</Tag> : null}
           {typeof event.details.reasoningEffort === 'string' ? <Tag>推理强度 {event.details.reasoningEffort}</Tag> : null}
         </Flex>
@@ -200,6 +203,13 @@ function eventDetail(event: TrajectoryEvent) {
             {typeof event.details.timeToFirstTokenMs === 'number' ? `首 Token ${formatDuration(event.details.timeToFirstTokenMs)}` : ''}
             {typeof event.details.timeToFirstTokenMs === 'number' && typeof event.details.interTokenLatencyMs === 'number' ? ' · ' : ''}
             {typeof event.details.interTokenLatencyMs === 'number' ? `Token 间隔 ${formatDuration(event.details.interTokenLatencyMs)}` : ''}
+          </Text>
+        ) : null}
+        {typeof event.details.contextTokensAtCall === 'number' || typeof event.details.contextTokenLimitAtCall === 'number' ? (
+          <Text type="secondary">
+            调用时上下文：{formatTokens(Number(event.details.contextTokensAtCall) || 0)}
+            {typeof event.details.contextTokenLimitAtCall === 'number' ? ` / ${formatTokens(event.details.contextTokenLimitAtCall)} Token` : ' Token'}
+            {typeof event.details.contextMessagesAtCall === 'number' ? ` · ${event.details.contextMessagesAtCall} 条消息` : ''}
           </Text>
         ) : null}
         {typeof event.details.apiEndpoint === 'string' || typeof event.details.providerCallId === 'string' || typeof event.details.serviceRequestId === 'string' ? (
