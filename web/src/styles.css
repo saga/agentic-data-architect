@@ -1901,4 +1901,36 @@ body {
     align-items: flex-start;
     flex-direction: column;
   }
+}.journey-map-edge-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #edf0f4;
+  border-radius: 10px;
+  background: #fafbfd;
 }
+
+.journey-map-edge-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.journey-map-edge-summary .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journey-map-edge-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 0 2px;
+}
+
+
