@@ -1089,13 +1089,6 @@ body {
   height: 100%;
 }
 
-.subpage-app {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: var(--workspace-bg, #f7f8fa);
-}
-
 .subpage-header {
   position: sticky;
   top: 0;
@@ -1857,24 +1850,21 @@ body {
 }
 
 .subpage-app {
-  /* AppInner 的父级不是 flex 容器，不能依赖 height: 100% 链式继承。
-     用 viewport 锚定，保证工作地图/配置/轨迹页一定占满整个浏览器可视区域。 */
+  /* 子页面挂在 #root 里，但 #root 是 overflow:hidden。用 viewport 锚定，
+     子页面自己占满可视区域并负责滚动，不依赖父级的高度链。 */
   position: fixed;
   inset: 0;
   z-index: 50;
-  width: 100vw;
-  height: 100dvh;
-  min-width: 0;
-  min-height: 100dvh;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #f7f9fc;
 }
 
+/* 工作地图用画布自己平移缩放，不要页面滚动条。
+   这两条必须留在 .subpage-app 之后：同优先级，后写的赢。
+   height 要写死，否则 .journey-map-page 的 height:100% 没有可解析的父高度。 */
 .journey-map-subpage {
-  width: 100%;
   height: 100%;
-  min-width: 0;
-  min-height: 100%;
   overflow: hidden;
 }
 
