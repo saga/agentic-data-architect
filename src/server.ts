@@ -18,6 +18,7 @@ import {
   RequestValidationError,
   UserInputResponseBodySchema,
   UpdateConfigBodySchema,
+  UpdateAgentModelBodySchema,
   UpdateWorkflowBodySchema,
   JourneyAiRequestSchema,
   JourneyTransitionBodySchema,
@@ -63,6 +64,7 @@ import {
 } from './investigation/conversation.js';
 import {
   abortCopilotTurn,
+  getClient,
   listPendingCopilotPermissions,
   listPendingCopilotUserInputs,
   respondToCopilotPermission,
@@ -211,6 +213,20 @@ app.post('/api/sessions', async (req, res) => {
    * 当前 Investigation 的 live execution state。
    * trajectory.jsonl 是历史记录，不能用来判断“现在是否还在跑”。
    */
+  /** 返回当前 Copilot 可用模型；主输入框用它填充模型切换菜单。 */
+  app.get('/api/copilot/models', async (_req, res) => {
+    const models = await (await getClient()).listModels();
+    res.json({
+      models: models.map((model) => ({
+        id: model.id,
+        name: model.name,
+        supportedReasoningEfforts: model.supportedReasoningEfforts ?? [],
+        defaultReasoningEffort: model.defaultReasoningEffort ?? null,
+        policyState: model.policy?.state ?? null,
+      })),
+    });
+  });
+
   app.get('/api/sessions/:name/execution', async (req, res) => {
     const name = sessionKey(req.params.name);
     const active = getActiveInvestigationTurn(name);
@@ -462,6 +478,30 @@ app.post('/api/sessions', async (req, res) => {
     res.json(await resetJourneyCustomization(name, context.workflow));
   });
 
+
+  /** 主对话框切换模型 / Auto 选择方式；保存后从下一轮对话开始使用。 */
+  app.patch('/api/sessions/:name/agent/model', async (req, res) => {
+    const name = sessionKey(routeParam(req.params.name));
+    const body = parseRequest(UpdateAgentModelBodySchema, req.body);
+    const current = await loadInvestigationControl(name);
+    if (body.model !== 'auto' && body.autoTier) {
+      res.status(400).json({ error: '只有选择 Auto 时才能设置自动选择方式。' });
+      return;
+    }
+    const control = await updateInvestigationControl(
+      name,
+      {
+        research: current.research,
+        agent: {
+          ...current.agent,
+          model: body.model,
+          ...(body.autoTier ? { autoTier: body.autoTier } : body.autoTier === null ? { autoTier: undefined } : {}),
+        },
+      },
+      'model settings changed from main chat',
+    );
+    res.json({ control });
+  });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
@@ -864,7 +904,11 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         (delta) => send('delta', { delta }),
         turnId,
         (status) => send('status', { status }),
-        selectedRoute ? { selectedRoute } : body.guided ? { selectedGuidance: message } : undefined,
+        {
+          ...(selectedRoute ? { selectedRoute } : {}),
+          ...(body.guided && !selectedRoute ? { selectedGuidance: message } : {}),
+          onReasoningDelta: (delta) => send('reasoning', { delta }),
+        },
       );
       send('completed', result);
       finished = true;
