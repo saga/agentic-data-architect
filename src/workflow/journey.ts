@@ -48,7 +48,14 @@ export interface ParsedJourney {
   issues: string[];
 }
 
+/**
+ * 当前 Workflow 自动推进时读取的事实快照。
+ *
+ * 这些字段属于应用状态，而不是 Markdown DSL。Workflow 只保存 completeWhen 的名字，
+ * 这里才决定这个名字如何映射到真实事实。这样增加业务事实时，不需要继续增加 DSL 字段。
+ */
 export interface JourneyFacts {
+  /** 用户明确给出的本次调查目标；为空时通常不能自动完成 intake。 */
   goal: string;
   /** Architecture Assessment 使用的确定性计数；Legacy 路线不需要填。 */
   findingCount?: number;
@@ -59,7 +66,9 @@ export interface JourneyFacts {
     semanticAssets: number;
     parseFailures: number;
   } | null;
+  /** 当前仍未解决的未知项，主要供 Agent 和 UI 导航使用。 */
   unknowns: string[];
+  /** 高严重度缺口类型，用来阻止关键调查阶段过早通过。 */
   highGapKinds: string[];
   targetComponentCount: number;
   mappingCount: number;
