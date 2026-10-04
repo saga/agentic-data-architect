@@ -558,8 +558,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (typeof e.data.providerCallId === 'string') event.details.providerCallId = e.data.providerCallId;
     if (typeof e.data.serviceRequestId === 'string') event.details.serviceRequestId = e.data.serviceRequestId;
     if (typeof e.data.initiator === 'string') event.details.initiator = e.data.initiator;
-    if (typeof e.data.interactionId === 'string') event.details.interactionId = e.data.interactionId;
-    if (e.data.quotaSnapshots !== undefined) event.details.quotaSnapshots = redactTrajectoryValue(e.data.quotaSnapshots);
     if (latestContextTokens !== undefined) event.details.contextTokensAtCall = latestContextTokens;
     if (latestContextLimit !== undefined) {
       event.details.contextTokenLimitAtCall = latestContextLimit;
