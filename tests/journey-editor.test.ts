@@ -20,21 +20,16 @@ test('journey editor serialization round-trips semantic graph', () => {
         type: 'task' as const,
         title: '明确目标',
         objective: '确认范围',
-        visible: true,
-        completion: 'deterministic' as const,
         actor: 'system' as const,
         completeWhen: 'goal',
         routes: [
-          { outcome: 'success', target: 'review', condition: 'goal' },
-          { outcome: 'needs-input', target: 'intake' },
+          { outcome: 'success', target: 'review' },
         ],
       },
       {
         id: 'review',
         type: 'review' as const,
         title: '人工确认',
-        visible: true,
-        completion: 'agent' as const,
         actor: 'human' as const,
         routes: [{ outcome: 'success', target: 'done' }],
       },
@@ -42,8 +37,6 @@ test('journey editor serialization round-trips semantic graph', () => {
         id: 'done',
         type: 'end' as const,
         title: '完成',
-        visible: false,
-        completion: 'agent' as const,
         actor: 'system' as const,
         routes: [],
       },
@@ -64,8 +57,7 @@ test('journey editor serialization round-trips semantic graph', () => {
       ...(condition !== undefined ? { condition } : {}),
     })),
     [
-      { outcome: 'success', target: 'review', condition: 'goal' },
-      { outcome: 'needs-input', target: 'intake' },
+      { outcome: 'success', target: 'review' },
     ],
   );
 });
@@ -115,8 +107,6 @@ test('selection-scoped Workflow AI cannot connect a new node to an unrelated nod
         id: 'new-step',
         type: 'task' as const,
         title: '新步骤',
-        visible: true,
-        completion: 'agent' as const,
         actor: 'agent' as const,
         routes: [{ outcome: 'success', target: 'unrelated' }],
       },
@@ -149,7 +139,6 @@ test('Workflow patch preserves dependency declarations', () => {
     type: 'update-node',
     nodeId: 'target',
     patch: {
-      requires: ['evidence', 'mapping'],
     },
   }]);
 
