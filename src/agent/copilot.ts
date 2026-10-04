@@ -4,7 +4,7 @@
  * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
-import { CopilotClient, ToolSet } from '@github/copilot-sdk';
+import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -101,6 +101,8 @@ export interface AskInput {
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
+  /** 当前 Investigation 的 Agent 权限模式；默认 permission 保持原有逐次确认行为。 */
+  permissionMode?: 'permission' | 'allow_all';
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
   onStatus?: (status: string) => void;
@@ -111,6 +113,73 @@ export interface AskInput {
 
 // turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
 const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
+
+interface PendingCopilotPermission {
+  sessionName: string;
+  turnId: string;
+  sessionId: string;
+  requestId: string;
+  kind: string;
+  requestedAt: string;
+  intention?: string;
+  fullCommandText?: string;
+  fileName?: string;
+  path?: string;
+  serverName?: string;
+  toolName?: string;
+  toolTitle?: string;
+  readOnly?: boolean;
+  managedApprovalRequired?: boolean;
+}
+
+interface PendingCopilotPermission {
+  sessionName: string;
+  turnId: string;
+  sessionId: string;
+  requestId: string;
+  kind: string;
+  requestedAt: string;
+  intention?: string;
+  fullCommandText?: string;
+  fileName?: string;
+  path?: string;
+  serverName?: string;
+  toolName?: string;
+  toolTitle?: string;
+  readOnly?: boolean;
+  managedApprovalRequired?: boolean;
+  respond: (allowed: boolean) => Promise<void>;
+}
+
+/** 当前进程中等待用户确认的权限请求；权限是临时运行态，不写入 Investigation 状态文件。 */
+const pendingCopilotPermissions = new Map<string, PendingCopilotPermission>();
+
+/** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
+export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
+  return [...pendingCopilotPermissions.values()]
+    .filter((item) => item.sessionName === sessionName)
+    .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
+    .map(({ respond: _respond, ...item }) => ({ ...item }));
+}
+
+/** 响应指定权限请求；成功后立即从前端待处理列表移除，SDK 随后继续执行工具。 */
+export async function respondToCopilotPermission(
+  sessionName: string,
+  turnId: string,
+  requestId: string,
+  allowed: boolean,
+): Promise<boolean> {
+  const pending = pendingCopilotPermissions.get(requestId);
+  if (!pending || pending.sessionName !== sessionName || pending.turnId !== turnId) return false;
+
+  try {
+    await pending.respond(allowed);
+    pendingCopilotPermissions.delete(requestId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function getSessionUsageMetrics(session: unknown): Promise<Record<string, unknown> | undefined> {
   try {
@@ -228,6 +297,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   const sessionConfig: CreateSessionConfig = {
     model: input.model ?? config.model,
+    // Allow All Access 使用 SDK 官方 approveAll；默认 permission 模式不注册 handler，
+    // 这样 permission.requested 会停在 pending，等待本工作台前端明确批准或拒绝。
+    ...(input.permissionMode === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
     workingDirectory,
     systemMessage: {
       mode: 'append' as const,
@@ -449,6 +521,29 @@ export async function askCopilot(input: AskInput): Promise<string> {
       (typeof request.toolName === 'string' && request.toolName.trim()) ||
       ('需要确认 ' + kind);
     pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
+    pendingCopilotPermissions.set(requestId, {
+      sessionName: investigationName,
+      turnId: input.turnId ?? '',
+      sessionId: session.sessionId,
+      requestId,
+      kind,
+      requestedAt: new Date().toISOString(),
+      ...(typeof request.intention === 'string' ? { intention: request.intention } : {}),
+      ...(typeof request.fullCommandText === 'string' ? { fullCommandText: redactTrajectoryValue(request.fullCommandText) as string } : {}),
+      ...(typeof request.fileName === 'string' ? { fileName: request.fileName } : {}),
+      ...(typeof request.path === 'string' ? { path: request.path } : {}),
+      ...(typeof request.serverName === 'string' ? { serverName: request.serverName } : {}),
+      ...(typeof request.toolName === 'string' ? { toolName: request.toolName } : {}),
+      ...(typeof request.toolTitle === 'string' ? { toolTitle: request.toolTitle } : {}),
+      ...(typeof request.readOnly === 'boolean' ? { readOnly: request.readOnly } : {}),
+      ...(typeof request.managedApprovalRequired === 'boolean' ? { managedApprovalRequired: request.managedApprovalRequired } : {}),
+      respond: async (allowed) => {
+        await session.rpc.permissions.handlePendingPermissionRequest({
+          requestId,
+          result: allowed ? { kind: 'approve-once' } : { kind: 'reject' },
+        });
+      },
+    });
     markActivity('permission', '等待确认：' + kind);
     input.onStatus?.('这一步需要你的确认，请在提示出现后继续操作。');
     input.onTrajectory?.({
@@ -742,6 +837,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     throw e;
   } finally {
     clearInterval(heartbeat);
+    for (const [requestId, pending] of pendingCopilotPermissions) {
+      if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
+    }
     if (input.turnId) activeSessions.delete(input.turnId);
     offAssistantTurnStart();
     offMessageDelta();
