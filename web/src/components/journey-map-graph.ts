@@ -86,8 +86,7 @@ export function dedupeRoutes(
       route.target
       + '\u0000'
       + route.outcome.trim().toLowerCase()
-      + '\u0000'
-      + String(route.condition ?? '').trim();
+      ;
 
     if (seen.has(key)) return false;
     seen.add(key);
@@ -108,9 +107,6 @@ export function applyWorkflowChanges(
     ...definitionInput,
     nodes: definitionInput.nodes.map((node) => ({
       ...node,
-      tools: node.tools ? [...node.tools] : undefined,
-      requires: node.requires ? [...node.requires] : undefined,
-      produces: node.produces ? [...node.produces] : undefined,
       routes: dedupeRoutes(node.routes).map((route) => ({ ...route })),
     })),
   };
@@ -125,9 +121,6 @@ export function applyWorkflowChanges(
         }
         definition.nodes.push({
           ...change.node,
-          tools: change.node.tools ? [...change.node.tools] : undefined,
-          requires: change.node.requires ? [...change.node.requires] : undefined,
-          produces: change.node.produces ? [...change.node.produces] : undefined,
           routes: dedupeRoutes(change.node.routes).map((route) => ({ ...route })),
         });
         break;
@@ -164,7 +157,7 @@ export function applyWorkflowChanges(
           (item) => item.outcome.toLowerCase() === change.outcome.toLowerCase(),
         );
         if (!route) throw new Error('找不到分支：' + change.nodeId + '/' + change.outcome);
-        Object.assign(route, change.patch);
+        if (change.patch.target !== undefined) route.target = change.patch.target;
         node.routes = dedupeRoutes(node.routes);
         break;
       }
@@ -220,8 +213,7 @@ export function definitionFromGraph(
     routes.push({
       outcome: edge.data?.outcome || 'success',
       target: edge.target,
-      ...(edge.data?.condition ? { condition: edge.data.condition } : {}),
-    });
+     });
 
     routeBySource.set(edge.source, routes);
   }
@@ -236,13 +228,8 @@ export function definitionFromGraph(
         type: node.data.nodeType,
         title: node.data.title,
         objective: node.data.objective,
-        visible: node.data.visible,
-        completion: node.data.completion,
         actor: node.data.actor,
         completeWhen: node.data.completeWhen,
-        tools: source?.tools,
-        requires: node.data.requires ?? source?.requires,
-        produces: node.data.produces ?? source?.produces,
         routes: dedupeRoutes(routeBySource.get(node.id) ?? []),
         line: source?.line,
       };
@@ -297,7 +284,7 @@ function findConnectionIssues(
 
   for (const node of definition.nodes) {
     const isStart = definition.start === node.id;
-    const terminal = node.type === 'end' || node.type === 'stop';
+    const terminal = node.type === 'end';
     const incomingCount = incoming.get(node.id) ?? 0;
     const outgoingCount = outgoing.get(node.id) ?? 0;
 
