@@ -248,6 +248,22 @@ function deriveTrajectoryDiagnostics(events: TrajectoryEvent[]): {
     lastActivityType = event.type;
     lastActivity = event.name;
 
+    // 自动续跑会在多个 sendAndWait 阶段之间产生 session_idle。
+    // 只要 idle 后又出现新的模型/工具活动，就不能把这个 idle 当成本轮最终完成。
+    if (event.type === 'model_call'
+      || event.type === 'tool_call'
+      || event.type === 'tool_result'
+      || event.type === 'tool_progress'
+      || event.type === 'assistant_turn_start'
+      || event.type === 'user_input'
+      || event.type === 'permission'
+      || event.type === 'permission_completed'
+      || event.type === 'user_input_requested'
+      || event.type === 'user_input_completed') {
+      idleObserved = false;
+      terminalFailure = false;
+    }
+
     if (event.type === 'tool_call' && event.status === 'started') {
       const id = event.details.toolCallId;
       if (typeof id === 'string' && id) pendingTools.add(id);
@@ -276,10 +292,20 @@ function deriveTrajectoryDiagnostics(events: TrajectoryEvent[]): {
     }
 
     if (event.type === 'assistant_turn_end') assistantTurnEnded = true;
-    if (event.type === 'session_idle') idleObserved = true;
+    if (event.type === 'session_idle') {
+      idleObserved = true;
+      terminalFailure = false;
+    }
     // 工具失败、单次上下文整理失败并不一定终止整轮；Agent 可能捕获后继续。
     // 只有 turn-level error / session.error 才把整轮标成 failed。
-    if (event.type === 'error' || event.type === 'session_error') terminalFailure = true;
+    if (event.type === 'error' || event.type === 'session_error') {
+      terminalFailure = true;
+      idleObserved = false;
+    }
+    if (event.type === 'turn_end') {
+      idleObserved = true;
+      terminalFailure = false;
+    }
   }
 
   let state: TrajectorySummary['state'];
