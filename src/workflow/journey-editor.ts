@@ -58,7 +58,7 @@ export const JourneyLayoutSchema = z.object({
   version: z.literal(1),
   nodes: z.record(z.string(), JourneyLayoutNodeSchema),
   /** 当前使用的自动布局算法；旧 layout 可以没有这个字段。 */
-  engine: z.literal('workflow-v1').optional(),
+  engine: z.enum(['workflow-v1', 'workflow-v2']).optional(),
   viewport: z.object({
     x: z.number().finite(),
     y: z.number().finite(),
@@ -142,8 +142,8 @@ export async function loadJourneyRunEvents(name: string, limit = 80): Promise<Jo
 /**
  * 为没有历史坐标的 Workflow 生成初始布局。
  *
- * rank 只表达“从 start 大致经过多少层”；同层节点横向展开。
- * 这不是通用图布局算法，目的是给小型 Data Architect Workflow 一个稳定、好读的起点。
+ * rank 只表达“从 start 大致经过多少层”；真正的画布排版由前端 workflow-v2 算法负责。
+ * 这里仍提供一个稳定的兜底坐标，方便没有 Layout 文件时先生成合法数据。
  * 用户手动拖动后，坐标写入 layout 文件；再次打开时不应因为 Workflow runtime 改变而乱跳。
  */
 export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayout {
@@ -184,7 +184,7 @@ export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayo
     });
   }
 
-  return { version: 1, engine: 'workflow-v1', nodes };
+  return { version: 1, engine: 'workflow-v2', nodes };
 }
 
 /**
