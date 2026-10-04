@@ -53,11 +53,11 @@ interface JourneyMapInspectorProps {
   selectedNode?: FlowNode;
   selectedEdge?: FlowEdge;
   nodeDraft?: Partial<WorkflowNodeDefinition>;
-  edgeDraft?: { outcome: string; target: string; condition?: string };
+  edgeDraft?: { outcome: string; target: string };
   connectTargetId?: string;
   connectOutcome: string;
   setNodeDraft: React.Dispatch<React.SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
-  setEdgeDraft: React.Dispatch<React.SetStateAction<{ outcome: string; target: string; condition?: string } | undefined>>;
+  setEdgeDraft: React.Dispatch<React.SetStateAction<{ outcome: string; target: string } | undefined>>;
   setConnectTargetId: React.Dispatch<React.SetStateAction<string | undefined>>;
   setConnectOutcome: React.Dispatch<React.SetStateAction<string>>;
   applyNodeDraft: () => Promise<void>;
@@ -225,8 +225,7 @@ export function JourneyMapInspector({
                           options={[
                             { value: 'agent', label: 'Agent' },
                             { value: 'human', label: '人工' },
-                            { value: 'system', label: '系统' },
-                          ]}
+                           ]}
                           onChange={(value) =>
                             setNodeDraft({
                               ...nodeDraft,
