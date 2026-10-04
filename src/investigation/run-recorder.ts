@@ -51,9 +51,15 @@ export async function createRunRecorder(name: string, metadata: Record<string, u
   };
 
   await write('run_started', { runId, ...metadata });
+
+  const safeMetadata = redactRunRecording(metadata);
+  const manifestMetadata: Record<string, unknown> =
+    safeMetadata && typeof safeMetadata === 'object' && !Array.isArray(safeMetadata)
+      ? safeMetadata as Record<string, unknown>
+      : {};
   await fs.writeFile(
     path.join(directory, 'manifest.json'),
-    JSON.stringify({ runId, startedAt: new Date().toISOString(), ...redactRunRecording(metadata) }, null, 2) + '\n',
+    JSON.stringify({ runId, startedAt: new Date().toISOString(), ...manifestMetadata }, null, 2) + '\n',
     'utf8',
   );
 
