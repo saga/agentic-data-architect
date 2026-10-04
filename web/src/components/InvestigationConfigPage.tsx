@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; avatarPath?:string; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -163,7 +163,7 @@ export function InvestigationConfigPage(props:{
              />
            </Card>
            <Card title='头像' className='settings-card'>
-             <Flex align='center' gap={18} wrap>
+             <Flex align='flex-start' gap={18} wrap>
                <Avatar
                  shape='square'
                  src={
@@ -181,7 +181,7 @@ export function InvestigationConfigPage(props:{
                  }}
                />
                <div style={{minWidth:260,flex:'1 1 320px'}}>
-                 <Paragraph type='secondary'>上传大图后，先在裁剪框里拖动、缩放和裁剪；保存时会严格输出为当前设定的像素尺寸。</Paragraph>
+                 <Paragraph type='secondary'>可以上传任意数量的头像。每条秘书回复会随机选择一个头像；上传新的头像不会覆盖已有头像。</Paragraph>
                  <Flex gap={8} wrap>
                    <ImgCrop
                      aspect={draft.agent.avatarWidth / draft.agent.avatarHeight}
@@ -196,43 +196,49 @@ export function InvestigationConfigPage(props:{
                    >
                      <Upload
                        accept='image/png,image/jpeg,image/webp'
-                       maxCount={1}
                        showUploadList={false}
                        beforeUpload={(file) => {
                          void handleAvatarBeforeUpload(file);
                          return false;
                        }}
                      >
-                       <Button icon={<UploadOutlined />} loading={avatarUploading}>
-                         {draft.agent.avatarPath ? '更换头像' : '上传头像'}
-                       </Button>
+                       <Button icon={<UploadOutlined />} loading={avatarUploading}>上传头像</Button>
                      </Upload>
                    </ImgCrop>
                  </Flex>
+                 {(draft.agent.avatarPaths?.length ?? (draft.agent.avatarPath ? 1 : 0)) > 0 ? (
+                   <Flex wrap gap={8} style={{marginTop:12}}>
+                     {(draft.agent.avatarPaths ?? (draft.agent.avatarPath ? [draft.agent.avatarPath] : [])).map((avatarPath) => {
+                       const avatarId = avatarPath.split('/').pop()?.replace(/\.png$/i, '');
+                       return (
+                         <Avatar
+                           key={avatarPath}
+                           shape='square'
+                           src={avatarId
+                             ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
+                             : undefined}
+                           icon={<PictureOutlined />}
+                           style={{width:48,height:Math.round(48 * draft.agent.avatarHeight / draft.agent.avatarWidth),objectFit:'cover'}}
+                         />
+                       );
+                     })}
+                   </Flex>
+                 ) : null}
+                 <Text type='secondary' style={{display:'block',marginTop:8}}>
+                   已上传 {(draft.agent.avatarPaths?.length ?? (draft.agent.avatarPath ? 1 : 0))} 个头像
+                 </Text>
                </div>
              </Flex>
-             {avatarError ? (
-               <Alert type='error' showIcon title={avatarError} style={{marginTop:14}} />
-             ) : null}
+             {avatarError ? <Alert type='error' showIcon title={avatarError} style={{marginTop:14}} /> : null}
              <Divider style={{margin:'18px 0 14px'}} />
              <Flex gap={12} wrap>
                <div>
                  <div className='field-label'>输出宽度（像素）</div>
-                 <InputNumber
-                   min={40}
-                   max={800}
-                   value={draft.agent.avatarWidth}
-                   onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 180);})}
-                 />
+                 <InputNumber min={40} max={800} value={draft.agent.avatarWidth} onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 180);})} />
                </div>
                <div>
                  <div className='field-label'>输出高度（像素）</div>
-                 <InputNumber
-                   min={40}
-                   max={1200}
-                   value={draft.agent.avatarHeight}
-                   onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 240);})}
-                 />
+                 <InputNumber min={40} max={1200} value={draft.agent.avatarHeight} onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 240);})} />
                </div>
                <div style={{alignSelf:'end',paddingBottom:4}}>
                  <Text type='secondary'>默认 180 × 240。修改尺寸后，下一次裁剪按新的比例处理。</Text>
