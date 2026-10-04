@@ -1618,57 +1618,6 @@ body {
   font-weight: 700;
 }
 
-.journey-flow-edge {
-  stroke: #c9d2df;
-  stroke-width: 2;
-}
-
-.journey-flow-edge-current {
-  stroke: #1677ff;
-  stroke-width: 2.8;
-}
-
-.journey-flow-edge-traversed {
-  stroke: #52c41a;
-  stroke-width: 2.6;
-}
-
-.journey-flow-edge-path {
-  stroke: #c9d2df;
-  stroke-width: 2;
-}
-
-.journey-flow-edge-current .journey-flow-edge-path,
-.journey-flow-edge-current {
-  stroke: #1677ff;
-  stroke-width: 2.8;
-}
-
-.journey-flow-edge-label {
-  /* EdgeLabelRenderer 的坐标通过 transform 直接写在元素上。
-     必须脱离普通行内布局，否则多个标签会互相累加横向静态位置。 */
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  padding: 2px 6px;
-  border: 1px solid #e6eaf0;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.94);
-  color: rgba(0, 0, 0, 0.58);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  font-size: 10px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.journey-flow-edge-condition {
-  color: rgba(0, 0, 0, 0.46);
-}
-
 .journey-node-editor-toolbar {
   z-index: 20;
   padding: 4px;
@@ -1698,24 +1647,6 @@ body {
   font-weight: 600;
 }
 
-.journey-flow-handle-edit {
-  width: 11px !important;
-  height: 11px !important;
-  background: #1677ff !important;
-  border: 2px solid #fff !important;
-  box-shadow: 0 0 0 1px #1677ff, 0 1px 5px rgba(22, 119, 255, 0.25);
-  z-index: 5;
-}
-
-.journey-flow-node-new .journey-flow-handle-edit {
-  background: #fa8c16 !important;
-  box-shadow: 0 0 0 1px #fa8c16, 0 1px 5px rgba(250, 140, 22, 0.28);
-}
-
-.journey-flow-edge-label {
-  z-index: 10;
-}
-
 .journey-map-connect-box {
   display: flex;
   flex-direction: column;
@@ -1739,18 +1670,6 @@ body {
 
 .journey-map-editor-header .ant-btn {
   white-space: nowrap;
-}
-
-.journey-map-flow-wrap .react-flow__edge {
-  pointer-events: stroke;
-}
-
-.journey-map-flow-wrap .react-flow__handle {
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-
-.journey-map-flow-wrap .react-flow__handle:hover {
-  transform: translateY(-50%) scale(1.25);
 }
 
 
@@ -1780,31 +1699,6 @@ body {
   margin-inline-end: 0;
   align-self: flex-start;
   font-weight: 600;
-}
-
-.journey-flow-handle-readonly {
-  opacity: 1;
-  width: 7px !important;
-  height: 7px !important;
-  background: #b8c2cf !important;
-  border: 1px solid #fff !important;
-  box-shadow: 0 0 0 1px #b8c2cf;
-  pointer-events: none;
-}
-
-.journey-flow-node-current .journey-flow-handle-readonly {
-  background: #1677ff !important;
-  box-shadow: 0 0 0 1px #1677ff;
-}
-
-.journey-flow-node-connection-error .journey-flow-handle-readonly {
-  background: #ff4d4f !important;
-  box-shadow: 0 0 0 1px #ff4d4f;
-}
-
-.journey-flow-node-new .journey-flow-handle-readonly {
-  background: #fa8c16 !important;
-  box-shadow: 0 0 0 1px #fa8c16;
 }
 
 /* Locked mode is visually identical to edit mode's graph, but never exposes edit cursor/action affordances. */
@@ -1851,51 +1745,6 @@ body {
     0 7px 20px rgba(250, 173, 20, 0.10);
 }
 
-/* Readonly uses the exact same graph and handles as edit mode, but handles
-   are visual only because nodesConnectable/edgesReconnectable are disabled. */
-.journey-flow-handle-readonly {
-  opacity: 1;
-  width: 7px !important;
-  height: 7px !important;
-  background: #b8c2cf !important;
-  border: 1px solid #fff !important;
-  box-shadow: 0 0 0 1px #b8c2cf;
-  pointer-events: none;
-}
-
-.journey-flow-node-current .journey-flow-handle-readonly {
-  background: #1677ff !important;
-  box-shadow: 0 0 0 1px #1677ff;
-}
-
-.journey-flow-node-connection-error .journey-flow-handle-readonly {
-  background: #ff4d4f !important;
-  box-shadow: 0 0 0 1px #ff4d4f;
-}
-
-.journey-flow-node-connection-warning .journey-flow-handle-readonly {
-  background: #faad14 !important;
-  box-shadow: 0 0 0 1px #faad14;
-}
-
-.journey-flow-node-new.journey-flow-node-connection-error {
-  border: 2px dashed #ff4d4f !important;
-  background: #fff2f0 !important;
-}
-
-.journey-map-locked-mode .react-flow__node {
-  cursor: default !important;
-}
-
-.journey-map-locked-mode .journey-flow-edge-label {
-  cursor: default;
-}
-
-.journey-map-locked-mode .react-flow__edge {
-  pointer-events: none;
-}
-
-/* 独立子页面 ------------------------------------------------------------ */
 .subpage-app {
   /* AppInner 的父级不是 flex 容器，不能依赖 height: 100% 链式继承。
      用 viewport 锚定，保证工作地图/配置/轨迹页一定占满整个浏览器可视区域。 */
