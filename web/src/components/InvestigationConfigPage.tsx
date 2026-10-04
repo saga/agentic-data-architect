@@ -7,7 +7,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ permissionMode:'permission'|'allow_all'; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -84,7 +84,18 @@ export function InvestigationConfigPage(props:{
         </div>}
         {tab==='skills'&&<div className='settings-page'>
           <Title level={4}>Agent 指导</Title>
-          <Card title='Agent 权限' className='settings-card'>
+          <Card title='对话显示' className='settings-card'>
+             <Paragraph type='secondary'>这个名字只用于对话里的说话人标识和复制出来的聊天记录，不会改变 Agent 的实际角色或权限。</Paragraph>
+             <div className='field-label'>助手名称</div>
+             <Input
+               value={draft.agent.displayName}
+               maxLength={40}
+               showCount
+               placeholder='例如：秘书'
+               onChange={e=>update(next=>{next.agent.displayName=e.target.value;})}
+             />
+           </Card>
+           <Card title='Agent 权限' className='settings-card'>
             <Paragraph type='secondary'>决定 Agent 执行命令、读写文件或调用需要确认的工具时，是否先向你确认。</Paragraph>
             <div className='permission-mode-control'>
               <Radio.Group
