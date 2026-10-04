@@ -553,7 +553,7 @@ Validation
 
 因此，**你说的这个“全新的基于 LangChain + DeepAgents + LangSmith + Snowflake Semantic View 的金融 AI Agent Data Architect 方案”，应该增加第二条真实的 Markdown Workflow，而不是只增加一个散装 Skill。**
 
-而且刚才我已经创建的 `financial-ai-native-architecture/SKILL.md`，现在这个定位需要改：**保留 Skill，但里面应该加入固定的 `@flow/@task/@gate/@end` 工作路线。**
+而且刚才我已经创建的 `financial-ai-native-architecture/SKILL.md`，现在这个定位需要改：**保留 Skill，但里面应该加入固定的 `@flow/@task/@review/@end` 工作路线。**
 
 [1]: https://www.anthropic.com/engineering/building-effective-agents?rel=nofollow&utm_source=chatgpt.com "Building Effective AI Agents \ Anthropic"
 [2]: https://openai.github.io/openai-agents-python/multi_agent/?utm_source=chatgpt.com "Agent orchestration - OpenAI Agents SDK"
