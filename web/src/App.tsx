@@ -453,22 +453,6 @@ function AppInner() {
 
   const routeSession = () => routeInfo()?.session;
   const [page, setPage] = useState<'chat' | 'config' | 'trajectory' | 'journey'>(() => routeInfo()?.page ?? 'chat');
-  // 每条回复固定一个随机头像；配置或消息刷新时只为尚未分配的消息抽取一次，避免流式渲染过程中头像跳变。
-  const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const avatarPaths = current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
-    if (!avatarPaths.length) return;
-    const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
-    setAssistantAvatarByMessage((previous) => {
-      const next = { ...previous };
-      for (const message of assistantMessages) {
-        if (!next[message.id]) next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
-      }
-      return next;
-    });
-  }, [current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
-
-
   const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory' | 'journey') => {
     if (!active) return;
     const suffix = nextPage === 'chat' ? '' : '/' + nextPage;
@@ -493,6 +477,23 @@ function AppInner() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
   const [current, setCurrent] = useState<SessionData>();
+  // 每条回复固定一个随机头像；配置或消息刷新时只为尚未分配的消息抽取一次，避免流式渲染过程中头像跳变。
+  const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const avatarPaths = current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
+    if (!avatarPaths.length) return;
+    const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
+    setAssistantAvatarByMessage((previous) => {
+      const next = { ...previous };
+      for (const message of assistantMessages) {
+        if (!next[message.id]) next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
+      }
+      return next;
+    });
+  }, [current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
+
+
+
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
