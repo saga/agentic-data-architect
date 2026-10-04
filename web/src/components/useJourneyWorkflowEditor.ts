@@ -175,6 +175,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     void loadWorkflow();
   }, [loadWorkflow]);
 
+  /**
+   * 当前 Definition 是画布的语义投影，而不是另一份可独立保存的状态。
+   * 节点标题、节点类型、Edge outcome 等变化都必须经过这里重新组合。
+   */
   const currentDefinition = useMemo(() => {
     if (!snapshot) return undefined;
     return definitionFromGraph(nodes, edges, snapshot.definition);
@@ -227,12 +231,26 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     })),
   });
 
+  /**
+   * 保存一次完整画布快照给 Undo/Redo。
+   *
+   * history 只服务编辑器，不写入 Workflow 文件。它保存节点位置和图连接，
+   * 这样撤销“移动节点”和撤销“修改路线”都可以走同一条路径。
+   */
   const pushHistory = () => {
     setPast((items) => [...items.slice(-30), snapshotNow()]);
     setFuture([]);
     setDirty(true);
   };
 
+  /**
+   * 任何结构变化后的统一重建入口。
+   *
+   * 为什么不在各个按钮里分别 setNodes/setEdges：
+   * 1. Definition 必须重新成为唯一语义来源；
+   * 2. graph projection 会重新生成稳定 Port；
+   * 3. 自动排版只跑一次，避免不同编辑动作产生不同布局规则。
+   */
   const rebuildStructuralGraph = async (
     nextNodes: FlowNode[],
     nextEdges: FlowEdge[],
@@ -271,7 +289,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   // ---- Graph 编辑动作 ----------------------------------------------------
   /**
    * 在一个现有步骤后添加“下一步”或“分支步骤”。
-   * 结构变化之后统一走 Workflow -> graph -> ELK，保证节点和连接同步。
+   *
+   * 这里先修改 X6 的草稿图，再通过 definitionFromGraph() 回到 Workflow Definition，
+   * 最后重新投影和自动排版。不要直接维护“节点数组 + route 数组”两份业务状态。
    */
   const addNodeAfter = async (sourceId: string, branch: boolean) => {
     const currentSnapshot = snapshotRef.current;
@@ -530,6 +550,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setDirty(true);
   };
 
+  /** 将右侧属性编辑转换为 Workflow Definition，再重新投影为 X6 Graph。 */
   const applyNodeDraft = async () => {
     if (!selectedNode || !nodeDraft) return;
 
@@ -559,6 +580,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     await rebuildStructuralGraph(nextNodes, currentEdges);
   };
 
+  /** 将右侧 Edge 属性修改写回真实 outcome/target，不改变画布视觉语义。 */
   const applyEdgeDraft = async () => {
     if (!selectedEdge || !edgeDraft) return;
 
