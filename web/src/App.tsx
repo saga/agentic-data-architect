@@ -859,7 +859,7 @@ function AppInner() {
                   title="思考过程"
                   defaultExpanded={false}
                   loading={false}
-                  className="assistant-think"
+                  classNames={{ root: 'assistant-think' }}
                 >
                   <XMarkdown content={reasoningByMessage[message.id]} className="message-markdown x-markdown-light" />
                 </Think>
@@ -912,7 +912,7 @@ function AppInner() {
                 loading
                 defaultExpanded
                 blink
-                className="assistant-think"
+                classNames={{ root: 'assistant-think' }}
               >
                 <XMarkdown content={streamingReasoning} className="message-markdown x-markdown-light" />
               </Think>
@@ -926,7 +926,7 @@ function AppInner() {
       });
     }
     return items;
-  }, [active, assistantAvatarByMessage, current?.context.journeyPlan?.routes, current?.messages, executionStatus.state, loading, nextGuidance, streamingAnswer]);
+  }, [active, assistantAvatarByMessage, current?.context.journeyPlan?.routes, current?.messages, executionStatus.state, loading, nextGuidance, reasoningByMessage, streamingAnswer, streamingReasoning]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
@@ -1085,6 +1085,7 @@ function AppInner() {
         followUpQuestions: string[];
       } | undefined;
 
+      let streamedReasoning = '';
       await consumeSse(response, ({ event, data }) => {
         if (event === 'started') {
           setTurnStatus('助手正在处理你的问题，请稍候…');
@@ -1100,8 +1101,9 @@ function AppInner() {
         if (event === 'reasoning') {
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') {
+            streamedReasoning += delta;
             setTurnStatus('助手正在分析你的问题，请稍候…');
-            setStreamingReasoning((currentReasoning) => currentReasoning + delta);
+            setStreamingReasoning(streamedReasoning);
           }
           return;
         }
@@ -1129,10 +1131,10 @@ function AppInner() {
         refreshed = await loadSession(key);
         await reloadSessions(false);
       }
-      if (streamingReasoning.trim() && refreshed) {
+      if (streamedReasoning.trim() && refreshed) {
         const lastAssistant = [...refreshed.messages].reverse().find((item) => item.role === 'assistant');
         if (lastAssistant) {
-          setReasoningByMessage((items) => ({ ...items, [lastAssistant.id]: streamingReasoning }));
+          setReasoningByMessage((items) => ({ ...items, [lastAssistant.id]: streamedReasoning }));
         }
       }
 
