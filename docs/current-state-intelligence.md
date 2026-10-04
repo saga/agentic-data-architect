@@ -63,3 +63,45 @@ candidate != confirmed source of truth。业务权威仍由用户确认；只有
 ## Retrieval
 
 V1.2 不引入 vector database，先使用 SQLite FTS5、名称匹配、graph traversal、semantic assets、source-of-truth candidates 和 findings。
+## Local Analytical Plane（DuckDB）
+
+当前 Investigation 的本地数据分析统一使用 DuckDB，文件保持在 workspace，应用状态继续由 SQLite 保存。
+
+~~~text
+Uploaded / discovered files
+  CSV / JSON / JSONL / Parquet / XLSX
+              ↓
+       Dataset Registry
+              ↓
+        DuckDB local plane
+          ├─ raw views
+          ├─ analysis tables
+          └─ scratch tables
+              ↓
+      profile / query / transform
+              ↓
+       reconcile / explain
+              ↓
+            Evidence
+~~~
+
+几个重要能力：
+
+- `local_profile` 使用 DuckDB `SUMMARIZE`，一次得到列级 count、NULL 比例、approx unique、min/max、均值和近似分位数。
+- `local_reconcile` 用明确的 business keys 和 numeric measures 做 source/target 对账，结果可以直接进入 Validation。
+- `local_explain` 用 `EXPLAIN ANALYZE` 获取真实执行信息，用于 SQL / 迁移性能排查。
+- XLSX 文件通过 DuckDB Excel extension 进入同一 Dataset Registry；老式 XLS 不属于当前支持范围。
+- Parquet 作为推荐的分析中间格式，用于避免把大文件完整塞进模型上下文。
+
+DuckDB 仍然不是权限边界、业务真相或 Investigation State。Agent 只能通过受限的 `local_*` tools 使用已经登记的数据集，分析结果必须保留 Dataset version / SHA-256 / SQL / Evidence。
+
+## Investigation Skills
+
+当前 capability Skill 进一步分成四类：
+
+- `investigation-session`：维护多轮调查状态，区分事实、Evidence、推断和未知。
+- `domain-modeling`：当业务术语影响模型、Mapping 或架构决定时统一 canonical language，并关联 Evidence。
+- `research`：调查外部事实和第三方能力，优先使用第一方资料并留下可复核的 Research Artifact。
+- `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
+
+这些 Skill 不增加 Workflow DSL 的复杂度，也不替代权限、Policy 或业务审批。
