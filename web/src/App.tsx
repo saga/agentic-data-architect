@@ -77,6 +77,7 @@ interface InvestigationControl {
     importantDocuments: Array<{ id: string; title: string; reference: string }>;
   };
   agent: {
+    permissionMode: 'permission' | 'allow_all';
     systemPrompt: {
       version: number;
       content: string;
@@ -108,6 +109,24 @@ interface AuditEvent {
   summary: string;
   configurationVersion?: number;
   details?: Record<string, unknown>;
+}
+
+interface PendingPermission {
+  sessionName: string;
+  turnId: string;
+  sessionId: string;
+  requestId: string;
+  kind: string;
+  requestedAt: string;
+  intention?: string;
+  fullCommandText?: string;
+  fileName?: string;
+  path?: string;
+  serverName?: string;
+  toolName?: string;
+  toolTitle?: string;
+  readOnly?: boolean;
+  managedApprovalRequired?: boolean;
 }
 
 type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
@@ -400,6 +419,7 @@ function AppInner() {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
+  const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
@@ -476,6 +496,28 @@ function AppInner() {
     setAttachments(existing);
   };
 
+  /** 拉取当前 Agent 正在等待的权限请求；权限只存在进程运行态，不写入调查配置。 */
+  const loadPendingPermissions = async (key: string) => {
+    try {
+      const result = await getJson<{ permissions: PendingPermission[] }>(
+        `/api/sessions/${encodeURIComponent(key)}/permissions`,
+      );
+      if (key === activeRef.current) setPendingPermissions(result.permissions);
+    } catch {
+      // Agent 未运行或服务刚重启时这里可能暂时不可用，不打断主对话。
+    }
+  };
+
+  useEffect(() => {
+    if (!active) return;
+    void loadPendingPermissions(active);
+    if (!loading) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void loadPendingPermissions(active);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [active, loading]);
+
   useEffect(() => {
     const onPopState = () => {
       const routed = routeInfo();
@@ -493,6 +535,7 @@ function AppInner() {
     setStreamingAnswer(undefined);
     setNextGuidance([]);
     setJourney(undefined);
+    setPendingPermissions([]);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -585,6 +628,28 @@ function AppInner() {
     }).catch(() => undefined);
 
     activeTurn.controller.abort();
+  };
+
+  const respondToPermission = async (permission: PendingPermission, allowed: boolean) => {
+    if (permission.sessionName !== active) return;
+    try {
+      await getJson<{ ok: true }>(
+        `/api/sessions/${encodeURIComponent(permission.sessionName)}/permissions/respond`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            turnId: permission.turnId,
+            requestId: permission.requestId,
+            allowed,
+          }),
+        },
+      );
+      setPendingPermissions((items) => items.filter((item) => item.requestId !== permission.requestId));
+      setTurnStatus(allowed ? '已允许这次操作，助手继续处理…' : '已拒绝这次操作，助手会继续处理…');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法处理权限请求');
+    }
   };
 
   const send = async (text?: string, routeId?: string) => {
@@ -1020,6 +1085,58 @@ function AppInner() {
               </Card>
             ) : null}
 
+            {pendingPermissions.length ? (
+              <div className="pending-permission-list">
+                {pendingPermissions.map((permission) => {
+                  const target =
+                    permission.fullCommandText
+                    ?? permission.fileName
+                    ?? permission.path
+                    ?? (permission.serverName && permission.toolName
+                      ? `${permission.serverName} / ${permission.toolName}`
+                      : permission.toolName
+                        ?? permission.toolTitle);
+                  return (
+                    <Alert
+                      key={permission.requestId}
+                      type="warning"
+                      showIcon
+                      title={
+                        <Flex align="center" justify="space-between" gap={8} wrap>
+                          <span>Agent 需要执行操作</span>
+                          <Tag color="orange">{permission.kind}</Tag>
+                        </Flex>
+                      }
+                      description={
+                        <Flex vertical gap={6}>
+                          {permission.intention ? <Text>{permission.intention}</Text> : null}
+                          {target ? <Text type="secondary"><code>{target}</code></Text> : null}
+                          {permission.readOnly !== undefined ? (
+                            <Text type="secondary">{permission.readOnly ? '只读操作' : '可能修改文件或数据'}</Text>
+                          ) : null}
+                          <Space>
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={() => void respondToPermission(permission, true)}
+                            >
+                              允许这次操作
+                            </Button>
+                            <Button
+                              size="small"
+                              danger
+                              onClick={() => void respondToPermission(permission, false)}
+                            >
+                              拒绝
+                            </Button>
+                          </Space>
+                        </Flex>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
             <div className="composer">
               {attachmentItems.length ? (
                 <div className="composer-files">
