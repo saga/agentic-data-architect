@@ -273,7 +273,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 已完成
               </Tag>
               <Text type="secondary">
-                当前执行位置：{snapshot.state.currentNodeId}
+                当前执行位置：{snapshot.execution.currentNodeId}
               </Text>
             </Flex>
 
