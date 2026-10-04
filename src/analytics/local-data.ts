@@ -235,13 +235,24 @@ function normalizeRelativePath(value: string): string {
   return normalized;
 }
 
-function absoluteDatasetPath(sessionName: string, relativePath: string): string {
+function absoluteDatasetPath(sessionName: string, relativePath: string, allowMissing = false): string {
   const root = path.resolve(workspaceRoot(sessionName));
   const normalized = normalizeRelativePath(relativePath);
   const resolved = path.resolve(root, normalized);
   if (resolved !== root && !resolved.startsWith(root + path.sep)) {
     throw new Error('本地数据路径超出当前 Investigation workspace。');
   }
+
+  // 防止 workspace 内的符号链接把 Agent 带到 workspace 外读取数据。
+  if (!allowMissing) {
+    const realRoot = fsSync.realpathSync(root);
+    const realPath = fsSync.realpathSync(resolved);
+    if (realPath !== realRoot && !realPath.startsWith(realRoot + path.sep)) {
+      throw new Error('本地数据路径不能通过符号链接离开当前 Investigation workspace。');
+    }
+    return realPath;
+  }
+
   return resolved;
 }
 
@@ -960,7 +971,7 @@ class LocalDuckDBEngine {
       await this.refreshViews();
       const safeSql = validateLocalReadOnlySql(sql);
       const output = outputRelativePath(relativePath);
-      const absolute = absoluteDatasetPath(this.sessionName, output);
+      const absolute = absoluteDatasetPath(this.sessionName, output, true);
       await fs.mkdir(path.dirname(absolute), { recursive: true });
 
       const started = Date.now();
