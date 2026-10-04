@@ -26,18 +26,15 @@ import type {
   WorkflowNodeDefinition,
   WorkflowNodeType,
   WorkflowActor,
-  CompletionMode,
-} from './journey-map-types.js';
+ } from './journey-map-types.js';
 
 const { Text } = Typography;
 
 const NODE_TYPE_LABEL: Record<WorkflowNodeType, string> = {
   task: '任务',
-  gate: '判断点',
-  review: '评审',
+   review: '评审',
   end: '完成',
-  stop: '停止',
-};
+ };
 
 /** 两个 Tab 共用同一套标签结构（Badge 只在有未处理事项时打点），切 Tab 时表头不再跳动。 */
 function tabLabel(icon: React.ReactNode, text: string, dot: boolean) {
@@ -210,10 +207,8 @@ export function JourneyMapInspector({
                           style={{ width: '100%' }}
                           options={[
                             { value: 'task', label: '任务' },
-                            { value: 'gate', label: '判断点' },
                             { value: 'review', label: '评审' },
                             { value: 'end', label: '完成' },
-                            { value: 'stop', label: '停止' },
                           ]}
                           onChange={(value) =>
                             setNodeDraft({
@@ -241,24 +236,7 @@ export function JourneyMapInspector({
                       </div>
                     </div>
 
-                    <div>
-                      <Text type="secondary">完成方式</Text>
-                      <Select
-                        value={nodeDraft.completion}
-                        style={{ width: '100%' }}
-                        options={[
-                          { value: 'agent', label: 'Agent 判断结果' },
-                          { value: 'deterministic', label: '确定性条件' },
-                        ]}
-                        onChange={(value) =>
-                          setNodeDraft({
-                            ...nodeDraft,
-                            completion: value as CompletionMode,
-                          })}
-                      />
-                    </div>
-
-                    {nodeDraft.completion === 'deterministic' ? (
+                    {nodeDraft.completeWhen !== undefined ? (
                       <div>
                         <Text type="secondary">completeWhen</Text>
                         <Input
@@ -272,44 +250,6 @@ export function JourneyMapInspector({
                         />
                       </div>
                     ) : null}
-                  </Flex>
-                ),
-              },
-              {
-                key: 'dependencies',
-                label: '依赖与产出',
-                children: (
-                  <Flex vertical gap={10}>
-                    <div>
-                      <Text type="secondary">前置成果</Text>
-                      <Input
-                        value={nodeDraft.requires?.join(', ') ?? ''}
-                        placeholder="例如 current-state, evidence"
-                        onChange={(event) =>
-                          setNodeDraft({
-                            ...nodeDraft,
-                            requires: event.target.value
-                              .split(',')
-                              .map((item) => item.trim())
-                              .filter(Boolean),
-                          })}
-                      />
-                    </div>
-                    <div>
-                      <Text type="secondary">产出成果</Text>
-                      <Input
-                        value={nodeDraft.produces?.join(', ') ?? ''}
-                        placeholder="例如 target, validation"
-                        onChange={(event) =>
-                          setNodeDraft({
-                            ...nodeDraft,
-                            produces: event.target.value
-                              .split(',')
-                              .map((item) => item.trim())
-                              .filter(Boolean),
-                          })}
-                      />
-                    </div>
                   </Flex>
                 ),
               },
@@ -339,7 +279,7 @@ export function JourneyMapInspector({
 
                     <Input
                       value={connectOutcome}
-                      placeholder="success / retry / needs-input"
+                      placeholder="success / failed / retry"
                       onChange={(event) => setConnectOutcome(event.target.value)}
                       addonBefore="outcome"
                     />
@@ -436,19 +376,6 @@ export function JourneyMapInspector({
                 setEdgeDraft({
                   ...edgeDraft,
                   target: value,
-                })}
-            />
-          </div>
-
-          <div>
-            <Text type="secondary">条件</Text>
-            <Input
-              value={edgeDraft.condition ?? ''}
-              placeholder="可选，例如 current-state"
-              onChange={(event) =>
-                setEdgeDraft({
-                  ...edgeDraft,
-                  condition: event.target.value,
                 })}
             />
           </div>
