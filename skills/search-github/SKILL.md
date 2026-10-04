@@ -11,6 +11,11 @@ metadata:
 
 ## 访问方式
 
+如果当前 Investigation 的目标或研究范围明确给出了 GitHub repository，优先调用工作台提供的 `research_github_repository`：它会把仓库放进当前 Investigation workspace 并自动跑一次 Discovery。之后再用 GitHub Tool、grep、view、Graphify 深入检查关键实现。
+
+`research_github_repository` 解决的是“把仓库纳入本次调查并生成可引用 Evidence”；GitHub Tool 仍用于更灵活的跨文件/Issue/PR 搜索。
+
+
 除非用户已经指定，否则开始研究时只问一次：
 
 1. 直接使用 GitHub Tool，通过 repository URL/API 读取。
@@ -38,6 +43,7 @@ metadata:
 ## 纪律
 
 - GitHub 代码是实现证据，不是业务真相。
+- 对关键代码关系（REST → Service → Entity → Table、配置、DAO、SQL 等），先查看实际源码，再用 `record_code_evidence` 保存文件和行号；不要只引用搜索结果或 Graphify 路径。
 - GitHub / view / grep / bash 的原始结果可以用于当前调查推理；需要作为最终 Claim 的依据时，必须通过 Discovery 或其他确定性能力沉淀为 Evidence。
 - README / architecture doc 是文档证据。
 - Issue / PR 是讨论证据，要记录状态和时间。
