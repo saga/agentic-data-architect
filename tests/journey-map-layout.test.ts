@@ -49,7 +49,7 @@ function edge(
   };
 }
 
-test('workflow layout keeps the main path horizontal and branch nodes off the main line', () => {
+test('workflow layout keeps the main path vertical and branch nodes off the main line', () => {
   const nodes = [node('a'), node('b'), node('c'), node('d')];
   const edges = [
     edge('a-b', 'a', 'b', 'success'),
@@ -61,11 +61,11 @@ test('workflow layout keeps the main path horizontal and branch nodes off the ma
   const result = layoutWorkflow(nodes, edges);
   const byId = new Map(result.map((item) => [item.id, item]));
 
-  assert.equal(byId.get('a')!.position.y, byId.get('b')!.position.y);
-  assert.equal(byId.get('b')!.position.y, byId.get('d')!.position.y);
-  assert.notEqual(byId.get('c')!.position.y, byId.get('a')!.position.y);
-  assert.ok(byId.get('b')!.position.x > byId.get('a')!.position.x);
-  assert.ok(byId.get('c')!.position.x > byId.get('a')!.position.x);
+  assert.equal(byId.get('a')!.position.x, byId.get('b')!.position.x);
+  assert.equal(byId.get('b')!.position.x, byId.get('d')!.position.x);
+  assert.notEqual(byId.get('c')!.position.x, byId.get('a')!.position.x);
+  assert.ok(byId.get('b')!.position.y > byId.get('a')!.position.y);
+  assert.ok(byId.get('c')!.position.y > byId.get('a')!.position.y);
 });
 
 test('loop edges do not change forward ranks', () => {
