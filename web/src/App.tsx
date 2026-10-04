@@ -362,14 +362,18 @@ function ChatMessageMeta(props: { speaker: string; capturedAt: string }) {
   );
 }
 
+/** Agent 头像单独放在 Bubble 的 avatar 插槽，不进入回答气泡内容。
+ * 这样头像可以按原始配置比例显示更大，而回答正文仍保持独立、可读的内容区域。
+ */
 function AssistantAvatar(props: {
   sessionName: string;
   control: InvestigationControl;
 }) {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
-  const displayWidth = 34;
-  const displayHeight = Math.max(34, Math.min(68, Math.round(displayWidth * height / width)));
+  // 聊天区展示尺寸控制在可读范围，实际上传图片仍严格保持配置的像素尺寸。
+  const displayWidth = Math.min(120, width);
+  const displayHeight = Math.round(displayWidth * height / width);
   return (
     <Avatar
       shape="square"
@@ -382,8 +386,8 @@ function AssistantAvatar(props: {
       style={{
         width: displayWidth,
         height: displayHeight,
-        flex: '0 0 auto',
         objectFit: 'cover',
+        flex: '0 0 auto',
       }}
     />
   );
@@ -674,17 +678,18 @@ function AppInner() {
       return {
         key: message.id,
         role: message.role,
+        ...(message.role === 'assistant'
+          ? { avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} /> }
+          : {}),
         content:
           message.role === 'assistant' ? (
-            <div className="assistant-chat-row">
-              <AssistantAvatar sessionName={current!.context.name} control={current!.control} />
-              <div className="assistant-message-content">
-                <ChatMessageMeta
-                  speaker={current!.control.agent.displayName?.trim() || '秘书'}
-                  capturedAt={message.capturedAt}
-                />
-                <ChatMarkdown content={message.content} />
-                {showActions ? (
+            <div className="assistant-message-content">
+              <ChatMessageMeta
+                speaker={current!.control.agent.displayName?.trim() || '秘书'}
+                capturedAt={message.capturedAt}
+              />
+              <ChatMarkdown content={message.content} />
+              {showActions ? (
                 <AssistantActionBar
                   routeOptions={current?.context.journeyPlan?.routes ?? []}
                   followUpQuestions={guidance ?? []}
@@ -692,8 +697,7 @@ function AppInner() {
                   onSelectRoute={(routeId) => void send(undefined, routeId)}
                   onAsk={(question) => void send(question, undefined, true)}
                 />
-                ) : null}
-              </div>
+              ) : null}
             </div>
           ) : (
             <div className="user-message-content">
@@ -709,10 +713,9 @@ function AppInner() {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
+        avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
         content: (
-          <div className="assistant-chat-row">
-            <AssistantAvatar sessionName={current!.context.name} control={current!.control} />
-            <div className="assistant-message-content">
+          <div className="assistant-message-content">
               <ChatMessageMeta
                 speaker={current!.control.agent.displayName?.trim() || '秘书'}
                 capturedAt={new Date().toISOString()}
