@@ -426,7 +426,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       datasets,
       engine: {
         type: 'duckdb',
-        databaseFile: path.relative(workspaceRoot(name), path.join(workspaceRoot(name), 'analysis.duckdb')),
+        databaseFile: path.relative(workspaceRoot(name), path.join(workspaceRoot(name), 'local.duckdb')),
       },
     });
   });
