@@ -197,6 +197,26 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
       )}
 
       {!terminal
+        ? data.sourceHandles.map((handle, index) => {
+            const positionStyle = handleStyle(index, data.sourceHandles.length);
+            const outcome = handle.label.trim();
+
+            return (
+              <span
+                key={handle.id + '-label'}
+                className="journey-flow-source-label"
+                style={{
+                  top: positionStyle.top,
+                }}
+                aria-hidden="true"
+              >
+                {outcome}
+              </span>
+            );
+          })
+        : null}
+
+      {!terminal
         ? data.sourceHandles.map((handle, index) => (
             <Handle
               key={handle.id}
@@ -206,7 +226,7 @@ export function JourneyFlowNode({ id, data, selected }: NodeProps<FlowNode>) {
               className="journey-flow-handle journey-flow-handle-edit"
               style={{
                 ...handleStyle(index, data.sourceHandles.length),
-                // Handle 仍可用于拖线，但视觉上完全透明；方向由连线本身的 source dot + target arrow 表示。
+                // Handle 继续保留为真正的拖线热区，但视觉上完全透明。
                 opacity: 0,
                 background: 'transparent',
                 border: 0,
