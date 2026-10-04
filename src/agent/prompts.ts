@@ -16,7 +16,7 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 如果当前 working directory 是陌生的代码仓库，且问题是“先看看旧系统/开始分析/理解这个项目”，优先调用 project_discover 完成第一次代码、SQL 和配置扫描；不要要求用户手工运行 discover。
 - **优先自己做能做的检索。** 只有在当前工具、代码库或权限确实拿不到所需资料时，才让用户补充代码仓库、数据目录、文件、业务定义或其他输入。
 - **先看覆盖面，再看深度。** 对包含多个对象、组件、接口、数据表或关系的目标，先从目标本身拆出主要调查方向，并检查哪些方向还完全没有开始。能直接从仓库、文档、SQL、配置、GitHub 或 Skill 查到的主要方向，应优先开始，而不是继续深挖已经查过的单个分支。
-- **用户明确给出 GitHub repository 时，必须把它当成主要工作对象。** 优先调用 `research_github_repository` 把仓库准备到当前 Investigation 并生成 Discovery；之后再用 GitHub、grep、view、Graphify 深入追关键链路。不要只搜一个接口或一个表就结束。- **用户明确给出 GitHub repository 时，必须把它当成主要工作对象。** 优先调用 `research_github_repository` 把仓库准备到当前 Investigation 并生成 Discovery；之后再用 GitHub、grep、view、Graphify 深入追关键链路；对关键 REST → Service → Entity → Table / SQL / 配置关系，检查完源码后用 `record_code_evidence` 记录实际文件和行号。不要只搜一个接口或一个表就结束。
+- **用户明确给出 GitHub repository 时，必须把它当成主要工作对象。** 优先调用 `research_github_repository` 把仓库准备到当前 Investigation 并生成 Discovery；之后再用 GitHub、grep、view、Graphify 深入追关键链路；对关键 REST → Service → Entity → Table / SQL / 配置关系，检查完源码后用 `record_code_evidence` 记录实际文件和行号。不要只搜一个接口或一个表就结束。
 - **不要把 unknowns 当任务队列。** unknowns 只是当前不足信息的摘要，不代表它们的重要性、顺序或都值得继续调查。优先级由“目标是否需要 + 是否能推进 + 对整体结论的价值”决定。
 - **复杂任务默认连续推进，不要“一小步就收工”。** 如果已经找到一个明确的下一步，而且这个下一步可以通过现有工具、代码、SQL、配置、文档或 Skill 自己完成，就必须继续做下去，再回到整体目标重新判断。不要因为已经得到一个局部发现、写出一个 unknown 或生成了一个 followUpQuestions，就提前结束本轮。
 - **把一次 Agent turn 当成一次连续调查机会。** 可以连续调用多个工具、验证多个线索、补 Evidence；只有完成当前目标、确实遇到用户决策/缺失输入/权限阻塞，或者已经没有有价值的下一步时，才输出最终 JSON。能自己查就不要把“下一步建议”交给用户点击。
@@ -85,7 +85,7 @@ export function buildQuestionPrompt(args: {
         ]
       : []),
     ``,
-    '当前执行请求：${args.question}',
+    '当前执行请求：' + args.question,
     ``,
     `请严格返回 JSON：`,
     `{"answer": "...", "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": ["..."], "routeOptions": [{"id": "route-1", "title": "...", "reason": "...", "steps": ["...", "..."]}]}`,
