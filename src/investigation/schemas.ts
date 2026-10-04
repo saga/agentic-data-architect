@@ -159,6 +159,10 @@ export const PlatformCapabilitySettingSchema = z.object({
 export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySettingSchema>;
 
 export const ControlAgentSchema = z.object({
+  /** 每个 Investigation 当前使用的模型；默认由 Auto 自动选择。 */
+  model: z.string().trim().min(1).max(200).default('auto'),
+  /** Auto 模式下的路由偏好；不设置时使用 Copilot 当前默认选择。 */
+  autoTier: z.enum(['efficiency', 'balance', 'intelligence', 'fast']).optional(),
   /** permission = 每次危险工具操作由前端确认；allow_all = 每次请求自动批准。 */
   permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
   /** 本轮 Agent 自己认为阶段完成后，最多再自动推进多少阶段；0 表示不自动续跑。 */
