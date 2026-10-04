@@ -94,6 +94,8 @@ export function InvestigationConfigPage(props:{
       const resized = await resizeAvatarToTarget(file);
       const body = new FormData();
       body.append('file', resized, 'avatar.png');
+      body.append('width', String(draft.agent.avatarWidth));
+      body.append('height', String(draft.agent.avatarHeight));
 
       const response = await fetch(
         `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar`,
@@ -167,8 +169,9 @@ export function InvestigationConfigPage(props:{
                  }
                  icon={<PictureOutlined />}
                  style={{
-                   width: 96,
-                   height: 96,
+                   width: 72,
+                   height: Math.round(72 * draft.agent.avatarHeight / draft.agent.avatarWidth),
+                   maxHeight: 180,
                    flex: '0 0 auto',
                    objectFit: 'cover',
                  }}
