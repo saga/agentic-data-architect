@@ -167,9 +167,45 @@ function getRegistryDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS idx_local_analysis_runs_session
       ON local_analysis_runs(session_name, created_at);
   `);
+
+  // SQLite 不会因为 CREATE TABLE IF NOT EXISTS 自动更新旧 CHECK constraint。
+  // 已有用户的 conversations.db 可能还只允许 csv/json/jsonl/parquet，或旧的 analysis_runs operation 集合。
+  // 因此这里做一次很小的兼容迁移，避免新版本第一次读取 XLSX / reconcile / explain 时才爆错。
+  migrateLocalAnalyticsSchema(registryDb);
   return registryDb;
 }
 
+/** 把历史 Dataset Registry / Analysis Run 表迁移到当前 CHECK constraint；只执行一次。 */
+function migrateLocalAnalyticsSchema(db: DatabaseSync): void {
+  const datasetSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'local_datasets'").get() as { sql?: string } | undefined;
+  const runsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'local_analysis_runs'").get() as { sql?: string } | undefined;
+  const datasetNeedsMigration = Boolean(datasetSchema?.sql && !datasetSchema.sql.includes("'xlsx'"));
+  const runsNeedsMigration = Boolean(runsSchema?.sql && (!runsSchema.sql.includes("'explain'") || !runsSchema.sql.includes("'reconcile'")));
+
+  if (!datasetNeedsMigration && !runsNeedsMigration) return;
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if (datasetNeedsMigration) {
+      db.exec("CREATE TABLE local_datasets_migrating (id TEXT PRIMARY KEY, session_name TEXT NOT NULL, name TEXT NOT NULL, relative_path TEXT NOT NULL, format TEXT NOT NULL CHECK (format IN ('csv','json','jsonl','parquet','xlsx')), relation TEXT NOT NULL UNIQUE, version INTEGER NOT NULL, sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, UNIQUE(session_name, relative_path)) STRICT");
+      db.exec("INSERT INTO local_datasets_migrating SELECT id, session_name, name, relative_path, format, relation, version, sha256, size_bytes, updated_at FROM local_datasets");
+      db.exec('DROP TABLE local_datasets');
+      db.exec('ALTER TABLE local_datasets_migrating RENAME TO local_datasets');
+    }
+    if (runsNeedsMigration) {
+      db.exec("CREATE TABLE local_analysis_runs_migrating (id TEXT PRIMARY KEY, session_name TEXT NOT NULL, operation TEXT NOT NULL CHECK (operation IN ('catalog','describe','sample','profile','query','transform','export','explain','reconcile')), dataset_id TEXT, sql TEXT NOT NULL, sql_hash TEXT NOT NULL, row_count INTEGER, duration_ms INTEGER NOT NULL, evidence_id TEXT, created_at TEXT NOT NULL) STRICT");
+      db.exec('INSERT INTO local_analysis_runs_migrating SELECT id, session_name, operation, dataset_id, sql, sql_hash, row_count, duration_ms, evidence_id, created_at FROM local_analysis_runs');
+      db.exec('DROP TABLE local_analysis_runs');
+      db.exec('ALTER TABLE local_analysis_runs_migrating RENAME TO local_analysis_runs');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_local_datasets_session ON local_datasets(session_name, updated_at)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_local_analysis_runs_session ON local_analysis_runs(session_name, created_at)');
+    db.exec('COMMIT');
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch { /* ignore rollback failure */ }
+    throw error;
+  }
+}
 
 function datasetRowToModel(row: DatasetRow): LocalDataset {
   return {
