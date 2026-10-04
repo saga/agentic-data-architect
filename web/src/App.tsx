@@ -371,9 +371,10 @@ function AssistantAvatar(props: {
 }) {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
-  // 聊天区展示尺寸控制在可读范围，实际上传图片仍严格保持配置的像素尺寸。
-  const displayWidth = Math.min(120, width);
-  const displayHeight = Math.round(displayWidth * height / width);
+  // 聊天区按配置尺寸显示；配置 300 × 300 就实际显示 300 × 300。
+  // 上传文件的像素尺寸和聊天区展示尺寸是同一组配置，避免“配置很大但界面被偷偷缩小”的误解。
+  const displayWidth = width;
+  const displayHeight = height;
   return (
     <Avatar
       shape="square"
@@ -679,7 +680,18 @@ function AppInner() {
         key: message.id,
         role: message.role,
         ...(message.role === 'assistant'
-          ? { avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} /> }
+          ? {
+              avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
+              // Bubble 的 avatar 外层默认有自己的尺寸；这里一起覆盖，否则大头像会被外层压缩。
+              styles: {
+                avatar: {
+                  width: Math.max(40, current!.control.agent.avatarWidth || 180),
+                  height: Math.max(40, current!.control.agent.avatarHeight || 240),
+                  flex: '0 0 auto',
+                  alignSelf: 'flex-start',
+                },
+              },
+            }
           : {}),
         content:
           message.role === 'assistant' ? (
@@ -714,6 +726,15 @@ function AppInner() {
         key: 'streaming-assistant',
         role: 'assistant',
         avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
+        // 流式回答也必须同步调整 Bubble 的 avatar 外层尺寸。
+        styles: {
+          avatar: {
+            width: Math.max(40, current!.control.agent.avatarWidth || 180),
+            height: Math.max(40, current!.control.agent.avatarHeight || 240),
+            flex: '0 0 auto',
+            alignSelf: 'flex-start',
+          },
+        },
         content: (
           <div className="assistant-message-content">
             <ChatMessageMeta
