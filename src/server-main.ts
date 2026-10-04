@@ -14,11 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
 
 async function main(): Promise<void> {
-  // 必须先安装 Permission bridge，再动态加载 server/copilot 依赖；否则静态 import
-  // 会先初始化 CopilotClient，bridge 就无法接管默认 permission handler。
   await import('./agent/copilot-permission-bridge.js');
   const { createApp } = await import('./server.js');
   const { closeConversationStore, recoverRunningConversationTurns } = await import('./investigation/conversation.js');
+  const { getActiveInvestigationTurn } = await import('./workflow/ask.js');
   const { closeLocalAnalytics } = await import('./analytics/local-data.js');
   const { stopClient } = await import('./agent/copilot.js');
 
@@ -33,15 +32,25 @@ async function main(): Promise<void> {
     });
   }
 
-  // 持久化数据库里的 running 只代表“上一次进程曾经开始过”，不能代表新进程仍有
-  // 一个真实的 active turn。Copilot session 目前没有在这里做自动 resume，因此启动时
-  // 必须把遗留 running turn 收敛为 aborted，前端才能正确显示“已中断”而不是“仍在执行”。
   const interruptedTurns = recoverRunningConversationTurns();
   if (interruptedTurns > 0) {
     console.warn('Marked ' + interruptedTurns + ' stale investigation turn(s) as interrupted after server restart.');
   }
 
   const app = createApp(vite);
+
+  // 返回当前 Node.js 进程真正持有的 active turn，而不是 SQLite/trajectory 的历史 running 状态。
+  // 页面刷新、Vite HMR 都不会改变这个状态。
+  app.get('/api/sessions/:name/execution', (req, res) => {
+    const name = path.basename(String(req.params.name));
+    const active = getActiveInvestigationTurn(name);
+    res.json({
+      running: Boolean(active),
+      turnId: active?.turnId ?? null,
+      phase: active?.phase ?? null,
+    });
+  });
+
   const server = createHttpServer(app);
   server.listen(config.port, config.host, () => {
     console.log(
