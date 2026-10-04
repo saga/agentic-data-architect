@@ -109,7 +109,7 @@ export function InvestigationConfigPage(props:{
               />
             ) : (
               <Text type='secondary' style={{display:'block',marginTop:10}}>
-                Agent 需要执行 shell、写文件等受控操作时，会在主对话区显示具体操作和“允许 / 拒绝”按钮。
+                Agent 需要执行 shell、写文件等受控操作时，会在主对话区显示具体操作；还可以选择“后续都允许”，让当前 Copilot Session 不再反复询问。
               </Text>
             )}
           </Card>
