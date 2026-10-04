@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto';
 import {
   closeLocalAnalytics,
   localQuery,
+  localExplain,
+  localReconcile,
   localTransform,
   localExportParquet,
   registerLocalDataset,
@@ -32,6 +34,49 @@ test('local SQL only permits read-only single statements', () => {
   );
 });
 
+test('DuckDB reconciliation and explain produce deterministic Evidence', async () => {
+  const sessionName = 'test-reconcile-' + randomUUID().slice(0, 8);
+  const sessionRoot = path.resolve('.workspace', sessionName);
+  const uploadsDir = path.join(sessionRoot, 'uploads');
+  await fs.mkdir(uploadsDir, { recursive: true });
+
+  try {
+    await fs.writeFile(path.join(uploadsDir, 'source.csv'), 'security_id,quantity\nAAPL,10\nMSFT,5\n', 'utf8');
+    await fs.writeFile(path.join(uploadsDir, 'target.csv'), 'security_id,quantity\nAAPL,11\nMSFT,5\n', 'utf8');
+
+    const source = await registerLocalDataset(sessionName, 'uploads/source.csv', 'Source');
+    const target = await registerLocalDataset(sessionName, 'uploads/target.csv', 'Target');
+    const reconciliation = await localReconcile(
+      sessionName,
+      source.relation,
+      target.relation,
+      ['security_id'],
+      ['quantity'],
+    );
+
+    assert.equal(reconciliation.source.rowCount, 2);
+    assert.equal(reconciliation.target.rowCount, 2);
+    assert.equal(reconciliation.sourceDuplicateGroups, 0);
+    assert.equal(reconciliation.targetDuplicateGroups, 0);
+    assert.equal(reconciliation.missingRows, 0);
+    assert.equal(reconciliation.extraRows, 0);
+    assert.equal(reconciliation.matchRate, 1);
+    assert.equal(reconciliation.measures[0]?.sourceSum, 15);
+    assert.equal(reconciliation.measures[0]?.targetSum, 16);
+    assert.equal(reconciliation.measures[0]?.difference, 1);
+    assert.equal(reconciliation.measures[0]?.mismatchKeys, 1);
+
+    const context = await loadWorkspaceContext(sessionName);
+    assert.ok(context.evidence.some((item) => item.id === reconciliation.evidenceId));
+
+    const explain = await localExplain(sessionName, 'SELECT count(*) AS row_count FROM ' + source.relation);
+    assert.ok(explain.rowCount > 0);
+    assert.ok(explain.evidenceId);
+  } finally {
+    closeLocalAnalytics();
+    await fs.rm(sessionRoot, { recursive: true, force: true });
+  }
+});
 test('workspace CSV becomes a DuckDB dataset with Evidence provenance', async () => {
   const sessionName = 'test-local-' + randomUUID().slice(0, 8);
   const sessionRoot = path.resolve('.workspace', sessionName);
