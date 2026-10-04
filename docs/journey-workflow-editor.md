@@ -102,6 +102,22 @@ Workflow 固定的是 Data Architect 的高层工作顺序，不是 Agent 每一
 
 因此 Workflow、Skill、Tool、Agent、Investigation State 的职责必须分开：Workflow 负责高层顺序、人工步骤和合法出口；Skill 负责某阶段怎么调查；Tool 负责真正执行；Agent 负责阶段内部的判断；State 保存当前执行位置和已完成步骤；runtime 不负责授权、审批、SQL 执行或外部副作用。
 
+### 3.2 completeWhen 怎么工作
+
+`completeWhen` 只是一个字符串 key，不是表达式语言。例如 `goal`、`current-state`、`validation`。Workflow runtime 把这个 key 交给宿主应用的事实判断逻辑；只有宿主应用知道这个 key 是否真的满足。
+
+当前项目的 `conditionPassed()` 是应用层实现，它把这些 key 映射到 Investigation 的真实状态。它可以检查数据集数量、SQL parse failure、source-of-truth gap、Mapping、Validation 等事实，但这些业务字段不进入 Markdown DSL。
+
+当当前节点有 `completeWhen` 且 evaluator 返回 true 时，runtime 只做一件事：沿该节点的第一个 route 前进。这样避免同时维护 `completion`、route condition、fallback 三套容易互相冲突的规则。
+
+### 3.3 outcome 为什么保持字符串
+
+`success`、`failed`、`retry`、`approved` 都只是 outcome。runtime 不理解这些词的业务含义，只根据当前节点找到同名出口，再进入 target。
+
+工作地图可以根据 outcome 做视觉分类：success 绿色、failed 红色、retry 灰色虚线。但这些颜色和线型不能反过来决定执行行为。
+
+`retry` 必须保留为真实 Edge。它表达的是“从当前处理步骤重新回到哪个真实步骤”，所以不需要 Group、隐藏节点或新的 DSL 类型。
+
 ## 4. X6 编辑器
 
 X6 是实际的图编辑器。
