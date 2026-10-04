@@ -2,7 +2,7 @@
  * Legacy Modernization Journey：把 Data Analyst / Data Architect 的工作组织成一张可执行路线图。
  *
  * Markdown Workflow 只描述路线和出口；具体怎么查仍由 Skill + Tool 决定。
- * 参考 copilot-server-agent 的 @flow / @task / @gate / @end / @stop 设计，
+ * 参考 copilot-server-agent 的轻量 @flow / @task / @review / @end 设计，
  * 这里只实现本项目当前真正需要的轻量部分，不引入完整流程引擎。
  */
 import fs from 'node:fs/promises';
@@ -19,8 +19,6 @@ export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
 export interface JourneyRoute {
   outcome: string;
   target: string;
-  /** 可选的确定性路由条件；按 DSL 顺序先匹配者优先。 */
-  condition?: string | undefined;
   line?: number | undefined;
 }
 
@@ -73,7 +71,6 @@ export interface JourneyStage {
   objective: string;
   status: JourneyStatus;
   nodeType: JourneyNodeType;
-  unlocked: boolean;
 }
 
 export interface JourneyPendingInteraction {
@@ -133,8 +130,8 @@ export interface JourneyState {
 /**
  * 解析 Markdown Workflow。
  *
- * 支持两种路线写法：Markdown 列表中的 "- success -> next-task"，
- * 以及 Workflow 顶部常见的 "start -> first-task"。
+ * 支持 Markdown 列表中的 "- success -> next-task"，
+ * 以及 Workflow 顶部的 "start -> first-task"。
  *
  * parser 只记录作者写了什么，不解释 completeWhen 的业务含义。
  * 普通 Markdown 仍然可以照常写给人看。
@@ -174,7 +171,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   };
 
   const headingPattern = /^##\s+@(flow|task|review|end)\s+([A-Za-z0-9._:-]+)\s*$/;
-  const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)(?:\s+if\s+([A-Za-z0-9._:-]+))?\s*$/;
+  const routePattern = /^(?:[-*]\s+)?([A-Za-z0-9._:-]+)\s*->\s*([A-Za-z0-9._:-]+)\s*$/;
   const attrPattern = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*?)\s*$/;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -215,7 +212,6 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
       current.routes.push({
         outcome: route[1].toLowerCase(),
         target: route[2],
-        ...(route[3] ? { condition: route[3].toLowerCase() } : {}),
         line: lineNumber,
       });
       continue;
@@ -404,9 +400,6 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
     for (const route of node.routes) {
       if (!nodeMap.has(route.target)) {
         issues.push(node.id + ' 第 ' + route.line + ' 行指向不存在的节点：' + route.target);
-      }
-      if (route.condition && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(route.condition)) {
-        issues.push(node.id + ' 使用了未知 route condition：' + route.condition);
       }
       const normalizedOutcome = route.outcome.toLowerCase();
       if (outcomes.has(normalizedOutcome)) {
@@ -696,7 +689,6 @@ export function describeJourneyCurrentNode(
     outcomes: node.routes.map((route) => ({
       outcome: route.outcome,
       target: route.target,
-      ...(route.condition ? { condition: route.condition } : {}),
     })),
   };
 }
@@ -705,7 +697,6 @@ export function describeJourneyCurrentNode(
 export const JourneyRouteSchema = z.object({
   outcome: z.string().min(1),
   target: z.string().min(1),
-  condition: z.string().min(1).optional(),
   line: z.number().int().positive().optional(),
 }).strict();
 
