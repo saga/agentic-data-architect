@@ -29,7 +29,8 @@ export function newInvestigation(name: string, userPrompt = '', workflow: Invest
     name,
     userPrompt,
     workflow,
-    goal: '',
+    // 用户创建 Investigation 时输入的第一句话就是任务目标；同时保留 userPrompt 作为原始输入。
+    goal: userPrompt.trim(),
     scope: [],
     systems: [],
     questions: [],
@@ -200,7 +201,8 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     userPrompt: raw.userPrompt ?? raw.goal ?? '',
     // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；显式 null 表示自主调查。
     workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
-    goal: raw.goal ?? '',
+    // 迁移旧 Investigation：如果只有 userPrompt，就把它恢复为真正的研究目标。
+    goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
     questions: raw.questions ?? [],
