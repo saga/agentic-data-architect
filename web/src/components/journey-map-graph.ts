@@ -511,12 +511,15 @@ export function normalizeConnection(
   if (!nodes.some((node) => node.id === connection.target)) return null;
 
   const outgoing = edges.filter((edge) => edge.source === connection.source);
+  const baseOutcome = connection.sourcePort === NEW_SOURCE_HANDLE_ID
+    ? 'success'
+    : 'branch';
   const outcome = nextOutcome(
     outgoing.map((edge) => ({
       outcome: edge.data?.outcome || 'branch',
       target: edge.target,
     })),
-    'branch',
+    baseOutcome,
   );
 
   return {
