@@ -127,8 +127,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   }, [nodes, edges, snapshot]);
 
   /**
-   * ELK 是异步的。多个“自动排版”同时发起时，只允许最后一次结果落地。
-   * 这里仍然保留这一层，因为它保护的是布局计算，不属于 React Flow。
+   * 自动排版可能产生异步结果。多个请求同时发起时，只允许最后一次结果落地。
+   * 这一层只保护布局计算，不属于 X6 Graph。
    */
   const layoutWithLatest = async (
     nodesToLayout: FlowNode[],
