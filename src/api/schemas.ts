@@ -48,6 +48,14 @@ export const PermissionResponseBodySchema = z.object({
   allowed: z.boolean(),
 }).strict();
 
+/** 回答 Agent 的 ask_user 请求；requestId 是工作台生成的运行态请求 ID。 */
+export const UserInputResponseBodySchema = z.object({
+  turnId: z.string().trim().min(1),
+  requestId: z.string().trim().min(1),
+  answer: z.string().trim().min(1).max(8000),
+  wasFreeform: z.boolean(),
+}).strict();
+
 /** API 输入 Schema 验证失败时使用的统一错误类型，交给 Express 错误处理中间件转换成 400。 */
 export class RequestValidationError extends Error {
   constructor(readonly issues: z.core.$ZodIssue[]) {
