@@ -21,7 +21,7 @@ import { conversationDbFile } from '../investigation/conversation.js';
 import { appendInvestigationEvidence, workspaceRoot } from '../investigation/workspace.js';
 import { nextId, type EvidenceRef } from '../evidence/types.js';
 
-export type LocalDatasetFormat = 'csv' | 'json' | 'jsonl' | 'parquet';
+export type LocalDatasetFormat = 'csv' | 'json' | 'jsonl' | 'parquet' | 'xlsx';
 
 export interface LocalDataset {
   id: string;
@@ -39,7 +39,7 @@ export interface LocalDataset {
 export interface LocalAnalysisRun {
   id: string;
   sessionName: string;
-  operation: 'catalog' | 'describe' | 'sample' | 'profile' | 'query' | 'transform' | 'export';
+  operation: 'catalog' | 'describe' | 'sample' | 'profile' | 'query' | 'transform' | 'export' | 'explain' | 'reconcile';
   datasetId?: string;
   sql: string;
   sqlHash: string;
@@ -97,6 +97,7 @@ const SUPPORTED_EXTENSIONS: Record<string, LocalDatasetFormat> = {
   '.jsonl': 'jsonl',
   '.ndjson': 'jsonl',
   '.parquet': 'parquet',
+  '.xlsx': 'xlsx',
 };
 
 function getRegistryDatabase(): DatabaseSync {
@@ -117,7 +118,7 @@ function getRegistryDatabase(): DatabaseSync {
       session_name TEXT NOT NULL,
       name TEXT NOT NULL,
       relative_path TEXT NOT NULL,
-      format TEXT NOT NULL CHECK (format IN ('csv','json','jsonl','parquet')),
+      format TEXT NOT NULL CHECK (format IN ('csv','json','jsonl','parquet','xlsx')),
       relation TEXT NOT NULL UNIQUE,
       version INTEGER NOT NULL,
       sha256 TEXT NOT NULL,
@@ -216,7 +217,7 @@ export async function registerLocalDataset(
 ): Promise<LocalDataset> {
   const normalized = normalizeRelativePath(relativePath);
   const format = inferFormat(normalized);
-  if (!format) throw new Error('不支持的本地数据格式：' + relativePath + '。支持 CSV、JSON、JSONL、Parquet。');
+  if (!format) throw new Error('不支持的本地数据格式：' + relativePath + '。支持 CSV、JSON、JSONL、Parquet、XLSX。');
 
   const file = await statDatasetFile(sessionName, normalized);
   const db = getRegistryDatabase();
@@ -347,6 +348,8 @@ function viewSql(dataset: LocalDataset): string {
       return `SELECT * FROM read_json_auto(${source}, format='newline_delimited')`;
     case 'parquet':
       return `SELECT * FROM read_parquet(${source})`;
+    case 'xlsx':
+      return `SELECT * FROM read_xlsx(${source})`;
   }
 }
 
@@ -390,7 +393,7 @@ export function validateLocalReadOnlySql(sql: string): string {
   }
 
   if (
-    /\b(read_csv_auto|read_csv|read_parquet|read_json_auto|read_json|read_text|read_blob|read_csv_objects|parquet_scan|glob|httpfs|sqlite_scan|postgres_scan)\s*\(/i.test(sanitized)
+    /\b(read_csv_auto|read_csv|read_parquet|read_json_auto|read_json|read_xlsx|read_text|read_blob|read_csv_objects|parquet_scan|glob|httpfs|sqlite_scan|postgres_scan)\s*\(/i.test(sanitized)
     || /https?:\/\//i.test(sanitized)
   ) {
     throw new Error('本地分析查询必须使用已经登记的数据集，不能自己读取文件、网络或其它数据库。');
@@ -519,6 +522,53 @@ class LocalDuckDBEngine {
       const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
       const sql = `SELECT * FROM ${dataset.relation} LIMIT ${safeLimit}`;
       return this.runAndRecord('sample', sql, dataset, safeLimit);
+    });
+  }
+
+  /**
+   * 使用 DuckDB 原生 SUMMARIZE 完成列级 profiling。它一次扫描即可返回 count、NULL 比例、
+   * approx_unique、min/max、均值、标准差和近似分位数，比逐列执行多个聚合更适合大文件。
+   */
+  async summarize(datasetRef: string): Promise<LocalQueryResult> {
+    return this.exclusive(async () => {
+      await this.refreshViews();
+      const dataset = getDataset(this.sessionName, datasetRef);
+      const started = Date.now();
+      const sql = 'SUMMARIZE ' + dataset.relation;
+      const reader = await this.connection.runAndReadAll(sql);
+      const summarized = reader.getRowObjectsJson() as Array<Record<string, unknown>>;
+      const rows = summarized.map((row) => {
+        const count = Number(row.count ?? 0);
+        const nullPercentage = Number(row.null_percentage ?? 0);
+        const approxUnique = Number(row.approx_unique ?? 0);
+        return {
+          column: row.column_name,
+          type: row.column_type,
+          rowCount: count,
+          nullCount: Math.max(0, Math.round(count * nullPercentage / 100)),
+          nullRate: nullPercentage / 100,
+          distinctCount: approxUnique,
+          distinctRate: count > 0 ? approxUnique / count : 0,
+          min: row.min ?? null,
+          max: row.max ?? null,
+          avg: row.avg ?? null,
+          std: row.std ?? null,
+          q25: row.q25 ?? null,
+          q50: row.q50 ?? null,
+          q75: row.q75 ?? null,
+        };
+      });
+      const result: LocalQueryResult = {
+        columns: ['column','type','rowCount','nullCount','nullRate','distinctCount','distinctRate','min','max','avg','std','q25','q50','q75'],
+        rows,
+        rowCount: rows.length ? Number(rows[0]?.rowCount ?? 0) : 0,
+        truncated: false,
+        sql,
+        analysisRunId: '',
+        evidenceId: '',
+        dataset: { id: dataset.id, version: dataset.version, sha256: dataset.sha256 },
+      };
+      return this.recordResult('profile', sql, dataset, result, started);
     });
   }
 
@@ -828,7 +878,7 @@ class LocalDuckDBEngine {
   }
 }
 
-/** 返回当前 Investigation 的 DuckDB engine；每个 session 对应一个 analysis.duckdb。 */
+/** 返回当前 Investigation 的 DuckDB engine；每个 session 对应一个 local.duckdb。 */
 export async function getLocalAnalytics(sessionName: string): Promise<LocalDuckDBEngine> {
   return ensureEngine(sessionName);
 }
@@ -842,7 +892,7 @@ export async function localSample(sessionName: string, dataset: string, limit = 
 }
 
 export async function localProfile(sessionName: string, dataset: string): Promise<LocalQueryResult> {
-  return (await ensureEngine(sessionName)).profile(dataset);
+  return (await ensureEngine(sessionName)).summarize(dataset);
 }
 
 export async function localTransform(
