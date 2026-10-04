@@ -67,7 +67,7 @@ test('journey map AI request has no user-visible mode or scope contract', () => 
 
 
 test('message requests accept either a user message or a structured route selection', () => {
-  assert.deepEqual(MessageBodySchema.parse({ message: '继续查 Position' }), { message: '继续查 Position' });
-  assert.deepEqual(MessageBodySchema.parse({ routeId: 'route-lineage' }), { routeId: 'route-lineage' });
+  assert.deepEqual(MessageBodySchema.parse({ message: '继续查 Position' }), { message: '继续查 Position', guided: false });
+  assert.deepEqual(MessageBodySchema.parse({ routeId: 'route-lineage' }), { routeId: 'route-lineage', guided: false });
   assert.throws(() => MessageBodySchema.parse({}));
 });
