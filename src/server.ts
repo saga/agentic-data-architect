@@ -263,7 +263,6 @@ app.post('/api/sessions', async (req, res) => {
       res.status(400).json({
         error: '工作地图还不能保存，请先修正这些问题。',
         issues: validation.issues,
-        warnings: validation.warnings,
       });
       return;
     }
