@@ -236,18 +236,17 @@ export function JourneyMapInspector({
                     </div>
 
                     <div>
-                      <div>
-                        <Text type="secondary">确定性条件</Text>
-                        <Input
-                          value={String(nodeDraft.completeWhen ?? '')}
-                          placeholder="例如 goal / current-state / validation"
-                          onChange={(event) =>
-                            setNodeDraft({
-                              ...nodeDraft,
-                              completeWhen: event.target.value,
-                            })}
-                        />
-                      </div>
+                      <Text type="secondary">确定性条件</Text>
+                      <Input
+                        value={String(nodeDraft.completeWhen ?? '')}
+                        placeholder="例如 goal / current-state / validation；留空表示由 Agent/人工选择出口"
+                        onChange={(event) =>
+                          setNodeDraft({
+                            ...nodeDraft,
+                            completeWhen: event.target.value,
+                          })}
+                      />
+                    </div>
                   </Flex>
                 ),
               },
