@@ -1,5 +1,3 @@
-import type { Edge, Node } from '@xyflow/react';
-
 /** DSL 中允许出现的 Workflow 节点类型；只取 BPMN 里最有价值的一小部分语义。 */
 export type WorkflowNodeType = 'task' | 'gate' | 'review' | 'end' | 'stop';
 
@@ -66,7 +64,7 @@ export interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
   /** 布局算法版本。升级算法后故意改值，让旧布局自动重新计算。 */
-  engine?: 'elk' | 'elk-v2' | 'elk-v3' | 'elk-v4' | 'elk-v5';
+  engine?: 'elk' | 'elk-v2' | 'elk-v3' | 'elk-v4' | 'elk-v5' | 'x6-v1';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -140,6 +138,12 @@ export interface HandleSpec {
   label: string;
 }
 
+/**
+ * 画布运行时节点。
+ *
+ * 这个类型不再依赖 React Flow。X6 只是渲染/交互层，业务层继续使用稳定的
+ * Workflow 节点 + position 数据，因此换图引擎不会污染 Workflow DSL。
+ */
 export interface FlowNodeData extends Record<string, unknown> {
   title: string;
   objective?: string;
@@ -152,6 +156,7 @@ export interface FlowNodeData extends Record<string, unknown> {
   produces?: string[];
   visible: boolean;
   isNew?: boolean;
+  selected?: boolean;
   sourceHandles: HandleSpec[];
   targetHandles: HandleSpec[];
   connectionIssue?: 'error' | 'warning';
@@ -161,15 +166,40 @@ export interface FlowNodeData extends Record<string, unknown> {
   onDelete?: (id: string) => void;
 }
 
+export interface FlowNode {
+  id: string;
+  type: 'journey';
+  position: { x: number; y: number };
+  data: FlowNodeData;
+  width?: number;
+  height?: number;
+}
+
 export interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
   condition?: string;
-  labelOffsetY?: number;
   onSelect?: (id: string) => void;
 }
 
-export type FlowNode = Node<FlowNodeData>;
-export type FlowEdge = Edge<FlowEdgeData>;
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  /** X6 source port；只作为画布连接身份，不进入 Workflow DSL。 */
+  sourceHandle?: string;
+  /** X6 target port；只作为画布连接身份，不进入 Workflow DSL。 */
+  targetHandle?: string;
+  data: FlowEdgeData;
+}
+
+/** 当前工作地图使用的图引擎。 */
+export const JOURNEY_GRAPH_ENGINE = 'x6' as const;
+
+/** X6 中隐藏的“新增出口”连接桩。 */
+export const NEW_SOURCE_HANDLE_ID = '__new__';
+
+/** X6 中统一复用的目标连接桩。 */
+export const TARGET_HANDLE_ID = '__in__';
 
 /** 节点状态对应的 CSS class；视觉细节留在 styles.css。 */
 export const STATUS_CLASS: Record<JourneyMapStage['status'], string> = {
@@ -179,4 +209,5 @@ export const STATUS_CLASS: Record<JourneyMapStage['status'], string> = {
   locked: 'journey-flow-node-locked',
 };
 
+/** Workflow 编辑器的边类型只是业务侧的稳定标识，不再对应 React Flow edge type。 */
 export const EDGE_TYPE = 'journey' as const;
