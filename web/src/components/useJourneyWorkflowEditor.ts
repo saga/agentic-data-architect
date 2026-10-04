@@ -23,7 +23,6 @@ import type {
   WorkflowNodeDefinition,
   WorkflowNodeType,
   WorkflowActor,
-  CompletionMode,
   WorkflowSnapshot,
 } from './journey-map-types.js';
 import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
@@ -43,7 +42,7 @@ interface JourneyWorkflowEditorResult {
   selectedNode?: FlowNode;
   selectedEdge?: FlowEdge;
   nodeDraft?: Partial<WorkflowNodeDefinition>;
-  edgeDraft?: { outcome: string; target: string; condition?: string };
+  edgeDraft?: { outcome: string; target: string };
   connectTargetId?: string;
   connectOutcome: string;
   validationIssues: string[];
@@ -69,7 +68,7 @@ interface JourneyWorkflowEditorResult {
   applyEdgeDraft: () => Promise<void>;
   connectSelectedNode: () => Promise<void>;
   setNodeDraft: Dispatch<SetStateAction<Partial<WorkflowNodeDefinition> | undefined>>;
-  setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string; condition?: string } | undefined>>;
+  setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string } | undefined>>;
   setConnectTargetId: Dispatch<SetStateAction<string | undefined>>;
   setConnectOutcome: Dispatch<SetStateAction<string>>;
   onGraphConnect: (connection: GraphConnection) => Promise<void>;
@@ -103,7 +102,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     baseDefinition: WorkflowDefinition;
   }>();
   const [nodeDraft, setNodeDraft] = useState<Partial<WorkflowNodeDefinition>>();
-  const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
+  const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
   const [connectOutcome, setConnectOutcome] = useState('success');
   // 只在打开地图、自动排版或结构变化后请求一次全图适配，拖动节点时不自动缩放。
@@ -199,12 +198,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       type: selectedNode.data.nodeType,
       title: selectedNode.data.title,
       objective: selectedNode.data.objective,
-      visible: selectedNode.data.visible,
-      completion: selectedNode.data.completion,
       actor: selectedNode.data.actor,
       completeWhen: selectedNode.data.completeWhen,
-      requires: selectedNode.data.requires,
-      produces: selectedNode.data.produces,
     });
   }, [selectedNode]);
 
@@ -217,7 +212,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setEdgeDraft({
       outcome: selectedEdge.data?.outcome || 'success',
       target: selectedEdge.target,
-      condition: selectedEdge.data?.condition,
     });
   }, [selectedEdge]);
 
@@ -310,9 +304,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         objective: '填写这一步要解决的问题。',
         nodeType: 'task',
         status: 'future',
-        completion: 'agent',
         actor: 'agent',
-        visible: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
         targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
@@ -555,14 +547,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
               title: String(nodeDraft.title || node.data.title),
               objective: nodeDraft.objective ? String(nodeDraft.objective) : undefined,
               nodeType: (nodeDraft.type as WorkflowNodeType) || node.data.nodeType,
-              visible: nodeDraft.visible !== false,
-              completion: (nodeDraft.completion as CompletionMode) || node.data.completion,
               actor: (nodeDraft.actor as WorkflowActor) || node.data.actor,
               completeWhen: nodeDraft.completeWhen
                 ? String(nodeDraft.completeWhen).trim()
                 : undefined,
-              requires: nodeDraft.requires,
-              produces: nodeDraft.produces,
             },
           }
         : node
@@ -591,9 +579,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             data: {
               ...(edge.data ?? { outcome }),
               outcome,
-              ...(edgeDraft.condition?.trim()
-                ? { condition: edgeDraft.condition.trim() }
-                : {}),
             },
           }
         : edge
@@ -667,9 +652,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         objective: '填写这一步要解决的问题。',
         nodeType: 'task',
         status: 'future',
-        completion: 'agent',
         actor: 'agent',
-        visible: true,
         isNew: true,
         sourceHandles: [{ id: sourceHandleId(id, 0), label: 'success' }],
         targetHandles: [{ id: targetHandleId(id, 0), label: '入口' }],
@@ -780,14 +763,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         type: node.type,
         title: node.title,
         objective: node.objective,
-        visible: node.visible,
-        completion: node.completion,
         actor: node.actor,
         completeWhen: node.completeWhen,
-        routes: node.routes.map(({ outcome, target, condition }) => ({
+        routes: node.routes.map(({ outcome, target }) => ({
           outcome,
           target,
-          condition,
         })),
       }))
       .sort()
