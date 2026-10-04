@@ -8,8 +8,7 @@ import {
   RobotOutlined,
   UserOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
-  AimOutlined,
+   AimOutlined,
 } from '@ant-design/icons';
 import type { Node } from '@antv/x6';
 import { register } from '@antv/x6-react-shape';
@@ -32,8 +31,7 @@ const NODE_TYPE_META: Record<
   gate: { label: '判断', icon: <BranchesOutlined /> },
   review: { label: '评审', icon: <UserOutlined /> },
   end: { label: '完成', icon: <CheckCircleOutlined /> },
-  stop: { label: '停止', icon: <ClockCircleOutlined /> },
-};
+ };
 
 const ACTOR_META = {
   agent: { label: 'Agent', icon: <RobotOutlined /> },
