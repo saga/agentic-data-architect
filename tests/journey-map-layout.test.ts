@@ -162,5 +162,6 @@ test('graph projection removes self-loop edges and their handles', () => {
 
   assert.equal(graph.edges.length, 0);
   assert.equal(graph.nodes.find((item) => item.id === 'a')!.data.sourceHandles.length, 0);
-  assert.equal(graph.nodes.find((item) => item.id === 'a')!.data.targetHandles.length, 0);
+  assert.equal(graph.nodes.find((item) => item.id === 'a')!.data.targetHandles.length, 1);
+  assert.equal(graph.nodes.find((item) => item.id === 'a')!.data.targetHandles[0]?.label, '入口');
 });
