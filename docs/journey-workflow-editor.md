@@ -63,40 +63,38 @@ skills/<workflow>/SKILL.md
 
 ## 3. Workflow DSL
 
-当前 DSL 只保留工作地图真正需要的少量语义：
+当前 DSL 只描述工作地图真正需要的少量语义：
 
 ~~~text
 @flow
 @task
-@gate
 @review
 @end
-@stop
 ~~~
 
 节点：
 
-- task：普通工作步骤。
-- gate：判断点。
-- review + actor: human：人工确认。
-- end / stop：结束事件。
+- task：普通工作步骤，默认由 Agent 处理。
+- review：人工确认步骤，默认由人工处理。
+- end：结束事件。
 
 节点可以有：
 
 - actor
-- completion
 - completeWhen
-- requires
-- produces
-- tools
 
-route 可以有：
+route 只有：
 
 - outcome
 - target
-- condition
 
-这不是完整 BPMN runtime。当前不做 parallel / inclusive gateway、多 token join、timer / message event、subprocess 等复杂执行语义。
+规则很简单：
+
+- 有 `completeWhen`：已有事实满足条件后自动走该节点的第一个出口。
+- 没有 `completeWhen`：由 Agent / 人工选择当前节点真实存在的 outcome。
+- `retry`、`failed` 等只是普通 outcome；工作地图根据 outcome 做视觉分类，不额外引入节点类型或分组。
+
+这不是完整 BPMN runtime，不做 gateway、parallel token、timer、message event、subprocess 等复杂执行语义。
 
 ## 4. X6 编辑器
 
