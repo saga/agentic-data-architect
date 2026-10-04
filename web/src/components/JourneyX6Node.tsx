@@ -75,7 +75,7 @@ export function JourneyX6Node({ node }: JourneyX6NodeProps) {
     return (
       <div className={className + ' journey-x6-node-terminal'}>
         <div className="journey-flow-event-symbol">
-          {data.nodeType === 'end' ? '✓' : '×'}
+          ✓
         </div>
         <div className="journey-flow-node-title">{data.title}</div>
       </div>
