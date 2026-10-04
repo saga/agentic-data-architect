@@ -1,12 +1,9 @@
 import type { CSSProperties } from 'react';
 import {
-  MarkerType,
-  Position,
-  type Connection,
-} from '@xyflow/react';
-import {
   EDGE_TYPE,
+  NEW_SOURCE_HANDLE_ID,
   STATUS_CLASS,
+  TARGET_HANDLE_ID,
   type FlowEdge,
   type FlowNode,
   type HandleSpec,
@@ -18,22 +15,17 @@ import {
   type WorkflowSnapshot,
 } from './journey-map-types.js';
 
-/** 给每个 source Handle 一个稳定 ID。
- *
- * React Flow 的多 Handle 场景要求每条连接点有唯一 id。
- * 这里故意使用“节点 + 顺序”，不要把 outcome 直接塞进 id，
- * 因为用户编辑 outcome 时不应该同时破坏 React Flow 的连接身份。
- */
+/** 给已有出口生成稳定的 source port ID。 */
 export function sourceHandleId(nodeId: string, index: number): string {
   return nodeId + '-out-' + String(index);
 }
 
-/** 给每个 target Handle 一个稳定 ID。 */
-export function targetHandleId(nodeId: string, index: number): string {
-  return nodeId + '-in-' + String(index);
+/** X6 中所有节点共享一个入口 port。多个 edge 可以连接到同一个入口 port。 */
+export function targetHandleId(_nodeId: string, _index = 0): string {
+  return TARGET_HANDLE_ID;
 }
 
-/** 多 Handle 时把连接点平均分布在节点上下，而不是全部挤在正中间。 */
+/** 自动布局和 connection-inspector 仍需要一个简单的、与画布无关的垂直分布计算。 */
 export function handleStyle(index: number, total: number): CSSProperties {
   const top = ((index + 1) / (total + 1)) * 100;
   return { top: String(top) + '%' };
@@ -63,12 +55,11 @@ export function nextId(prefix: string, existing: Set<string>): string {
   return id;
 }
 
-/** 为新增分支生成不重复的 outcome。
- *
- * outcome 本身就是 DSL 的分支名字，因此必须在同一 source 节点内唯一。
- * 例如已有 success 时自动给新分支一个 branch，而不是伪造第二个 success。
- */
-export function nextOutcome(routes: JourneyRouteDefinitionLike[], base: string): string {
+/** 为新增分支生成不重复的 outcome。 */
+export function nextOutcome(
+  routes: JourneyRouteDefinitionLike[],
+  base: string,
+): string {
   const used = new Set(routes.map((route) => route.outcome.toLowerCase()));
 
   if (!used.has(base.toLowerCase())) return base;
@@ -87,9 +78,32 @@ type JourneyRouteDefinitionLike = {
 };
 
 /**
+ * 去掉同一 source 下完全重复的 route。
+ * 这是语义层的防御，不依赖 X6 是否把重叠边渲染成一条。
+ */
+export function dedupeRoutes(
+  routes: WorkflowNodeDefinition['routes'],
+): WorkflowNodeDefinition['routes'] {
+  const seen = new Set<string>();
+
+  return routes.filter((route) => {
+    const key =
+      route.target
+      + '\u0000'
+      + route.outcome.trim().toLowerCase()
+      + '\u0000'
+      + String(route.condition ?? '').trim();
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * 浏览器侧应用语义 Patch。
  *
- * React Flow 只是画布适配层；AI 预览真正应用时也通过这里回到 Workflow Definition。
+ * React/X6 都只是编辑器适配层；AI 预览真正应用时仍然通过这里回到 Workflow Definition。
  */
 export function applyWorkflowChanges(
   definitionInput: WorkflowDefinition,
@@ -102,7 +116,7 @@ export function applyWorkflowChanges(
       tools: node.tools ? [...node.tools] : undefined,
       requires: node.requires ? [...node.requires] : undefined,
       produces: node.produces ? [...node.produces] : undefined,
-      routes: node.routes.map((route) => ({ ...route })),
+      routes: dedupeRoutes(node.routes).map((route) => ({ ...route })),
     })),
   };
 
@@ -119,7 +133,7 @@ export function applyWorkflowChanges(
           tools: change.node.tools ? [...change.node.tools] : undefined,
           requires: change.node.requires ? [...change.node.requires] : undefined,
           produces: change.node.produces ? [...change.node.produces] : undefined,
-          routes: change.node.routes.map((route) => ({ ...route })),
+          routes: dedupeRoutes(change.node.routes).map((route) => ({ ...route })),
         });
         break;
       case 'update-node': {
@@ -142,7 +156,10 @@ export function applyWorkflowChanges(
       case 'add-route': {
         const node = definition.nodes.find((item) => item.id === change.nodeId);
         if (!node) throw new Error('找不到节点：' + change.nodeId);
-        node.routes.push({ ...change.route });
+        node.routes = dedupeRoutes([
+          ...node.routes,
+          { ...change.route },
+        ]);
         break;
       }
       case 'update-route': {
@@ -153,6 +170,7 @@ export function applyWorkflowChanges(
         );
         if (!route) throw new Error('找不到分支：' + change.nodeId + '/' + change.outcome);
         Object.assign(route, change.patch);
+        node.routes = dedupeRoutes(node.routes);
         break;
       }
       case 'remove-route': {
@@ -169,11 +187,7 @@ export function applyWorkflowChanges(
   return definition;
 }
 
-/** 保存 React Flow 节点位置。
- *
- * Workflow 语义仍然由 Markdown/Definition 保存；这里仅保存 Canvas layout。
- * elk-v5 是“需要重新自动排版”的版本标记，不代表 Workflow 版本。
- */
+/** 保存 X6 画布位置；布局数据仍然只保存节点坐标，不保存图引擎内部对象。 */
 export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   const result: Record<string, { x: number; y: number }> = {};
 
@@ -191,11 +205,10 @@ export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   };
 }
 
-/** 把当前 React Flow graph 还原为 Workflow Definition。
+/**
+ * 把当前图还原为 Workflow Definition。
  *
- * 这是编辑器最重要的边界：
- * React Flow 只负责编辑；
- * 保存/验证/执行时，最终都重新回到统一的 Workflow Definition。
+ * X6 的 Node/Edge 对象不进入业务层；这里仍然只读取稳定的 source/target/outcome。
  */
 export function definitionFromGraph(
   nodes: FlowNode[],
@@ -235,22 +248,14 @@ export function definitionFromGraph(
         tools: source?.tools,
         requires: node.data.requires ?? source?.requires,
         produces: node.data.produces ?? source?.produces,
-        routes: routeBySource.get(node.id) ?? [],
+        routes: dedupeRoutes(routeBySource.get(node.id) ?? []),
         line: source?.line,
       };
     }),
   };
 }
 
-/** 把当前 graph 中的结构问题转换成用户能直接理解的提示。
- *
- * 注意：
- * - start 没有 incoming 是正常的；
- * - end/stop 没有 outgoing 是正常的；
- * - 其它节点缺入口/出口才是结构问题；
- * - route 指向不存在节点属于更明确的 error；
- * - 有入口但从 start 实际走不到，属于 warning。
- */
+/** 把 Workflow Definition 中明显的断连问题转换成画布即时提示。 */
 function findConnectionIssues(
   definition: WorkflowDefinition,
 ): Map<string, { severity: 'error' | 'warning'; text: string }> {
@@ -260,12 +265,14 @@ function findConnectionIssues(
   const reachable = new Set<string>();
 
   for (const node of definition.nodes) {
+    const routes = dedupeRoutes(node.routes);
+
     outgoing.set(
       node.id,
-      node.routes.filter((route) => route.target !== node.id).length,
+      routes.filter((route) => route.target !== node.id).length,
     );
 
-    for (const route of node.routes) {
+    for (const route of routes) {
       if (!nodeMap.has(route.target) || route.target === node.id) {
         continue;
       }
@@ -274,8 +281,6 @@ function findConnectionIssues(
     }
   }
 
-  // 从 Workflow start 做一次很轻量的图遍历。
-  // 这里不是替代服务端 validation，而是为了让 UI 在编辑时即时指出明显断开的节点。
   const stack = [definition.start];
   while (stack.length) {
     const current = stack.pop();
@@ -286,7 +291,7 @@ function findConnectionIssues(
     const node = nodeMap.get(current);
     if (!node) continue;
 
-    for (const route of node.routes) {
+    for (const route of dedupeRoutes(node.routes)) {
       if (nodeMap.has(route.target)) {
         stack.push(route.target);
       }
@@ -337,33 +342,10 @@ function findConnectionIssues(
 }
 
 /**
- * 去掉同一节点上的完全重复出口。
+ * 把 Workflow Definition 投影成引擎无关的 Graph。
  *
- * Workflow 定义偶尔会因为 AI patch / 历史版本合并产生完全相同的 route：
- * source + target + outcome + condition 全都一样。画布上这种连接没有任何新增信息，
- * 只会制造两条重叠的线和两个连接点，因此只保留第一条。
- */
-function dedupeRoutes(routes: WorkflowNodeDefinition['routes']): WorkflowNodeDefinition['routes'] {
-  const seen = new Set<string>();
-
-  return routes.filter((route) => {
-    const key =
-      route.target
-      + '\u0000'
-      + route.outcome.trim().toLowerCase()
-      + '\u0000'
-      + String(route.condition ?? '').trim();
-
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-/** 把 Workflow Definition 投影成 React Flow。
- *
- * 这里故意让“锁定模式”和“编辑模式”走同一份建图代码。
- * 两者的区别只在 draggable/connectable/selectable，而不是节点/边是否存在。
+ * X6 的实际端口由 JourneyX6Graph 再映射，但业务层仍保存 sourceHandles/targetHandles，
+ * 方便属性面板和人工 transition 使用。
  */
 export function graphFromDefinition(
   definition: WorkflowDefinition,
@@ -381,20 +363,17 @@ export function graphFromDefinition(
 
   for (const node of definition.nodes) {
     dedupeRoutes(node.routes).forEach((route, index) => {
-      // Self-loop 不属于工作地图的可视连接，也不能占用 Handle。
       if (!nodeMap.has(route.target) || route.target === node.id) return;
 
       const id = node.id + ':' + route.outcome + ':' + route.target + ':' + String(index);
 
-      outgoing.set(node.id, [
-        ...(outgoing.get(node.id) ?? []),
-        { target: route.target, outcome: route.outcome, id },
-      ]);
+      const nextOutgoing = outgoing.get(node.id) ?? [];
+      nextOutgoing.push({ target: route.target, outcome: route.outcome, id });
+      outgoing.set(node.id, nextOutgoing);
 
-      incoming.set(route.target, [
-        ...(incoming.get(route.target) ?? []),
-        { source: node.id, outcome: route.outcome, id },
-      ]);
+      const nextIncoming = incoming.get(route.target) ?? [];
+      nextIncoming.push({ source: node.id, outcome: route.outcome, id });
+      incoming.set(route.target, nextIncoming);
     });
   }
 
@@ -404,54 +383,38 @@ export function graphFromDefinition(
     const status = stageStatus(snapshot, item.id);
     const sourceRoutes = outgoing.get(item.id) ?? [];
     const targetRoutes = incoming.get(item.id) ?? [];
+    const terminal = item.type === 'end' || item.type === 'stop';
+    const waiting = snapshot.execution.status === 'waiting'
+      && snapshot.execution.currentNodeId === item.id;
 
     const sourceHandles: HandleSpec[] = sourceRoutes.map((route, index) => ({
       id: sourceHandleId(item.id, index),
       label: route.outcome,
     }));
 
-    const targetHandles: HandleSpec[] = targetRoutes.map((route, index) => ({
-      id: targetHandleId(item.id, index),
-      label: route.outcome,
-    }));
-
-    const hasSelfLoop = item.routes.some((route) => route.target === item.id);
-
-    // 只有真的没有出口时才显示“新增出口”。
-    // 如果原 Workflow 只有 self-loop，这里不再制造一个看起来像 self-loop 残留的连接点。
-    if (
-      !sourceHandles.length
-      && !hasSelfLoop
-      && item.type !== 'end'
-      && item.type !== 'stop'
-    ) {
+    // 非终点保留一个隐藏的“新分支” port；X6 会提供透明拖线热区。
+    if (!terminal) {
       sourceHandles.push({
-        id: sourceHandleId(item.id, 0),
-        label: '新增出口',
+        id: NEW_SOURCE_HANDLE_ID,
+        label: '',
       });
     }
 
-    // 同理：只有完全没有已声明的自环/入口时，才显示一个新的入口点。
-    if (!targetHandles.length && !hasSelfLoop) {
-      targetHandles.push({
+    const targetHandles: HandleSpec[] = [
+      {
         id: targetHandleId(item.id, 0),
-        label: '入口',
-      });
-    }
+        label: targetRoutes.length ? '入口' : '入口',
+      },
+    ];
 
     const connectionIssue = issues.get(item.id);
-    const terminal = item.type === 'end' || item.type === 'stop';
-    const waiting = snapshot.execution.status === 'waiting'
-      && snapshot.execution.currentNodeId === item.id;
 
     return {
       id: item.id,
       type: 'journey',
       position: layout.nodes[item.id] ?? { x: 0, y: 0 },
-      draggable: true,
-      selectable: true,
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      width: terminal ? 190 : 236,
+      height: terminal ? 96 : 180,
       data: {
         title: item.title,
         objective: item.objective,
@@ -472,21 +435,10 @@ export function graphFromDefinition(
               connectionIssueText: connectionIssue.text,
             }
           : {}),
+        ...(waiting ? { waiting: true } : {}),
         onAddStep,
         onAddBranch,
         onDelete,
-      },
-      className:
-        'journey-flow-node journey-flow-node-stage '
-        + STATUS_CLASS[status]
-        + ' journey-flow-node-type-' + item.type
-        + ' journey-flow-node-actor-' + item.actor
-        + (waiting ? ' journey-flow-node-waiting' : '')
-        + (!item.visible ? ' journey-flow-node-deemphasized' : '')
-        + (connectionIssue ? ' journey-flow-node-connection-' + connectionIssue.severity : '')
-        + (newNodeIds.has(item.id) ? ' journey-flow-node-new' : ''),
-      style: {
-        width: terminal ? 190 : 236,
       },
     };
   });
@@ -505,29 +457,15 @@ export function graphFromDefinition(
       const targetIncoming = incoming.get(route.target) ?? [];
       const incomingIndex = targetIncoming.findIndex((edge) => edge.id === edgeId);
 
-      const sourceCompleted = snapshot.state.completedNodeIds.includes(node.id);
-      const isCurrent = snapshot.state.currentNodeId === node.id;
-
       edges.push({
         id: edgeId,
         source: node.id,
         target: route.target,
         sourceHandle: sourceHandleId(node.id, routeIndex),
         targetHandle: targetHandleId(route.target, Math.max(0, incomingIndex)),
-        type: EDGE_TYPE,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        animated: isCurrent,
-        className:
-          'journey-flow-edge'
-          + (sourceCompleted ? ' journey-flow-edge-traversed' : '')
-          + (isCurrent ? ' journey-flow-edge-current' : ''),
         data: {
           outcome: route.outcome,
           ...(route.condition ? { condition: route.condition } : {}),
-          // 分支多时标签也需要错开，否则“success / retry / rollback”会叠成一团。
-          labelOffsetY:
-            (routeIndex - (validRoutes.length - 1) / 2) * 20
-            + (Math.max(0, incomingIndex) - (Math.max(0, targetIncoming.length) - 1) / 2) * 10,
           onSelect: onSelectEdge,
         },
       });
@@ -537,13 +475,22 @@ export function graphFromDefinition(
   return { nodes, edges };
 }
 
-/** 通过鼠标从一个 Handle 拖到另一个节点时，创建一条新的 Flow edge。
+/** X6 新连线只需要 source/target 节点；outcome 由编辑器按 source 的既有出口自动分配。 */
+export interface GraphConnection {
+  source: string;
+  target: string;
+  sourcePort?: string;
+  targetPort?: string;
+}
+
+/**
+ * 从 X6 的新建连接转换成业务边。
  *
- * outcome 默认使用 branch：
- * 用户可以直接点击边标签/右侧属性，把它改成 needs-input、retry 等正式 outcome。
+ * outcome 不从隐藏 port 推断，而是由同一 source 下的现有 outcome 做去重，
+ * 因此“从新出口拖线”永远得到一个新的 outcome，不会偷偷生成两条 success。
  */
 export function normalizeConnection(
-  connection: Connection,
+  connection: GraphConnection,
   nodes: FlowNode[],
   edges: FlowEdge[],
 ): FlowEdge | null {
@@ -551,13 +498,10 @@ export function normalizeConnection(
     return null;
   }
 
-  const sourceNode = nodes.find((node) => node.id === connection.source);
-  const targetNode = nodes.find((node) => node.id === connection.target);
-
-  if (!sourceNode || !targetNode) return null;
+  if (!nodes.some((node) => node.id === connection.source)) return null;
+  if (!nodes.some((node) => node.id === connection.target)) return null;
 
   const outgoing = edges.filter((edge) => edge.source === connection.source);
-  const incoming = edges.filter((edge) => edge.target === connection.target);
   const outcome = nextOutcome(
     outgoing.map((edge) => ({
       outcome: edge.data?.outcome || 'branch',
@@ -565,9 +509,6 @@ export function normalizeConnection(
     })),
     'branch',
   );
-
-  const sourceHandle = sourceHandleId(connection.source, outgoing.length);
-  const targetHandle = targetHandleId(connection.target, incoming.length);
 
   return {
     id:
@@ -580,13 +521,8 @@ export function normalizeConnection(
       + String(outgoing.length),
     source: connection.source,
     target: connection.target,
-    sourceHandle,
-    targetHandle,
-    type: EDGE_TYPE,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    data: {
-      outcome,
-      labelOffsetY: (outgoing.length - Math.floor(outgoing.length / 2)) * 10,
-    },
+    sourceHandle: sourceHandleId(connection.source, outgoing.length),
+    targetHandle: TARGET_HANDLE_ID,
+    data: { outcome },
   };
 }
