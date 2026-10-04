@@ -7,6 +7,7 @@ import {
   Snapline,
 } from '@antv/x6';
 import {
+  JOURNEY_NODE_SIZE,
   NEW_SOURCE_HANDLE_ID,
   NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
@@ -119,7 +120,15 @@ export function JourneyX6Graph({
    * success / retry / need-input 因此成为“出口自己的标签”，
    * 而不是 EdgeLabelRenderer 那种独立悬浮元素。
    */
-  const buildPorts = (node: FlowNode) => ({
+  const buildPorts = (node: FlowNode) => {
+    const terminal =
+      node.data.nodeType === 'end' || node.data.nodeType === 'stop';
+    const size = terminal
+      ? JOURNEY_NODE_SIZE.terminal
+      : JOURNEY_NODE_SIZE.regular;
+    const newPortY = size.height - 18;
+
+    return {
     groups: {
       input: {
         position: 'left',
@@ -163,7 +172,7 @@ export function JourneyX6Graph({
       newInput: {
         position: {
           name: 'absolute',
-          args: { x: 0, y: '88%' },
+          args: { x: 0, y: newPortY },
         },
         attrs: {
           circle: {
@@ -178,7 +187,7 @@ export function JourneyX6Graph({
       newOutput: {
         position: {
           name: 'absolute',
-          args: { x: '100%', y: '88%' },
+          args: { x: size.width, y: newPortY },
         },
         attrs: {
           circle: {
@@ -225,7 +234,8 @@ export function JourneyX6Graph({
             },
           ]),
     ],
-  });
+    };
+  };
 
   /** 给 X6 添加完整业务 graph。 */
   const rebuildGraphStructure = () => {
@@ -252,44 +262,104 @@ export function JourneyX6Graph({
       );
 
       graph.addEdges(
-        edges.map((edge) => ({
-          id: edge.id,
-          shape: 'edge',
-          source: {
-            cell: edge.source,
-            port: edge.sourceHandle,
-          },
-          target: {
-            cell: edge.target,
-            port: edge.targetHandle,
-          },
-          router: {
-            name: 'orth',
-            args: {
-              padding: 24,
+        edges.map((edge) => {
+          const sourceNode = nodes.find((node) => node.id === edge.source);
+          const targetNode = nodes.find((node) => node.id === edge.target);
+          const backward =
+            sourceNode && targetNode
+              ? targetNode.position.x <= sourceNode.position.x
+              : false;
+          const selected = edge.id === selectedEdgeId;
+
+          const backwardIndex = edges
+            .slice(0, edges.indexOf(edge))
+            .filter((item) => {
+              const source = nodes.find((node) => node.id === item.source);
+              const target = nodes.find((node) => node.id === item.target);
+              return Boolean(source && target && target.position.x <= source.position.x);
+            }).length;
+
+          const minY = Math.min(...nodes.map((node) => node.position.y));
+          const maxY = Math.max(
+            ...nodes.map(
+              (node) =>
+                node.position.y
+                + (node.height ?? JOURNEY_NODE_SIZE.regular.height),
+            ),
+          );
+
+          const edgeConfig: Record<string, unknown> = {
+            id: edge.id,
+            shape: 'edge',
+            source: {
+              cell: edge.source,
+              port: edge.sourceHandle,
             },
-          },
-          connector: {
-            name: 'rounded',
-            args: {
-              radius: 10,
+            target: {
+              cell: edge.target,
+              port: edge.targetHandle,
             },
-          },
-          labels: [],
-          attrs: {
-            line: {
-              stroke: edge.id === selectedEdgeId ? '#1677ff' : '#aab6c5',
-              strokeWidth: edge.id === selectedEdgeId ? 3 : 1.8,
-              strokeLinejoin: 'round',
-              targetMarker: {
-                name: 'block',
-                width: edge.id === selectedEdgeId ? 10 : 8,
-                height: edge.id === selectedEdgeId ? 7 : 6,
+            connector: {
+              name: 'rounded',
+              args: { radius: 10 },
+            },
+            labels: [],
+            attrs: {
+              line: {
+                stroke: selected ? '#1677ff' : backward ? '#8b98a8' : '#99a6b5',
+                strokeWidth: selected ? 2.8 : 1.8,
+                strokeLinejoin: 'round',
+                strokeLinecap: 'round',
+                ...(backward ? { strokeDasharray: '6 4', opacity: 0.78 } : {}),
+                targetMarker: {
+                  name: 'block',
+                  width: selected ? 10 : 8,
+                  height: selected ? 7 : 6,
+                },
               },
             },
-          },
-          data: edge.data,
-        })),
+            data: edge.data,
+          };
+
+          if (backward) {
+            const useBottom = backwardIndex % 2 === 1;
+            const laneIndex = Math.floor(backwardIndex / 2);
+            const lane = useBottom
+              ? maxY + 56 + laneIndex * 30
+              : minY - 56 - laneIndex * 30;
+
+            const sourceX =
+              (sourceNode?.position.x ?? 0)
+              + (sourceNode?.width ?? JOURNEY_NODE_SIZE.regular.width)
+              + 28;
+            const targetX = (targetNode?.position.x ?? 0) - 28;
+
+            Object.assign(edgeConfig, {
+              vertices: [
+                { x: sourceX, y: lane },
+                { x: targetX, y: lane },
+              ],
+              router: {
+                name: 'orth',
+                args: { padding: 18 },
+              },
+            });
+          } else {
+            Object.assign(edgeConfig, {
+              router: {
+                name: 'manhattan',
+                args: {
+                  step: 16,
+                  padding: 18,
+                  startDirections: ['right'],
+                  endDirections: ['left'],
+                },
+              },
+            });
+          }
+
+          return edgeConfig;
+        }),
       );
     });
   };
@@ -437,13 +507,13 @@ export function JourneyX6Graph({
         return;
       }
 
-      const source = edge.getSource();
-      const target = edge.getTarget();
+      const sourcePort = edge.getSourcePortId();
+      const targetPort = edge.getTargetPortId();
       const connection: GraphConnection = {
         source: sourceCell.id,
         target: targetCell.id,
-        ...(typeof source.port === 'string' ? { sourcePort: source.port } : {}),
-        ...(typeof target.port === 'string' ? { targetPort: target.port } : {}),
+        ...(sourcePort ? { sourcePort } : {}),
+        ...(targetPort ? { targetPort } : {}),
       };
 
       if (isNew) {
@@ -504,6 +574,11 @@ export function JourneyX6Graph({
         || data.nodeType !== node.data.nodeType
         || data.actor !== node.data.actor
         || data.status !== node.data.status
+        || data.completion !== node.data.completion
+        || data.completeWhen !== node.data.completeWhen
+        || data.visible !== node.data.visible
+        || data.connectionIssue !== node.data.connectionIssue
+        || data.connectionIssueText !== node.data.connectionIssueText
         || data.selected !== (node.id === selectedNodeId)
       ) {
         cell.setData(
