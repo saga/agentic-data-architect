@@ -124,10 +124,10 @@ export function JourneyMapInspector({
             <SettingOutlined />
             <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '连接属性' : '属性'}</Text>
             {selectedNode && nodeDraft?.type ? (
-              <Tag bordered={false}>{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
+              <Tag variant="filled">{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
             ) : null}
             {selectedEdge && edgeDraft ? (
-              <Tag bordered={false}>{edgeDraft.outcome || '分支'}</Tag>
+              <Tag variant="filled">{edgeDraft.outcome || '分支'}</Tag>
             ) : null}
           </Flex>
           {selectedNode ? (
@@ -398,7 +398,7 @@ export function JourneyMapInspector({
                     ? 'green'
                     : undefined
               }
-              bordered={false}
+              variant="filled"
             >
               {selectedEdge.data?.kind === 'success'
                 ? '成功'
