@@ -88,6 +88,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       importantDocuments: [],
     },
     agent: {
+      permissionMode: 'permission',
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
@@ -111,6 +112,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       importantDocuments: control.research.importantDocuments.map((item) => ({ ...item })),
     },
     agent: {
+      permissionMode: control.agent.permissionMode,
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: { ...control.agent.systemPrompt },
       mcpServers: control.agent.mcpServers.map((item) => ({
@@ -148,6 +150,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
         : [],
     },
     agent: {
+      permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
       platformCapabilities: config.graphifyEnabled
         ? [{
             name: 'graphify-structural-analysis',
@@ -282,6 +285,7 @@ async function updateInvestigationControlImpl(
       })).filter((item) => item.title && item.reference),
     },
     agent: {
+      permissionMode: next.agent.permissionMode,
       // Platform capabilities are controlled by the application, not the per-Investigation UI.
       // Custom MCP servers remain user-configurable for this Investigation.
       platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
@@ -310,6 +314,7 @@ async function updateInvestigationControlImpl(
   if (JSON.stringify(current.research) !== JSON.stringify(control.research)) changed.push('research');
   if (promptChanged) changed.push('guidance');
   if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
+  if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
 
   await appendAuditEvent(name, {
     actor: 'user',
@@ -319,6 +324,7 @@ async function updateInvestigationControlImpl(
     details: {
       changed,
       guidanceVersion: control.agent.systemPrompt.version,
+      permissionMode: control.agent.permissionMode,
       mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
       platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
     },
