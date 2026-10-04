@@ -954,11 +954,12 @@ function AppInner() {
         navigateToSession(key);
       }
 
+      // 页面刷新后没有本地 activeTurnRef，但服务端可能仍有上一轮执行；等待真实 live turn 结束。
+      // 在等待期间不要覆盖旧 turn 的 Stop 引用，否则用户将无法停止真正正在执行的上一轮。
+      await waitForExecutionIdle(key as string);
+
       activeTurnRef.current = { key: key as string, turnId, controller };
       setStreamingAnswer({ key: key as string, content: '' });
-
-      // 页面刷新后没有本地 activeTurnRef，但服务端可能仍有上一轮执行；等待真实 live turn 结束。
-      await waitForExecutionIdle(key as string);
 
       setCurrent((existing) => existing ? {
         ...existing,
