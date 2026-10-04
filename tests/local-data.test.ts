@@ -77,6 +77,37 @@ test('DuckDB reconciliation and explain produce deterministic Evidence', async (
     await fs.rm(sessionRoot, { recursive: true, force: true });
   }
 });
+test('local dataset rejects symlinks that escape the Investigation workspace', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('symlink creation is environment-dependent on Windows CI');
+    return;
+  }
+
+  const sessionName = 'test-symlink-' + randomUUID().slice(0, 8);
+  const sessionRoot = path.resolve('.workspace', sessionName);
+  const outsideDir = path.resolve('.workspace-symlink-target-' + randomUUID().slice(0, 8));
+  const uploadsDir = path.join(sessionRoot, 'uploads');
+
+  await fs.mkdir(uploadsDir, { recursive: true });
+  await fs.mkdir(outsideDir, { recursive: true });
+
+  try {
+    const outsideFile = path.join(outsideDir, 'outside.csv');
+    const linkedFile = path.join(uploadsDir, 'linked.csv');
+    await fs.writeFile(outsideFile, 'security_id,quantity\\nAAPL,10\\n', 'utf8');
+    await fs.symlink(outsideFile, linkedFile);
+
+    await assert.rejects(
+      () => registerLocalDataset(sessionName, 'uploads/linked.csv'),
+      /符号链接离开当前 Investigation workspace/,
+    );
+  } finally {
+    closeLocalAnalytics();
+    await fs.rm(sessionRoot, { recursive: true, force: true });
+    await fs.rm(outsideDir, { recursive: true, force: true });
+  }
+});
+
 test('workspace CSV becomes a DuckDB dataset with Evidence provenance', async () => {
   const sessionName = 'test-local-' + randomUUID().slice(0, 8);
   const sessionRoot = path.resolve('.workspace', sessionName);
