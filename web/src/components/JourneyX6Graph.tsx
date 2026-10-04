@@ -132,7 +132,7 @@ export function JourneyX6Graph({
    */
   const buildPorts = (node: FlowNode) => {
     const terminal =
-      node.data.nodeType === 'end' || node.data.nodeType === 'stop';
+      node.data.nodeType === 'end';
 
     // retry 也是真实 Workflow Edge，不能从 Port 中隐藏；它只是采用不同的视觉路由。
     const visibleSources = node.data.sourceHandles;
@@ -256,7 +256,7 @@ export function JourneyX6Graph({
           x: node.position.x,
           y: node.position.y,
           width: node.width ?? (
-            node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+            node.data.nodeType === 'end'
               ? JOURNEY_NODE_SIZE.terminal.width
               : JOURNEY_NODE_SIZE.regular.width
           ),
