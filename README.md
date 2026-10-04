@@ -184,14 +184,7 @@ Workflow 现在不是只读的路线图。打开“编辑工作地图”后，�
 
 内置 Skill 的 SKILL.md 不会被直接改写。自定义 Workflow 保存在当前 Investigation 的 workflow/ 目录，并把 Markdown DSL、画布布局和执行状态分开保存。
 
-Workflow DSL 新增 completion：
-
-~~~text
-completion: deterministic
-completion: agent
-~~~
-
-有 completeWhen 的旧节点默认按 deterministic 处理；没有 completeWhen 的旧节点默认由 Agent 根据实际 outcome 推进。Workflow 的分支仍然使用简单的 outcome，例如：
+Workflow DSL 保持最小语义：有 `completeWhen` 的步骤由已有事实自动推进；没有 `completeWhen` 的步骤由 Agent / 人工选择 Workflow 中真实存在的 outcome。分支只描述结果和目标，例如：
 
 ~~~text
 - success -> next
@@ -238,9 +231,8 @@ skills/legacy-modernization/SKILL.md
 ~~~text
 @flow
 @task
-@gate
+@review
 @end
-@stop
 ~~~
 
 这条路线不是一条不能回头的流程图。发现新的 lineage、业务定义或数据质量问题时，可以回到前面的调查关卡；只有 Current-State、Mapping、Validation 等确定性状态满足条件，路线才会推进。
