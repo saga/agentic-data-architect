@@ -10,6 +10,7 @@ import type {
   FlowEdge,
   FlowNode,
   FlowNodeData,
+  NEW_SOURCE_HANDLE_ID,
 } from './journey-map-types.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
@@ -172,6 +173,17 @@ export function JourneyX6Graph({
           },
         },
       })),
+      {
+        // 单独提供一个透明的“新分支”出口。它不是 Workflow route，
+        // 所以不会出现在属性面板或人工 transition 选项里。
+        id: NEW_SOURCE_HANDLE_ID,
+        group: 'output',
+        attrs: {
+          text: {
+            text: '',
+          },
+        },
+      },
     ],
   });
 
