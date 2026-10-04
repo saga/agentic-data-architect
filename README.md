@@ -191,11 +191,11 @@ completion: deterministic
 completion: agent
 ~~~
 
-有 completeWhen 的旧节点默认按 deterministic 处理；没有 completeWhen 的旧节点默认由 Agent 根据实际 outcome 推进。Workflow 的分支仍然使用简单的：
+有 completeWhen 的旧节点默认按 deterministic 处理；没有 completeWhen 的旧节点默认由 Agent 根据实际 outcome 推进。Workflow 的分支仍然使用简单的 outcome，例如：
 
 ~~~text
 - success -> next
-- needs-input -> intake
+- failed -> review
 - retry -> investigate
 ~~~
 
