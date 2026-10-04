@@ -10,6 +10,8 @@ import {
   type WorkflowLayout,
   type WorkflowNodeDefinition,
   type WorkflowSnapshot,
+  JOURNEY_NODE_SIZE,
+  NEW_TARGET_HANDLE_ID,
 } from './journey-map-types.js';
 
 /** 给已有出口生成稳定的 source port ID。 */
@@ -191,7 +193,7 @@ export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
 
   return {
     version: 1,
-    engine: 'elk-v5',
+    engine: 'workflow-v1',
     nodes: result,
   };
 }
@@ -401,8 +403,8 @@ export function graphFromDefinition(
       id: item.id,
       type: 'journey',
       position: layout.nodes[item.id] ?? { x: 0, y: 0 },
-      width: terminal ? 190 : 236,
-      height: terminal ? 96 : 180,
+      width: terminal ? JOURNEY_NODE_SIZE.terminal.width : JOURNEY_NODE_SIZE.regular.width,
+      height: terminal ? JOURNEY_NODE_SIZE.terminal.height : JOURNEY_NODE_SIZE.regular.height,
       data: {
         title: item.title,
         objective: item.objective,
@@ -509,7 +511,7 @@ export function normalizeConnection(
     source: connection.source,
     target: connection.target,
     sourceHandle: sourceHandleId(connection.source, outgoing.length),
-    targetHandle: TARGET_HANDLE_ID,
+    targetHandle: NEW_TARGET_HANDLE_ID,
     data: { outcome },
   };
 }
