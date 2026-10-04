@@ -96,8 +96,8 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     agent: {
       permissionMode: 'permission',
       displayName: '秘书',
-      avatarWidth: 200,
-      avatarHeight: 400,
+      avatarWidth: 180,
+      avatarHeight: 240,
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
@@ -174,8 +174,8 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(agent.avatarMimeType === 'image/png' || agent.avatarMimeType === 'image/jpeg' || agent.avatarMimeType === 'image/webp'
         ? { avatarMimeType: agent.avatarMimeType }
         : {}),
-      avatarWidth: normalizeAvatarDimension(agent.avatarWidth, 200, 40, 800),
-      avatarHeight: normalizeAvatarDimension(agent.avatarHeight, 400, 40, 1200),
+      avatarWidth: normalizeAvatarDimension(agent.avatarWidth, 180, 40, 800),
+      avatarHeight: normalizeAvatarDimension(agent.avatarHeight, 240, 40, 1200),
       platformCapabilities: config.graphifyEnabled
         ? [{
             name: 'graphify-structural-analysis',
