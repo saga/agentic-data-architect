@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   App as AntApp,
+  Avatar,
   Button,
   Card,
   ConfigProvider,
@@ -28,6 +29,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SendOutlined,
+  RobotOutlined,
   SettingOutlined,
   ToolOutlined,
   CopyOutlined,
@@ -349,6 +351,33 @@ function ChatMessageMeta(props: { speaker: string; capturedAt: string }) {
   );
 }
 
+function AssistantAvatar(props: {
+  sessionName: string;
+  control: InvestigationControl;
+}) {
+  const width = Math.max(40, props.control.agent.avatarWidth || 200);
+  const height = Math.max(40, props.control.agent.avatarHeight || 400);
+  const displayWidth = 34;
+  const displayHeight = Math.max(34, Math.min(68, Math.round(displayWidth * height / width)));
+  return (
+    <Avatar
+      shape="square"
+      src={
+        props.control.agent.avatarPath
+          ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
+          : undefined
+      }
+      icon={<RobotOutlined />}
+      style={{
+        width: displayWidth,
+        height: displayHeight,
+        flex: '0 0 auto',
+        objectFit: 'cover',
+      }}
+    />
+  );
+}
+
 function AssistantActionBar(props: {
   routeOptions: NonNullable<SessionContext['journeyPlan']>['routes'];
   followUpQuestions: string[];
@@ -636,13 +665,15 @@ function AppInner() {
         role: message.role,
         content:
           message.role === 'assistant' ? (
-            <div className="assistant-message-content">
-              <ChatMessageMeta
-                speaker={current?.control.agent.displayName?.trim() || '秘书'}
-                capturedAt={message.capturedAt}
-              />
-              <ChatMarkdown content={message.content} />
-              {showActions ? (
+            <div className="assistant-chat-row">
+              <AssistantAvatar sessionName={current!.context.name} control={current!.control} />
+              <div className="assistant-message-content">
+                <ChatMessageMeta
+                  speaker={current!.control.agent.displayName?.trim() || '秘书'}
+                  capturedAt={message.capturedAt}
+                />
+                <ChatMarkdown content={message.content} />
+                {showActions ? (
                 <AssistantActionBar
                   routeOptions={current?.context.journeyPlan?.routes ?? []}
                   followUpQuestions={guidance ?? []}
@@ -650,7 +681,8 @@ function AppInner() {
                   onSelectRoute={(routeId) => void send(undefined, routeId)}
                   onAsk={(question) => void send(question, undefined, true)}
                 />
-              ) : null}
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="user-message-content">
@@ -666,9 +698,20 @@ function AppInner() {
       items.push({
         key: 'streaming-assistant',
         role: 'assistant',
-        content: displayAssistantContent(currentStreamingAnswer.content)
-          ? <ChatMarkdown content={currentStreamingAnswer.content} />
-          : <Text type="secondary">助手正在整理答案，请稍候…</Text>,
+        content: (
+          <div className="assistant-chat-row">
+            <AssistantAvatar sessionName={current!.context.name} control={current!.control} />
+            <div className="assistant-message-content">
+              <ChatMessageMeta
+                speaker={current!.control.agent.displayName?.trim() || '秘书'}
+                capturedAt={new Date().toISOString()}
+              />
+              {displayAssistantContent(currentStreamingAnswer.content)
+                ? <ChatMarkdown content={currentStreamingAnswer.content} />
+                : <Text type="secondary">助手正在整理答案，请稍候…</Text>}
+            </div>
+          </div>
+        ),
         footer: undefined,
       });
     }
