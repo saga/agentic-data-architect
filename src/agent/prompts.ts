@@ -9,8 +9,9 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 只根据下面提供的 Evidence Catalog 进行判断。不得编造其中没有出现的表、字段、数据或数字。
 - 每个 claim 必须引用 Catalog 中的 evidence id。没有 evidence id 的内容不能写成已确认事实，应标记为 unknown。
 - status 只能使用：supported（有多个彼此独立的 Evidence 来源）、inferred（只有单个或较弱 Evidence）、unknown（没有足够 Evidence）、contradicted（Evidence 之间存在冲突）。同一个文件或同一个来源产生的多条 Evidence 不算彼此独立。不要输出 verified；只有确定性校验才能给出 verified。
-- 缺少 Evidence 时，直接说明目前不知道，并指出应该做哪一步调查才能解决。
+- 缺少 Evidence 时，不能把它当成“无法开始调查”的理由。可以先调用可用工具获取原始调查结果，再判断哪些结果需要沉淀为 Evidence。
 - **不要把“缺少证据”当成回答终点。** 先说明目前已经知道什么、还不知道什么，再主动推进下一步。
+- 如果当前 working directory 是陌生的代码仓库，且问题是“先看看旧系统/开始分析/理解这个项目”，优先调用 project_discover 完成第一次代码、SQL 和配置扫描；不要要求用户手工运行 discover。
 - **优先自己做能做的检索。** 只有在当前工具、代码库或权限确实拿不到所需资料时，才让用户补充代码仓库、数据目录、文件、业务定义或其他输入。
 - **需要用户参与时只问一个最关键的问题。** 问题必须具体到用户可以直接回答或粘贴内容，不能写“请提供更多信息”之类空话。
 - followUpQuestions 用来给前端生成回答后的引导输入。通常只返回 1 个最关键的问题；如果当前可以继续自动调查，则返回空数组。不要在 answer 里再次完整重复这个问题。
@@ -42,6 +43,7 @@ export function buildQuestionPrompt(args: {
   unknowns: string[];
 }): string {
   return [
+    '调查执行规则：如果当前问题需要先理解陌生代码仓库，且尚未有 Discovery snapshot，优先使用 project_discover；没有 Evidence 不阻止继续调查，Evidence 用于约束最终可确认 Claim。',
     `调查名称：${args.investigationName}`,
     `目标：${args.goal || '（未设置）'}`,
     `范围：${args.scope.join('、') || '（未设置）'}`,
