@@ -124,6 +124,10 @@ export async function readTrajectory(name: string, options: { turnId?: string; l
 export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown): TrajectorySummary | null {
   if (!events.length) return null;
 
+  // 总 Token / Premium Cost 统计跨所有历史轮次；运行状态只看“最近一轮”。
+  // 否则第一轮曾经 timeout / waiting permission，会把后来已经成功完成的轮次误报成异常。
+  const latestTurnId = events.at(-1)!.turnId;
+  const latestTurnEvents = events.filter((event) => event.turnId === latestTurnId);
   const first = events[0]!;
   const last = events.at(-1)!;
   const usageObject = usage && typeof usage === 'object'
@@ -192,13 +196,13 @@ export function summarizeTrajectory(events: TrajectoryEvent[], usage?: unknown):
         ? usageObject.totalPremiumRequestCost
         : undefined;
 
-  const completionEvent = [...events].reverse().find((event) =>
+  const completionEvent = [...latestTurnEvents].reverse().find((event) =>
     event.type === 'turn_end'
     || (event.type === 'status' && event.name === '结果已保存')
     || event.type === 'error'
   );
   const finishedAt = completionEvent?.timestamp;
-  const diagnostics = deriveTrajectoryDiagnostics(events);
+  const diagnostics = deriveTrajectoryDiagnostics(latestTurnEvents);
   return TrajectorySummarySchema.parse({
     turnId: first.turnId,
     startedAt: first.timestamp,
