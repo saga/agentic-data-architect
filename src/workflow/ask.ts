@@ -258,6 +258,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
     platformCapabilities: control.agent.platformCapabilities,
     // 每轮执行读取并固定当前 Investigation 的权限模式；配置修改后会创建新的 Copilot Session。
     permissionMode: control.agent.permissionMode,
+    autoContinuationTurns: control.agent.autoContinuationTurns,
     mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
     ...(onDelta ? { onDelta } : {}),
     ...(onStatus ? { onStatus } : {}),
