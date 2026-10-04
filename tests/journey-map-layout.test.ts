@@ -24,9 +24,7 @@ function node(id: string, x = 0, y = 0): FlowNode {
       title: id,
       nodeType: 'task',
       status: 'future',
-      completion: 'agent',
       actor: 'agent',
-      visible: true,
       sourceHandles: [{ id: id + '-out-0', label: 'success' }],
       targetHandles: [{ id: id + '-in-0', label: 'in' }],
     },
@@ -53,7 +51,7 @@ test('workflow layout keeps the main path vertical and branch nodes off the main
   const nodes = [node('a'), node('b'), node('c'), node('d')];
   const edges = [
     edge('a-b', 'a', 'b', 'success'),
-    edge('a-c', 'a', 'c', 'needs-input'),
+    edge('a-c', 'a', 'c', 'failed'),
     edge('b-d', 'b', 'd', 'success'),
     edge('c-d', 'c', 'd', 'success'),
   ];
@@ -107,8 +105,6 @@ test('graph projection removes self-loop edges and their handles', () => {
         id: 'a',
         type: 'task',
         title: '步骤 A',
-        visible: true,
-        completion: 'agent',
         actor: 'agent',
         routes: [{ outcome: 'retry', target: 'a' }],
       },
@@ -116,9 +112,7 @@ test('graph projection removes self-loop edges and their handles', () => {
         id: 'done',
         type: 'end',
         title: '完成',
-        visible: true,
-        completion: 'agent',
-        actor: 'system',
+        actor: 'agent',
         routes: [],
       },
     ],
@@ -154,8 +148,7 @@ test('graph projection removes self-loop edges and their handles', () => {
         status: 'active',
       },
     },
-    analysis: [],
-    events: [],
+     events: [],
   } satisfies WorkflowSnapshot;
 
   const graph = graphFromDefinition(definition, snapshot.layout, snapshot);
