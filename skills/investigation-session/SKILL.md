@@ -27,7 +27,19 @@ metadata:
 - 上下文不足时只问一个具体问题。
 - 能通过确定性脚本得到的信息，直接运行脚本，不用文字猜测结果。
 - 已有 SKILL 能定义的流程，遵循对应 SKILL，不在 prompt 中重新发明流程。
+- 业务术语影响模型、映射或架构决定时使用 domain-modeling。
+- 需要确认外部事实或第三方能力时使用 research，并把结果作为可复核的临时资料。
+- 出现真正的业务/架构取舍时使用 grilling；事实先查清，决定由用户确认。
 - 用户可以随时补充资料、提出问题或纠正方向；不要把一次回答视为任务结束。
+
+## 决策与术语
+
+调查过程中不要把“查到了什么”和“决定怎么做”混在一起：
+
+- Evidence / Research 是事实材料。
+- Domain Modeling 保存确认后的业务语言。
+- Grilling 只处理真正需要人决定的分叉。
+- Target Architecture、Mapping 和 Validation 继续使用现有 Investigation / Workflow 产物。
 
 ## 文件沉淀
 - 当前 session 的调查状态放在 `.workspace/<session-name>/context.json`。
