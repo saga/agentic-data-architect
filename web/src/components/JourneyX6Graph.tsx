@@ -382,12 +382,12 @@ export function JourneyX6Graph({
 
     graph.on('node:selected', ({ node }) => {
       const data = node.getData<FlowNodeData>();
-      node.setData({ ...data, selected: true }, { silent: true });
+      node.setData({ ...data, selected: true });
     });
 
     graph.on('node:unselected', ({ node }) => {
       const data = node.getData<FlowNodeData>();
-      node.setData({ ...data, selected: false }, { silent: true });
+      node.setData({ ...data, selected: false });
     });
 
     graph.on('edge:connected', async ({ edge, isNew }) => {
@@ -481,7 +481,6 @@ export function JourneyX6Graph({
             ...node.data,
             selected: node.id === selectedNodeId,
           },
-          { silent: true },
         );
       }
 
