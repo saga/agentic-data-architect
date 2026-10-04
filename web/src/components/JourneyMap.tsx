@@ -32,6 +32,9 @@ export interface JourneyMapProps {
  * 图编辑能力统一由 AntV X6 承担：节点、Port、Edge、路由、缩放、选择、吸附和小地图
  * 都在 JourneyX6Graph 内完成。Workflow Definition / AI Patch / 保存逻辑仍由 editor hook
  * 管理，因此更换图引擎不会改变业务层。
+ *
+ * 页面本身只负责三件事：组合画布和右栏、显示保存/校验状态、把用户动作交给 editor hook。
+ * 不在这里直接修改 Workflow Definition，也不把 X6 对象存进业务状态。
  */
 export function JourneyMap(props: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
