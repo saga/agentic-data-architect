@@ -62,7 +62,7 @@ export function buildQuestionPrompt(args: {
     ``,
     '当前未知项（仅作为线索，不是按顺序执行的待办清单）：',
     args.unknowns.slice(0, 12).map((u) => `- ${u}`).join('\n') || '（无）',
-    '如果这里有历史遗留、重复或过于笼统的 unknown，不要逐条处理；以当前目标和实际 Evidence 为准重新判断。'
+    '如果这里有历史遗留、重复或过于笼统的 unknown，不要逐条处理；以当前目标和实际 Evidence 为准重新判断。',
     ...(args.selectedRoute
       ? [
           '用户刚刚从界面选择了一个下一步调查动作。它已经是用户确认的选择，不要把它当成普通建议：',
