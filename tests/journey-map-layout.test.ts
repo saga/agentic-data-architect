@@ -47,23 +47,45 @@ function edge(
   };
 }
 
-test('workflow layout keeps the main path vertical and branch nodes off the main line', () => {
-  const nodes = [node('a'), node('b'), node('c'), node('d')];
+test('workflow layout uses a 2D S-shaped main path with side branches', () => {
+  const nodes = [
+    node('a'),
+    node('b'),
+    node('c'),
+    node('d'),
+    node('e'),
+    node('f'),
+  ];
   const edges = [
     edge('a-b', 'a', 'b', 'success'),
     edge('a-c', 'a', 'c', 'failed'),
     edge('b-d', 'b', 'd', 'success'),
     edge('c-d', 'c', 'd', 'success'),
+    edge('d-e', 'd', 'e', 'success'),
+    edge('e-f', 'e', 'f', 'success'),
   ];
 
   const result = layoutWorkflow(nodes, edges);
   const byId = new Map(result.map((item) => [item.id, item]));
 
-  assert.equal(byId.get('a')!.position.x, byId.get('b')!.position.x);
-  assert.equal(byId.get('b')!.position.x, byId.get('d')!.position.x);
-  assert.notEqual(byId.get('c')!.position.x, byId.get('a')!.position.x);
+  // 主线不再全部落在同一个 x；仍然保持从上到下的阅读方向。
+  const mainXs = ['a', 'b', 'd', 'e', 'f'].map((id) => byId.get(id)!.position.x);
+  assert.ok(new Set(mainXs).size >= 3);
   assert.ok(byId.get('b')!.position.y > byId.get('a')!.position.y);
-  assert.ok(byId.get('c')!.position.y > byId.get('a')!.position.y);
+  assert.ok(byId.get('d')!.position.y > byId.get('b')!.position.y);
+  assert.ok(byId.get('f')!.position.y > byId.get('e')!.position.y);
+
+  // 分支节点不与主线重合，且与起点不在同一列。
+  assert.notEqual(byId.get('c')!.position.x, byId.get('a')!.position.x);
+  assert.ok(Math.abs(byId.get('c')!.position.x - byId.get('a')!.position.x) >= 200);
+
+  // 不是“横线/竖线”旋转，而是明显占用二维空间。
+  const xs = result.map((item) => item.position.x);
+  const ys = result.map((item) => item.position.y);
+  const width = Math.max(...xs) - Math.min(...xs);
+  const height = Math.max(...ys) - Math.min(...ys);
+  assert.ok(width > 500);
+  assert.ok(height > width);
 });
 
 test('loop edges do not change forward ranks', () => {
