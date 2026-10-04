@@ -382,7 +382,7 @@ function AssistantActionBar(props: {
       ) : null}
       {questions.length ? (
         <>
-          <Text type="secondary" className="assistant-action-label">需要确认</Text>
+          <Text type="secondary" className="assistant-action-label">继续调查</Text>
           <Flex wrap gap={6}>
             {questions.map((question) => (
               <Button
