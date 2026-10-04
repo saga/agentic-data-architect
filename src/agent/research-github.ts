@@ -71,11 +71,27 @@ async function cloneRepository(repository: GitHubRepository, targetDir: string):
     env.GIT_CONFIG_VALUE_0 = 'Authorization: Basic ' + auth;
   }
 
-  await execFile(
-    'git',
-    ['clone', '--depth', '1', repository.url + '.git', targetDir],
-    { env, maxBuffer: 4 * 1024 * 1024 },
-  );
+  try {
+    await execFile(
+      'git',
+      ['clone', '--depth', '1', repository.url + '.git', targetDir],
+      { env, maxBuffer: 4 * 1024 * 1024 },
+    );
+    return;
+  } catch (gitError) {
+    // 本机可能只有 GitHub CLI 登录态，没有 GITHUB_TOKEN 环境变量。
+    // 这种情况下让 gh 自己处理认证；如果 gh 也不可用，再把原始 git 错误抛给上层。
+    await fs.rm(targetDir, { recursive: true, force: true });
+    try {
+      await execFile(
+        'gh',
+        ['repo', 'clone', repository.owner + '/' + repository.name, targetDir, '--', '--depth', '1'],
+        { maxBuffer: 4 * 1024 * 1024 },
+      );
+    } catch {
+      throw gitError;
+    }
+  }
 }
 
 /** 获取 GitHub repository 的本地研究副本，并运行现有确定性 Discovery。 */
