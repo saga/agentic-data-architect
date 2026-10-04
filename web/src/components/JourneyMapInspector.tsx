@@ -122,7 +122,7 @@ export function JourneyMapInspector({
         <Flex align="center" justify="space-between" gap={8}>
           <Flex align="center" gap={7} style={{ minWidth: 0 }}>
             <SettingOutlined />
-            <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '分支属性' : '属性'}</Text>
+            <Text strong>{selectedNode ? '节点属性' : selectedEdge ? '连接属性' : '属性'}</Text>
             {selectedNode && nodeDraft?.type ? (
               <Tag bordered={false}>{NODE_TYPE_LABEL[nodeDraft.type] ?? nodeDraft.type}</Tag>
             ) : null}
@@ -372,11 +372,49 @@ export function JourneyMapInspector({
         </Flex>
       ) : selectedEdge && edgeDraft ? (
         <Flex vertical gap={10}>
+          <div className="journey-map-edge-summary">
+            <div>
+              <Text type="secondary">来源</Text>
+              <Text strong ellipsis={{ tooltip: selectedEdge.source }}>
+                {nodes.find((node) => node.id === selectedEdge.source)?.data.title ?? selectedEdge.source}
+              </Text>
+            </div>
+            <ArrowRightOutlined />
+            <div>
+              <Text type="secondary">目标</Text>
+              <Text strong ellipsis={{ tooltip: edgeDraft.target }}>
+                {nodes.find((node) => node.id === edgeDraft.target)?.data.title ?? edgeDraft.target}
+              </Text>
+            </div>
+          </div>
+
+          <div className="journey-map-edge-info">
+            <Text type="secondary">连接类型</Text>
+            <Tag
+              color={
+                selectedEdge.data?.kind === 'fail'
+                  ? 'red'
+                  : selectedEdge.data?.kind === 'success'
+                    ? 'green'
+                    : undefined
+              }
+              bordered={false}
+            >
+              {selectedEdge.data?.kind === 'success'
+                ? '成功'
+                : selectedEdge.data?.kind === 'fail'
+                  ? '失败'
+                  : selectedEdge.data?.kind === 'retry'
+                    ? '重试'
+                    : '分支'}
+            </Tag>
+          </div>
+
           <div>
-            <Text type="secondary">分支结果</Text>
+            <Text type="secondary">结果</Text>
             <Input
               value={edgeDraft.outcome}
-              placeholder="success / needs-input / retry"
+              placeholder="Workflow outcome"
               onChange={(event) =>
                 setEdgeDraft({
                   ...edgeDraft,
@@ -386,7 +424,7 @@ export function JourneyMapInspector({
           </div>
 
           <div>
-            <Text type="secondary">目标</Text>
+            <Text type="secondary">目标步骤</Text>
             <Select
               value={edgeDraft.target}
               style={{ width: '100%' }}
@@ -403,19 +441,16 @@ export function JourneyMapInspector({
           </div>
 
           <div>
-            <Text type="secondary">条件（可选）</Text>
+            <Text type="secondary">条件</Text>
             <Input
               value={edgeDraft.condition ?? ''}
-              placeholder="例如 goal / current-state"
+              placeholder="可选，例如 current-state"
               onChange={(event) =>
                 setEdgeDraft({
                   ...edgeDraft,
                   condition: event.target.value,
                 })}
             />
-            <Text type="secondary" className="journey-map-connect-hint">
-              仅对确定性节点参与自动路由；同一节点按 DSL 中的顺序先匹配。
-            </Text>
           </div>
 
           <Flex gap={8}>
@@ -424,7 +459,7 @@ export function JourneyMapInspector({
               icon={<SaveOutlined />}
               onClick={() => void applyEdgeDraft()}
             >
-              应用分支属性
+              应用连接
             </Button>
 
             <Button
@@ -432,7 +467,7 @@ export function JourneyMapInspector({
               icon={<DeleteOutlined />}
               onClick={deleteSelectedEdge}
             >
-              删除分支
+              删除连接
             </Button>
           </Flex>
         </Flex>
@@ -440,7 +475,7 @@ export function JourneyMapInspector({
         <div className="journey-map-inspector-empty">
           <HolderOutlined />
           <Text type="secondary">
-            点击节点编辑属性；点击连线修改分支结果或目标。
+            点击节点编辑步骤；点击连线查看并修改连接信息。
           </Text>
         </div>
       )}
