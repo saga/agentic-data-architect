@@ -244,11 +244,18 @@ app.post('/api/sessions', async (req, res) => {
     }
     await appendAuditEvent(name, {
       actor: 'user',
-      action: body.allowed ? 'agent.permission.approved' : 'agent.permission.rejected',
-      summary: body.allowed ? '用户允许 Agent 执行这次操作。' : '用户拒绝 Agent 执行这次操作。',
+      action: body.allowed
+        ? (body.scope === 'session' ? 'agent.permission.approved_for_session' : 'agent.permission.approved')
+        : 'agent.permission.rejected',
+      summary: body.allowed
+        ? (body.scope === 'session'
+          ? '用户允许 Agent 执行这次操作，并允许当前 Copilot Session 后续继续执行权限操作。'
+          : '用户允许 Agent 执行这次操作。')
+        : '用户拒绝 Agent 执行这次操作。',
       details: {
         turnId: body.turnId,
         requestId: body.requestId,
+        scope: body.scope,
       },
     });
     res.json({ ok: true });
