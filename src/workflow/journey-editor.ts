@@ -440,7 +440,7 @@ export async function getJourneySnapshot(
 export function validateJourneyEdit(
   definitionInput: JourneyDefinition,
   layoutInput: JourneyLayout,
-): { issues: string[]; warnings: string[] } {
+): { issues: string[] } {
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const layout = JourneyLayoutSchema.parse(layoutInput);
   const issues = validateJourneyDefinition(definition);
@@ -971,7 +971,7 @@ export async function buildJourneyAgentInstruction(
     '当这一轮已经完成当前节点并有足够依据选择出口时，在最终 JSON 中额外返回：',
     '{"workflow":{"nodeId":"当前节点 ID","outcome":"允许的 outcome"}}',
     '如果这轮没有完成当前节点，或者不能可靠判断出口，不要返回 workflow 字段，不要猜。',
-    '需要用户补充信息时，使用当前节点真正存在的 needs-input 等 outcome。',
+    '需要用户补充信息时，不要猜；应由当前 Workflow 中真实存在的人工步骤或 outcome 决定。',
   ].join('\n');
 }
 
