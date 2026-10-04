@@ -716,14 +716,13 @@ function AppInner() {
         avatar: <AssistantAvatar sessionName={current!.context.name} control={current!.control} />,
         content: (
           <div className="assistant-message-content">
-              <ChatMessageMeta
-                speaker={current!.control.agent.displayName?.trim() || '秘书'}
-                capturedAt={new Date().toISOString()}
-              />
-              {displayAssistantContent(currentStreamingAnswer.content)
-                ? <ChatMarkdown content={currentStreamingAnswer.content} />
-                : <Text type="secondary">助手正在整理答案，请稍候…</Text>}
-            </div>
+            <ChatMessageMeta
+              speaker={current!.control.agent.displayName?.trim() || '秘书'}
+              capturedAt={new Date().toISOString()}
+            />
+            {displayAssistantContent(currentStreamingAnswer.content)
+              ? <ChatMarkdown content={currentStreamingAnswer.content} />
+              : <Text type="secondary">助手正在整理答案，请稍候…</Text>}
           </div>
         ),
         footer: undefined,
