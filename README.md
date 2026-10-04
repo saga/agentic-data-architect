@@ -126,6 +126,8 @@ New Investigation
   → 目标 / 问题
   → 默认：自主调查
   → 可选：采用一套工作路线
+
+如果目标里直接给了 GitHub repository，工作台会先把仓库放进当前 Investigation 的研究目录并自动运行一次 Discovery。后续 Agent 可以继续用 GitHub、grep、view 和 Graphify 深入检查；关键源码关系可以登记为 code Evidence。
 ~~~
 
 当前提供三套可选的工作路线：
