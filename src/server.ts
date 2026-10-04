@@ -493,15 +493,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     });
   });
 
-  /** 上传当前 Investigation 的秘书头像；前端已经裁剪并缩放到配置尺寸，这里只负责安全落盘和更新 Control。 */
+  /** 上传当前 Investigation 的秘书头像；每次上传生成独立文件，不覆盖已有头像。 */
   app.post('/api/sessions/:name/assistant/avatar', upload.single('file'), async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
     if (!req.file) {
       res.status(400).json({ error: '没有收到头像文件，请重新选择。' });
       return;
     }
-
-    // 裁剪器最终统一生成 PNG；服务端固定写入 avatar.png，因此不接受其它 MIME。
     if (req.file.mimetype !== 'image/png') {
       res.status(400).json({ error: '头像上传接口只接受 PNG 图片。' });
       return;
@@ -512,21 +510,24 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }
 
     const root = workspaceRoot(name);
-    const avatarDir = path.join(root, 'assistant');
-    const avatarPath = path.join(avatarDir, 'avatar.png');
+    const avatarDir = path.join(root, 'assistant', 'avatars');
     await fs.mkdir(avatarDir, { recursive: true });
-    // 固定保存成 PNG；客户端已经将图片压缩到配置的目标尺寸，避免长期保存原始大图。
+    const avatarId = randomUUID();
+    const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.png');
+    const avatarPath = path.join(root, relativePath);
     await fs.writeFile(avatarPath, req.file.buffer);
 
     const current = await loadInvestigationControl(name);
     const requestedWidth = Number(req.body?.width);
     const requestedHeight = Number(req.body?.height);
     const avatarWidth = Number.isInteger(requestedWidth) && requestedWidth >= 40 && requestedWidth <= 800
-      ? requestedWidth
-      : current.agent.avatarWidth;
+      ? requestedWidth : current.agent.avatarWidth;
     const avatarHeight = Number.isInteger(requestedHeight) && requestedHeight >= 40 && requestedHeight <= 1200
-      ? requestedHeight
-      : current.agent.avatarHeight;
+      ? requestedHeight : current.agent.avatarHeight;
+    const avatarPaths = [...new Set([
+      ...(current.agent.avatarPaths ?? (current.agent.avatarPath ? [current.agent.avatarPath] : [])),
+      relativePath,
+    ])];
 
     const control = await updateInvestigationControl(
       name,
@@ -534,22 +535,24 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         research: current.research,
         agent: {
           ...current.agent,
-          avatarPath: 'assistant/avatar.png',
+          avatarPath: relativePath,
+          avatarPaths,
           avatarMimeType: 'image/png',
           avatarWidth,
           avatarHeight,
         },
       },
-      'assistant avatar updated',
+      'assistant avatar added',
     );
 
     await appendAuditEvent(name, {
       actor: 'user',
-      action: 'assistant.avatar.updated',
-      summary: 'Updated the investigation assistant avatar.',
+      action: 'assistant.avatar.added',
+      summary: 'Added an investigation assistant avatar.',
       configurationVersion: control.version,
       details: {
-        avatarPath: control.agent.avatarPath,
+        avatarPath: relativePath,
+        avatarCount: avatarPaths.length,
         avatarWidth: control.agent.avatarWidth,
         avatarHeight: control.agent.avatarHeight,
         sizeBytes: req.file.size,
@@ -559,20 +562,48 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     res.json({ control });
   });
 
-  /** 返回当前 Investigation 的秘书头像；头像文件只允许来自固定的 assistant/avatar.png。 */
-  app.get('/api/sessions/:name/assistant/avatar', async (req, res) => {
+  /** 返回指定秘书头像；只允许访问当前 Control 中登记过的头像文件。 */
+  app.get('/api/sessions/:name/assistant/avatar/:avatarId', async (req, res) => {
     const name = sessionKey(req.params.name);
+    const avatarId = String(req.params.avatarId);
+    if (!/^[0-9a-f-]+$/i.test(avatarId)) {
+      res.status(400).end();
+      return;
+    }
     const control = await loadInvestigationControl(name);
-    if (control.agent.avatarPath !== 'assistant/avatar.png') {
+    const avatarPaths = control.agent.avatarPaths ?? (control.agent.avatarPath ? [control.agent.avatarPath] : []);
+    const relativePath = avatarPaths.find((item) => path.basename(item, path.extname(item)) === avatarId);
+    if (!relativePath) {
       res.status(404).end();
       return;
     }
 
-    const avatarFile = path.join(workspaceRoot(name), 'assistant', 'avatar.png');
     try {
-      // 直接读取并返回 Buffer，避免 Express sendFile 在不同本地开发环境下再次做文件路径解析。
-      // 这样也把“检查文件存在”和“实际读取文件”合并成一次 I/O，避免 TOCTOU 问题。
-      const buffer = await fs.readFile(avatarFile);
+      const buffer = await fs.readFile(path.join(workspaceRoot(name), relativePath));
+      res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
+      res.setHeader('Content-Length', buffer.byteLength);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.end(buffer);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        res.status(404).end();
+        return;
+      }
+      throw error;
+    }
+  });
+
+  /** 兼容旧版单头像 URL：旧 Control 中的 avatar.png 仍然可以显示。 */
+  app.get('/api/sessions/:name/assistant/avatar', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const control = await loadInvestigationControl(name);
+    const relativePath = control.agent.avatarPath;
+    if (!relativePath) {
+      res.status(404).end();
+      return;
+    }
+    try {
+      const buffer = await fs.readFile(path.join(workspaceRoot(name), relativePath));
       res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
       res.setHeader('Content-Length', buffer.byteLength);
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
