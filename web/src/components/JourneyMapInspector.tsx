@@ -235,9 +235,9 @@ export function JourneyMapInspector({
                       </div>
                     </div>
 
-                    {nodeDraft.completeWhen !== undefined ? (
+                    <div>
                       <div>
-                        <Text type="secondary">completeWhen</Text>
+                        <Text type="secondary">确定性条件</Text>
                         <Input
                           value={String(nodeDraft.completeWhen ?? '')}
                           placeholder="例如 goal / current-state / validation"
@@ -248,7 +248,6 @@ export function JourneyMapInspector({
                             })}
                         />
                       </div>
-                    ) : null}
                   </Flex>
                 ),
               },
