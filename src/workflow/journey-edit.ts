@@ -58,13 +58,6 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
 export type JourneyWorkflowChange = z.infer<typeof JourneyWorkflowChangeSchema>;
 export const JourneyWorkflowChangesSchema = z.array(JourneyWorkflowChangeSchema).min(1).max(60);
 
-export interface JourneyAnalysisIssue {
-  severity: 'warning' | 'error';
-  code: string;
-  nodeId?: string;
-  message: string;
-}
-
 function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
   return {
     id: definition.id,
@@ -260,13 +253,6 @@ export function diffJourneyWorkflowDefinitions(
   }
 
   return changes;
-}
-
-/** Workflow 结构分析目前只依赖服务端的图验证；保留统一入口供编辑器显示提醒。 */
-export function analyzeJourneyWorkflow(
-  _definition: JourneyDefinition,
-): JourneyAnalysisIssue[] {
-  return [];
 }
 
 /** 只允许修改选中节点及其相邻节点/边，避免 AI 无意中重写整张图。 */
