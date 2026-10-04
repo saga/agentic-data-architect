@@ -2125,3 +2125,29 @@ body {
 }
 
 
+
+
+/* Sender 底部只保留模型选择；上传文件仍放在输入框左侧。 */
+.sender-model-controls {
+  min-height: 30px;
+  padding: 2px 4px 0;
+}
+
+.sender-model-label {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sender-model-controls .ant-select {
+  max-width: 220px;
+}
+
+.assistant-think {
+  margin: 4px 0 6px;
+  max-width: min(860px, 70vw);
+}
+
+.assistant-think .x-markdown-light {
+  font-size: 13px;
+  line-height: 1.65;
+}
