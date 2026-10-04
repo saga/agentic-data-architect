@@ -217,14 +217,11 @@ export function JourneyX6Graph({
           attrs: portAttrs,
         },
         newInput: {
-          position: {
-            name: 'absolute',
-            args: { x: '50%', y: 0 },
-          },
+          position: 'top' as const,
           attrs: {
             circle: {
               r: 8,
-              magnet: 'passive',
+              magnet: 'passive' as const,
               fill: 'transparent',
               stroke: 'transparent',
               opacity: 0,
@@ -232,10 +229,7 @@ export function JourneyX6Graph({
           },
         },
         newOutput: {
-          position: {
-            name: 'absolute',
-            args: { x: '50%', y: size.height },
-          },
+          position: 'bottom' as const,
           attrs: {
             circle: {
               r: 8,
