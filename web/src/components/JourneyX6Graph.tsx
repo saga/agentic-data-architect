@@ -160,6 +160,36 @@ export function JourneyX6Graph({
           },
         },
       },
+      newInput: {
+        position: {
+          name: 'absolute',
+          args: { x: 0, y: '88%' },
+        },
+        attrs: {
+          circle: {
+            r: 7,
+            magnet: 'passive',
+            fill: 'transparent',
+            stroke: 'transparent',
+            opacity: 0,
+          },
+        },
+      },
+      newOutput: {
+        position: {
+          name: 'absolute',
+          args: { x: '100%', y: '88%' },
+        },
+        attrs: {
+          circle: {
+            r: 7,
+            magnet: true,
+            fill: 'transparent',
+            stroke: 'transparent',
+            opacity: 0,
+          },
+        },
+      },
     },
     items: [
       ...node.data.targetHandles.map((handle) => ({
@@ -168,7 +198,7 @@ export function JourneyX6Graph({
       })),
       {
         id: NEW_TARGET_HANDLE_ID,
-        group: 'input',
+        group: 'newInput',
       },
       ...node.data.sourceHandles.map((handle) => ({
         id: handle.id,
@@ -186,7 +216,7 @@ export function JourneyX6Graph({
               // 单独提供一个透明的“新分支”出口。它不是 Workflow route，
               // 所以不会出现在属性面板或人工 transition 选项里。
               id: NEW_SOURCE_HANDLE_ID,
-              group: 'output',
+              group: 'newOutput',
               attrs: {
                 text: {
                   text: '',
