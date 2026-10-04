@@ -192,7 +192,8 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     lines.push('## @' + node.type + ' ' + node.id);
     lines.push('title: ' + node.title);
     if (node.objective) lines.push('objective: ' + node.objective);
-    lines.push('actor: ' + node.actor);
+    const defaultActor = node.type === 'review' ? 'human' : 'agent';
+    if (node.actor !== defaultActor) lines.push('actor: ' + node.actor);
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
     for (const route of node.routes) {
       lines.push(
