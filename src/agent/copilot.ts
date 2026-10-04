@@ -338,7 +338,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         pendingCopilotUserInputs.set(requestId, {
           sessionName: investigationName,
           turnId: input.turnId ?? '',
-          sessionId: session.sessionId,
+          sessionId: input.sessionId ?? '',
           requestId,
           question: request.question,
           choices: request.choices ?? [],
