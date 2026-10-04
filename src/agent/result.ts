@@ -5,7 +5,7 @@
  */
 import * as z from 'zod';
 import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
-import { JourneyRouteOptionSchema } from '../investigation/schemas.js';
+import { AgentCheckpointSchema, JourneyRouteOptionSchema, type AgentCheckpoint } from '../investigation/schemas.js';
 
 /**
  * 结构化 Agent 结果：
@@ -23,6 +23,8 @@ export type AgentClaimDraft = z.infer<typeof AgentClaimDraftSchema>;
 /** Agent 最终结构化答案的运行时 Schema；允许单个坏 Claim 通过 catch 降级而不丢掉整份答案。 */
 export const AgentAnswerSchema = z.object({
   answer: z.string().max(8000).catch(''),
+  /** 有实质调查成果时输出；这是中间 checkpoint，不是最终报告。 */
+  checkpoint: AgentCheckpointSchema.optional().catch(undefined),
   claims: z.array(AgentClaimDraftSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
@@ -130,9 +132,22 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
     routeOptions: parsed.data.routeOptions,
+    ...(parsed.data.checkpoint ? { checkpoint: parsed.data.checkpoint } : {}),
     warnings,
     droppedEvidenceRefs,
   };
+}
+
+/** 从完整 Agent JSON 中只提取阶段性 checkpoint；解析失败时直接忽略，不影响最终答案。 */
+export function extractAgentCheckpoint(raw: string): AgentCheckpoint | undefined {
+  try {
+    const data = JSON.parse(extractJson(raw)) as unknown;
+    if (!data || typeof data !== 'object' || !('checkpoint' in data)) return undefined;
+    const parsed = AgentCheckpointSchema.safeParse((data as Record<string, unknown>).checkpoint);
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** 把模型层 ParsedAnswer 转成可持久化的业务 Claim，并由调用方生成唯一 ID。 */
