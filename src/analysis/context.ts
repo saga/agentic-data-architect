@@ -64,6 +64,35 @@ export function buildQuestionContext(args: {
     return null;
   };
 
+  const renderCodeEvidence = (): string[] => {
+    const codeEvidence = evidence
+      .filter((item) => item.type === 'code_reference')
+      .filter((item) => {
+        const haystack = [
+          item.file ?? '',
+          item.source,
+          item.statement ?? '',
+          typeof item.value === 'object' && item.value ? JSON.stringify(item.value) : '',
+        ].join(' ').toLowerCase();
+        return qt.length === 0 || qt.some((token) => haystack.includes(token));
+      })
+      .slice(-20);
+
+    if (!codeEvidence.length) return [];
+    const lines = ['', '关键代码 Evidence：'];
+    for (const item of codeEvidence) {
+      const ref = use(item.id);
+      const value = item.value && typeof item.value === 'object'
+        ? item.value as Record<string, unknown>
+        : {};
+      const excerpt = typeof value.excerpt === 'string' ? value.excerpt.slice(0, 1800) : '';
+      lines.push('- ' + (item.file ?? item.source) + (ref ? ' [' + ref + ']' : ''));
+      if (item.statement) lines.push('  直接说明：' + item.statement);
+      if (excerpt) lines.push('  源码片段：\n' + excerpt);
+    }
+    return lines;
+  };
+
   if (!lineage) {
     const sourceLines: string[] = [];
     const sourceIds: string[] = [];
@@ -78,9 +107,18 @@ export function buildQuestionContext(args: {
         sourceLines.push('- ' + file.path);
       }
     }
+    const codeLines = renderCodeEvidence();
     return {
-      text: ['(no SQL lineage yet — run discover first)', sourceLines.length ? 'Source files (provenance only):' : '', ...sourceLines].filter(Boolean).join('\n'),
-      evidenceIds: sourceIds,
+      text: [
+        '(no SQL lineage yet — run discover first)',
+        sourceLines.length ? 'Source files (provenance only):' : '',
+        ...sourceLines,
+        ...codeLines,
+      ].filter(Boolean).join('\n'),
+      evidenceIds: [...new Set([...sourceIds, ...codeLines.flatMap((line) => {
+        const match = line.match(/\[([^\]]+)\]/);
+        return match ? [match[1]] : [];
+      })])],
     };
   }
   const ranked = lineage.tables
@@ -202,33 +240,7 @@ export function buildQuestionContext(args: {
     );
   }
 
-  const codeEvidence = evidence
-    .filter((item) => item.type === 'code_reference')
-    .filter((item) => {
-      const haystack = [
-        item.file ?? '',
-        item.source,
-        item.statement ?? '',
-        typeof item.value === 'object' && item.value ? JSON.stringify(item.value) : '',
-      ].join(' ').toLowerCase();
-      return qt.length === 0 || qt.some((token) => haystack.includes(token));
-    })
-    .slice(-20);
-
-  if (codeEvidence.length > 0) {
-    out.push('');
-    out.push('关键代码 Evidence：');
-    for (const item of codeEvidence) {
-      const ref = use(item.id);
-      const value = item.value && typeof item.value === 'object'
-        ? item.value as Record<string, unknown>
-        : {};
-      const excerpt = typeof value.excerpt === 'string' ? value.excerpt.slice(0, 1800) : '';
-      out.push('- ' + (item.file ?? item.source) + (ref ? ' [' + ref + ']' : ''));
-      if (item.statement) out.push('  直接说明：' + item.statement);
-      if (excerpt) out.push('  源码片段：\n' + excerpt);
-    }
-  }
+  out.push(...renderCodeEvidence());
 
   const relProfiles = profiles.filter((p) => topNames.has(p.dataset.toLowerCase()));
   if (relProfiles.length > 0) {
