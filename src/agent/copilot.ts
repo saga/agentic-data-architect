@@ -346,17 +346,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
           reject,
         });
         input.onStatus?.('Agent 正在等待你的回答。');
-        input.onTrajectory?.({
-          type: 'user_input_requested',
-          name: '等待用户回答',
-          status: 'waiting',
-          details: {
-            requestId,
-            question: redactTrajectoryValue(request.question),
-            ...(request.choices?.length ? { choices: redactTrajectoryValue(request.choices) } : {}),
-            allowFreeform: request.allowFreeform !== false,
-          },
-        });
       });
     },
     workingDirectory,
@@ -762,7 +751,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
       name: 'Agent 请求用户输入',
       status: 'waiting',
       details: {
-        runtimeRequestId: e.data.requestId,
+        // 轨迹必须保存 SDK 的 runtime requestId，才能和 user_input.completed 对上。
+        requestId: e.data.requestId,
         question: redactTrajectoryValue(e.data.question),
         ...(e.data.choices?.length ? { choices: redactTrajectoryValue(e.data.choices) } : {}),
         ...(typeof e.data.allowFreeform === 'boolean' ? { allowFreeform: e.data.allowFreeform } : {}),
