@@ -2848,7 +2848,7 @@ knowledge/                       .workspace/<session>/
 
 ## V1.7 Journey Workflow Editor：工作地图成为真正的可执行 Workflow
 
-V1.7 修正了一个之前架构上的不一致：图地图展示的分支，之前并不是实际状态机的一部分；Workflow runtime 仍主要依赖节点数组顺序。
+V1.7 修正了一个之前架构上的不一致：工作地图展示的分支，之前并不是实际状态机的一部分；Workflow runtime 仍主要依赖节点数组顺序。
 
 当前链路：
 
