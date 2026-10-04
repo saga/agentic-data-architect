@@ -8,17 +8,27 @@
 import * as z from 'zod';
 export const JourneyStateSchema = z.object({
   workflowId: z.string().min(1),
-  currentNodeId: z.string().min(1),
-  completedNodeIds: z.array(z.string()),
-  unlockedNodeIds: z.array(z.string()),
   stages: z.array(z.object({
     id: z.string().min(1),
     title: z.string().min(1),
     objective: z.string().min(1),
     status: z.enum(['completed', 'current', 'locked', 'future']),
-    nodeType: z.enum(['task', 'gate', 'review', 'end', 'stop']),
-    unlocked: z.boolean(),
+    nodeType: z.enum(['task', 'review', 'end']),
   }).strict()),
+  execution: z.object({
+    workflowId: z.string().min(1),
+    workflowVersion: z.number().int().nonnegative(),
+    runId: z.string().min(1),
+    currentNodeId: z.string().min(1),
+    completedNodeIds: z.array(z.string()),
+    status: z.enum(['active', 'waiting', 'completed']),
+    pendingInteraction: z.object({
+      id: z.string().min(1),
+      nodeId: z.string().min(1),
+      reason: z.string().min(1),
+      requestedAt: z.string().datetime(),
+    }).optional(),
+  }).strict(),
 }).strict();
 
 
