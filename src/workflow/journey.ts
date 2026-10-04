@@ -436,7 +436,7 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
   const terminals = definition.nodes
     .filter((node) => node.type === 'end')
     .map((node) => node.id);
-  if (!terminals.length) issues.push('Workflow 至少需要一个 @end 或 @stop 终点。');
+  if (!terminals.length) issues.push('Workflow 至少需要一个 @end 终点。');
 
   const canReachTerminal = new Set(terminals);
   const reverseQueue = [...terminals];
@@ -450,7 +450,7 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
   }
   for (const node of definition.nodes) {
     if (!canReachTerminal.has(node.id)) {
-      issues.push('节点无法沿任何路径到达 @end / @stop：' + node.id);
+      issues.push('节点无法沿任何路径到达 @end：' + node.id);
     }
   }
 
@@ -515,9 +515,7 @@ export function applyJourneyTransition(
   const completed = new Set(execution.completedNodeIds);
   if (target.id !== nodeId) completed.add(nodeId);
 
-  const waitingForHuman = target.actor === 'human'
-    && target.type !== 'end'
-    && target.type !== 'stop';
+  const waitingForHuman = target.actor === 'human' && target.type !== 'end';
   const nextStatus: JourneyExecution['status'] = target.type === 'end'
     ? 'completed'
     : waitingForHuman
@@ -683,8 +681,7 @@ export function describeJourneyCurrentNode(
     type: node.type,
     title: node.title,
     objective: node.objective || node.title,
-    completion: node.completion,
-    actor: node.actor,
+     actor: node.actor,
     ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
     outcomes: node.routes.map((route) => ({
       outcome: route.outcome,
