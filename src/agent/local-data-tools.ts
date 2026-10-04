@@ -8,6 +8,7 @@ import { defineTool } from '@github/copilot-sdk';
 import pathModule from 'node:path';
 import * as z from 'zod';
 import { runDiscovery } from '../workflow/discover.js';
+import { loadInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import {
   discoverLocalDatasets,
@@ -44,7 +45,11 @@ export function createLocalDataTools(sessionName: string) {
           path: candidate,
           ...(profile ? { profile: true } : {}),
         });
-        return summary;
+        const investigation = await loadInvestigation(sessionName);
+        const evidenceIds = investigation.evidence
+          .filter((e) => e.discoveryRunId === summary.runId)
+          .map((e) => e.id);
+        return { ...summary, evidenceIds };
       },
     }),
     defineTool('local_catalog', {
