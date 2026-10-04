@@ -41,6 +41,13 @@ export const AbortBodySchema = z.object({
   turnId: z.string().trim().min(1),
 }).strict();
 
+/** 前端处理 Agent 权限请求；只允许针对当前 Investigation 的活动 turn 做决定。 */
+export const PermissionResponseBodySchema = z.object({
+  turnId: z.string().trim().min(1),
+  requestId: z.string().trim().min(1),
+  allowed: z.boolean(),
+}).strict();
+
 /** API 输入 Schema 验证失败时使用的统一错误类型，交给 Express 错误处理中间件转换成 400。 */
 export class RequestValidationError extends Error {
   constructor(readonly issues: z.core.$ZodIssue[]) {
