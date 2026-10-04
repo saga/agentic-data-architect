@@ -55,7 +55,11 @@ export async function answerQuestion(
   onDelta?: (delta: string) => void,
   turnId?: string,
   onStatus?: (status: string) => void,
-  options?: { selectedRoute?: JourneyRouteOption },
+  options?: {
+    selectedRoute?: JourneyRouteOption;
+    /** 用户点击了上一轮 Agent 的“继续调查”引导；这次调用应直接执行，而不是重新询问。 */
+    selectedGuidance?: string;
+  },
 ): Promise<AnswerSummary> {
   const selectedRoute = options?.selectedRoute;
   const effectiveQuestion = selectedRoute
@@ -168,6 +172,7 @@ const prompt = buildQuestionPrompt({
     question: effectiveQuestion,
     contextText: questionContextText,
     ...(selectedRoute ? { selectedRoute } : {}),
+    ...(options?.selectedGuidance ? { selectedGuidance: options.selectedGuidance } : {}),
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
