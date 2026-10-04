@@ -79,8 +79,9 @@ KISS 不只是架构原则，UI 一样要遵守。**界面只保留用户现在�
 - **右栏不是信息仓库，而是当前工作的辅助栏。** 常驻内容只回答四件事：这次要查什么、现在怎么样、卡在哪里、下一步做什么。完整指标、资料清单、技能/MCP、配置版本、审计记录等只在用户主动打开时显示。
 
 - **状态文案也必须说完整的人话。** 不使用“就绪”“处理中”“思考中”“已完成”“失败”等孤立状态词。状态至少要说明是谁在做什么，必要时再告诉用户接下来该等什么或做什么。例如，“可以继续提问”“助手正在查找资料，请稍候”“这一步需要你的确认，请继续操作”。
-- **Data Architect 的固定工作路线由 Markdown Workflow 定义。** Data Analyst / Data Architect 的固定顺序、Gate、返工和下一关不要继续散落在 prompt 或 React 代码里；分别放在 `skills/legacy-modernization/SKILL.md`、`skills/financial-ai-native-architecture/SKILL.md`、`skills/data-architecture-assessment/SKILL.md` 中。TypeScript runtime 负责解析、校验和根据确定性状态推进。
-- **Skill 统一用 SKILL.md 打包，但必须声明执行类型。** frontmatter 使用 metadata.kind: capability 或 metadata.kind: workflow。capability 只提供一个可被 Agent 自由组合的能力，不定义 @flow；workflow 才能定义 @flow / @task / @gate / @end / @stop，并由 Journey runtime 根据确定性状态推进。
+- **Data Architect 的固定工作路线由 Markdown Workflow 定义。** Data Analyst / Data Architect 的高层工作阶段、人工确认和典型回退不要散落在 prompt 或 React 代码里；分别放在 `skills/legacy-modernization/SKILL.md`、`skills/financial-ai-native-architecture/SKILL.md`、`skills/data-architecture-assessment/SKILL.md` 中。TypeScript runtime 只负责解析、结构校验、执行位置和确定性推进。
+- **Workflow DSL 刻意保持很小。** 当前只允许 `@flow`、`@task`、`@review`、`@end` 四种 block。节点只描述 `title`、`objective`、`actor`、`completeWhen`；连线只描述 `outcome -> target`。不再增加 `@gate`、`@stop`、`completion`、`visible`、`tools`、`requires/produces` 或 route condition。
+- **Skill 统一用 SKILL.md 打包，但必须声明执行类型。** frontmatter 使用 metadata.kind: capability 或 metadata.kind: workflow。capability 只提供可被 Agent 自由组合的能力，不定义 @flow；workflow 才能定义固定的高层工作路线。Workflow 不替 Agent 决定每一个调查动作。
 - **Workflow 和 Skill 分工不能混。** Workflow 说明“现在做什么、什么时候能过、失败回哪里”；Skill 说明“这一关具体怎么查”。SQL、profiling、lineage、GitHub、Confluence、Web Search 都是执行能力，不是 Workflow 节点本身。通用 Data Architect 经验放在 `knowledge/`，只作为方法参考，不能代替当前 Investigation 的 Evidence。
 - **路线图必须允许返工。** 发现新的 lineage、业务定义或数据质量问题时，Agent 应回到相应调查关卡，而不是继续往后假装完成。生成 draft 方案、draft mapping 不等于关卡完成。
 - **回答之后必须主动把用户带到下一步。** Agent 回答不能停在“目前不知道 / 需要先检索 / 请提供更多信息”。先把已经知道的和不知道的说清楚，再明确下一步；如果下一步需要用户补充信息，就只问一个最关键的问题，并提供一个直接可输入的入口。优先让 Agent 自己完成能完成的检索，只有确实缺少代码库、数据目录、文件、业务定义等外部输入或权限时才让用户补充。
