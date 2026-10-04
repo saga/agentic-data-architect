@@ -310,7 +310,7 @@ Legacy Modernization 不再只是一次性生成 Modernization Plan，而是由�
   → 切换
 ```
 
-Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `@flow / @task / @gate / @end / @stop` 语法。现在 Workflow 已经有 Investigation 级 execution state：deterministic 节点由状态推进，agent 节点通过合法 outcome 推进；用户可以在工作地图中创建自定义 Workflow，并由服务端验证后应用。仍不引入完整的审批/命令执行引擎。
+Workflow 定义位于 `skills/legacy-modernization/SKILL.md`，使用轻量的 `@flow / @task / @review / @end` 语法。节点只有 title、objective、actor、completeWhen；连线只有 outcome -> target。Execution 保存真正的当前节点和完成状态；用户可以在工作地图中创建自定义 Workflow，并由服务端验证后应用。仍不引入完整的审批/命令执行引擎。
 
 边界：
 
@@ -2879,40 +2879,34 @@ Agent Turn
 - Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
 - Workflow version 改变后清除 Copilot session，避免继续使用旧的流程上下文。
 
-### V1.7 DSL 只增加 completion
+### V1.7 Workflow DSL 收敛
 
-原有 DSL 保持不变：
+这一版不是继续增加 DSL，而是把最近验证后没有独立运行价值的字段删掉。
 
-~~~text
-@flow / @task / @gate / @review / @end / @stop
-- success -> target
-- needs-input -> target
-- retry -> target
-~~~
-
-只新增：
-
-~~~yaml
-completion: deterministic
-~~~
-
-以及：
-
-~~~yaml
-completion: agent
-~~~
-
-兼容规则：
+当前正式语法：
 
 ~~~text
-有 completeWhen
-  → 默认 deterministic
+@flow
+@task
+@review
+@end
 
-没有 completeWhen
-  → 默认 agent
+start -> intake
+- success -> inspect
+- failed -> review
+- retry -> intake
 ~~~
 
-没有引入 branch、condition、switch、loop 等新控制语法，避免 Markdown DSL 迅速变成一个流程引擎。
+节点字段只有：
+
+- title
+- objective
+- actor
+- completeWhen
+
+其中 `@review` 默认由人工处理；有 `completeWhen` 的节点由宿主事实判断后自动推进，没有 `completeWhen` 的节点由 Agent/人工选择真实 outcome。
+
+明确不放进 DSL：`completion`、`visible`、`tools`、`requires/produces`、route condition、`@gate`、`@stop` 和 `system actor`。这些字段要么属于 UI，要么属于宿主业务规则，要么没有独立运行语义。
 
 ### V1.7 Workflow Execution
 
