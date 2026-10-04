@@ -302,6 +302,7 @@ async function updateInvestigationControlImpl(
     },
     agent: {
       permissionMode: next.agent.permissionMode,
+      displayName: next.agent.displayName.trim().slice(0, 40),
       // Platform capabilities are controlled by the application, not the per-Investigation UI.
       // Custom MCP servers remain user-configurable for this Investigation.
       platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
