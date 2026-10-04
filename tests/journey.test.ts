@@ -48,11 +48,9 @@ test('rejects dangling nodes and dead-end nodes', () => {
     'start -> intake',
     '',
     '## @task intake',
-    'completion: agent',
     '- success -> missing',
     '',
     '## @task orphan',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
@@ -68,7 +66,6 @@ test('deterministic retry self-loop does not mark the node completed', () => {
     'start -> check',
     '',
     '## @task check',
-    'completion: deterministic',
     'completeWhen: goal',
     '- retry -> check',
   ].join('\n'));
@@ -89,7 +86,6 @@ test('allows a retry cycle when the graph still has an exit to done', () => {
     'start -> check',
     '',
     '## @task check',
-    'completion: agent',
     '- retry -> check',
     '- success -> done',
     '',
@@ -110,21 +106,17 @@ test('journey state follows execution and facts, not node array order', () => {
     'title: 接到任务',
     'objective: 明确目标',
     'completeWhen: goal',
-    'completion: deterministic',
     '- success -> investigate',
     '',
     '## @task investigate',
     'title: 查关键问题',
-    'completion: agent',
     '- success -> target',
     '',
     '## @task target',
     'title: 设计方案',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
-    'visible: false',
   ].join('\n'));
 
   assert.ok(result.definition);
@@ -143,11 +135,9 @@ test('preserves an execution position across a graph edit when the node still ex
     'start -> investigate',
     '',
     '## @task investigate',
-    'completion: agent',
     '- success -> target',
     '',
     '## @task target',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
@@ -193,16 +183,13 @@ test('applies only an actual outgoing workflow outcome', () => {
     'start -> investigate',
     '',
     '## @task investigate',
-    'completion: agent',
     '- success -> target',
     '- retry -> investigate',
     '',
     '## @task target',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
-    'visible: false',
   ].join('\n'));
 
   assert.ok(result.definition);
@@ -234,7 +221,7 @@ test('loads the architecture assessment markdown workflow', async () => {
   const definition = await loadWorkflowJourney('data-architecture-assessment');
   assert.equal(definition.id, 'data-architecture-assessment');
   assert.equal(definition.start, 'intake');
-  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
+  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completeWhen, 'goal');
 });
 
 
@@ -244,7 +231,6 @@ test('current-state gate requires an actual discovered dataset', () => {
     'start -> current',
     '',
     '## @task current',
-    'completion: deterministic',
     'completeWhen: current-state',
     '- success -> done',
     '',
@@ -288,7 +274,6 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
     'start -> truth',
     '',
     '## @task truth',
-    'completion: deterministic',
     'completeWhen: data-truth',
     '- success -> done',
     '- retry -> truth',
@@ -335,7 +320,6 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
     'start -> investigate',
     '',
     '## @task investigate',
-    'completion: deterministic',
     'completeWhen: investigation',
     '- success -> done',
     '',
@@ -383,7 +367,6 @@ test('cutover is an explicit human review after validation', () => {
     'start -> validation',
     '',
     '## @task validation',
-    'completion: deterministic',
     'completeWhen: validation',
     '- success -> cutover',
     '',
@@ -393,7 +376,6 @@ test('cutover is an explicit human review after validation', () => {
     '- rollback -> investigate',
     '',
     '## @task investigate',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
@@ -430,7 +412,6 @@ test('assessment findings gate does not pass from current-state alone', () => {
     'start -> findings',
     '',
     '## @task findings',
-    'completion: deterministic',
     'completeWhen: assessment-findings',
     '- success -> done',
     '',
