@@ -487,7 +487,13 @@ export function validateJourneyEdit(
   };
 }
 
-/** 保存一张工作地图；服务端重新验证，不能绕过结构检查。 */
+/**
+ * 保存当前 Investigation 的 Workflow 版本。
+ *
+ * Definition 和 Layout 一起提交，但服务端先验证 Definition 的结构与每个节点坐标。
+ * 验证失败时不会创建新版本。保存成功后才推进 Workflow version，并尽量把旧 execution
+ * 的当前位置保留下来；如果当前节点已经不存在，则由 normalizeExecution 回到 start。
+ */
 export async function saveJourneyDefinition(
   name: string,
   workflowId: WorkflowId,
@@ -762,7 +768,12 @@ async function appendJourneyTransitionEvents(
   }
 }
 
-/** 将 Agent 返回的合法 outcome 写入 durable Workflow execution。 */
+/**
+ * 将 Agent 返回的合法 outcome 写入 durable Execution。
+ *
+ * Agent 只能提出当前节点已经声明的 outcome；真正的 target 由 applyJourneyTransition
+ * 根据 Workflow Definition 查找。这样模型不会直接控制 Workflow 的跳转边界。
+ */
 export async function applyAgentWorkflowTransition(
   name: string,
   workflowId: WorkflowId | null,
@@ -962,7 +973,12 @@ export async function applyHumanWorkflowTransition(
   }
 }
 
-/** 给 Agent 的低 token Workflow 控制说明，只注入当前节点及其合法出口。 */
+/**
+ * 给 Agent 注入当前 Workflow 控制说明。
+ *
+ * 这里只发送当前节点、目标和合法出口，避免每一轮重复把整张 Workflow 重新写进上下文。
+ * 它是运行时提示，不是授权机制；服务端 transition 仍然是最终校验点。
+ */
 export async function buildJourneyAgentInstruction(
   name: string,
   workflowId: WorkflowId | null,
