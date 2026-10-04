@@ -118,6 +118,43 @@ Workflow 固定的是 Data Architect 的高层工作顺序，不是 Agent 每一
 
 `retry` 必须保留为真实 Edge。它表达的是“从当前处理步骤重新回到哪个真实步骤”，所以不需要 Group、隐藏节点或新的 DSL 类型。
 
+### 3.4 人工步骤的最小实现
+
+人工等待只依赖 `actor: human`。`@review` 默认就是人工步骤，因此普通路线不需要再写一套 approval DSL。
+
+进入人工步骤以后，Execution 会记录：
+
+~~~text
+status = waiting
+currentNodeId = review
+pendingInteraction = { nodeId, reason, requestedAt }
+~~~
+
+Agent 不能替代人工推进。只有收到当前节点实际声明的 outcome，才会调用 Workflow transition。
+
+Approval、authorization、policy、风险判断等安全语义不放进 Workflow。它们属于平台控制层；Workflow 只表达“这里需要人确认”以及“确认后有哪些合法出口”。
+
+### 3.5 执行状态只有一个来源
+
+`WorkflowExecution` 是真实运行状态，负责保存当前节点、已完成节点、运行状态和人工等待信息。`WorkflowState.stages` 只是 UI 投影。
+
+因此不要再在其它对象里重复保存 `currentNodeId`、`completedNodeIds` 或 `unlockedNodeIds`。重复状态会让工作地图和实际执行位置出现分叉。
+
+### 3.6 什么属于 Workflow，什么不属于 Workflow
+
+| 内容 | 所在层 |
+| --- | --- |
+| 高层阶段顺序 | Workflow Skill |
+| 当前阶段具体怎么调查 | Agent + Skill |
+| SQL / 搜索 / lineage / profiling | Tool |
+| 当前 Investigation 的事实 | Investigation State |
+| completeWhen 的业务判断 | 宿主 evaluator |
+| 人工确认 | Workflow actor + 宿主 UI |
+| 权限 / approval / policy | 平台控制层 |
+| 节点坐标和连线样式 | X6 / Layout |
+
+这个边界决定了 Workflow 文件应该短而稳定；复杂性留在已有能力层，而不是不断给 DSL 增加字段。
+
 ## 4. X6 编辑器
 
 X6 是实际的图编辑器。
