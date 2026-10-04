@@ -64,7 +64,7 @@ interface TrajectorySummary {
   totalPremiumRequestCost?: number;
   models: Record<string, { inputTokens: number; outputTokens: number; totalNanoAiu?: number }>;
   eventCount: number;
-  state?: 'running' | 'waiting' | 'completed' | 'failed';
+  state?: 'running' | 'waiting' | 'completed' | 'failed' | 'aborted';
   waitingOn?: 'permission' | 'user_input' | 'tool' | 'model' | 'session';
   lastActivityAt?: string;
   lastActivity?: string;
@@ -84,6 +84,15 @@ interface TrajectoryTurnSummary {
   toolCalls: number;
   failedEvents: number;
   compactions: number;
+}
+
+interface ExecutionStatus {
+  state: 'idle' | 'running' | 'waiting_permission' | 'waiting_user_input' | 'committing';
+  running: boolean;
+  turnId: string | null;
+  phase: 'executing' | 'committing' | null;
+  pendingPermissionCount: number;
+  pendingUserInputCount: number;
 }
 
 interface ConversationTurnSummary {
@@ -107,6 +116,38 @@ function formatDuration(ms?: number) {
 
 function formatTokens(value: number) {
   return value.toLocaleString();
+}
+
+function turnStateLabel(state?: TrajectorySummary['state']) {
+  switch (state) {
+    case 'running': return '执行中';
+    case 'waiting': return '等待处理';
+    case 'completed': return '已完成';
+    case 'failed': return '失败';
+    case 'aborted': return '已中断';
+    default: return '状态未知';
+  }
+}
+
+function turnStateTagColor(state?: TrajectorySummary['state']): string | undefined {
+  switch (state) {
+    case 'running': return 'processing';
+    case 'waiting': return 'warning';
+    case 'completed': return 'success';
+    case 'failed': return 'error';
+    case 'aborted': return 'default';
+    default: return undefined;
+  }
+}
+
+function executionStateLabel(state: ExecutionStatus['state']) {
+  switch (state) {
+    case 'running': return '实时：执行中';
+    case 'waiting_permission': return '实时：等待授权';
+    case 'waiting_user_input': return '实时：等待回答';
+    case 'committing': return '实时：保存中';
+    default: return '实时：空闲';
+  }
 }
 
 function formatCost(value?: number) {
@@ -385,10 +426,13 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
       <Flex justify="space-between" align="flex-start" gap={16} wrap>
         <div className="trajectory-turn-heading">
           <Flex align="center" gap={8} wrap>
-            <Badge status={summary.finishedAt ? 'success' : 'processing'} />
+            <Badge status={turnStateTagColor(summary.state) as any} />
             <Text strong className="trajectory-turn-title">
               {turn.userQuestion || '本轮 Agent 执行'}
             </Text>
+            <Tag color={turnStateTagColor(summary.state)}>
+              {turnStateLabel(summary.state)}
+            </Tag>
           </Flex>
           <Text type="secondary">{formatTime(summary.startedAt)} · {turn.turnId}</Text>
         </div>
@@ -517,14 +561,28 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
   const [summary, setSummary] = useState<TrajectorySummary | null>(null);
   const [turns, setTurns] = useState<TrajectoryTurnSummary[]>([]);
   const [conversationTurns, setConversationTurns] = useState<ConversationTurnSummary[]>([]);
+  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>({
+    state: 'idle',
+    running: false,
+    turnId: null,
+    phase: null,
+    pendingPermissionCount: 0,
+    pendingUserInputCount: 0,
+  });
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/trajectory?limit=5000`);
-      if (!response.ok) throw new Error((await response.text()) || response.statusText);
-      const data = await response.json() as {
+      const [trajectoryResponse, executionResponse] = await Promise.all([
+        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/trajectory?limit=5000`),
+        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/execution`),
+      ]);
+      if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
+      if (executionResponse.ok) {
+        setExecutionStatus(await executionResponse.json() as ExecutionStatus);
+      }
+      const data = await trajectoryResponse.json() as {
         events: TrajectoryEvent[];
         summary: TrajectorySummary | null;
         turns: TrajectoryTurnSummary[];
@@ -568,12 +626,19 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
         summary: {
           turnId: turn.turnId,
           startedAt: turn.createdAt,
-          ...(turn.status === 'completed' ? { finishedAt: turn.updatedAt } : {}),
+          ...((turn.status === 'completed' || turn.status === 'failed' || turn.status === 'aborted') ? { finishedAt: turn.updatedAt } : {}),
           inputTokens: 0,
           outputTokens: 0,
           totalTokens: 0,
           models: {},
           eventCount: 0,
+          state: turn.status === 'completed'
+            ? 'completed'
+            : turn.status === 'failed'
+              ? 'failed'
+              : turn.status === 'aborted'
+                ? 'aborted'
+                : 'running',
         },
         modelCalls: 0,
         toolCalls: 0,
@@ -602,6 +667,9 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={props.onBack}>返回调查</Button>
           <Title level={4} style={{ margin: 0 }}>Agent 执行轨迹</Title>
           <Tag color="blue">Copilot · 实时</Tag>
+          <Tag color={executionStatus.running ? 'processing' : undefined}>
+            {executionStateLabel(executionStatus.state)}
+          </Tag>
         </Flex>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button>
       </header>
@@ -647,6 +715,10 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
                   );
                 })() : null}
               </Flex>
+              <Paragraph type="secondary" className="trajectory-note">
+                当前执行状态：{executionStateLabel(executionStatus.state)}
+                {executionStatus.turnId ? ` · Turn ${executionStatus.turnId}` : ''}
+              </Paragraph>
               <Paragraph type="secondary" className="trajectory-note">
                 这里只展示可观察的执行事件，不展示模型隐藏推理过程。除了模型 Token/额度，还会记录工具参数摘要、工具返回摘要、权限请求、Session idle、Session error、上下文变化和最后活动，方便定位“为什么一直没结束”。
               </Paragraph>
