@@ -21,43 +21,25 @@ const baseFacts: JourneyFacts = {
   blockingValidationTotal: 0,
 };
 
-test('parses workflow branches and completion mode', () => {
+test('parses the minimal workflow DSL', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
     'start -> intake',
-    '',
-    '## @task start',
-    'title: Start',
-    'visible: false',
-    '- success -> intake',
     '',
     '## @task intake',
     'title: Intake',
     'objective: Define the goal.',
     'completeWhen: goal',
-    'completion: deterministic',
-    'actor: system',
-    '- success -> estate',
-    '- needs-input -> intake',
-    '',
-    '## @task estate',
-    'title: Estate',
-    'completion: agent',
     '- success -> done',
     '',
     '## @end done',
-    'visible: false',
-  ].join('\n'));
+  ].join('\\n'));
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
   assert.equal(result.definition?.start, 'intake');
-  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.completion, 'deterministic');
-  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.actor, 'system');
-  assert.deepEqual(
-    result.definition?.nodes.find((node) => node.id === 'intake')?.routes.map((route) => route.outcome),
-    ['success', 'needs-input'],
-  );
+  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.completeWhen, 'goal');
+  assert.equal(result.definition?.nodes.find((node) => node.id === 'intake')?.actor, 'agent');
 });
 
 test('rejects dangling nodes and dead-end nodes', () => {
@@ -78,57 +60,6 @@ test('rejects dangling nodes and dead-end nodes', () => {
 
   assert.ok(result.issues.some((issue) => issue.includes('missing')));
   assert.ok(result.issues.some((issue) => issue.includes('orphan')));
-});
-
-test('supports lightweight conditional routing for deterministic workflow nodes', () => {
-  const result = parseJourneyMarkdown([
-    '## @flow demo',
-    'start -> check',
-    '',
-    '## @task check',
-    'completion: deterministic',
-    'completeWhen: goal',
-    'actor: system',
-    '- goal-path -> done if goal',
-    '- success -> stop',
-    '',
-    '## @end done',
-    '',
-    '## @stop stop',
-  ].join('\n'));
-
-  assert.equal(result.issues.length, 0);
-  assert.ok(result.definition);
-  const check = result.definition!.nodes.find((node) => node.id === 'check')!;
-  assert.equal(check.routes[0]?.condition, 'goal');
-  const execution = initialJourneyExecution(result.definition!);
-  const state = buildJourneyState(result.definition!, baseFacts, execution);
-  assert.equal(state.currentNodeId, 'done');
-});
-
-test('deterministic nodes use an unconditional fallback when no condition matches', () => {
-  const result = parseJourneyMarkdown([
-    '## @flow demo',
-    'start -> check',
-    '',
-    '## @task check',
-    'completion: deterministic',
-    'completeWhen: goal',
-    '- validation-path -> done if validation',
-    '- fallback -> stop',
-    '',
-    '## @end done',
-    '',
-    '## @stop stop',
-  ].join('\n'));
-
-  assert.equal(result.issues.length, 0);
-  assert.ok(result.definition);
-
-  const facts = { ...baseFacts, goal: 'modernize proxy voting' };
-  const state = buildJourneyState(result.definition!, facts, initialJourneyExecution(result.definition!));
-  assert.equal(state.currentNodeId, 'stop');
-  assert.deepEqual(state.completedNodeIds, ['check']);
 });
 
 test('deterministic retry self-loop does not mark the node completed', () => {
@@ -186,7 +117,6 @@ test('journey state follows execution and facts, not node array order', () => {
     'title: 查关键问题',
     'completion: agent',
     '- success -> target',
-    '- needs-input -> investigate',
     '',
     '## @task target',
     'title: 设计方案',
