@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ permissionMode:'permission'|'allow_all'; displayName:string; avatarPath?:string; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -222,7 +222,7 @@ export function InvestigationConfigPage(props:{
                    min={40}
                    max={800}
                    value={draft.agent.avatarWidth}
-                   onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 200);})}
+                   onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 180);})}
                  />
                </div>
                <div>
@@ -231,11 +231,11 @@ export function InvestigationConfigPage(props:{
                    min={40}
                    max={1200}
                    value={draft.agent.avatarHeight}
-                   onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 400);})}
+                   onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 240);})}
                  />
                </div>
                <div style={{alignSelf:'end',paddingBottom:4}}>
-                 <Text type='secondary'>默认 200 × 400。修改尺寸后，下一次裁剪按新的比例处理。</Text>
+                 <Text type='secondary'>默认 180 × 240。修改尺寸后，下一次裁剪按新的比例处理。</Text>
                </div>
              </Flex>
            </Card>
