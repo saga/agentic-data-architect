@@ -173,7 +173,7 @@ npm run flow:lint
 
 ## Workflow Editor
 
-完整设计见 `docs/journey-workflow-editor.md`。工作地图使用 AntV X6，Workflow Definition 与画布布局分开保存。自动排版使用项目内置的 workflow-v1，不依赖 ELK。
+完整设计见 `docs/journey-workflow-editor.md`。工作地图使用 AntV X6，Workflow Definition 与画布布局分开保存。自动排版使用项目内置的 workflow-v2：S 型主线 + 两侧分支，不依赖 ELK。
 
 核心边界：
 
