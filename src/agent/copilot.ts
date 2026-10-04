@@ -306,6 +306,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let assistantTurnEnded = false;
   let sessionIdleObserved = false;
   let modelCallCount = 0;
+  let toolCallCount = 0;
+  let latestContextTokens: number | undefined;
+  let latestContextLimit: number | undefined;
+  let latestContextMessages: number | undefined;
 
   const markActivity = (type: string, activity: string) => {
     lastActivityAt = new Date().toISOString();
@@ -365,12 +369,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : toolName;
     const startedAt = Date.now();
+    toolCallCount += 1;
     trajectoryToolStarts.set(toolCallId, { startedAt, name: toolName || '工具调用' });
     markActivity('tool_call', '正在调用工具 ' + (toolName || '工具'));
     input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
     input.onTrajectory?.({
       type: 'tool_call',
-      name: toolName || '工具调用',
+      name: `调用工具 #${toolCallCount}: ${toolName || '工具调用'}`,
       status: 'started',
       details: {
         toolCallId,
@@ -511,6 +516,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const offUsage = session.on('assistant.usage', (e) => {
     modelCallCount += 1;
     markActivity('model_call', '模型调用 #' + modelCallCount);
+    const usageData = e.data as unknown as Record<string, unknown>;
     const event: {
       type: 'model_call';
       name: string;
@@ -523,7 +529,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       details: Record<string, unknown>;
     } = {
       type: 'model_call',
-      name: '模型调用',
+      name: '模型调用 #' + modelCallCount,
       status: 'completed',
       details: {},
     };
@@ -534,9 +540,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (typeof e.data.duration === 'number') event.durationMs = e.data.duration;
     // 缓存命中和推理 token 直接读 SDK 的类型化字段（cacheReadTokens / reasoningTokens），
     // 不要再把整个事件转成 Record 去猜字段名——那些字段在 SDK 里根本不存在。
-    if (typeof e.data.cacheReadTokens === 'number') event.details.cachedInputTokens = e.data.cacheReadTokens;
+    if (typeof e.data.cacheReadTokens === 'number') {
+      event.details.cachedInputTokens = e.data.cacheReadTokens;
+      if (typeof e.data.inputTokens === 'number') {
+        event.details.newInputTokens = Math.max(0, e.data.inputTokens - e.data.cacheReadTokens);
+      }
+    }
     if (typeof e.data.cacheWriteTokens === 'number') event.details.cacheWriteTokens = e.data.cacheWriteTokens;
     if (typeof e.data.reasoningTokens === 'number') event.details.reasoningTokens = e.data.reasoningTokens;
+    if (typeof usageData.availableToolCount === 'number') event.details.availableToolCount = usageData.availableToolCount;
     if (typeof e.data.finishReason === 'string') event.details.finishReason = e.data.finishReason;
     if (typeof e.data.reasoningEffort === 'string') event.details.reasoningEffort = e.data.reasoningEffort;
     if (typeof e.data.timeToFirstTokenMs === 'number') event.details.timeToFirstTokenMs = e.data.timeToFirstTokenMs;
@@ -548,9 +560,18 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (typeof e.data.initiator === 'string') event.details.initiator = e.data.initiator;
     if (typeof e.data.interactionId === 'string') event.details.interactionId = e.data.interactionId;
     if (e.data.quotaSnapshots !== undefined) event.details.quotaSnapshots = redactTrajectoryValue(e.data.quotaSnapshots);
+    if (latestContextTokens !== undefined) event.details.contextTokensAtCall = latestContextTokens;
+    if (latestContextLimit !== undefined) {
+      event.details.contextTokenLimitAtCall = latestContextLimit;
+      event.details.contextPercentAtCall = Math.round(latestContextTokens! / latestContextLimit * 100);
+    }
+    if (latestContextMessages !== undefined) event.details.contextMessagesAtCall = latestContextMessages;
     input.onTrajectory?.(event);
   });
   const offUsageInfo = session.on('session.usage_info', (e) => {
+    latestContextTokens = e.data.currentTokens;
+    latestContextLimit = e.data.tokenLimit;
+    latestContextMessages = e.data.messagesLength;
     const percent = e.data.tokenLimit > 0
       ? Math.round((e.data.currentTokens / e.data.tokenLimit) * 100)
       : undefined;
