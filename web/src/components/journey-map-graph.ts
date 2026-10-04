@@ -26,7 +26,12 @@ export function targetHandleId(nodeId: string, index: number): string {
   return nodeId + '-in-' + String(index);
 }
 
-/** 根据真实执行状态给节点映射 UI 状态。 */
+/**
+ * 根据唯一的 execution 状态给节点映射 UI 状态。
+ *
+ * stages 只是展示投影，因此 completed/current 优先读取 execution；只有“未来可达”
+ * 才读取 stage 投影。这样节点拖动或重新排版不会改变 Workflow 的实际执行位置。
+ */
 export function stageStatus(
   snapshot: WorkflowSnapshot,
   id: string,
@@ -37,7 +42,7 @@ export function stageStatus(
   return 'locked';
 }
 
-/** 为 UI 生成稳定的节点 ID。 */
+/** 为画布新增节点生成稳定、可读且不重复的 ID；ID 最终仍会经过服务端 Definition 校验。 */
 export function nextId(prefix: string, existing: Set<string>): string {
   let index = existing.size + 1;
   let id = prefix + '-' + index;
@@ -50,7 +55,7 @@ export function nextId(prefix: string, existing: Set<string>): string {
   return id;
 }
 
-/** 为新增分支生成不重复的 outcome。 */
+/** 给一个节点新增分支时生成不重复的 outcome；不定义 outcome 的业务含义。 */
 export function nextOutcome(
   routes: JourneyRouteDefinitionLike[],
   base: string,
@@ -95,9 +100,10 @@ export function dedupeRoutes(
 }
 
 /**
- * 浏览器侧应用语义 Patch。
+ * 在浏览器端应用 Workflow 语义修改。
  *
- * React/X6 都只是编辑器适配层；AI 预览真正应用时仍然通过这里回到 Workflow Definition。
+ * 这里故意不碰 X6 内部对象和布局算法。用户拖线、右栏编辑、AI Patch 最终都先
+ * 转回同一个 Workflow Definition，再重新投影成图。这样 UI 不会产生第二套业务状态。
  */
 export function applyWorkflowChanges(
   definitionInput: WorkflowDefinition,
@@ -175,7 +181,12 @@ export function applyWorkflowChanges(
   return definition;
 }
 
-/** 保存 X6 画布位置；布局数据仍然只保存节点坐标，不保存图引擎内部对象。 */
+/**
+ * 把当前画布位置转换成可持久化 Layout。
+ *
+ * 只保存节点 x/y，避免把 X6 Node/Edge、临时 port 或 viewport 私有结构写入 Workflow。
+ * Layout 可以重新生成，不应该反过来成为 Workflow 语义来源。
+ */
 export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
   const result: Record<string, { x: number; y: number }> = {};
 
@@ -194,9 +205,10 @@ export function layoutFromNodes(nodes: FlowNode[]): WorkflowLayout {
 }
 
 /**
- * 把当前图还原为 Workflow Definition。
+ * 把 X6 当前图还原成业务 Workflow Definition。
  *
- * X6 的 Node/Edge 对象不进入业务层；这里仍然只读取稳定的 source/target/outcome。
+ * 这里只读取 source、target、outcome；Port ID、router、connector、折线路径都属于
+ * 画布实现细节。这样即使以后更换图引擎，Workflow Markdown 和 runtime 仍可复用。
  */
 export function definitionFromGraph(
   nodes: FlowNode[],
