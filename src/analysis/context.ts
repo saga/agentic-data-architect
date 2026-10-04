@@ -107,7 +107,9 @@ export function buildQuestionContext(args: {
         sourceLines.push('- ' + file.path);
       }
     }
+    const codeEvidenceStart = usedIds.length;
     const codeLines = renderCodeEvidence();
+    const codeEvidenceIds = usedIds.slice(codeEvidenceStart);
     return {
       text: [
         '(no SQL lineage yet — run discover first)',
@@ -115,10 +117,7 @@ export function buildQuestionContext(args: {
         ...sourceLines,
         ...codeLines,
       ].filter(Boolean).join('\n'),
-      evidenceIds: [...new Set([...sourceIds, ...codeLines.flatMap((line) => {
-        const match = line.match(/\[([^\]]+)\]/);
-        return match ? [match[1]] : [];
-      })])],
+      evidenceIds: [...new Set([...sourceIds, ...codeEvidenceIds])],
     };
   }
   const ranked = lineage.tables
