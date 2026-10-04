@@ -11,6 +11,7 @@ import * as z from 'zod';
 import { runDiscovery } from '../workflow/discover.js';
 import { createGitHubResearchTool } from './research-github.js';
 import { loadInvestigation, saveInvestigation } from '../investigation/store.js';
+import { nextId } from '../evidence/types.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import {
   discoverLocalDatasets,
