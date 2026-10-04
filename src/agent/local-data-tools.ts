@@ -5,7 +5,10 @@
  * Agent 不直接拿到 DuckDB 文件路径，也没有 ATTACH / COPY / INSTALL / LOAD 能力。
  */
 import { defineTool } from '@github/copilot-sdk';
+import pathModule from 'node:path';
 import * as z from 'zod';
+import { runDiscovery } from '../workflow/discover.js';
+import { workspaceRoot } from '../investigation/workspace.js';
 import {
   discoverLocalDatasets,
   listLocalDatasets,
@@ -22,6 +25,28 @@ import {
 
 export function createLocalDataTools(sessionName: string) {
   return [
+    defineTool('project_discover', {
+      description: '扫描当前 Investigation workspace 中的代码、SQL、配置和数据目录，生成一次完整的 Discovery 快照、SQL lineage、基础 findings 和可引用 Evidence。第一次分析一个陌生 legacy 项目时优先调用。',
+      parameters: z.object({
+        path: z.string().optional().describe('相对当前 Investigation workspace 的目录；默认扫描整个 workspace。'),
+        profile: z.boolean().optional().describe('是否同时做数据库 profiling；代码仓库首次扫描默认 false。'),
+      }),
+      skipPermission: true,
+      handler: async ({ path, profile }) => {
+        const root = workspaceRoot(sessionName);
+        const relativePath = (path ?? '.').trim() || '.';
+        const candidate = pathModule.resolve(root, relativePath);
+        const rootWithSep = root.endsWith(pathModule.sep) ? root : root + pathModule.sep;
+        if (candidate !== root && !candidate.startsWith(rootWithSep)) {
+          throw new Error('只能扫描当前 Investigation workspace 内的目录。');
+        }
+        const summary = await runDiscovery(sessionName, {
+          path: candidate,
+          ...(profile ? { profile: true } : {}),
+        });
+        return summary;
+      },
+    }),
     defineTool('local_catalog', {
       description: '列出当前 Investigation workspace 中可分析的数据集。首次分析本地数据时优先调用。',
       parameters: z.object({
