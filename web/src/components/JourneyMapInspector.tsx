@@ -354,7 +354,7 @@ export function JourneyMapInspector({
                     </Button>
 
                     <Text type="secondary" className="journey-map-connect-hint">
-                      也可以直接拖右侧连接点 → 目标步骤左侧连接点。
+                      也可以从节点右侧出口区域拖到目标步骤。
                     </Text>
                   </div>
                 ),
@@ -440,7 +440,7 @@ export function JourneyMapInspector({
         <div className="journey-map-inspector-empty">
           <HolderOutlined />
           <Text type="secondary">
-            点击节点编辑属性；点击连线标签修改分支结果或目标。
+            点击节点编辑属性；点击连线修改分支结果或目标。
           </Text>
         </div>
       )}
