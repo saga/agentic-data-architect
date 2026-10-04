@@ -7,7 +7,7 @@ import {
   type JourneyRoute,
 } from './journey.js';
 
-/** 可被人工编辑器和 Workflow AI 共用的语义修改操作。 */
+/** Workflow 编辑器和 Workflow AI 共用的语义修改操作；只描述业务结构变化，不描述画布实现。 */
 export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('replace-definition'),
@@ -58,6 +58,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
 export type JourneyWorkflowChange = z.infer<typeof JourneyWorkflowChangeSchema>;
 export const JourneyWorkflowChangesSchema = z.array(JourneyWorkflowChangeSchema).min(1).max(60);
 
+/** 深拷贝 Definition，避免编辑操作直接修改当前快照。Workflow 很小，不需要引入 immutable 框架。 */
 function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
   return {
     id: definition.id,
@@ -79,6 +80,7 @@ function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
   };
 }
 
+/** outcome 比较不区分大小写，但保存时保留用户写入的原始文字。 */
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -176,7 +178,7 @@ export function applyJourneyWorkflowChanges(
   return JourneyDefinitionSchema.parse(definition);
 }
 
-/** 为 AI/审计/预览生成稳定的语义 diff。 */
+/** 只比较 Workflow Definition 的业务语义；节点坐标属于画布，不应进入业务 diff。 */
 export function diffJourneyWorkflowDefinitions(
   before: JourneyDefinition,
   after: JourneyDefinition,
