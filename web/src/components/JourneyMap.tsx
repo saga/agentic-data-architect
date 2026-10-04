@@ -189,22 +189,6 @@ export function JourneyMap(props: JourneyMapProps) {
             </Flex>
           </header>
 
-          {snapshot.analysis?.length ? (
-            <div className="journey-map-warning-panel">
-              <Flex align="center" justify="space-between">
-                <Text strong>Workflow 检查</Text>
-                <Tag color="warning">{snapshot.analysis.length} 个提醒</Tag>
-              </Flex>
-              <div className="journey-map-validation-items">
-                {snapshot.analysis.slice(0, 6).map((item, index) => (
-                  <Text type="warning" key={index}>
-                    {item.message}
-                  </Text>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           {validationIssues.length ? (
             <div className="journey-map-validation-panel">
               <div className="journey-map-validation-title">
@@ -283,7 +267,7 @@ export function JourneyMap(props: JourneyMapProps) {
               <Tag variant="filled">
                 {completedCount}/
                 {Math.max(
-                  currentDefinition?.nodes.filter((node) => node.visible).length ?? 0,
+                  currentDefinition?.nodes.length ?? 0,
                   1,
                 )}{' '}
                 已完成
