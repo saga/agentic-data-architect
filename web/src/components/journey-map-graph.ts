@@ -1,7 +1,6 @@
 import {
   EDGE_TYPE,
   STATUS_CLASS,
-  TARGET_HANDLE_ID,
   type FlowEdge,
   type FlowNode,
   type HandleSpec,
@@ -18,9 +17,9 @@ export function sourceHandleId(nodeId: string, index: number): string {
   return nodeId + '-out-' + String(index);
 }
 
-/** X6 中所有节点共享一个入口 port。多个 edge 可以连接到同一个入口 port。 */
-export function targetHandleId(_nodeId: string, _index = 0): string {
-  return TARGET_HANDLE_ID;
+/** 给已有 incoming edge 生成稳定的 target port ID。 */
+export function targetHandleId(nodeId: string, index: number): string {
+  return nodeId + '-in-' + String(index);
 }
 
 /** 根据真实执行状态给节点映射 UI 状态。 */
@@ -384,12 +383,17 @@ export function graphFromDefinition(
       label: route.outcome,
     }));
 
-    const targetHandles: HandleSpec[] = [
-      {
-        id: targetHandleId(item.id, 0),
-        label: targetRoutes.length ? '入口' : '入口',
-      },
-    ];
+    const targetHandles: HandleSpec[] = targetRoutes.length
+      ? targetRoutes.map((route, index) => ({
+          id: targetHandleId(item.id, index),
+          label: route.outcome,
+        }))
+      : [
+          {
+            id: targetHandleId(item.id, 0),
+            label: '入口',
+          },
+        ];
 
     const connectionIssue = issues.get(item.id);
 
