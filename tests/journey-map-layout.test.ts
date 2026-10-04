@@ -135,9 +135,6 @@ test('graph projection removes self-loop edges and their handles', () => {
     },
     state: {
       workflowId: 'demo',
-      currentNodeId: 'a',
-      completedNodeIds: [],
-      unlockedNodeIds: ['a'],
       stages: [],
       execution: {
         workflowId: 'demo',
