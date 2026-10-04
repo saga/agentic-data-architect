@@ -1,18 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { App as AntApp, Modal } from 'antd';
-import {
-  addEdge,
-  MarkerType,
-  Position,
-  reconnectEdge,
-  useEdgesState,
-  useNodesInitialized,
-  useNodesState,
-  type Connection,
-  type NodeChange,
-  type EdgeChange,
-  type ReactFlowInstance,
-} from '@xyflow/react';
 
 import {
   applyWorkflowChanges,
@@ -24,11 +11,9 @@ import {
   normalizeConnection,
   sourceHandleId,
   targetHandleId,
+  type GraphConnection,
 } from './journey-map-graph.js';
 import { autoLayoutJourney } from './journey-map-layout.js';
-import {
-  EDGE_TYPE,
-} from './journey-map-types.js';
 import type {
   FlowEdge,
   FlowNode,
@@ -85,20 +70,19 @@ interface JourneyWorkflowEditorResult {
   setEdgeDraft: Dispatch<SetStateAction<{ outcome: string; target: string; condition?: string } | undefined>>;
   setConnectTargetId: Dispatch<SetStateAction<string | undefined>>;
   setConnectOutcome: Dispatch<SetStateAction<string>>;
-  handleNodesChange: (changes: NodeChange<FlowNode>[]) => void;
-  handleEdgesChange: (changes: EdgeChange<FlowEdge>[]) => void;
-  onConnect: (connection: Connection) => Promise<void>;
-  onReconnect: (oldEdge: FlowEdge, connection: Connection) => Promise<void>;
+  onGraphConnect: (connection: GraphConnection) => Promise<void>;
+  onGraphReconnect: (edgeId: string, connection: GraphConnection) => Promise<void>;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  flowInstanceRef: MutableRefObject<ReactFlowInstance<FlowNode, FlowEdge> | null>;
   onNodeClick: (id: string) => void;
   onEdgeClick: (id: string) => void;
   clearSelection: () => void;
   deleteSelectedEdge: () => void;
   beginNodeDrag: () => void;
+  onNodeMoved: (id: string, position: { x: number; y: number }) => void;
+  deleteSelectedCell: (id: string, kind: 'node' | 'edge') => void;
 }
 
 export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
@@ -120,27 +104,18 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const [edgeDraft, setEdgeDraft] = useState<{ outcome: string; target: string; condition?: string }>();
   const [connectTargetId, setConnectTargetId] = useState<string>();
   const [connectOutcome, setConnectOutcome] = useState('success');
-  // ---- 编辑器状态 ---------------------------------------------------------
-  // nodes / edges 是 React Flow 的运行时草稿；保存时再转换回 Workflow Definition。
+
+  // Workflow 运行时草稿完全与图引擎解耦。
   const [past, setPast] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
   const [future, setFuture] = useState<Array<{ nodes: FlowNode[]; edges: FlowEdge[] }>>([]);
+  const [nodes, setNodes] = useState<FlowNode[]>([]);
+  const [edges, setEdges] = useState<FlowEdge[]>([]);
 
-  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FlowNode>([]);
-  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<FlowEdge>([]);
   const nodesRef = useRef<FlowNode[]>([]);
   const edgesRef = useRef<FlowEdge[]>([]);
   const snapshotRef = useRef<WorkflowSnapshot | undefined>(undefined);
   const newNodeIdsRef = useRef<Set<string>>(new Set());
-  const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
-  const lastMeasuredNodeCountRef = useRef(0);
   const layoutRequestRef = useRef(0);
-  const relayoutAfterMeasureRef = useRef(false);
-  /** 下一次节点落地后要不要把视角对准整张图。见下面那个 fitView effect。 */
-  const pendingFitRef = useRef(false);
-
-  // React Flow 会在首次渲染和新增节点后重新测量真实 DOM 尺寸。
-  // 自动布局必须在“测量完成”后再跑一次，否则 ELK 只能使用估算高度。
-  const nodesInitialized = useNodesInitialized({ includeHiddenNodes: true });
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -149,11 +124,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   }, [nodes, edges, snapshot]);
 
   /**
-   * 所有布局请求共享一个递增 token。
-   *
-   * ELK 是异步的：用户连续点击“自动排版”、新增节点后又马上修改节点，
-   * 老请求可能比新请求更晚返回。没有 token 时，老结果会覆盖新结果。
-   * 因此只有最后一次 layout request 可以写回 React Flow。
+   * ELK 是异步的。多个“自动排版”同时发起时，只允许最后一次结果落地。
+   * 这里仍然保留这一层，因为它保护的是布局计算，不属于 React Flow。
    */
   const layoutWithLatest = async (
     nodesToLayout: FlowNode[],
@@ -165,14 +137,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     return requestId === layoutRequestRef.current ? layouted : undefined;
   };
 
-
-
   // ---- 服务端 Workflow 生命周期 -----------------------------------------
-  /** 只负责把服务端快照取回来。
-   *
-   * 画布统一由下面那个 graphKey effect 重建。
-   * loadWorkflow 只负责读取服务端保存版本，不在请求完成后额外覆盖用户当前的 React Flow 编辑状态。
-   */
   const loadWorkflow = useCallback(async () => {
     const name = sessionNameFromUrl();
     if (!name) return;
@@ -224,6 +189,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setNodeDraft(undefined);
       return;
     }
+
     setNodeDraft({
       id: selectedNode.id,
       type: selectedNode.data.nodeType,
@@ -243,6 +209,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setEdgeDraft(undefined);
       return;
     }
+
     setEdgeDraft({
       outcome: selectedEdge.data?.outcome || 'success',
       target: selectedEdge.target,
@@ -253,12 +220,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const snapshotNow = (): { nodes: FlowNode[]; edges: FlowEdge[] } => ({
     nodes: nodesRef.current.map((node) => ({
       ...node,
-      data: { ...node.data },
       position: { ...node.position },
+      data: { ...node.data },
     })),
     edges: edgesRef.current.map((edge) => ({
       ...edge,
-      data: edge.data ? { ...edge.data } : undefined,
+      data: edge.data ? { ...edge.data } : { outcome: 'success' },
     })),
   });
 
@@ -268,10 +235,44 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setDirty(true);
   };
 
+  const rebuildStructuralGraph = async (
+    nextNodes: FlowNode[],
+    nextEdges: FlowEdge[],
+    nextNewIds = new Set(newNodeIdsRef.current),
+  ): Promise<{ nodes: FlowNode[]; edges: FlowEdge[] } | undefined> => {
+    const currentSnapshot = snapshotRef.current;
+    if (!currentSnapshot) return undefined;
+
+    const definition = definitionFromGraph(
+      nextNodes,
+      nextEdges,
+      currentSnapshot.definition,
+    );
+    const graph = graphFromDefinition(
+      definition,
+      layoutFromNodes(nextNodes),
+      currentSnapshot,
+      (value) => { void addNodeAfter(value, false); },
+      (value) => { void addNodeAfter(value, true); },
+      deleteNode,
+      setSelectedEdgeId,
+      nextNewIds,
+    );
+
+    const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
+    if (!layoutedNodes) return undefined;
+
+    setNodes(layoutedNodes);
+    setEdges(graph.edges);
+    setValidationIssues([]);
+
+    return { nodes: layoutedNodes, edges: graph.edges };
+  };
+
   // ---- Graph 编辑动作 ----------------------------------------------------
   /**
    * 在一个现有步骤后添加“下一步”或“分支步骤”。
-   * 结构变更完成后统一重新走 ELK，保证节点位置与 Handle 数量同步。
+   * 结构变化之后统一走 Workflow -> graph -> ELK，保证节点和连接同步。
    */
   const addNodeAfter = async (sourceId: string, branch: boolean) => {
     const currentSnapshot = snapshotRef.current;
@@ -284,24 +285,21 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const id = nextId('step', new Set(currentNodes.map((node) => node.id)));
     const oldSuccess = currentEdges.find(
-      (edge) => edge.source === sourceId
+      (edge) =>
+        edge.source === sourceId
         && String(edge.data?.outcome ?? '').toLowerCase() === 'success',
     );
-    const oldSingle = currentEdges.length
-      ? currentEdges.filter((edge) => edge.source === sourceId)
-      : [];
+    const oldSingle = currentEdges.filter((edge) => edge.source === sourceId);
 
     const node: FlowNode = {
       id,
       type: 'journey',
       position: {
         x: source.position.x + 360,
-        y: source.position.y + (branch ? 190 : 0),
+        y: source.position.y + (branch ? 180 : 0),
       },
-      draggable: true,
-      selectable: true,
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      width: 236,
+      height: 210,
       data: {
         title: branch ? '新的分支步骤' : '新的下一步',
         objective: '填写这一步要解决的问题。',
@@ -317,15 +315,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         onAddBranch: (value) => { void addNodeAfter(value, true); },
         onDelete: (value) => deleteNode(value),
       },
-      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future journey-flow-node-new',
-      style: { width: 236 },
     };
 
     let nextNodes = [...currentNodes, node];
     let nextEdges = [...currentEdges];
 
     if (!branch && oldSuccess) {
-      // “添加下一步”不是再造一条 success-1，而是把新节点插到现有 success 路线上。
       nextEdges = nextEdges
         .filter((edge) => edge.id !== oldSuccess.id)
         .concat([
@@ -340,14 +335,11 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             source: id,
             target: oldSuccess.target,
             sourceHandle: sourceHandleId(id, 0),
-            targetHandle: oldSuccess.targetHandle,
-            type: EDGE_TYPE,
-            markerEnd: { type: MarkerType.ArrowClosed },
+            targetHandle: targetHandleId(oldSuccess.target, 0),
             data: { outcome: oldSuccess.data?.outcome ?? 'success' },
           },
         ]);
     } else if (!branch && oldSingle.length === 1) {
-      // 只有一条非 success 出口时，也按“插入一步”处理，保留原 outcome。
       const old = oldSingle[0];
       nextEdges = nextEdges
         .filter((edge) => edge.id !== old.id)
@@ -363,9 +355,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
             source: id,
             target: old.target,
             sourceHandle: sourceHandleId(id, 0),
-            targetHandle: old.targetHandle,
-            type: EDGE_TYPE,
-            markerEnd: { type: MarkerType.ArrowClosed },
+            targetHandle: targetHandleId(old.target, 0),
             data: { outcome: 'success' },
           },
         ]);
@@ -386,27 +376,29 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           id: sourceId + ':' + outcome + ':' + id,
           source: sourceId,
           target: id,
-          type: EDGE_TYPE,
-          markerEnd: { type: MarkerType.ArrowClosed },
+          sourceHandle: sourceHandleId(
+            sourceId,
+            currentEdges.filter((edge) => edge.source === sourceId).length,
+          ),
+          targetHandle: targetHandleId(id, 0),
           data: { outcome },
         },
       ];
 
-      // 如果原节点已经有明确的主 success 目标，新的分支先接回该目标。
-      // 用户之后可以在边属性中改 outcome/target，而不是面对一个悬空节点。
       if (branch && oldSuccess) {
         nextEdges.push({
           id: id + ':success:' + oldSuccess.target,
           source: id,
           target: oldSuccess.target,
-          type: EDGE_TYPE,
-          markerEnd: { type: MarkerType.ArrowClosed },
+          sourceHandle: sourceHandleId(id, 0),
+          targetHandle: targetHandleId(oldSuccess.target, 0),
           data: { outcome: 'success' },
         });
       }
     }
 
     pushHistory();
+
     const nextNewIds = new Set(newNodeIdsRef.current);
     nextNewIds.add(id);
     newNodeIdsRef.current = nextNewIds;
@@ -423,18 +415,15 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       nextNewIds,
     );
-    const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
 
+    const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
     if (!laidOutNodes) return;
+
     setNodes(laidOutNodes);
     setEdges(graph.edges);
     setSelectedNodeId(id);
     setSelectedEdgeId(undefined);
     setValidationIssues([]);
-
-    requestAnimationFrame(() => {
-      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.25, maxZoom: 1.1 });
-    });
   };
 
   const deleteNode = (id: string) => {
@@ -466,60 +455,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         nextNewIds.delete(id);
         newNodeIdsRef.current = nextNewIds;
 
-        const base = currentSnapshot.definition;
-        const definition = definitionFromGraph(nextNodes, nextEdges, base);
-        const graph = graphFromDefinition(
-          definition,
-          layoutFromNodes(nextNodes),
-          currentSnapshot,
-          (value) => { void addNodeAfter(value, false); },
-          (value) => { void addNodeAfter(value, true); },
-          deleteNode,
-          setSelectedEdgeId,
-          nextNewIds,
-        );
-        setNodes((await layoutWithLatest(graph.nodes, graph.edges)) ?? nodesRef.current);
-        setEdges(graph.edges);
+        await rebuildStructuralGraph(nextNodes, nextEdges, nextNewIds);
         setSelectedNodeId(undefined);
         setSelectedEdgeId(undefined);
-        setValidationIssues([]);
       },
     });
   };
 
-  const rebuildStructuralGraph = async (
-    nextNodes: FlowNode[],
-    nextEdges: FlowEdge[],
-    nextNewIds = new Set(newNodeIdsRef.current),
-  ): Promise<{ nodes: FlowNode[]; edges: FlowEdge[] } | undefined> => {
-    const currentSnapshot = snapshotRef.current;
-    if (!currentSnapshot) return undefined;
-
-    const base = currentSnapshot.definition;
-    const definition = definitionFromGraph(nextNodes, nextEdges, base);
-    const graph = graphFromDefinition(
-      definition,
-      layoutFromNodes(nextNodes),
-      currentSnapshot,
-      (value) => { void addNodeAfter(value, false); },
-      (value) => { void addNodeAfter(value, true); },
-      deleteNode,
-      setSelectedEdgeId,
-      nextNewIds,
-    );
-
-    const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
-    if (!layoutedNodes) return undefined;
-    setNodes(layoutedNodes);
-    setEdges(graph.edges);
-    setValidationIssues([]);
-    requestAnimationFrame(() => {
-      flowInstanceRef.current?.fitView({ padding: 0.18, minZoom: 0.45, maxZoom: 1.1 });
-    });
-    return { nodes: layoutedNodes, edges: graph.edges };
-  };
-
-  const onConnect = async (connection: Connection) => {
+  const onGraphConnect = async (connection: GraphConnection) => {
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
     const edge = normalizeConnection(connection, currentNodes, currentEdges);
@@ -528,103 +471,75 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     pushHistory();
     const rebuilt = await rebuildStructuralGraph(
       [...currentNodes],
-      addEdge(edge, currentEdges),
+      [...currentEdges, edge],
     );
+
     setSelectedEdgeId(
       rebuilt?.edges.find(
-        (item) =>
-          item.source === edge.source
+        (item) => item.source === edge.source
           && item.target === edge.target
           && item.data?.outcome === edge.data?.outcome,
       )?.id,
     );
   };
 
-  const onReconnect = async (oldEdge: FlowEdge, connection: Connection) => {
+  const onGraphReconnect = async (
+    edgeId: string,
+    connection: GraphConnection,
+  ) => {
+    const oldEdge = edgesRef.current.find((edge) => edge.id === edgeId);
+    if (!oldEdge) return;
     if (!connection.source || !connection.target || connection.source === connection.target) return;
 
     pushHistory();
-    const currentNodes = nodesRef.current;
-    const currentEdges = edgesRef.current;
-    const remainingEdges = currentEdges.filter((edge) => edge.id !== oldEdge.id);
-    const nextConnection = {
-      ...connection,
-      sourceHandle: sourceHandleId(
-        connection.source,
-        remainingEdges.filter((edge) => edge.source === connection.source).length,
-      ),
-      targetHandle: targetHandleId(
-        connection.target,
-        remainingEdges.filter((edge) => edge.target === connection.target).length,
-      ),
-    };
+
+    const nextEdges = edgesRef.current.map((edge) => (
+      edge.id === edgeId
+        ? {
+            ...edge,
+            source: connection.source,
+            target: connection.target,
+            sourceHandle: sourceHandleId(
+              connection.source,
+              edgesRef.current.filter((candidate) => candidate.source === connection.source).length,
+            ),
+            targetHandle: targetHandleId(connection.target, 0),
+            data: { ...edge.data },
+          }
+        : edge
+    ));
+
     const rebuilt = await rebuildStructuralGraph(
-      [...currentNodes],
-      reconnectEdge(oldEdge, nextConnection, currentEdges),
+      nodesRef.current,
+      nextEdges,
     );
+
     setSelectedEdgeId(
       rebuilt?.edges.find(
-        (item) =>
-          item.source === connection.source
+        (item) => item.source === connection.source
           && item.target === connection.target
           && item.data?.outcome === oldEdge.data?.outcome,
       )?.id,
     );
   };
 
-  const handleNodesChange = (changes: NodeChange<FlowNode>[]) => {
-    const removed = changes.filter((change) => change.type === 'remove');
-    if (changes.some((change) => change.type !== 'select')) setDirty(true);
-    if (!removed.length) {
-      onNodesChangeInternal(changes);
-      return;
-    }
-
-    const removedIds = new Set(removed.map((change) => change.id));
-
-    for (const id of removedIds) {
-      if (id === snapshotRef.current?.definition.start) {
-        message.warning('不能删除 Workflow 的第一步。');
-        return;
-      }
-    }
-
-    pushHistory();
-    const nextNodes = nodesRef.current.filter((node) => !removedIds.has(node.id));
-    const nextEdges = edgesRef.current.filter(
-      (edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target),
-    );
-
-    const nextNewIds = new Set(newNodeIdsRef.current);
-    for (const id of removedIds) nextNewIds.delete(id);
-    newNodeIdsRef.current = nextNewIds;
-
-    void rebuildStructuralGraph(nextNodes, nextEdges, nextNewIds);
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-  };
-
-  const handleEdgesChange = (changes: EdgeChange<FlowEdge>[]) => {
-    const removed = changes.filter((change) => change.type === 'remove');
-    if (changes.length) setDirty(true);
-    if (!removed.length) {
-      onEdgesChangeInternal(changes);
-      return;
-    }
-
-    pushHistory();
-    const removedIds = new Set(removed.map((change) => change.id));
-    const nextEdges = edgesRef.current.filter((edge) => !removedIds.has(edge.id));
-    void rebuildStructuralGraph(nodesRef.current, nextEdges);
-    setSelectedEdgeId(undefined);
+  const onNodeMoved = (id: string, position: { x: number; y: number }) => {
+    setNodes((current) => current.map((node) => (
+      node.id === id
+        ? { ...node, position: { x: position.x, y: position.y } }
+        : node
+    )));
+    setDirty(true);
   };
 
   const applyNodeDraft = async () => {
     if (!selectedNode || !nodeDraft) return;
 
     pushHistory();
+
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
+
     const nextNodes = currentNodes.map((node) => (
       node.id === selectedNode.id
         ? {
@@ -647,68 +562,44 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         : node
     ));
 
-    const currentSnapshot = snapshotRef.current;
-    if (!currentSnapshot) return;
-    const base = currentSnapshot.definition;
-    const definition = definitionFromGraph(nextNodes, currentEdges, base);
-    const graph = graphFromDefinition(
-      definition,
-      layoutFromNodes(nextNodes),
-      currentSnapshot,
-      (id) => { void addNodeAfter(id, false); },
-      (id) => { void addNodeAfter(id, true); },
-      deleteNode,
-      setSelectedEdgeId,
-      newNodeIdsRef.current,
-    );
-    const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
-    if (!layoutedNodes) return;
-    setNodes(layoutedNodes);
-    setEdges(graph.edges);
-    setValidationIssues([]);
+    await rebuildStructuralGraph(nextNodes, currentEdges);
   };
 
   const applyEdgeDraft = async () => {
     if (!selectedEdge || !edgeDraft) return;
+
     const outcome = edgeDraft.outcome.trim();
     if (!outcome) {
       message.warning('分支结果不能是空的。');
       return;
     }
 
-    const currentNodes = nodesRef.current;
-    const currentEdges = edgesRef.current;
-    if (
-      currentEdges.some(
-        (edge) =>
-          edge.id !== selectedEdge.id
-          && edge.source === selectedEdge.source
-          && edge.target === edgeDraft.target,
-      )
-    ) {
-      message.info('这个节点已经连向该目标步骤；可以保留一条连接，再通过 outcome 区分。');
-    }
-
     pushHistory();
-    const nextEdges = currentEdges.map((edge) => (
+
+    const nextEdges = edgesRef.current.map((edge) => (
       edge.id === selectedEdge.id
         ? {
             ...edge,
             target: edgeDraft.target,
+            targetHandle: targetHandleId(edgeDraft.target, 0),
             data: {
-              ...(edge.data ?? {}),
+              ...(edge.data ?? { outcome }),
               outcome,
-              condition: edgeDraft.condition?.trim() || undefined,
+              ...(edgeDraft.condition?.trim()
+                ? { condition: edgeDraft.condition.trim() }
+                : {}),
             },
           }
         : edge
     ));
-    await rebuildStructuralGraph(currentNodes, nextEdges);
+
+    await rebuildStructuralGraph(nodesRef.current, nextEdges);
   };
 
   const connectSelectedNode = async () => {
     const source = selectedNodeId;
     const target = connectTargetId;
+
     if (!source || !target || source === target) {
       message.warning('请选择一个不同于当前节点的目标步骤。');
       return;
@@ -717,6 +608,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
     const outcome = connectOutcome.trim() || 'success';
+
     if (currentEdges.some(
       (edge) =>
         edge.source === source
@@ -728,9 +620,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
 
     pushHistory();
-    const sourceNode = currentNodes.find((node) => node.id === source);
-    const targetNode = currentNodes.find((node) => node.id === target);
-    if (!sourceNode || !targetNode) return;
 
     const edge: FlowEdge = {
       id: source + ':' + outcome + ':' + target + ':' + String(
@@ -738,10 +627,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       ),
       source,
       target,
-      type: EDGE_TYPE,
-      markerEnd: { type: MarkerType.ArrowClosed },
+      sourceHandle: sourceHandleId(
+        source,
+        currentEdges.filter((item) => item.source === source).length,
+      ),
+      targetHandle: targetHandleId(target, 0),
       data: { outcome },
     };
+
     await rebuildStructuralGraph(currentNodes, [...currentEdges, edge]);
     setConnectTargetId(undefined);
     setConnectOutcome('success');
@@ -756,14 +649,13 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const id = nextId('step', new Set(currentNodes.map((node) => node.id)));
     const maxX = currentNodes.reduce((max, node) => Math.max(max, node.position.x), 0);
+
     const node: FlowNode = {
       id,
       type: 'journey',
       position: { x: maxX + 360, y: 0 },
-      draggable: true,
-      selectable: true,
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      width: 236,
+      height: 210,
       data: {
         title: '新建步骤',
         objective: '填写这一步要解决的问题。',
@@ -779,17 +671,20 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         onAddBranch: (value) => { void addNodeAfter(value, true); },
         onDelete: deleteNode,
       },
-      className: 'journey-flow-node journey-flow-node-stage journey-flow-node-future journey-flow-node-new',
-      style: { width: 236 },
     };
 
     pushHistory();
+
     const nextIds = new Set(newNodeIdsRef.current);
     nextIds.add(id);
     newNodeIdsRef.current = nextIds;
 
-    const base = currentSnapshot.definition;
-    const definition = definitionFromGraph([...currentNodes, node], currentEdges, base);
+    const definition = definitionFromGraph(
+      [...currentNodes, node],
+      currentEdges,
+      currentSnapshot.definition,
+    );
+
     const graph = graphFromDefinition(
       definition,
       layoutFromNodes([...currentNodes, node]),
@@ -803,6 +698,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
     const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
     if (!laidOutNodes) return;
+
     setNodes(laidOutNodes);
     setEdges(graph.edges);
     setSelectedNodeId(id);
@@ -810,10 +706,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setValidationIssues([]);
   };
 
-  /**
-   * 拖动一个节点是一个完整编辑动作，而不是几十/几百次 mousemove。
-   * 因此只在 drag start 保存一次 Undo snapshot。
-   */
+  /** 拖动节点是一个完整编辑动作，X6 只在 node:moved 后写入位置。 */
   const beginNodeDrag = () => {
     pushHistory();
   };
@@ -821,7 +714,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const undo = () => {
     const previous = past.at(-1);
     if (!previous) return;
+
     const current = snapshotNow();
+
     setFuture((items) => [...items, current]);
     setPast((items) => items.slice(0, -1));
     setDirty(true);
@@ -832,7 +727,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const redo = () => {
     const next = future.at(-1);
     if (!next) return;
+
     const current = snapshotNow();
+
     setPast((items) => [...items, current]);
     setFuture((items) => items.slice(0, -1));
     setDirty(true);
@@ -844,6 +741,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     if (!currentDefinition) return;
 
     pushHistory();
+
     const graph = graphFromDefinition(
       currentDefinition,
       layoutFromNodes(nodesRef.current),
@@ -854,14 +752,16 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setSelectedEdgeId,
       newNodeIdsRef.current,
     );
+
     const laidOutNodes = await layoutWithLatest(graph.nodes, graph.edges);
     if (!laidOutNodes) return;
-    pendingFitRef.current = true;
+
     setNodes(laidOutNodes);
+    setEdges(graph.edges);
     setValidationIssues([]);
   };
 
-  /** 画布打开后始终可编辑；React Flow 是本地编辑状态，保存时再写回 Workflow DSL。 */
+  /** 服务端定义签名改变时重建画布；普通节点拖动不会改变这里的 signature。 */
   const graphKey = (() => {
     if (!snapshot) return 'none';
 
@@ -889,10 +789,8 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   })();
 
   useEffect(() => {
-    // 服务端版本变化后重建画布；普通节点拖动不会改变 graphKey，因此不会被这个 effect 覆盖。
-    lastMeasuredNodeCountRef.current = 0;
-
     const current = snapshotRef.current;
+
     if (!current) {
       setNodes([]);
       setEdges([]);
@@ -906,7 +804,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         current.definition,
         current.layout,
         current,
-          (id) => { void addNodeAfter(id, false); },
+        (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
         deleteNode,
         setSelectedEdgeId,
@@ -915,13 +813,13 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
 
       const shouldAutoLayout =
         current.source !== 'custom' || current.layout.engine !== 'elk-v5';
+
       const layoutedNodes = shouldAutoLayout
         ? await autoLayoutJourney(graph.nodes, graph.edges)
         : graph.nodes;
 
       if (cancelled) return;
-      relayoutAfterMeasureRef.current = shouldAutoLayout;
-      pendingFitRef.current = true;
+
       setNodes(layoutedNodes);
       setEdges(graph.edges);
       setSelectedNodeId(undefined);
@@ -938,68 +836,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     };
   }, [graphKey]);
 
-  /**
-   * 用 React Flow 实际测量的节点尺寸做一次最终布局。
-   *
-   * 这一步解决了一个很隐蔽的问题：自定义节点在编辑模式和锁定模式的内容高度
-   * 并不完全等于固定值。ELK 如果只拿估算尺寸排版，视觉上仍可能出现“节点贴住”
-   * 的情况。React Flow 官方提供 useNodesInitialized 来判断尺寸测量是否完成。
-   *
-   */
-  useEffect(() => {
-    if (!nodesInitialized || !nodes.length) return;
-    if (!relayoutAfterMeasureRef.current) return;
-
-    if (lastMeasuredNodeCountRef.current === nodes.length) return;
-    lastMeasuredNodeCountRef.current = nodes.length;
-    relayoutAfterMeasureRef.current = false;
-
-    let cancelled = false;
-
-    const relayoutAfterMeasure = async () => {
-      const layouted = await layoutWithLatest(nodesRef.current, edgesRef.current);
-      if (!cancelled && layouted) {
-        // 实测重排会再挪一次节点，视角要跟着重算，所以这里重新申请一次对准。
-        pendingFitRef.current = true;
-        setNodes(layouted);
-      }
-    };
-
-    void relayoutAfterMeasure();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [nodes, nodesInitialized]);
-
-  /**
-   * 把视角对准整张图。
-   *
-   * 关键是不能在 setNodes 之后立刻调 fitView：那一刻 React 还没把新节点提交给
-   * React Flow，fitView 量到的是一张空画布，算出来的缩放会被 maxZoom 卡住，
-   * 13 个节点里只有一两个露在屏幕上——看上去就跟白屏一样。
-   *
-   * 所以改成：需要对准时只置一个标记，等 React Flow 把节点尺寸量完
-   * （nodesInitialized）并且新节点真的提交进画布（nodes 变了）之后，再对准。
-   * 实测重排会在之后把节点再挪一次，它也会重新置标记，于是最终落点仍然正确。
-   */
-  useEffect(() => {
-    if (!pendingFitRef.current || !nodesInitialized || !nodes.length) return;
-    pendingFitRef.current = false;
-    flowInstanceRef.current?.fitView({
-      padding: 0.1,
-      minZoom: 0.2,
-      maxZoom: 1.1,
-    });
-  }, [nodes, nodesInitialized]);
-
-  const definitionPayload = currentDefinition;
-  const layoutPayload = layoutFromNodes(nodes);
-
-  /** 保存当前画布。服务端会重新检查结构，通过后才创建新的 Workflow 版本。 */
+  /** 保存当前画布；服务端仍然验证 Workflow Definition。 */
   const saveWorkflow = async () => {
     const name = sessionNameFromUrl();
-    if (!name || !definitionPayload) return;
+    if (!name || !currentDefinition) return;
 
     try {
       const response = await fetch(
@@ -1007,9 +847,13 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ definition: definitionPayload, layout: layoutPayload }),
+          body: JSON.stringify({
+            definition: currentDefinition,
+            layout: layoutFromNodes(nodes),
+          }),
         },
       );
+
       const body = await response.json() as {
         snapshot?: WorkflowSnapshot;
         issues?: string[];
@@ -1027,6 +871,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       }
 
       if (body.snapshot) setSnapshot(body.snapshot);
+
       setDirty(false);
       setValidationIssues([]);
       newNodeIdsRef.current = new Set();
@@ -1067,21 +912,25 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           }),
         },
       );
+
       const body = await response.json() as {
         definition?: WorkflowDefinition;
         message?: string;
         changes?: WorkflowChange[];
         error?: string;
       };
+
       if (!response.ok || !body.definition || !body.changes?.length) {
         throw new Error(body.error || response.statusText || 'AI 没有返回 Workflow 修改。');
       }
+
       setPendingAiChange({
         message: body.message?.trim() || 'AI 已提出一版修改。',
         changes: body.changes,
         definition: body.definition,
         baseDefinition: currentCanvasDefinition,
       });
+
       return {
         message: body.message?.trim() || 'AI 已提出修改，请检查预览。',
         changes: body.changes,
@@ -1092,8 +941,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
   };
 
-
-  /** 应用 AI Patch；等待期间如果画布发生变化，则放弃旧提议。 */
   const applyAiChanges = async () => {
     const pending = pendingAiChange;
     const currentSnapshot = snapshotRef.current;
@@ -1104,6 +951,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       edgesRef.current,
       currentSnapshot.definition,
     );
+
     if (JSON.stringify(currentCanvasDefinition) !== JSON.stringify(pending.baseDefinition)) {
       message.warning('画布已经发生变化，请重新让 AI 修改当前版本。');
       setPendingAiChange(undefined);
@@ -1111,18 +959,24 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
 
     try {
-      const nextDefinition = applyWorkflowChanges(currentCanvasDefinition, pending.changes);
+      const nextDefinition = applyWorkflowChanges(
+        currentCanvasDefinition,
+        pending.changes,
+      );
+
       pushHistory();
+
       const graph = graphFromDefinition(
         nextDefinition,
         layoutFromNodes(nodesRef.current),
         { ...currentSnapshot, definition: nextDefinition },
-          (id) => { void addNodeAfter(id, false); },
+        (id) => { void addNodeAfter(id, false); },
         (id) => { void addNodeAfter(id, true); },
         deleteNode,
         setSelectedEdgeId,
         new Set(),
       );
+
       const layoutedNodes = await layoutWithLatest(graph.nodes, graph.edges);
       if (!layoutedNodes) return;
 
@@ -1134,7 +988,6 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       setValidationIssues([]);
       setDirty(true);
       setPendingAiChange(undefined);
-      pendingFitRef.current = true;
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     }
@@ -1147,6 +1000,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     const name = sessionNameFromUrl();
     const currentSnapshot = snapshotRef.current;
     if (!name || !currentSnapshot) return;
+
     if (dirty) {
       message.warning('当前画布有未保存修改，请先保存，再推进人工步骤。');
       return;
@@ -1164,10 +1018,12 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           }),
         },
       );
+
       const body = await response.json() as { error?: string };
       if (!response.ok) {
         throw new Error(body.error || response.statusText || '人工 Workflow transition 失败。');
       }
+
       await loadWorkflow();
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
@@ -1188,19 +1044,44 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
           '/api/sessions/' + encodeURIComponent(name) + '/workflow/reset',
           { method: 'POST' },
         );
+
         const body = await response.json().catch(() => ({})) as { error?: string };
         if (!response.ok) {
           message.error(body.error || '恢复工作地图失败，请重试。');
           return;
         }
+
         message.success('已恢复内置工作地图。');
         await loadWorkflow();
       },
     });
   };
 
+  const deleteSelectedCell = (id: string, kind: 'node' | 'edge') => {
+    if (kind === 'edge') {
+      if (!edgesRef.current.some((edge) => edge.id === id)) return;
 
-  // 把所有编辑动作集中在 hook 内，JourneyMap 只负责布局 UI。
+      pushHistory();
+
+      void rebuildStructuralGraph(
+        nodesRef.current,
+        edgesRef.current.filter((edge) => edge.id !== id),
+      );
+
+      setSelectedEdgeId(undefined);
+      return;
+    }
+
+    deleteNode(id);
+  };
+
+  const deleteSelectedEdge = () => {
+    const edgeId = selectedEdgeId;
+    if (!edgeId) return;
+    deleteSelectedCell(edgeId, 'edge');
+  };
+
+  // ---- 当前步骤 / 输出 ---------------------------------------------------
   const activeDefinition = snapshot?.definition;
 
   const currentStage = snapshot
@@ -1231,7 +1112,10 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     validationIssues,
     currentDefinition,
     pendingAiChange: pendingAiChange
-      ? { message: pendingAiChange.message, changes: pendingAiChange.changes }
+      ? {
+          message: pendingAiChange.message,
+          changes: pendingAiChange.changes,
+        }
       : undefined,
     currentStage,
     completedCount,
@@ -1252,32 +1136,21 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setEdgeDraft,
     setConnectTargetId,
     setConnectOutcome,
-    handleNodesChange,
-    handleEdgesChange,
-    onConnect,
-    onReconnect,
+    onGraphConnect,
+    onGraphReconnect,
     undo,
     redo,
     canUndo: past.length > 0,
     canRedo: future.length > 0,
-    flowInstanceRef,
     onNodeClick: (id) => setSelectedNodeId(id),
     onEdgeClick: (id) => setSelectedEdgeId(id),
     clearSelection: () => {
       setSelectedNodeId(undefined);
       setSelectedEdgeId(undefined);
     },
-    deleteSelectedEdge: () => {
-      const edgeId = selectedEdgeId;
-      if (!edgeId) return;
-
-      pushHistory();
-      void rebuildStructuralGraph(
-        nodesRef.current,
-        edgesRef.current.filter((edge) => edge.id !== edgeId),
-      );
-      setSelectedEdgeId(undefined);
-    },
+    deleteSelectedEdge,
     beginNodeDrag,
+    onNodeMoved,
+    deleteSelectedCell,
   };
 }
