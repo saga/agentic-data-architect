@@ -141,11 +141,13 @@ Current State 至少回答：
 
 - success -> target
 
+
+这些阶段不设置 completeWhen：目标架构、映射和验证都需要结合本轮真实产物判断完成，不能因为某个计数器有值就自动“通关”。Agent 在完成阶段主要工作后，返回当前节点已有的 success / retry 等合法 outcome，由服务端推进地图。
+
 ## @task target
 
 title: 设计新方案
 objective: 在旧系统已经说清楚以后，确定新的数据怎么接、怎么整理、业务定义放哪里、怎么管。
-completeWhen: target
 
 设计内容：
 
@@ -167,7 +169,6 @@ completeWhen: target
 
 title: 新旧对应
 objective: 把旧数据对应到新数据，并把 transformation、business rule、validation rule 写清楚。
-completeWhen: mapping
 
 每条 mapping 至少说明：
 
@@ -187,7 +188,6 @@ completeWhen: mapping
 
 title: 验证结果
 objective: 证明目标系统和旧系统在关键业务结果上可以对得上，并提前定义切换条件。
-completeWhen: validation
 
 至少覆盖：
 
