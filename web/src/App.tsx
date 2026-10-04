@@ -145,6 +145,15 @@ interface PendingPermission {
   managedApprovalRequired?: boolean;
 }
 
+interface ExecutionStatus {
+  state: 'idle' | 'running' | 'waiting_permission' | 'waiting_user_input' | 'committing';
+  running: boolean;
+  turnId: string | null;
+  phase: 'executing' | 'committing' | null;
+  pendingPermissionCount: number;
+  pendingUserInputCount: number;
+}
+
 interface PendingUserInput {
   sessionName: string;
   turnId: string;
@@ -518,6 +527,7 @@ function AppInner() {
 
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
   const [pendingUserInputs, setPendingUserInputs] = useState<PendingUserInput[]>([]);
@@ -598,6 +608,42 @@ function AppInner() {
     setAttachments(existing);
   };
 
+  /** 查询当前 Node.js 进程的真实执行状态；不使用 trajectory 推断 live state。 */
+  const loadExecutionStatus = async (key: string): Promise<ExecutionStatus> => {
+    try {
+      const status = await getJson<ExecutionStatus>(
+        `/api/sessions/${encodeURIComponent(key)}/execution`,
+      );
+      if (key === activeRef.current) setExecutionStatus(status);
+      return status;
+    } catch {
+      const idle: ExecutionStatus = { state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 };
+      if (key === activeRef.current) setExecutionStatus(idle);
+      return idle;
+    }
+  };
+
+  /** 用统一的 live execution state 生成顶部状态文字。 */
+  const executionStatusText = (status: ExecutionStatus): string => {
+    switch (status.state) {
+      case 'running': return '上一轮任务仍在执行';
+      case 'waiting_permission': return '等待你的授权';
+      case 'waiting_user_input': return '等待你的回答';
+      case 'committing': return '正在保存分析结果';
+      default: return '可以继续提问';
+    }
+  };
+
+  /** 刷新后如果服务端仍有真实 active turn，新问题先排队，避免第二个 turn 抢占当前 Investigation。 */
+  const waitForExecutionIdle = async (key: string) => {
+    for (;;) {
+      const status = await loadExecutionStatus(key);
+      if (!status.running) return;
+      setTurnStatus(executionStatusText(status) + '，当前问题会在上一轮完成后自动继续。');
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+    }
+  };
+
   /** 拉取当前 Agent 正在等待的权限/用户输入请求；这些都是短暂运行态，不写入调查配置。 */
   const loadPendingInteractions = async (key: string) => {
     try {
@@ -620,13 +666,16 @@ function AppInner() {
 
   useEffect(() => {
     if (!active) return;
+    void loadExecutionStatus(active);
     void loadPendingInteractions(active);
-    if (!loading) return;
     const timer = window.setInterval(() => {
-      if (!document.hidden) void loadPendingInteractions(active);
+      if (!document.hidden) {
+        void loadExecutionStatus(active);
+        void loadPendingInteractions(active);
+      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [active, loading]);
+  }, [active]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -648,6 +697,7 @@ function AppInner() {
     setPendingPermissions([]);
     setPendingUserInputs([]);
     setUserInputDrafts({});
+    setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -788,19 +838,21 @@ function AppInner() {
       });
     }
     return items;
-  }, [active, assistantAvatarByMessage, current?.context.journeyPlan?.routes, current?.messages, loading, nextGuidance, streamingAnswer]);
+  }, [active, assistantAvatarByMessage, current?.context.journeyPlan?.routes, current?.messages, executionStatus.state, loading, nextGuidance, streamingAnswer]);
 
   const cancelActiveTurn = () => {
     const activeTurn = activeTurnRef.current;
-    if (!activeTurn) return;
+    const key = activeTurn?.key ?? active;
+    const turnId = activeTurn?.turnId ?? executionStatus.turnId;
+    if (!key || !turnId) return;
 
-    void fetch(`/api/sessions/${encodeURIComponent(activeTurn.key)}/messages/abort`, {
+    void fetch(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ turnId: activeTurn.turnId }),
+      body: JSON.stringify({ turnId }),
     }).catch(() => undefined);
 
-    activeTurn.controller.abort();
+    activeTurn?.controller.abort();
   };
 
   /** 处理权限请求；session scope 使用 Copilot SDK 原生的“当前会话继续允许”。 */
@@ -904,6 +956,9 @@ function AppInner() {
 
       activeTurnRef.current = { key: key as string, turnId, controller };
       setStreamingAnswer({ key: key as string, content: '' });
+
+      // 页面刷新后没有本地 activeTurnRef，但服务端可能仍有上一轮执行；等待真实 live turn 结束。
+      await waitForExecutionIdle(key as string);
 
       setCurrent((existing) => existing ? {
         ...existing,
@@ -1236,8 +1291,12 @@ function AppInner() {
               <Text strong className="topbar-label">调查工作区</Text>
             </div>
             <Space>
-              <Tag className="workspace-status" variant="filled" icon={loading ? <LoadingOutlined spin /> : undefined}>
-                {loading ? turnStatus : '可以继续提问'}
+              <Tag
+                className="workspace-status"
+                variant="filled"
+                icon={(loading || executionStatus.running) ? <LoadingOutlined spin /> : undefined}
+              >
+                {loading ? turnStatus : executionStatusText(executionStatus)}
               </Tag>
               <Button
                 type="text"
