@@ -8,7 +8,7 @@ export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
   timestamp: z.string().datetime(),
-  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','status']),
+  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','checkpoint','status']),
   name: z.string().min(1),
   status: z.enum(['started','completed','failed','waiting','info']).optional(),
   durationMs: z.number().nonnegative().optional(),
@@ -118,6 +118,48 @@ export async function readTrajectory(name: string, options: { turnId?: string; l
   const events = text.split('\n').filter(Boolean).map((line) => { try { return TrajectoryEventSchema.parse(JSON.parse(line)); } catch { return null; } }).filter((event): event is TrajectoryEvent => Boolean(event));
   const filtered = options.turnId ? events.filter((event) => event.turnId === options.turnId) : events;
   return filtered.slice(-limit);
+}
+
+/** 读取最近的阶段性调查小结；checkpoint 本身作为 trajectory 的可追溯事件保存。 */
+export interface TrajectoryCheckpoint {
+  id: string;
+  turnId: string;
+  timestamp: string;
+  execution: number;
+  title: string;
+  summary: string;
+  confirmed: string[];
+  evidenceIds: string[];
+  unknowns: string[];
+  nextStep?: string;
+}
+
+const trajectoryCheckpointDetails = z.object({
+  execution: z.number().int().nonnegative(),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  confirmed: z.array(z.string()).default([]),
+  evidenceIds: z.array(z.string()).default([]),
+  unknowns: z.array(z.string()).default([]),
+  nextStep: z.string().optional(),
+}).strict();
+
+export function listTrajectoryCheckpoints(events: TrajectoryEvent[], limit = 20): TrajectoryCheckpoint[] {
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
+  return events
+    .filter((event) => event.type === 'checkpoint')
+    .map((event) => {
+      const parsed = trajectoryCheckpointDetails.safeParse(event.details);
+      if (!parsed.success) return null;
+      return {
+        id: event.id,
+        turnId: event.turnId,
+        timestamp: event.timestamp,
+        ...parsed.data,
+      };
+    })
+    .filter((item): item is TrajectoryCheckpoint => Boolean(item))
+    .slice(-safeLimit);
 }
 
 /** 从 trajectory events 汇总 token、Premium Request Cost 和时间；最终 AI credit 以 SDK usage.getMetrics 为准。 */
