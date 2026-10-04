@@ -2965,7 +2965,7 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 - retry 保留为真实 Workflow Edge，视觉上使用灰色虚线外侧回线，不创建 Group、隐藏节点或第二套控制结构。
 - 服务端保存前检查 start、route target、重复 outcome、不可达节点以及无法到达 @end 的循环。
 
-自动排版使用项目自己的 workflow-v1：
+自动排版使用项目自己的 workflow-v2：
 
 - 主流程默认纵向向下。
 - 同层分支横向展开。
@@ -2997,7 +2997,7 @@ journey-map-graph
   → Workflow Definition ↔ engine-neutral Graph / 连接问题诊断
 
 journey-map-layout
-  → workflow-v1 主流程阅读顺序 / 分支和回线布局
+  → workflow-v2 主流程阅读顺序 / S 型主线 / 分支和回线布局
 
 JourneyMapInspector
   → node / edge property editing
@@ -3010,7 +3010,7 @@ Workflow Definition
         ↓
 engine-neutral Graph
         ↓
-workflow-v1 domain layout
+workflow-v2 domain layout
         ↓
 主流程纵向 + 分支左右展开 + retry 外侧回线
         ↓
