@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import {
   EDGE_TYPE,
   STATUS_CLASS,
@@ -22,12 +21,6 @@ export function sourceHandleId(nodeId: string, index: number): string {
 /** X6 中所有节点共享一个入口 port。多个 edge 可以连接到同一个入口 port。 */
 export function targetHandleId(_nodeId: string, _index = 0): string {
   return TARGET_HANDLE_ID;
-}
-
-/** 自动布局和 connection-inspector 仍需要一个简单的、与画布无关的垂直分布计算。 */
-export function handleStyle(index: number, total: number): CSSProperties {
-  const top = ((index + 1) / (total + 1)) * 100;
-  return { top: String(top) + '%' };
 }
 
 /** 根据真实执行状态给节点映射 UI 状态。 */
