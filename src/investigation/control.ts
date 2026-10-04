@@ -124,6 +124,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       permissionMode: control.agent.permissionMode,
       displayName: control.agent.displayName,
       ...(control.agent.avatarPath ? { avatarPath: control.agent.avatarPath } : {}),
+      ...(control.agent.avatarPaths?.length ? { avatarPaths: [...control.agent.avatarPaths] } : {}),
       ...(control.agent.avatarMimeType ? { avatarMimeType: control.agent.avatarMimeType } : {}),
       avatarWidth: control.agent.avatarWidth,
       avatarHeight: control.agent.avatarHeight,
@@ -171,6 +172,9 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(typeof agent.avatarPath === 'string' && agent.avatarPath.trim()
         ? { avatarPath: agent.avatarPath.trim() }
         : {}),
+      ...(Array.isArray(agent.avatarPaths)
+        ? { avatarPaths: [...new Set(agent.avatarPaths.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))] }
+        : agent.avatarPath ? { avatarPaths: [agent.avatarPath] } : {}),
       ...(agent.avatarMimeType === 'image/png' || agent.avatarMimeType === 'image/jpeg' || agent.avatarMimeType === 'image/webp'
         ? { avatarMimeType: agent.avatarMimeType }
         : {}),
