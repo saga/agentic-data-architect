@@ -495,7 +495,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   /** 上传当前 Investigation 的秘书头像；前端已经裁剪并缩放到配置尺寸，这里只负责安全落盘和更新 Control。 */
   app.post('/api/sessions/:name/assistant/avatar', upload.single('file'), async (req, res) => {
-    const name = sessionKey(req.params.name);
+    const name = sessionKey(routeParam(req.params.name));
     if (!req.file) {
       res.status(400).json({ error: '没有收到头像文件，请重新选择。' });
       return;
