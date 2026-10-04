@@ -1026,7 +1026,7 @@ export async function buildJourneyAgentInstruction(
     '',
     outcomes,
     '',
-    '当这一轮已经完成当前节点并有足够依据选择出口时，在最终 JSON 中额外返回：',
+    '调查动作与 Workflow 推进是两件事：即使当前节点的 completeWhen 尚未满足，也可以先调查并收集事实；只有真正满足条件并选择了合法出口时，才返回 workflow 字段。',
     '{"workflow":{"nodeId":"当前节点 ID","outcome":"允许的 outcome"}}',
     '如果这轮没有完成当前节点，或者不能可靠判断出口，不要返回 workflow 字段，不要猜。',
     '需要用户补充信息时，不要猜；应由当前 Workflow 中真实存在的人工步骤或 outcome 决定。',
