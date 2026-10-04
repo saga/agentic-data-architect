@@ -40,6 +40,7 @@ import {
   Conversations,
   Mermaid,
   Sender,
+  Think,
   XProvider,
 } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
@@ -76,6 +77,16 @@ interface WorkspaceInput {
   sha256?: string;
 }
 
+type AutoTier = 'efficiency' | 'balance' | 'intelligence' | 'fast';
+
+interface CopilotModelOption {
+  id: string;
+  name: string;
+  supportedReasoningEfforts: string[];
+  defaultReasoningEffort: string | null;
+  policyState: string | null;
+}
+
 interface InvestigationControl {
   schemaVersion: number;
   version: number;
@@ -87,6 +98,8 @@ interface InvestigationControl {
     importantDocuments: Array<{ id: string; title: string; reference: string }>;
   };
   agent: {
+    model: string;
+    autoTier?: AutoTier;
     permissionMode: 'permission' | 'allow_all';
     displayName: string;
     avatarPath?: string;
@@ -489,6 +502,10 @@ function AppInner() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
   const [current, setCurrent] = useState<SessionData>();
+  const [availableModels, setAvailableModels] = useState<CopilotModelOption[]>([]);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [reasoningByMessage, setReasoningByMessage] = useState<Record<string, string>>({});
   // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -579,7 +596,7 @@ function AppInner() {
     }
   };
 
-  const loadSession = async (key: string, clearFirst = false) => {
+  const loadSession = async (key: string, clearFirst = false): Promise<SessionData | undefined> => {
     const requestId = ++loadRequestRef.current;
     setError(undefined);
     if (clearFirst) {
@@ -607,6 +624,7 @@ function AppInner() {
         type: input.mimeType,
       }));
     setAttachments(existing);
+    return result;
   };
 
   /** 查询当前 Node.js 进程的真实执行状态；不使用 trajectory 推断 live state。 */
@@ -666,6 +684,12 @@ function AppInner() {
   };
 
   useEffect(() => {
+    void getJson<{ models: CopilotModelOption[] }>('/api/copilot/models')
+      .then((result) => setAvailableModels(result.models ?? []))
+      .catch(() => setAvailableModels([]));
+  }, []);
+
+  useEffect(() => {
     if (!active) return;
     void loadExecutionStatus(active);
     void loadPendingInteractions(active);
@@ -698,6 +722,8 @@ function AppInner() {
     setPendingPermissions([]);
     setPendingUserInputs([]);
     setUserInputDrafts({});
+    setStreamingReasoning('');
+    setReasoningByMessage({});
     setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
@@ -726,6 +752,46 @@ function AppInner() {
   }, [resizing]);
 
   /** 把当前对话复制成可直接留档的文本；每条消息都带说话人和时间，避免导出后分不清是谁说的。 */
+  const modelOptions = useMemo(() => {
+    const values = [...availableModels];
+    if (current?.control.agent.model && !values.some((item) => item.id === current.control.agent.model)) {
+      values.unshift({
+        id: current.control.agent.model,
+        name: current.control.agent.model,
+        supportedReasoningEfforts: [],
+        defaultReasoningEffort: null,
+        policyState: null,
+      });
+    }
+    return values.sort((a, b) => a.id === 'auto' ? -1 : b.id === 'auto' ? 1 : a.name.localeCompare(b.name));
+  }, [availableModels, current?.control.agent.model]);
+
+  const updateModelSettings = async (model: string, autoTier: AutoTier | null) => {
+    if (!active || !current || modelSaving || loading) return;
+    setModelSaving(true);
+    setError(undefined);
+    try {
+      const result = await getJson<{ control: InvestigationControl }>(
+        `/api/sessions/${encodeURIComponent(active)}/agent/model`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, autoTier }),
+        },
+      );
+      setCurrent((existing) => existing ? { ...existing, control: result.control } : existing);
+      setTurnStatus(
+        model === 'auto'
+          ? (autoTier ? '已调整自动选择方式，下一轮对话开始使用。' : '已恢复自动选择默认方式，下一轮对话开始使用。')
+          : `已切换模型为 ${model}，下一轮对话开始使用。`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法修改模型设置');
+    } finally {
+      setModelSaving(false);
+    }
+  };
+
   const copyConversation = async () => {
     const messages = current?.messages ?? [];
     if (!messages.length) return;
@@ -788,6 +854,16 @@ function AppInner() {
                 speaker={current!.control.agent.displayName?.trim() || '秘书'}
                 capturedAt={message.capturedAt}
               />
+              {reasoningByMessage[message.id] ? (
+                <Think
+                  title="思考过程"
+                  defaultExpanded={false}
+                  loading={false}
+                  className="assistant-think"
+                >
+                  <XMarkdown content={reasoningByMessage[message.id]} className="message-markdown x-markdown-light" />
+                </Think>
+              ) : null}
               <ChatMarkdown content={message.content} />
               {showActions ? (
                 <AssistantActionBar
@@ -830,9 +906,20 @@ function AppInner() {
               speaker={current!.control.agent.displayName?.trim() || '秘书'}
               capturedAt={new Date().toISOString()}
             />
+            {streamingReasoning ? (
+              <Think
+                title="助手正在分析问题"
+                loading
+                defaultExpanded
+                blink
+                className="assistant-think"
+              >
+                <XMarkdown content={streamingReasoning} className="message-markdown x-markdown-light" />
+              </Think>
+            ) : null}
             {displayAssistantContent(currentStreamingAnswer.content)
               ? <ChatMarkdown content={currentStreamingAnswer.content} />
-              : <Text type="secondary">助手正在整理答案，请稍候…</Text>}
+              : !streamingReasoning ? <Text type="secondary">助手正在整理答案，请稍候…</Text> : null}
           </div>
         ),
         footer: undefined,
@@ -936,6 +1023,7 @@ function AppInner() {
 
     setValue('');
     setNextGuidance([]);
+    setStreamingReasoning('');
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
@@ -1009,6 +1097,14 @@ function AppInner() {
           }
           return;
         }
+        if (event === 'reasoning') {
+          const delta = (data as { delta?: unknown }).delta;
+          if (typeof delta === 'string') {
+            setTurnStatus('助手正在分析你的问题，请稍候…');
+            setStreamingReasoning((currentReasoning) => currentReasoning + delta);
+          }
+          return;
+        }
         if (event === 'delta') {
           setTurnStatus('助手正在整理答案，请稍候…');
           const delta = (data as { delta?: unknown }).delta;
@@ -1028,9 +1124,16 @@ function AppInner() {
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
       setTurnStatus('正在保存这次分析结果，请稍候…');
+      let refreshed: SessionData | undefined;
       if (activeRef.current === key) {
-        await loadSession(key);
+        refreshed = await loadSession(key);
         await reloadSessions(false);
+      }
+      if (streamingReasoning.trim() && refreshed) {
+        const lastAssistant = [...refreshed.messages].reverse().find((item) => item.role === 'assistant');
+        if (lastAssistant) {
+          setReasoningByMessage((items) => ({ ...items, [lastAssistant.id]: streamingReasoning }));
+        }
       }
 
       const questions = Array.isArray(result.followUpQuestions)
@@ -1052,6 +1155,7 @@ function AppInner() {
       }
     } finally {
       setStreamingAnswer(undefined);
+      setStreamingReasoning('');
       setTurnStatus('助手正在处理你的问题，请稍候…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
@@ -1524,6 +1628,48 @@ function AppInner() {
                     />
                   </Tooltip>
                 }
+                footer={() => (
+                  <Flex align="center" justify="space-between" gap={8} wrap className="sender-model-controls">
+                    <Space size={4} wrap>
+                      <Text type="secondary" className="sender-model-label">模型</Text>
+                      <Select
+                        size="small"
+                        variant="borderless"
+                        value={current.control.agent.model}
+                        loading={!availableModels.length}
+                        disabled={modelSaving || loading}
+                        showSearch
+                        optionFilterProp="label"
+                        options={modelOptions.map((model) => ({
+                          value: model.id,
+                          label: model.id === 'auto' ? 'Auto（自动选择模型）' : model.name || model.id,
+                        }))}
+                        onChange={(model) => void updateModelSettings(model, model === 'auto' ? (current.control.agent.autoTier ?? null) : null)}
+                        style={{ minWidth: 175 }}
+                      />
+                      {current.control.agent.model === 'auto' ? (
+                        <>
+                          <Text type="secondary" className="sender-model-label">自动选择</Text>
+                          <Select
+                            size="small"
+                            variant="borderless"
+                            value={current.control.agent.autoTier ?? ''}
+                            disabled={modelSaving || loading}
+                            options={[
+                              { value: '', label: '默认' },
+                              { value: 'efficiency', label: '省资源' },
+                              { value: 'balance', label: '均衡' },
+                              { value: 'intelligence', label: '能力优先' },
+                              { value: 'fast', label: '最快' },
+                            ]}
+                            onChange={(tier: AutoTier | '') => void updateModelSettings('auto', tier || null)}
+                            style={{ minWidth: 92 }}
+                          />
+                        </>
+                      ) : null}
+                    </Space>
+                  </Flex>
+                )}
                 header={
                   <Sender.Header
                     title="文件"
