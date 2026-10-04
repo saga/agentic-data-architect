@@ -125,7 +125,7 @@ export function JourneyX6Graph({
    * - success：从底部出去、从顶部进入，形成清晰的主流程；
    * - fail：从右侧出去、从左侧进入；
    * - 其它分支：从左侧出去、从右侧进入；
-   * - retry：从左侧出去、从左侧进入，并在画布最外侧走灰色虚线回线。
+   * - retry：从左侧出去、从左侧进入，并沿画布最外侧走灰色虚线回线。
    *
    * X6 自带 top/right/bottom/left 均匀分布 Port 的布局能力，
    * 不需要自己计算每个 Port 的像素位置。
@@ -377,10 +377,17 @@ export function JourneyX6Graph({
           if (kind === 'retry') {
             const sourceNode = nodes.find((node) => node.id === edge.source);
             const targetNode = nodes.find((node) => node.id === edge.target);
-            const minX = Math.min(
-              ...nodes.map((node) => node.position.x),
-            );
-            const laneX = minX - 72;
+            const retryEdgeIndex = edges
+              .slice(0, edges.indexOf(edge))
+              .filter(
+                (candidate) =>
+                  (candidate.data?.kind ?? classifyJourneyEdge(candidate.data?.outcome))
+                    === 'retry',
+              ).length;
+            const laneX =
+              Math.min(...nodes.map((node) => node.position.x))
+              - 72
+              - Math.floor(retryEdgeIndex / 2) * 28;
 
             return {
               ...edgeConfig,
@@ -636,7 +643,6 @@ export function JourneyX6Graph({
         || data.visible !== node.data.visible
         || data.connectionIssue !== node.data.connectionIssue
         || data.connectionIssueText !== node.data.connectionIssueText
-        || JSON.stringify(data.retryGroupIds ?? []) !== JSON.stringify(node.data.retryGroupIds ?? [])
         || data.selected !== (node.id === selectedNodeId)
       ) {
         cell.setData(
