@@ -99,7 +99,7 @@ export function JourneyFlowEdge({
             strokeLinecap: 'round',
             strokeLinejoin: 'round',
           }}
-          className="journey-flow-edge-text"
+          className="journey-flow-edge-text nodrag nopan"
           pointerEvents={data?.onSelect ? 'all' : 'none'}
           onClick={() => data?.onSelect?.(id)}
         />
