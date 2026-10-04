@@ -13,6 +13,7 @@ import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphify
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
+import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -469,6 +470,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let latestContextTokens: number | undefined;
   let latestContextLimit: number | undefined;
   let latestContextMessages: number | undefined;
+  const runRecorder: RunRecorder | null = input.turnId
+    ? await createRunRecorder(investigationName, {
+        turnId: input.turnId,
+        sessionId: session.sessionId,
+        prompt: input.prompt,
+        systemPrompt: input.systemPrompt,
+        workflowInstruction,
+        model: input.model ?? config.model,
+        workingDirectory,
+        workflowSkill: input.workflowSkill ?? null,
+        permissionMode: input.permissionMode ?? 'permission',
+        mcpServers: Object.keys(mcpServers),
+      })
+    : null;
 
   const markActivity = (type: string, activity: string) => {
     lastActivityAt = new Date().toISOString();
@@ -532,6 +547,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
     trajectoryToolStarts.set(toolCallId, { startedAt, name: toolName || '工具调用' });
     markActivity('tool_call', '正在调用工具 ' + (toolName || '工具'));
     input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
+    void runRecorder?.write('tool_call', {
+      toolCallId,
+      toolName,
+      mcpServerName: e.data.mcpServerName,
+      mcpToolName: e.data.mcpToolName,
+      parentToolCallId: e.data.parentToolCallId,
+      arguments: e.data.arguments,
+    });
     input.onTrajectory?.({
       type: 'tool_call',
       name: `调用工具 #${toolCallCount}: ${toolName || '工具调用'}`,
@@ -592,6 +615,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(e.data.toolTelemetry !== undefined ? { toolTelemetry: redactTrajectoryValue(e.data.toolTelemetry) } : {}),
       },
     });
+    void runRecorder?.write('tool_result', {
+      toolCallId,
+      toolName,
+      success: e.data.success,
+      result: e.data.result,
+      error: e.data.error,
+      toolTelemetry: e.data.toolTelemetry,
+    });
     if (toolCallId) trajectoryToolStarts.delete(toolCallId);
   });
   // These events are UI status signals, not model chain-of-thought. Keep them
@@ -607,6 +638,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       (typeof request.path === 'string' && request.path.trim()) ||
       (typeof request.toolName === 'string' && request.toolName.trim()) ||
       ('需要确认 ' + kind);
+    void runRecorder?.write('permission_request', { requestId, permissionRequest: request });
     const managedApprovalRequired = request.managedApprovalRequired === true;
     const autoApproved = input.permissionMode === 'allow_all' && !managedApprovalRequired;
     if (!autoApproved) {
@@ -708,6 +740,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     });
   });
   const offUsage = session.on('assistant.usage', (e) => {
+    void runRecorder?.write('model_usage', e.data);
     modelCallCount += 1;
     markActivity('model_call', '模型调用 #' + modelCallCount);
     const usageData = e.data as unknown as Record<string, unknown>;
@@ -787,6 +820,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
     input.onStatus?.('Agent 正在等待你的输入。');
     // ask_user 的真正等待由 onUserInputRequest handler 实现；这里仅补充 SDK runtime requestId，
     // 方便轨迹中的 user_input.completed 与本轮执行对应。
+    void runRecorder?.write('user_input_request', {
+      requestId: e.data.requestId,
+      question: e.data.question,
+      choices: e.data.choices,
+      allowFreeform: e.data.allowFreeform,
+    });
     input.onTrajectory?.({
       type: 'user_input_requested',
       name: 'Agent 请求用户输入',
@@ -802,6 +841,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   });
 
   const offUserInputCompleted = session.on('user_input.completed', (e) => {
+    void runRecorder?.write('user_input_completed', e.data);
     const pending = pendingUserInputs.get(e.data.requestId);
     const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
     pendingUserInputs.delete(e.data.requestId);
@@ -835,6 +875,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   });
 
   const offSessionError = session.on('session.error', (e) => {
+    void runRecorder?.write('session_error', e.data);
     markActivity('session_error', 'Session 错误：' + e.data.message);
     input.onTrajectory?.({
       type: 'session_error',
@@ -897,6 +938,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }
 
       content = '';
+      await runRecorder?.write('agent_request', {
+        execution,
+        prompt: continuationPrompt,
+        workflowInstruction: currentWorkflowInstruction,
+      });
       if (execution > 0) {
         input.onStatus?.(`Agent 已完成前一阶段，正在自主继续调查（第 ${execution + 1} 阶段）…`);
         input.onTrajectory?.({
@@ -915,6 +961,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
         config.turnTimeoutMs,
       );
       finalContent = final?.data.content || content;
+      await runRecorder?.write('model_response', {
+        execution,
+        response: finalContent,
+        sessionTurnId: final?.data.turnId,
+      });
 
       // 每个阶段结束后立即应用 Workflow outcome。这样自动续跑进入下一阶段时，
       // 模型拿到的是最新的工作位置，而不是上一阶段的旧节点。
@@ -1022,6 +1073,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
     throw e;
   } finally {
+    await runRecorder?.write('run_finished', { elapsedMs: Date.now() - turnStartedAt });
+    await runRecorder?.close();
     clearInterval(heartbeat);
     for (const [requestId, pending] of pendingCopilotPermissions) {
       if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
