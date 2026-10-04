@@ -31,10 +31,6 @@ const WORKBENCH_TOOLS = new ToolSet()
 /** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
-  // Graphify 是平台级 structural-analysis capability；把项目 .venv/bin 放进 PATH，
-  // 这样 Skill 中的 graphify 命令与 MCP 使用的是同一份依赖。
-  prepareGraphifyEnvironment();
-  assertGraphifyRuntimeAvailable();
   if (starting) return starting;
   starting = (async () => {
     // 所有 Investigation 共用这个应用自己的 Copilot 运行目录，具体 Session 再由 SDK 按 sessionId 分目录保存。
@@ -311,6 +307,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const journeyMapPurpose = input.purpose === 'journey-map';
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
   const graphifyEnabled = !journeyMapPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
+  // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
+  if (graphifyEnabled) {
+    // 把项目 .venv/bin 放进 PATH，让 Skill 中的 graphify 命令与 MCP 使用同一份依赖。
+    prepareGraphifyEnvironment();
+    assertGraphifyRuntimeAvailable();
+  }
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   const investigationName = path.basename(workingDirectory);
   const workflowInstruction = journeyMapPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
