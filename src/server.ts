@@ -14,6 +14,7 @@ import {
   AbortBodySchema,
   CreateSessionBodySchema,
   MessageBodySchema,
+  PermissionResponseBodySchema,
   RequestValidationError,
   UpdateConfigBodySchema,
   UpdateWorkflowBodySchema,
@@ -59,7 +60,12 @@ import {
   listConversationTurns,
   searchConversation,
 } from './investigation/conversation.js';
-import { abortCopilotTurn, stopClient } from './agent/copilot.js';
+import {
+  abortCopilotTurn,
+  listPendingCopilotPermissions,
+  respondToCopilotPermission,
+  stopClient,
+} from './agent/copilot.js';
 import {
   appendAuditEvent,
   loadInvestigationControl,
@@ -210,6 +216,33 @@ app.post('/api/sessions', async (req, res) => {
     const turns = summarizeTrajectoryTurns(events);
     const conversationTurns = listConversationTurns(name, 200);
     res.json({ events, summary, turns, conversationTurns });
+  });
+
+  /** 返回当前 Investigation 正在等待用户处理的 Agent 权限请求。 */
+  app.get('/api/sessions/:name/permissions', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    res.json({ permissions: listPendingCopilotPermissions(name) });
+  });
+
+  /** 处理一个待确认权限；允许后继续执行被暂停的 Agent 工具。 */
+  app.post('/api/sessions/:name/permissions/respond', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const body = parseRequest(PermissionResponseBodySchema, req.body);
+    const handled = await respondToCopilotPermission(name, body.turnId, body.requestId, body.allowed);
+    if (!handled) {
+      res.status(404).json({ error: '这个权限请求已经处理、已结束，或不属于当前执行。' });
+      return;
+    }
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: body.allowed ? 'agent.permission.approved' : 'agent.permission.rejected',
+      summary: body.allowed ? '用户允许 Agent 执行这次操作。' : '用户拒绝 Agent 执行这次操作。',
+      details: {
+        turnId: body.turnId,
+        requestId: body.requestId,
+      },
+    });
+    res.json({ ok: true });
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
