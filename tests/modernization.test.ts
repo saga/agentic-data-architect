@@ -75,7 +75,7 @@ describe('Modernization workbench', () => {
     });
     const lineageGap = gaps.find((gap) => gap.kind === 'lineage');
     assert.ok(lineageGap);
-    assert.equal(lineageGap?.severity, 'medium');
+    assert.equal(lineageGap?.severity, 'high');
   });
 
   it('keeps modernization work products runtime validated', () => {
