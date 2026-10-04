@@ -374,7 +374,8 @@ function AssistantAvatar(props: {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
   const avatarPath = props.avatarPath ?? props.control.agent.avatarPath;
-  const avatarId = avatarPath?.split('/').pop()?.replace(/\\.png$/i, '');
+  // avatarPath 是 workspace 相对路径；这里只取 UUID，不能把 .png 一起传给后端。
+  const avatarId = avatarPath?.split('/').pop()?.replace(/\.png$/i, '');
   const avatarUrl = avatarPath === 'assistant/avatar.png'
     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
     : avatarId
@@ -478,20 +479,40 @@ function AppInner() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
   const [current, setCurrent] = useState<SessionData>();
-  // 每条回复固定一个随机头像；配置或消息刷新时只为尚未分配的消息抽取一次，避免流式渲染过程中头像跳变。
+  // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
+    const sessionName = current?.context.name;
     const avatarPaths = current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
-    if (!avatarPaths.length) return;
-    const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
-    setAssistantAvatarByMessage((previous) => {
-      const next = { ...previous };
-      for (const message of assistantMessages) {
-        if (!next[message.id]) next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
+    if (!sessionName || !avatarPaths.length) return;
+
+    const storageKey = `ada.avatarAssignments.${sessionName}`;
+    let stored: Record<string, string> = {};
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) stored = parsed as Record<string, string>;
       }
-      return next;
-    });
-  }, [current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
+    } catch {
+      // 本地存储不可用时仍然允许当前页面正常显示头像。
+    }
+
+    const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
+    const next = { ...stored };
+    for (const message of assistantMessages) {
+      if (!next[message.id]) {
+        next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
+      }
+    }
+
+    setAssistantAvatarByMessage(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      // 不影响聊天。
+    }
+  }, [current?.context.name, current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
 
 
 

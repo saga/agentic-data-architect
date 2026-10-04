@@ -535,7 +535,8 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         research: current.research,
         agent: {
           ...current.agent,
-          avatarPath: relativePath,
+          // avatarPaths 是完整头像池；avatarPath 保留原来的默认头像，不能随着每次上传被替换。
+          avatarPath: current.agent.avatarPath ?? relativePath,
           avatarPaths,
           avatarMimeType: 'image/png',
           avatarWidth,
