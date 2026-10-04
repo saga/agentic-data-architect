@@ -96,6 +96,12 @@ route 只有：
 
 这不是完整 BPMN runtime，不做 gateway、parallel token、timer、message event、subprocess 等复杂执行语义。
 
+### 3.1 为什么只保留这些语义
+
+Workflow 固定的是 Data Architect 的高层工作顺序，不是 Agent 每一步必须调用什么工具。Agent 在一个阶段内部可以自由检索、调用 Skill、使用 Tool、反复验证和回到前面的调查步骤。这些细节不应该继续膨胀 Workflow DSL。
+
+因此 Workflow、Skill、Tool、Agent、Investigation State 的职责必须分开：Workflow 负责高层顺序、人工步骤和合法出口；Skill 负责某阶段怎么调查；Tool 负责真正执行；Agent 负责阶段内部的判断；State 保存当前执行位置和已完成步骤；runtime 不负责授权、审批、SQL 执行或外部副作用。
+
 ## 4. X6 编辑器
 
 X6 是实际的图编辑器。
