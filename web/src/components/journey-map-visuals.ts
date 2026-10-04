@@ -1,4 +1,4 @@
-import type { FlowEdge, FlowNode, JourneyEdgeKind } from './journey-map-types.js';
+import type { JourneyEdgeKind } from './journey-map-types.js';
 
 const SUCCESS_PATTERNS = [
   'success',
@@ -56,7 +56,7 @@ function matchesPattern(outcome: string, patterns: string[]): boolean {
 
 /**
  * 只决定工作地图怎么画，不改变 Workflow DSL 的 outcome。
- * 顺序很重要：retry 优先于 fail，避免 “rollback-after-fail” 一类结果被误判。
+ * retry 优先于 fail，避免 rollback-after-fail 一类结果被误判。
  */
 export function classifyJourneyEdge(outcome: string | undefined): JourneyEdgeKind {
   const normalized = String(outcome ?? '').trim().toLowerCase();
