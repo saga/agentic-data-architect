@@ -24,13 +24,8 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
       type: z.enum(['task', 'gate', 'review', 'end', 'stop']).optional(),
       title: z.string().min(1).optional(),
       objective: z.string().optional(),
-      visible: z.boolean().optional(),
-      completion: z.enum(['deterministic', 'agent']).optional(),
-      actor: z.enum(['agent', 'human', 'system']).optional(),
+      actor: z.enum(['agent', 'human']).optional(),
       completeWhen: z.string().optional(),
-      tools: z.array(z.string()).optional(),
-      requires: z.array(z.string()).optional(),
-      produces: z.array(z.string()).optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -71,8 +66,7 @@ export interface JourneyAnalysisIssue {
   code:
     | 'multiple-conditional-routes'
     | 'conditional-route-without-fallback'
-    | 'missing-required-producer'
-    | 'duplicate-produced-output';
+    ;
   nodeId?: string;
   message: string;
 }
@@ -96,9 +90,6 @@ function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
       })),
       ...(node.objective ? { objective: node.objective } : {}),
       ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
-      ...(node.tools?.length ? { tools: [...node.tools] } : {}),
-      ...(node.requires?.length ? { requires: [...node.requires] } : {}),
-      ...(node.produces?.length ? { produces: [...node.produces] } : {}),
       ...(node.line !== undefined ? { line: node.line } : {}),
     })),
   };
@@ -304,15 +295,6 @@ export function analyzeJourneyWorkflow(
   definition: JourneyDefinition,
 ): JourneyAnalysisIssue[] {
   const issues: JourneyAnalysisIssue[] = [];
-  const producedBy = new Map<string, string[]>();
-
-  for (const node of definition.nodes) {
-    for (const output of node.produces ?? []) {
-      const key = normalize(output);
-      if (!key) continue;
-      producedBy.set(key, [...(producedBy.get(key) ?? []), node.id]);
-    }
-  }
 
   for (const node of definition.nodes) {
     const conditionalRoutes = node.routes.filter((route) => Boolean(route.condition));
@@ -335,27 +317,9 @@ export function analyzeJourneyWorkflow(
       });
     }
 
-    for (const required of node.requires ?? []) {
-      if (!producedBy.has(normalize(required))) {
-        issues.push({
-          severity: 'warning',
-          code: 'missing-required-producer',
-          nodeId: node.id,
-          message: node.id + ' 依赖产物“' + required + '”，但当前图中没有声明对应 produces。',
-        });
-      }
     }
   }
 
-  for (const [output, producers] of producedBy) {
-    if (producers.length > 1) {
-      issues.push({
-        severity: 'warning',
-        code: 'duplicate-produced-output',
-        message: '产物“' + output + '”由多个节点声明产生：' + producers.join('、') + '。',
-      });
-    }
-  }
 
   return issues;
 }
