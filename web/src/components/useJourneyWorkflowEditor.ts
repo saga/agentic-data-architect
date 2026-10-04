@@ -1075,14 +1075,14 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
   const activeDefinition = snapshot?.definition;
 
   const currentStage = snapshot
-    ? snapshot.state.stages.find((stage) => stage.id === snapshot.state.currentNodeId)
+    ? snapshot.state.stages.find((stage) => stage.id === snapshot.execution.currentNodeId)
       ?? snapshot.state.stages.find((stage) => stage.status === 'current')
       ?? snapshot.state.stages.find((stage) => stage.status === 'future')
       ?? snapshot.state.stages.at(-1)
     : undefined;
 
   const completedCount = snapshot && activeDefinition
-    ? snapshot.state.completedNodeIds.filter((id) =>
+    ? snapshot.execution.completedNodeIds.filter((id) =>
         activeDefinition.nodes.some((node) => node.id === id),
       ).length
     : 0;
