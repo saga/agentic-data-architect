@@ -185,8 +185,8 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
                 snapshot: {
                   ...snapshot,
                   agent: {
-                    permissionMode: agentRecord.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
                     ...agentWithoutSkills,
+                    permissionMode: agentRecord.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
                   },
                 },
               };
