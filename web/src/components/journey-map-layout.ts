@@ -4,6 +4,7 @@ import type {
   WorkflowLayout,
 } from './journey-map-types.js';
 import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
+import { classifyJourneyEdge } from './journey-map-visuals.js';
 
 /**
  * Workflow-specific 自动排版。
@@ -21,8 +22,8 @@ import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
 
 const MAIN_X = 420;
 const MAIN_Y = 56;
-const ROW_GAP = 272;
-const LANE_GAP = 376;
+const ROW_GAP = 168;
+const LANE_GAP = 300;
 const CANVAS_PADDING = 56;
 const COLLISION_GAP = 36;
 
@@ -54,6 +55,7 @@ function findBackEdges(nodes: FlowNode[], edges: FlowEdge[]): Set<string> {
   for (const edge of edges) {
     if (
       edge.source === edge.target
+      || classifyJourneyEdge(edge.data?.outcome) === 'retry'
       || !nodeIds.has(edge.source)
       || !nodeIds.has(edge.target)
     ) continue;
@@ -125,6 +127,7 @@ export function getForwardLayoutEdges(
       edge.source !== edge.target
       && nodeIds.has(edge.source)
       && nodeIds.has(edge.target)
+      && classifyJourneyEdge(edge.data?.outcome) !== 'retry'
       && !backEdges.has(edge.id),
   );
 }
