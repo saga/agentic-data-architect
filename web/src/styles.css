@@ -1441,210 +1441,216 @@ body {
   color: #1677ff;
 }
 
-/* X6 React node docs recommend avoiding positioning hacks inside React-rendered nodes. */
+/* X6 / Agent Flow node ------------------------------------------------------ */
+/*
+ * 工作地图不再沿用旧的“状态卡片”视觉。
+ * 节点保持轻量白卡，状态只用一个小点表示；真正的成功/失败/重试语义由连线和 retry group 表达。
+ */
 .journey-flow-node {
   position: static;
-}
-
-.journey-x6-node-actions {
   display: flex;
-  justify-content: flex-end;
-  min-height: 34px;
-  padding: 5px 9px 0;
-}
-
-.journey-x6-node-actions .ant-btn {
-  min-width: 28px;
-  height: 26px;
-  padding: 0 7px;
-}
-
-.journey-x6-node-selected {
-  border-color: #1677ff !important;
-  box-shadow:
-    0 0 0 3px rgba(22,119,255,.10),
-    0 10px 28px rgba(22,119,255,.14) !important;
-}
-
-.journey-x6-node-terminal {
+  flex-direction: column;
   width: 100%;
   height: 100%;
-}
-
-/* Workflow map node base -------------------------------------------------- */
-/* 自定义 nodeType=journey 不会吃 React Flow default node 的背景/边框变量，
-   因此这些视觉基础样式必须由项目自己的 class 明确定义。 */
-.journey-flow-node {
-  position: relative;
-  width: 236px;
-  min-width: 236px;
-  border: 1px solid #d9e1ec;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.98);
-  color: rgba(0, 0, 0, 0.88);
-  box-shadow: 0 8px 26px rgba(31, 42, 55, 0.08);
-  overflow: visible;
-}
-
-.journey-flow-node-content {
-  display: grid;
-  gap: 8px;
-  padding: 13px 14px;
   min-width: 0;
+  min-height: 0;
+  border: 1px solid #d9dee7;
+  border-radius: 12px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  box-shadow: 0 6px 20px rgba(31, 42, 55, 0.07);
+  overflow: visible;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
 }
 
-.journey-flow-stage-content {
-  min-height: 176px;
+.journey-flow-node-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 13px 8px;
 }
 
-.journey-flow-node-kicker {
+.journey-flow-node-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  font-size: 10px;
-  line-height: 1.4;
-  font-weight: 700;
-  letter-spacing: 0.02em;
 }
 
-.journey-flow-node-kicker-completed { color: #389e0d; }
-.journey-flow-node-kicker-current { color: #1677ff; }
-.journey-flow-node-kicker-future { color: #6b7a90; }
-.journey-flow-node-kicker-locked { color: #9aa6b5; }
-
-.journey-flow-node-completed {
-  border-color: #95de64;
-  background: linear-gradient(180deg, #fbfff8 0%, #f6ffed 100%);
-}
-
-.journey-flow-node-current {
-  border-color: #91caff;
-  background: linear-gradient(180deg, #ffffff 0%, #f0f7ff 100%);
-  box-shadow:
-    0 0 0 4px rgba(22, 119, 255, 0.08),
-    0 12px 30px rgba(22, 119, 255, 0.12);
-}
-
-.journey-flow-node-locked {
-  border-style: dashed;
-  opacity: 0.48;
-  box-shadow: none;
-}
-
-.journey-flow-node-future {
-  border-color: #d6e4ff;
-  background: #fcfdff;
-}
-
-.journey-flow-node-type {
-  margin-left: auto;
-  padding: 2px 6px;
-  border-radius: 999px;
+.journey-flow-node-type-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 7px;
   background: #f5f7fa;
-  color: #7b8794;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.journey-flow-node-actor {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .journey-flow-node-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 650;
+  white-space: nowrap;
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 20px;
+  font-weight: 650;
+}
+
+.journey-flow-node-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #b7c0cc;
+}
+
+.journey-flow-node-status-completed .journey-flow-node-status-dot {
+  background: #52c41a;
+}
+
+.journey-flow-node-status-current {
+  border-color: #91caff;
+  box-shadow:
+    0 0 0 3px rgba(22, 119, 255, 0.08),
+    0 8px 24px rgba(22, 119, 255, 0.11);
+}
+
+.journey-flow-node-status-current .journey-flow-node-status-dot {
+  background: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.journey-flow-node-status-locked {
+  opacity: 0.42;
+  box-shadow: none;
+}
+
+.journey-flow-node-status-future .journey-flow-node-status-dot {
+  background: #aeb8c5;
 }
 
 .journey-flow-node-subtitle {
   display: -webkit-box;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  color: rgba(0, 0, 0, 0.58);
+  color: rgba(0, 0, 0, 0.56);
   font-size: 11px;
   line-height: 1.5;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
-.journey-flow-node-config {
+.journey-flow-node-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px 7px;
+  gap: 6px 10px;
   min-width: 0;
   margin-top: auto;
   padding-top: 7px;
   border-top: 1px solid #f0f2f5;
-}
-
-.journey-flow-node-config > .ant-typography {
+  color: rgba(0, 0, 0, 0.48);
   font-size: 10px;
   line-height: 16px;
 }
 
+.journey-flow-node-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
 .journey-flow-node-waiting-label {
   color: #1677ff;
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.journey-flow-terminal-content {
+.journey-x6-node-actions {
+  display: flex;
+  flex: 0 0 24px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 6px 5px;
+}
+
+.journey-x6-node-actions .ant-btn {
+  width: 23px;
+  height: 23px;
+  min-height: 23px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.journey-x6-node-selected {
+  border-color: #1677ff !important;
+  box-shadow:
+    0 0 0 2px rgba(22, 119, 255, 0.10),
+    0 8px 24px rgba(22, 119, 255, 0.12) !important;
+}
+
+.journey-x6-node-terminal {
   display: grid;
+  width: 100%;
+  height: 100%;
   place-items: center;
-  gap: 4px;
-  min-height: 96px;
-  padding: 14px;
-  border: 1px solid #d9e1ec;
-  border-radius: 14px;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #d9dee7;
+  border-radius: 999px;
   background: #fff;
-  box-shadow: 0 8px 26px rgba(31, 42, 55, 0.08);
+  box-shadow: 0 6px 18px rgba(31, 42, 55, 0.06);
 }
 
-.journey-flow-event-symbol {
+.journey-x6-node-terminal .journey-flow-event-symbol {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   border-radius: 50%;
-  background: #f0f5ff;
-  color: #1677ff;
+  background: #f5f7fa;
+  color: #64748b;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.journey-node-editor-toolbar {
-  z-index: 20;
-  padding: 4px;
-  border: 1px solid #e6eaf0;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.1);
+.journey-x6-node-terminal .journey-flow-node-title {
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
 }
 
-/* Workflow editor: make newly-created nodes unmistakable. */
 .journey-flow-node-new {
-  border: 2px dashed #fa8c16 !important;
-  background: #fffbe6 !important;
-  box-shadow:
-    0 0 0 3px rgba(250, 140, 22, 0.12),
-    0 7px 20px rgba(250, 140, 22, 0.14);
+  border-style: dashed;
 }
 
-.journey-flow-node-new .journey-flow-node-title {
-  color: #ad4e00;
+.journey-flow-node-deemphasized {
+  opacity: 0.58;
 }
 
-.journey-flow-node-new-tag {
-  margin-top: 8px;
-  margin-inline-end: 0;
-  align-self: flex-start;
+.journey-flow-node-connection-error {
+  border-color: #ff4d4f !important;
+}
+
+.journey-flow-node-connection-warning {
+  border-color: #faad14 !important;
+}
+
+.journey-flow-node-connection-indicator {
+  color: #d48806;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .journey-map-connect-box {
@@ -1672,47 +1678,7 @@ body {
   white-space: nowrap;
 }
 
-
-/* Workflow map: both locked and edit modes use the same visible graph. */
-.journey-flow-node-deemphasized {
-  opacity: 0.68;
-  background: #f8fafc;
-}
-
-.journey-flow-node-connection-error {
-  border: 2px solid #ff4d4f !important;
-  background: #fff2f0 !important;
-  box-shadow:
-    0 0 0 3px rgba(255, 77, 79, 0.10),
-    0 7px 20px rgba(255, 77, 79, 0.12);
-}
-
-.journey-flow-node-connection-indicator {
-  color: #d48806;
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.journey-flow-node-connection-tag {
-  margin-top: 8px;
-  margin-inline-end: 0;
-  align-self: flex-start;
-  font-weight: 600;
-}
-
-/* Locked mode is visually identical to edit mode's graph, but never exposes edit cursor/action affordances. */
-.journey-map-locked-mode .react-flow__node {
-  cursor: default !important;
-}
-
-.journey-map-locked-mode .journey-flow-edge-label {
-  cursor: default;
-}
-
-.journey-map-locked-mode .react-flow__edge {
-  pointer-events: none;
-}
+/* 工作地图中的 retry 不再使用 edge line；X6 group 背景由 JourneyX6Graph 动态生成。 */
 
 /* Connection diagnostics -------------------------------------------------- */
 .journey-flow-node-connection-warning {
@@ -1866,11 +1832,6 @@ body {
   height: 100%;
   overflow: hidden;
   border-right: 1px solid #e9edf3;
-}
-
-.journey-map-workspace .journey-map-flow-wrap > .react-flow {
-  width: 100%;
-  height: 100%;
 }
 
 .journey-map-workspace .journey-map-inspector {
