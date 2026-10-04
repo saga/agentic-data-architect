@@ -1,6 +1,8 @@
 /**
  * Legacy Modernization Journey：把 Data Analyst / Data Architect 的工作组织成一张可执行路线图。
  *
+ * 这里是 Workflow 的核心运行边界：Markdown 描述路线，应用代码提供事实，执行状态单独持久化。
+ *
  * Markdown Workflow 只描述路线和出口；具体怎么查仍由 Skill + Tool 决定。
  * 参考 copilot-server-agent 的轻量 @flow / @task / @review / @end 设计，
  * 这里只实现本项目当前真正需要的轻量部分，不引入完整流程引擎。
