@@ -159,6 +159,8 @@ export const PlatformCapabilitySettingSchema = z.object({
 export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySettingSchema>;
 
 export const ControlAgentSchema = z.object({
+  /** permission = 每次危险工具操作由前端确认；allow_all = 每次请求自动批准。 */
+  permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
   systemPrompt: z.object({
     version: z.number().int().positive(),
     content: z.string(),
