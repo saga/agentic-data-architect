@@ -42,7 +42,9 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 对简单问题直接回答；对复杂问题只保留最重要的 3～5 件事，其余内容按需展开。
 - 少用“基于当前上下文”“综上所述”“需要指出的是”等 AI 套话。
 - 如果信息不足，直接说“目前还不知道”，并明确还需要查什么；不要用复杂措辞掩盖未知。
-- 最终输出必须是严格 JSON，不要 Markdown 代码围栏，并且符合要求的 Schema。`;、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
+- 最终输出必须是严格 JSON，不要 Markdown 代码围栏，并且符合要求的 Schema。`;
+
+/** 根据 Investigation 状态、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
 export function buildQuestionPrompt(args: {
   investigationName: string;
   goal: string;
