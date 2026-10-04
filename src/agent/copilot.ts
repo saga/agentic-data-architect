@@ -80,7 +80,7 @@ export interface AskInput {
   systemPrompt: string;
   /** 记录本轮可展示的 Agent 执行轨迹；不包含思维链正文。 */
   onTrajectory?: (event: {
-    type: 'user_input' | 'turn_start' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'permission' | 'compaction' | 'turn_end' | 'error' | 'status';
+    type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'status';
     name: string;
     status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
     durationMs?: number;
@@ -254,6 +254,26 @@ export async function askCopilot(input: AskInput): Promise<string> {
   if (input.turnId) {
     activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
   }
+  const heartbeat = setInterval(() => {
+    input.onTrajectory?.({
+      type: 'status',
+      name: 'Agent 状态',
+      status: 'info',
+      details: {
+        elapsedMs: Date.now() - turnStartedAt,
+        lastActivityAt,
+        lastActivityType,
+        lastActivity,
+        pendingTools: trajectoryToolStarts.size,
+        pendingPermissions: pendingPermissions.size,
+        pendingUserInputs: pendingUserInputs.size,
+        assistantTurnEnded,
+        sessionIdleObserved,
+        modelCallCount,
+      },
+    });
+  }, 15_000);
+
   try {
     if (input.shouldAbort?.()) {
       await session.abort();
@@ -275,27 +295,78 @@ export async function askCopilot(input: AskInput): Promise<string> {
   });
 
   let content = '';
+  // 运行态诊断只记录“当前在哪一步”，不记录模型隐藏推理正文。
+  const turnStartedAt = Date.now();
   const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
+  const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
+  const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
+  let lastActivityAt = new Date(turnStartedAt).toISOString();
+  let lastActivityType = 'turn_start';
+  let lastActivity = 'Agent 本轮开始';
+  let assistantTurnEnded = false;
+  let sessionIdleObserved = false;
+  let modelCallCount = 0;
+
+  const markActivity = (type: string, activity: string) => {
+    lastActivityAt = new Date().toISOString();
+    lastActivityType = type;
+    lastActivity = activity;
+  };
+
+  const offAssistantTurnStart = session.on('assistant.turn_start', (e) => {
+    assistantTurnEnded = false;
+    markActivity('assistant_turn_start', '模型开始处理');
+    input.onTrajectory?.({
+      type: 'assistant_turn_start',
+      name: '模型处理开始',
+      status: 'started',
+      details: {
+        turnId: e.data.turnId,
+        ...(typeof e.data.interactionId === 'string' ? { interactionId: e.data.interactionId } : {}),
+      },
+    });
+  });
+
   const offMessageDelta = session.on('assistant.message_delta', (e) => {
     if (e.data.deltaContent) {
       content += e.data.deltaContent;
+      markActivity('assistant.message_delta', '助手正在生成回答');
       input.onDelta?.(e.data.deltaContent);
     }
   });
   const offIntent = session.on('assistant.intent', (e) => {
     const intent = typeof e.data.intent === 'string' ? e.data.intent.trim() : '';
     if (intent) {
-      input.onStatus?.(statusFromIntent(intent));
-      input.onTrajectory?.({ type: 'intent', name: 'Agent 意图', status: 'info', details: { intent } });
+      const status = statusFromIntent(intent);
+      markActivity('intent', intent);
+      input.onStatus?.(status);
+      input.onTrajectory?.({ type: 'intent', name: 'Agent 意图', status: 'info', details: { intent, mappedStatus: status } });
     }
   });
   const offReasoning = session.on('assistant.reasoning_delta', () => {
+    // 只刷新运行态，不把隐藏推理文本写入 trajectory。
+    markActivity('assistant.reasoning', '模型正在分析');
     input.onStatus?.('助手正在分析你的问题，请稍候…');
+  });
+
+  const offAssistantTurnEnd = session.on('assistant.turn_end', (e) => {
+    assistantTurnEnded = true;
+    markActivity('assistant_turn_end', '模型这一轮输出完成，等待 Session 收尾');
+    input.onTrajectory?.({
+      type: 'assistant_turn_end',
+      name: '模型处理完成',
+      status: 'completed',
+      details: {
+        turnId: e.data.turnId,
+      },
+    });
   });
   const offToolStart = session.on('tool.execution_start', (e) => {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : toolName;
-    trajectoryToolStarts.set(toolCallId, { startedAt: Date.now(), name: toolName || '工具调用' });
+    const startedAt = Date.now();
+    trajectoryToolStarts.set(toolCallId, { startedAt, name: toolName || '工具调用' });
+    markActivity('tool_call', '正在调用工具 ' + (toolName || '工具'));
     input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
     input.onTrajectory?.({
       type: 'tool_call',
@@ -303,24 +374,58 @@ export async function askCopilot(input: AskInput): Promise<string> {
       status: 'started',
       details: {
         toolCallId,
+        startedAt: new Date(startedAt).toISOString(),
         ...(typeof e.data.mcpServerName === 'string' ? { mcpServerName: e.data.mcpServerName } : {}),
+        ...(typeof e.data.mcpToolName === 'string' ? { mcpToolName: e.data.mcpToolName } : {}),
+        ...(typeof e.data.parentToolCallId === 'string' ? { parentToolCallId: e.data.parentToolCallId } : {}),
+        ...(typeof e.agentId === 'string' ? { agentId: e.agentId } : {}),
         ...(e.data.arguments !== undefined ? { arguments: redactTrajectoryValue(e.data.arguments) } : {}),
       },
     });
   });
+  const offToolProgress = session.on('tool.execution_progress', (e) => {
+    const toolRun = trajectoryToolStarts.get(e.data.toolCallId);
+    markActivity('tool_progress', '工具正在运行：' + (toolRun?.name ?? '工具'));
+    input.onTrajectory?.({
+      type: 'tool_progress',
+      name: toolRun?.name ?? '工具进度',
+      status: 'info',
+      ...(toolRun ? { durationMs: Date.now() - toolRun.startedAt } : {}),
+      details: {
+        toolCallId: e.data.toolCallId,
+        progressMessage: e.data.progressMessage,
+      },
+    });
+  });
+
   const offToolComplete = session.on('tool.execution_complete', (e) => {
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : '';
     const toolRun = trajectoryToolStarts.get(toolCallId);
     const toolName = toolRun?.name ?? '工具调用';
+    const durationMs = toolRun ? Date.now() - toolRun.startedAt : undefined;
+    const result = e.data.result as unknown as Record<string, unknown> | undefined;
+    const resultContent = typeof result?.content === 'string' ? result.content : undefined;
+    markActivity('tool_result', '工具返回：' + toolName);
     input.onStatus?.('助手正在整理刚找到的资料，请稍候…');
     input.onTrajectory?.({
       type: 'tool_result',
       name: toolName,
       status: e.data.success === false ? 'failed' : 'completed',
-      ...(toolRun ? { durationMs: Date.now() - toolRun.startedAt } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
       details: {
         toolCallId,
-        ...(typeof e.data.error === 'string' ? { error: e.data.error } : {}),
+        ...(typeof e.data.model === 'string' ? { model: e.data.model } : {}),
+        ...(typeof e.data.isUserRequested === 'boolean' ? { isUserRequested: e.data.isUserRequested } : {}),
+        ...(typeof e.data.parentToolCallId === 'string' ? { parentToolCallId: e.data.parentToolCallId } : {}),
+        ...(resultContent !== undefined ? {
+          resultPreview: redactTrajectoryValue(resultContent),
+          resultLength: resultContent.length,
+        } : {}),
+        ...(result?.detailedContent && typeof result.detailedContent === 'string'
+          ? { detailedResultLength: result.detailedContent.length }
+          : {}),
+        ...(e.data.error !== undefined ? { error: redactTrajectoryValue(e.data.error) } : {}),
+        ...(e.data.toolTelemetry !== undefined ? { toolTelemetry: redactTrajectoryValue(e.data.toolTelemetry) } : {}),
       },
     });
     if (toolCallId) trajectoryToolStarts.delete(toolCallId);
@@ -328,12 +433,58 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // These events are UI status signals, not model chain-of-thought. Keep them
   // operational so the browser never receives hidden reasoning text.
   const offPermission = session.on('permission.requested', (e) => {
+    const requestId = e.data.requestId;
+    const request = e.data.permissionRequest as unknown as Record<string, unknown>;
+    const kind = typeof request.kind === 'string' ? request.kind : 'unknown';
+    const summary =
+      (typeof request.intention === 'string' && request.intention.trim()) ||
+      (typeof request.fullCommandText === 'string' && request.fullCommandText.trim()) ||
+      (typeof request.fileName === 'string' && request.fileName.trim()) ||
+      (typeof request.path === 'string' && request.path.trim()) ||
+      (typeof request.toolName === 'string' && request.toolName.trim()) ||
+      ('需要确认 ' + kind);
+    pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
+    markActivity('permission', '等待确认：' + kind);
     input.onStatus?.('这一步需要你的确认，请在提示出现后继续操作。');
     input.onTrajectory?.({
       type: 'permission',
-      name: '需要确认',
+      name: '等待确认：' + kind,
       status: 'waiting',
-      details: {},
+      details: {
+        requestId,
+        kind,
+        ...(typeof request.toolCallId === 'string' ? { toolCallId: request.toolCallId } : {}),
+        ...(typeof request.intention === 'string' ? { intention: request.intention } : {}),
+        ...(typeof request.fullCommandText === 'string' ? { fullCommandText: redactTrajectoryValue(request.fullCommandText) } : {}),
+        ...(typeof request.fileName === 'string' ? { fileName: request.fileName } : {}),
+        ...(typeof request.path === 'string' ? { path: request.path } : {}),
+        ...(typeof request.serverName === 'string' ? { serverName: request.serverName } : {}),
+        ...(typeof request.toolName === 'string' ? { toolName: request.toolName } : {}),
+        ...(typeof request.toolTitle === 'string' ? { toolTitle: request.toolTitle } : {}),
+        ...(typeof request.readOnly === 'boolean' ? { readOnly: request.readOnly } : {}),
+        ...(typeof request.managedApprovalRequired === 'boolean'
+          ? { managedApprovalRequired: request.managedApprovalRequired }
+          : {}),
+      },
+    });
+  });
+
+  const offPermissionCompleted = session.on('permission.completed', (e) => {
+    const pending = pendingPermissions.get(e.data.requestId);
+    const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
+    const result = e.data.result as unknown as Record<string, unknown> | undefined;
+    pendingPermissions.delete(e.data.requestId);
+    markActivity('permission_completed', '确认已处理');
+    input.onTrajectory?.({
+      type: 'permission_completed',
+      name: '确认已处理',
+      status: 'completed',
+      ...(durationMs !== undefined ? { durationMs } : {}),
+      details: {
+        requestId: e.data.requestId,
+        ...(pending ? { kind: pending.kind, summary: redactTrajectoryValue(pending.summary) } : {}),
+        ...(typeof result?.kind === 'string' ? { resultKind: result.kind } : {}),
+      },
     });
   });
   const offCompaction = session.on('session.compaction_start', () => {
@@ -341,16 +492,25 @@ export async function askCopilot(input: AskInput): Promise<string> {
     input.onTrajectory?.({ type: 'compaction', name: '整理上下文', status: 'started' });
   });
   const offCompactionComplete = session.on('session.compaction_complete', (e) => {
+    markActivity('compaction', e.data.success === false ? '上下文整理失败' : '上下文整理完成');
     input.onTrajectory?.({
       type: 'compaction',
       name: '整理上下文',
       status: e.data.success === false ? 'failed' : 'completed',
       details: {
         ...(typeof e.data.preCompactionTokens === 'number' ? { preCompactionTokens: e.data.preCompactionTokens } : {}),
+        ...(typeof e.data.postCompactionTokens === 'number' ? { postCompactionTokens: e.data.postCompactionTokens } : {}),
+        ...(typeof e.data.messagesRemoved === 'number' ? { messagesRemoved: e.data.messagesRemoved } : {}),
+        ...(typeof e.data.tokensRemoved === 'number' ? { tokensRemoved: e.data.tokensRemoved } : {}),
+        ...(typeof e.data.compactionTokensUsed === 'object' ? { compactionTokensUsed: redactTrajectoryValue(e.data.compactionTokensUsed) } : {}),
+        ...(typeof e.data.requestId === 'string' ? { requestId: e.data.requestId } : {}),
+        ...(typeof e.data.error === 'string' ? { error: e.data.error } : {}),
       },
     });
   });
   const offUsage = session.on('assistant.usage', (e) => {
+    modelCallCount += 1;
+    markActivity('model_call', '模型调用 #' + modelCallCount);
     const event: {
       type: 'model_call';
       name: string;
@@ -375,11 +535,26 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // 缓存命中和推理 token 直接读 SDK 的类型化字段（cacheReadTokens / reasoningTokens），
     // 不要再把整个事件转成 Record 去猜字段名——那些字段在 SDK 里根本不存在。
     if (typeof e.data.cacheReadTokens === 'number') event.details.cachedInputTokens = e.data.cacheReadTokens;
+    if (typeof e.data.cacheWriteTokens === 'number') event.details.cacheWriteTokens = e.data.cacheWriteTokens;
     if (typeof e.data.reasoningTokens === 'number') event.details.reasoningTokens = e.data.reasoningTokens;
+    if (typeof e.data.finishReason === 'string') event.details.finishReason = e.data.finishReason;
+    if (typeof e.data.reasoningEffort === 'string') event.details.reasoningEffort = e.data.reasoningEffort;
+    if (typeof e.data.timeToFirstTokenMs === 'number') event.details.timeToFirstTokenMs = e.data.timeToFirstTokenMs;
+    if (typeof e.data.interTokenLatencyMs === 'number') event.details.interTokenLatencyMs = e.data.interTokenLatencyMs;
     if (typeof e.data.apiEndpoint === 'string') event.details.apiEndpoint = e.data.apiEndpoint;
+    if (typeof e.data.apiCallId === 'string') event.details.apiCallId = e.data.apiCallId;
+    if (typeof e.data.providerCallId === 'string') event.details.providerCallId = e.data.providerCallId;
+    if (typeof e.data.serviceRequestId === 'string') event.details.serviceRequestId = e.data.serviceRequestId;
+    if (typeof e.data.initiator === 'string') event.details.initiator = e.data.initiator;
+    if (typeof e.data.interactionId === 'string') event.details.interactionId = e.data.interactionId;
+    if (e.data.quotaSnapshots !== undefined) event.details.quotaSnapshots = redactTrajectoryValue(e.data.quotaSnapshots);
     input.onTrajectory?.(event);
   });
   const offUsageInfo = session.on('session.usage_info', (e) => {
+    const percent = e.data.tokenLimit > 0
+      ? Math.round((e.data.currentTokens / e.data.tokenLimit) * 100)
+      : undefined;
+    markActivity('session.usage_info', '上下文占用 ' + (percent !== undefined ? percent + '%' : ''));
     input.onTrajectory?.({
       type: 'status',
       name: '上下文占用',
@@ -388,6 +563,87 @@ export async function askCopilot(input: AskInput): Promise<string> {
         currentTokens: e.data.currentTokens,
         tokenLimit: e.data.tokenLimit,
         messagesLength: e.data.messagesLength,
+        ...(percent !== undefined ? { percent } : {}),
+      },
+    });
+  });
+
+  const offUserInputRequested = session.on('user_input.requested', (e) => {
+    pendingUserInputs.set(e.data.requestId, { requestedAt: Date.now(), question: e.data.question });
+    markActivity('user_input_requested', '等待用户输入');
+    input.onStatus?.('Agent 正在等待你的输入。');
+    input.onTrajectory?.({
+      type: 'user_input_requested',
+      name: '等待用户输入',
+      status: 'waiting',
+      details: {
+        requestId: e.data.requestId,
+        question: redactTrajectoryValue(e.data.question),
+        ...(e.data.choices?.length ? { choices: redactTrajectoryValue(e.data.choices) } : {}),
+        ...(typeof e.data.allowFreeform === 'boolean' ? { allowFreeform: e.data.allowFreeform } : {}),
+      },
+    });
+  });
+
+  const offUserInputCompleted = session.on('user_input.completed', (e) => {
+    const pending = pendingUserInputs.get(e.data.requestId);
+    const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
+    pendingUserInputs.delete(e.data.requestId);
+    markActivity('user_input_completed', '用户输入已提供');
+    input.onTrajectory?.({
+      type: 'user_input_completed',
+      name: '用户输入已提供',
+      status: 'completed',
+      ...(durationMs !== undefined ? { durationMs } : {}),
+      details: {
+        requestId: e.data.requestId,
+        ...(pending ? { question: redactTrajectoryValue(pending.question) } : {}),
+      },
+    });
+  });
+
+  const offSessionIdle = session.on('session.idle', (e) => {
+    sessionIdleObserved = true;
+    markActivity('session_idle', e.data.aborted ? 'Session 已结束（已中止）' : 'Session 已进入 idle');
+    input.onTrajectory?.({
+      type: 'session_idle',
+      name: e.data.aborted ? 'Session 已中止' : 'Session 已 idle',
+      status: e.data.aborted ? 'info' : 'completed',
+      details: {
+        aborted: e.data.aborted,
+        pendingTools: trajectoryToolStarts.size,
+        pendingPermissions: pendingPermissions.size,
+        pendingUserInputs: pendingUserInputs.size,
+      },
+    });
+  });
+
+  const offSessionError = session.on('session.error', (e) => {
+    markActivity('session_error', 'Session 错误：' + e.data.message);
+    input.onTrajectory?.({
+      type: 'session_error',
+      name: 'Session 错误',
+      status: 'failed',
+      details: {
+        errorType: e.data.errorType,
+        message: e.data.message,
+        ...(typeof e.data.statusCode === 'number' ? { statusCode: e.data.statusCode } : {}),
+        ...(typeof e.data.providerCallId === 'string' ? { providerCallId: e.data.providerCallId } : {}),
+      },
+    });
+  });
+
+  const offContextChanged = session.on('session.context_changed', (e) => {
+    markActivity('context_changed', '运行目录/仓库上下文发生变化');
+    input.onTrajectory?.({
+      type: 'context_changed',
+      name: '运行上下文变化',
+      status: 'info',
+      details: {
+        cwd: e.data.cwd,
+        ...(typeof e.data.gitRoot === 'string' ? { gitRoot: e.data.gitRoot } : {}),
+        ...(typeof e.data.repository === 'string' ? { repository: e.data.repository } : {}),
+        ...(typeof e.data.branch === 'string' ? { branch: e.data.branch } : {}),
       },
     });
   });
@@ -413,23 +669,51 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
     const usageAfter = await getSessionUsageMetrics(session);
     const turnUsage = diffUsageMetrics(usageAfter, usageBefore);
+    markActivity('turn_end', 'Agent 本轮结束');
     input.onTrajectory?.({
       type: 'turn_end',
       name: 'Agent 本轮结束',
       status: 'completed',
       details: {
         ...(turnUsage ? { turnUsage: redactTrajectoryValue(turnUsage) } : {}),
+        elapsedMs: Date.now() - turnStartedAt,
+        modelCallCount,
+        sessionIdleObserved,
       },
     });
     return finalContent;
   } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    const timedOut = TURN_TIMEOUT.test(errorMessage);
+    markActivity(timedOut ? 'timeout' : 'error', timedOut ? '等待 Session 完成超时' : 'Agent 执行失败');
     input.onTrajectory?.({
       type: 'error',
-      name: 'Agent 执行失败',
+      name: timedOut ? 'Agent 等待超时' : 'Agent 执行失败',
       status: 'failed',
-      details: { error: e instanceof Error ? e.message : String(e) },
+      details: {
+        error: errorMessage,
+        elapsedMs: Date.now() - turnStartedAt,
+        timeoutMs: config.turnTimeoutMs,
+        lastActivityAt,
+        lastActivityType,
+        lastActivity,
+        pendingTools: trajectoryToolStarts.size,
+        pendingPermissions: pendingPermissions.size,
+        pendingUserInputs: pendingUserInputs.size,
+        assistantTurnEnded,
+        sessionIdleObserved,
+        modelCallCount,
+        ...(pendingPermissions.size ? {
+          permissions: [...pendingPermissions.entries()].map(([requestId, item]) => ({
+            requestId,
+            kind: item.kind,
+            requestedAt: new Date(item.requestedAt).toISOString(),
+            summary: redactTrajectoryValue(item.summary),
+          })),
+        } : {}),
+      },
     });
-    if (e instanceof Error && TURN_TIMEOUT.test(e.message)) {
+    if (timedOut) {
       try {
         await session.abort();
       } catch {
@@ -438,13 +722,23 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
     throw e;
   } finally {
+    clearInterval(heartbeat);
     if (input.turnId) activeSessions.delete(input.turnId);
+    offAssistantTurnStart();
     offMessageDelta();
     offIntent();
     offReasoning();
+    offAssistantTurnEnd();
     offToolStart();
+    offToolProgress();
     offToolComplete();
     offPermission();
+    offPermissionCompleted();
+    offUserInputRequested();
+    offUserInputCompleted();
+    offSessionIdle();
+    offSessionError();
+    offContextChanged();
     offCompaction();
     offCompactionComplete();
     offUsage();
