@@ -135,7 +135,8 @@ interface PendingCopilotPermission {
   toolTitle?: string;
   readOnly?: boolean;
   managedApprovalRequired?: boolean;
-  respond: (allowed: boolean) => Promise<void>;
+  /** 把前端的“允许一次 / 后续都允许 / 拒绝”转换成 Copilot SDK 权限决定。 */
+  respond: (decision: 'approve-once' | 'approve-for-session' | 'reject') => Promise<void>;
 }
 
 /** 当前进程中等待用户确认的权限请求；权限是临时运行态，不写入 Investigation 状态文件。 */
@@ -198,12 +199,19 @@ export async function respondToCopilotPermission(
   turnId: string,
   requestId: string,
   allowed: boolean,
+  scope: 'once' | 'session' = 'once',
 ): Promise<boolean> {
   const pending = pendingCopilotPermissions.get(requestId);
   if (!pending || pending.sessionName !== sessionName || pending.turnId !== turnId) return false;
 
+  const decision = !allowed
+    ? 'reject'
+    : scope === 'session'
+      ? 'approve-for-session'
+      : 'approve-once';
+
   try {
-    await pending.respond(allowed);
+    await pending.respond(decision);
     pendingCopilotPermissions.delete(requestId);
     return true;
   } catch {
@@ -620,10 +628,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(typeof request.toolTitle === 'string' ? { toolTitle: request.toolTitle } : {}),
         ...(typeof request.readOnly === 'boolean' ? { readOnly: request.readOnly } : {}),
         ...(typeof request.managedApprovalRequired === 'boolean' ? { managedApprovalRequired: request.managedApprovalRequired } : {}),
-        respond: async (allowed) => {
+        respond: async (decision) => {
           await session.rpc.permissions.handlePendingPermissionRequest({
             requestId,
-            result: allowed ? { kind: 'approve-once' } : { kind: 'reject' },
+            // Copilot SDK 原生支持 approve-for-session，不需要我们自己维护一套“自动允许”状态。
+            result: { kind: decision },
           });
         },
       });
