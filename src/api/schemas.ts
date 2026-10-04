@@ -30,6 +30,8 @@ export const UpdateConfigBodySchema = z.object({
 export const MessageBodySchema = z.object({
   message: z.string().trim().min(1).optional(),
   routeId: z.string().trim().min(1).max(80).optional(),
+  /** true 表示这是用户点击 Agent 提供的“继续调查”引导，不是重新提出同一个普通问题。 */
+  guided: z.boolean().default(false),
   turnId: z.string().trim().min(1).optional(),
 }).strict().refine(
   (value) => Boolean(value.message || value.routeId),
