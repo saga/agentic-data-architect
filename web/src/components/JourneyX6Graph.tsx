@@ -135,6 +135,8 @@ export function JourneyX6Graph({
       node.data.nodeType === 'end' || node.data.nodeType === 'stop';
 
     // retry 也是真实 Workflow Edge，不能从 Port 中隐藏；它只是采用不同的视觉路由。
+    const visibleSources = node.data.sourceHandles;
+    const visibleTargets = node.data.targetHandles;
 
     const portAttrs = {
       circle: {
