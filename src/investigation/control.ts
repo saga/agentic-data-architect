@@ -94,6 +94,8 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       importantDocuments: [],
     },
     agent: {
+      model: config.model,
+      autoTier: undefined,
       permissionMode: 'permission',
       autoContinuationTurns: 4,
       displayName: '秘书',
@@ -122,6 +124,8 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       importantDocuments: control.research.importantDocuments.map((item) => ({ ...item })),
     },
     agent: {
+      model: control.agent.model,
+      ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
       permissionMode: control.agent.permissionMode,
       autoContinuationTurns: control.agent.autoContinuationTurns,
       displayName: control.agent.displayName,
@@ -167,6 +171,10 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
         : [],
     },
     agent: {
+      model: typeof agent.model === 'string' && agent.model.trim() ? agent.model.trim().slice(0, 200) : defaults.agent.model,
+      ...(agent.autoTier === 'efficiency' || agent.autoTier === 'balance' || agent.autoTier === 'intelligence' || agent.autoTier === 'fast'
+        ? { autoTier: agent.autoTier }
+        : {}),
       permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
       autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 4, 0, 6),
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
@@ -328,6 +336,8 @@ async function updateInvestigationControlImpl(
       })).filter((item) => item.title && item.reference),
     },
     agent: {
+      model: next.agent.model.trim().slice(0, 200),
+      ...(next.agent.autoTier ? { autoTier: next.agent.autoTier } : {}),
       permissionMode: next.agent.permissionMode,
       autoContinuationTurns: normalizeAvatarDimension(next.agent.autoContinuationTurns, current.agent.autoContinuationTurns, 0, 6),
       displayName: next.agent.displayName.trim().slice(0, 40),
@@ -363,6 +373,8 @@ async function updateInvestigationControlImpl(
   if (JSON.stringify(current.research) !== JSON.stringify(control.research)) changed.push('research');
   if (promptChanged) changed.push('guidance');
   if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
+  if (current.agent.model !== control.agent.model) changed.push('model');
+  if (current.agent.autoTier !== control.agent.autoTier) changed.push('autoTier');
   if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
   if (current.agent.autoContinuationTurns !== control.agent.autoContinuationTurns) changed.push('autoContinuation');
   if (current.agent.displayName !== control.agent.displayName) changed.push('displayName');
@@ -381,6 +393,8 @@ async function updateInvestigationControlImpl(
     details: {
       changed,
       guidanceVersion: control.agent.systemPrompt.version,
+      model: control.agent.model,
+      ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
       permissionMode: control.agent.permissionMode,
       autoContinuationTurns: control.agent.autoContinuationTurns,
       displayName: control.agent.displayName,
