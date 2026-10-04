@@ -122,7 +122,7 @@ const userMessage = saveConversationMessage({
     ...control.research.githubRepositories,
     ...extractGitHubRepositories([inv.goal, inv.userPrompt, effectiveQuestion].filter(Boolean).join('\n')),
   ])].slice(0, 5);
-  if (githubRepositories.length && inv.discoveryRuns.length === 0) {
+  if (githubRepositories.length) {
     onStatus?.('正在准备代码仓库并建立初始调查资料，请稍候…');
     for (const repository of githubRepositories) {
       try {
