@@ -176,9 +176,20 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
             // Strip that obsolete field while preserving the rest of the historical record.
             const snapshot = item.snapshot as unknown as Record<string, unknown>;
             const snapshotAgent = snapshot?.agent;
-            if (snapshotAgent && typeof snapshotAgent === 'object' && !Array.isArray(snapshotAgent) && 'skills' in snapshotAgent) {
-              const { skills: _skills, ...agentWithoutSkills } = snapshotAgent as Record<string, unknown>;
-              return { ...item, snapshot: { ...snapshot, agent: agentWithoutSkills } };
+            if (snapshotAgent && typeof snapshotAgent === 'object' && !Array.isArray(snapshotAgent)) {
+              const agentRecord = snapshotAgent as Record<string, unknown>;
+              // 兼容权限模式字段加入前生成的旧历史快照。
+              const { skills: _skills, ...agentWithoutSkills } = agentRecord;
+              return {
+                ...item,
+                snapshot: {
+                  ...snapshot,
+                  agent: {
+                    permissionMode: agentRecord.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
+                    ...agentWithoutSkills,
+                  },
+                },
+              };
             }
             return item;
           })
