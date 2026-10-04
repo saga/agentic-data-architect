@@ -63,8 +63,8 @@ export interface WorkflowDefinition {
 export interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
-  /** 布局算法版本。升级算法后故意改值，让旧布局自动重新计算。 */
-  engine?: 'elk' | 'elk-v2' | 'elk-v3' | 'elk-v4' | 'elk-v5';
+  /** 自动布局算法版本；旧 elk* 值继续兼容历史布局。 */
+  engine?: 'workflow-v1' | 'elk' | 'elk-v2' | 'elk-v3' | 'elk-v4' | 'elk-v5';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -194,6 +194,12 @@ export interface FlowEdge {
 
 /** 当前工作地图使用的图引擎。 */
 export const JOURNEY_GRAPH_ENGINE = 'x6' as const;
+
+/** 工作地图固定节点尺寸；布局、X6 Shape、Graph projection 必须共用。 */
+export const JOURNEY_NODE_SIZE = {
+  regular: { width: 236, height: 210 },
+  terminal: { width: 190, height: 96 },
+} as const;
 
 /** X6 中隐藏的“新增出口”连接桩。 */
 export const NEW_SOURCE_HANDLE_ID = '__new__';
