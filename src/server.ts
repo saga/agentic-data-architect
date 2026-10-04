@@ -37,7 +37,7 @@ import {
   validateJourneyEdit,
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
-import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
+import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { buildReport } from './analysis/report.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
@@ -195,12 +195,14 @@ app.post('/api/sessions', async (req, res) => {
     const context = await loadWorkspaceContext(name);
     const snapshot = await loadLatestSnapshot<any>(name);
     const conversation = getConversationSummary(name);
+    const trajectory = await readTrajectory(name, { limit: 5000 });
     res.json({
       context,
       control: await loadInvestigationControl(name),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
       messages: listConversationMessages(name, 200),
+      checkpoints: listTrajectoryCheckpoints(trajectory, 20),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
       currentState: snapshot?.currentState ?? null,
@@ -908,6 +910,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
           ...(selectedRoute ? { selectedRoute } : {}),
           ...(body.guided && !selectedRoute ? { selectedGuidance: message } : {}),
           onReasoningDelta: (delta) => send('reasoning', { delta }),
+          onCheckpoint: (checkpoint) => send('checkpoint', checkpoint),
         },
       );
       send('completed', result);
