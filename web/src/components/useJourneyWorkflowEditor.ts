@@ -25,8 +25,8 @@ import type {
   WorkflowActor,
   CompletionMode,
   WorkflowSnapshot,
-  JOURNEY_NODE_SIZE,
 } from './journey-map-types.js';
+import { JOURNEY_NODE_SIZE } from './journey-map-types.js';
 
 /** 从 URL 取得当前 Investigation 名称。页面路由本身就是唯一上下文来源。 */
 function sessionNameFromUrl(): string | undefined {
