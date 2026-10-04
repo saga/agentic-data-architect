@@ -1,7 +1,7 @@
 /**
  * Copilot Agent 的本地数据工具。
  *
- * 只暴露 catalog、register、describe、sample、profile、query 六个高价值操作。
+ * 暴露 catalog、register、describe、sample、profile、query、transform、export、explain、reconcile 等高价值本地分析操作。
  * Agent 不直接拿到 DuckDB 文件路径，也没有 ATTACH / COPY / INSTALL / LOAD 能力。
  */
 import { defineTool } from '@github/copilot-sdk';
@@ -16,6 +16,8 @@ import {
   localTransform,
   localExportParquet,
   registerLocalDataset,
+  localExplain,
+  localReconcile,
 } from '../analytics/local-data.js';
 
 export function createLocalDataTools(sessionName: string) {
@@ -87,6 +89,27 @@ export function createLocalDataTools(sessionName: string) {
         path: z.string().min(1).regex(/^(exports|parquet)\//),
       }),
       handler: async ({ sql, path }) => localExportParquet(sessionName, sql, path),
+    }),
+    defineTool('local_explain', {
+      description: '对已经登记的数据集上的只读 SQL 执行 DuckDB EXPLAIN ANALYZE，查看实际执行计划和性能信息。',
+      parameters: z.object({
+        sql: z.string().min(1).describe('只读 SELECT 或 WITH 查询；数据来源必须是已经登记的 relation。'),
+      }),
+      skipPermission: true,
+      handler: async ({ sql }) => localExplain(sessionName, sql),
+    }),
+    defineTool('local_reconcile', {
+      description: '对两个已经登记的数据集做确定性的 source/target 对账，比较记录数、重复主键、缺失/多余记录和指定数值 measure。',
+      parameters: z.object({
+        source: z.string().min(1).describe('source 数据集名称、relation 或 id。'),
+        target: z.string().min(1).describe('target 数据集名称、relation 或 id。'),
+        keys: z.array(z.string().min(1)).min(1).max(12).describe('两边共同的业务主键列。'),
+        measures: z.array(z.string().min(1)).max(20).optional().describe('可选的数值列，用于比较 source/target 汇总。'),
+        tolerance: z.number().min(0).optional().describe('measure 汇总允许的绝对差值，默认 0。'),
+      }),
+      skipPermission: true,
+      handler: async ({ source, target, keys, measures, tolerance }) =>
+        localReconcile(sessionName, source, target, keys, measures ?? [], tolerance ?? 0),
     }),
     defineTool('local_query', {
       description: '在已经登记的数据集上执行一条只读 DuckDB SELECT 或 WITH 查询。结果最多返回 1000 行并保存为 Evidence。',
