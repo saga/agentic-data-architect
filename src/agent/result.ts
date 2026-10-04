@@ -35,7 +35,7 @@ export const AgentAnswerSchema = z.object({
   workflow: z.object({
     nodeId: z.string().trim().min(1),
     outcome: z.string().trim().min(1),
-  }).optional(),
+  }).optional().catch(undefined),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
