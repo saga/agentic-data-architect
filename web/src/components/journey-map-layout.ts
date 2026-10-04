@@ -141,7 +141,7 @@ export function calculateWorkflowRanks(
   const incoming = new Set(forwardEdges.map((edge) => edge.target));
   const startNode = nodes.find((node) => !incoming.has(node.id)) ?? nodes[0];
   const ranks = new Map<string, number>(
-    nodes.map((node) => [node.id, Number.POSITIVE_INFINITY]),
+    nodes.map((node) => [node.id, -1]),
   );
 
   if (startNode) ranks.set(startNode.id, 0);
@@ -154,7 +154,7 @@ export function calculateWorkflowRanks(
       if (!Number.isFinite(sourceRank)) continue;
 
       const nextRank = Number(sourceRank) + 1;
-      const currentRank = ranks.get(edge.target) ?? Number.POSITIVE_INFINITY;
+      const currentRank = ranks.get(edge.target) ?? -1;
 
       if (nextRank <= currentRank) continue;
 
@@ -171,7 +171,7 @@ export function calculateWorkflowRanks(
   }
 
   for (const node of nodes) {
-    if (!Number.isFinite(ranks.get(node.id))) {
+    if ((ranks.get(node.id) ?? -1) < 0) {
       maxRank += 1;
       ranks.set(node.id, maxRank);
     }
