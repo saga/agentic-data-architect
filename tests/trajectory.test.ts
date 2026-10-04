@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeTrajectory, type TrajectoryEvent } from '../src/investigation/trajectory.js';
+import { listTrajectoryCheckpoints, summarizeTrajectory, type TrajectoryEvent } from '../src/investigation/trajectory.js';
 
 function event(overrides: Partial<TrajectoryEvent>): TrajectoryEvent {
   return {
@@ -193,7 +193,6 @@ test('trajectory checkpoints can be listed without affecting runtime state', () 
     }),
   ];
 
-  const { listTrajectoryCheckpoints } = await import('../src/investigation/trajectory.js');
   const checkpoints = listTrajectoryCheckpoints(events);
   assert.equal(checkpoints.length, 2);
   assert.equal(checkpoints[0]?.execution, 0);
