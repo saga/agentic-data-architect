@@ -893,8 +893,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
         throw new Error('Turn aborted.');
       }
 
-      // message_delta 会继续走同一个 onDelta；这里清空仅用于拿到“本次
-      // sendAndWait”的独立最终内容，避免把多个 JSON 串起来再交给解析器。
       content = '';
       if (execution > 0) {
         input.onStatus?.(`Agent 已完成前一阶段，正在自主继续调查（第 ${execution + 1} 阶段）…`);
@@ -923,7 +921,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           '不要向用户解释“下一步可以做什么”，而是现在就做。',
           '只有确实需要用户作决定、补充缺失输入、处理权限，或者已经没有有价值的调查动作时，才结束这一阶段。',
           '如果已经完成目标，也直接结束，不要为了延长运行而虚构工作。',
-        ].join('\\n');
+        ].join('\n');
       }
     }
 
@@ -1057,3 +1055,20 @@ async function resumeOrCreate(
   c: CopilotClient,
   sessionId: string,
   sessionConfig: Parameters<CopilotClient['createSession']>[0],
+) {
+  try {
+    return await c.resumeSession(sessionId, sessionConfig);
+  } catch (e) {
+    if (e instanceof Error && SESSION_NOT_FOUND.test(e.message)) {
+      return c.createSession(sessionConfig);
+    }
+    try {
+      if ((await c.getSessionMetadata(sessionId)) === undefined) {
+        return c.createSession(sessionConfig);
+      }
+    } catch {
+      /* preserve the original resume error */
+    }
+    throw e;
+  }
+}
