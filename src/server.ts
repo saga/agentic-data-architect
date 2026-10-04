@@ -16,6 +16,7 @@ import {
   MessageBodySchema,
   PermissionResponseBodySchema,
   RequestValidationError,
+  UserInputResponseBodySchema,
   UpdateConfigBodySchema,
   UpdateWorkflowBodySchema,
   JourneyAiRequestSchema,
@@ -63,7 +64,9 @@ import {
 import {
   abortCopilotTurn,
   listPendingCopilotPermissions,
+  listPendingCopilotUserInputs,
   respondToCopilotPermission,
+  respondToCopilotUserInput,
   stopClient,
 } from './agent/copilot.js';
 import {
@@ -240,6 +243,34 @@ app.post('/api/sessions', async (req, res) => {
       details: {
         turnId: body.turnId,
         requestId: body.requestId,
+      },
+    });
+    res.json({ ok: true });
+  });
+
+  /** 返回当前 Investigation 的 Agent 待回答问题。 */
+  app.get('/api/sessions/:name/user-inputs', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    res.json({ requests: listPendingCopilotUserInputs(name) });
+  });
+
+  /** 把用户回答交回 ask_user；Agent 会从等待的 Promise 继续执行。 */
+  app.post('/api/sessions/:name/user-inputs/respond', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const body = parseRequest(UserInputResponseBodySchema, req.body);
+    const handled = respondToCopilotUserInput(name, body.turnId, body.requestId, body.answer, body.wasFreeform);
+    if (!handled) {
+      res.status(404).json({ error: '这个用户输入请求已经处理、已结束，或答案不符合请求要求。' });
+      return;
+    }
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'agent.user_input.answered',
+      summary: '用户回答了 Agent 的问题。',
+      details: {
+        turnId: body.turnId,
+        requestId: body.requestId,
+        wasFreeform: body.wasFreeform,
       },
     });
     res.json({ ok: true });
