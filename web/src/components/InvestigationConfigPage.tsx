@@ -37,6 +37,7 @@ export function InvestigationConfigPage(props:{
   const [workflowTarget,setWorkflowTarget]=useState<ConfigWorkflow>();
   const [confirmText,setConfirmText]=useState('');
   const [avatarUploading,setAvatarUploading]=useState(false);
+  const [avatarError,setAvatarError]=useState<string>();
 
   useEffect(()=>setDraft(clone(props.control)),[props.control]);
   const update=(mutator:(next:ConfigPageControl)=>void)=>setDraft(prev=>{const next=clone(prev);mutator(next);return next;});
@@ -90,6 +91,7 @@ export function InvestigationConfigPage(props:{
   /** 接收 antd-img-crop 已经完成裁剪的文件，再上传到当前 Investigation。 */
   const handleAvatarBeforeUpload = async (file: File) => {
     setAvatarUploading(true);
+    setAvatarError(undefined);
     try {
       const resized = await resizeAvatarToTarget(file);
       const body = new FormData();
@@ -109,6 +111,8 @@ export function InvestigationConfigPage(props:{
       const data = await response.json() as { control: ConfigPageControl };
       setDraft(clone(data.control));
       await props.onSaved(data.control);
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : '头像上传失败，请重试。');
     } finally {
       setAvatarUploading(false);
     }
@@ -207,6 +211,9 @@ export function InvestigationConfigPage(props:{
                  </Flex>
                </div>
              </Flex>
+             {avatarError ? (
+               <Alert type='error' showIcon title={avatarError} style={{marginTop:14}} />
+             ) : null}
              <Divider style={{margin:'18px 0 14px'}} />
              <Flex gap={12} wrap>
                <div>
