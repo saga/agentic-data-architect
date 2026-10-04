@@ -251,8 +251,16 @@ export function JourneyX6Graph({
           shape: JOURNEY_X6_SHAPE,
           x: node.position.x,
           y: node.position.y,
-          width: node.width ?? 236,
-          height: node.height ?? 210,
+          width: node.width ?? (
+            node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+              ? JOURNEY_NODE_SIZE.terminal.width
+              : JOURNEY_NODE_SIZE.regular.width
+          ),
+          height: node.height ?? (
+            node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+              ? JOURNEY_NODE_SIZE.terminal.height
+              : JOURNEY_NODE_SIZE.regular.height
+          ),
           data: {
             ...node.data,
             selected: node.id === selectedNodeId,
@@ -288,7 +296,7 @@ export function JourneyX6Graph({
             ),
           );
 
-          const edgeConfig: Record<string, unknown> = {
+          const edgeConfigBase = {
             id: edge.id,
             shape: 'edge',
             source: {
@@ -334,7 +342,8 @@ export function JourneyX6Graph({
               + 28;
             const targetX = (targetNode?.position.x ?? 0) - 28;
 
-            Object.assign(edgeConfig, {
+            return {
+              ...edgeConfigBase,
               vertices: [
                 { x: sourceX, y: lane },
                 { x: targetX, y: lane },
@@ -343,22 +352,21 @@ export function JourneyX6Graph({
                 name: 'orth',
                 args: { padding: 18 },
               },
-            });
-          } else {
-            Object.assign(edgeConfig, {
-              router: {
-                name: 'manhattan',
-                args: {
-                  step: 16,
-                  padding: 18,
-                  startDirections: ['right'],
-                  endDirections: ['left'],
-                },
-              },
-            });
+            };
           }
 
-          return edgeConfig;
+          return {
+            ...edgeConfigBase,
+            router: {
+              name: 'manhattan',
+              args: {
+                step: 16,
+                padding: 18,
+                startDirections: ['right'],
+                endDirections: ['left'],
+              },
+            },
+          };
         }),
       );
     });
