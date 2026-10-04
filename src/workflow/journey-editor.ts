@@ -1,8 +1,13 @@
 /**
  * 工作地图编辑器的服务端存储边界。
  *
- * 内置 Skill 只提供初始路线；用户修改后直接保存到 Investigation workspace。
- * X6 的坐标只属于画布布局，不进入 Workflow 语义。
+ * 这里连接三个彼此独立的东西：
+ * 1. Skill 提供的内置 Workflow；
+ * 2. Investigation 自己保存的 Workflow 定义和画布布局；
+ * 3. 当前 Workflow execution。
+ *
+ * 重要原则：Definition 保存“做什么”，Layout 保存“怎么摆”，Execution 保存“现在做到哪”。
+ * 三者不能混成一个文件，也不能把 X6 私有对象直接持久化。
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -121,7 +126,7 @@ export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent
   await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(event) + '\n', 'utf8');
 }
 
-/** 只读取最近的事件，避免快照随着运行历史无限增长。 */
+/** 只读取最近事件供 UI/诊断使用；完整历史文件仍留在 workspace，不塞进当前快照。 */
 export async function loadJourneyRunEvents(name: string, limit = 80): Promise<JourneyRunEvent[]> {
   const raw = await readTextOrNull(journeyFile(name, EVENTS_FILE));
   if (!raw) return [];
@@ -134,7 +139,13 @@ export async function loadJourneyRunEvents(name: string, limit = 80): Promise<Jo
   });
 }
 
-/** 按图深度给新 Workflow 一个稳定初始布局；用户拖动后的坐标另存。 */
+/**
+ * 为没有历史坐标的 Workflow 生成初始布局。
+ *
+ * rank 只表达“从 start 大致经过多少层”；同层节点横向展开。
+ * 这不是通用图布局算法，目的是给小型 Data Architect Workflow 一个稳定、好读的起点。
+ * 用户手动拖动后，坐标写入 layout 文件；再次打开时不应因为 Workflow runtime 改变而乱跳。
+ */
 export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayout {
   const depth = new Map<string, number>([[definition.start, 0]]);
   const queue = [definition.start];
@@ -176,7 +187,12 @@ export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayo
   return { version: 1, engine: 'workflow-v1', nodes };
 }
 
-/** 序列化成可人工阅读、可重新 parse 的 Workflow Markdown。 */
+/**
+ * 把当前 Definition 序列化成最小 Markdown DSL。
+ *
+ * 默认 actor 不写出来：task 默认 agent，review 默认 human。
+ * 这样生成的文件尽量短，Git diff 也更容易看出真正的业务变化。
+ */
 export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): string {
   const definition = JourneyDefinitionSchema.parse(definitionInput);
   const lines = [
@@ -298,7 +314,13 @@ async function loadCustomActive(
   };
 }
 
-/** Journey 的 deterministic facts 不发起模型调用，只读取已有 workspace 状态。 */
+/**
+ * 从已有 Investigation 状态组装 deterministic facts。
+ *
+ * 这个函数绝不能为了判断 Workflow 又发起一次 Agent 调用；否则“是否完成”会变成不稳定的模型结果。
+ * 当前三条内置 Workflow 共享一部分事实，因此这里暂时集中组装；真正需要扩展时优先改 evaluator，
+ * 不要给 Markdown DSL 增加新的字段。
+ */
 async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const context = await loadWorkspaceContext(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
@@ -325,7 +347,12 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   };
 }
 
-/** 当前 Investigation 的 active Workflow；没有 custom 时使用内置 Skill。 */
+/**
+ * 取得当前 Investigation 真正生效的 Workflow。
+ *
+ * 没有自定义文件时读取 Skill 内置版本；有自定义文件时读取 Investigation 保存的版本。
+ * 这样“内置路线”和“本次调查已经调整过的路线”不会混淆。
+ */
 export async function loadActiveJourney(
   name: string,
   workflowId: WorkflowId,
@@ -357,7 +384,12 @@ export async function loadActiveJourney(
   };
 }
 
-/** 读取和当前 Workflow version 绑定的执行状态。 */
+/**
+ * 读取与当前 Definition version 绑定的 Execution。
+ *
+ * Workflow 定义发生版本变化后，旧 execution 不能直接套到新图上；normalizeExecution 会检查
+ * workflowId、version 和 currentNodeId，发现不匹配就重新从 start 建立状态。
+ */
 export async function loadJourneyExecution(
   name: string,
   definition: JourneyDefinition,
