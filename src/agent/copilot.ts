@@ -866,8 +866,67 @@ export async function askCopilot(input: AskInput): Promise<string> {
       await session.abort();
       throw new Error('Turn aborted.');
     }
-    const final = await session.sendAndWait({ prompt: input.prompt }, config.turnTimeoutMs);
-    const finalContent = final?.data.content || content;
+
+    /**
+     * 一个用户问题默认不再只对应一次 Copilot sendAndWait。
+     *
+     * Copilot SDK 的 Session 会在 Agent 自己认为“这一轮完成”后进入 idle；
+     * 这并不代表 Investigation 的目标已经完成。以前这里一次 sendAndWait
+     * 返回就直接结束整个 Investigation turn，所以 Agent 很容易查一两步
+     * 就把“下一步”交给用户。
+     *
+     * 这里先采用一个很小、可控的自动续跑窗口：首轮结束后，最多再主动
+     * 推进两轮。仍然复用同一个 Session，因此上下文、工具、Skills 和已经
+     * 找到的资料都保留；如果 Agent 真正需要用户选择/输入/权限，SDK 仍然
+     * 会在 sendAndWait 内等待，不会绕过人工控制。
+     *
+     * 这不是永久 while(true)：先用固定上限验证“长运行感”是否明显改善，
+     * 避免一次小改动把 Agent 变成不可控的无限循环。
+     */
+    const AUTO_CONTINUATION_TURNS = 2;
+    let finalContent = '';
+    let continuationPrompt = input.prompt;
+
+    for (let execution = 0; execution <= AUTO_CONTINUATION_TURNS; execution += 1) {
+      if (input.shouldAbort?.()) {
+        await session.abort();
+        throw new Error('Turn aborted.');
+      }
+
+      // message_delta 会继续走同一个 onDelta；这里清空仅用于拿到“本次
+      // sendAndWait”的独立最终内容，避免把多个 JSON 串起来再交给解析器。
+      content = '';
+      if (execution > 0) {
+        input.onStatus?.(`Agent 已完成前一阶段，正在自主继续调查（第 ${execution + 1} 阶段）…`);
+        input.onTrajectory?.({
+          type: 'status',
+          name: `自主继续调查 #${execution}`,
+          status: 'started',
+          details: {
+            execution,
+            maxAutomaticContinuations: AUTO_CONTINUATION_TURNS,
+          },
+        });
+      }
+
+      const final = await session.sendAndWait(
+        { prompt: continuationPrompt },
+        config.turnTimeoutMs,
+      );
+      finalContent = final?.data.content || content;
+
+      if (execution < AUTO_CONTINUATION_TURNS) {
+        continuationPrompt = [
+          '继续自主推进当前 Investigation，不要因为上一阶段已经产生了一个局部答案就停止。',
+          '重新检查当前目标、刚刚得到的结果和仍然存在的 unknowns：',
+          '如果还有可以由你自己通过现有工具、代码、SQL、配置、文档或 Skill 完成的有价值调查，直接继续执行。',
+          '不要向用户解释“下一步可以做什么”，而是现在就做。',
+          '只有确实需要用户作决定、补充缺失输入、处理权限，或者已经没有有价值的调查动作时，才结束这一阶段。',
+          '如果已经完成目标，也直接结束，不要为了延长运行而虚构工作。',
+        ].join('\\n');
+      }
+    }
+
     const workflowTransition = await applyAgentWorkflowTransition(
       investigationName,
       input.workflowSkill ?? null,
@@ -998,20 +1057,3 @@ async function resumeOrCreate(
   c: CopilotClient,
   sessionId: string,
   sessionConfig: Parameters<CopilotClient['createSession']>[0],
-) {
-  try {
-    return await c.resumeSession(sessionId, sessionConfig);
-  } catch (e) {
-    if (e instanceof Error && SESSION_NOT_FOUND.test(e.message)) {
-      return c.createSession(sessionConfig);
-    }
-    try {
-      if ((await c.getSessionMetadata(sessionId)) === undefined) {
-        return c.createSession(sessionConfig);
-      }
-    } catch {
-      /* preserve the original resume error */
-    }
-    throw e;
-  }
-}
