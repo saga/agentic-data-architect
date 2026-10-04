@@ -493,6 +493,82 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     });
   });
 
+  /** 上传当前 Investigation 的秘书头像；前端已经裁剪并缩放到配置尺寸，这里只负责安全落盘和更新 Control。 */
+  app.post('/api/sessions/:name/assistant/avatar', upload.single('file'), async (req, res) => {
+    const name = sessionKey(req.params.name);
+    if (!req.file) {
+      res.status(400).json({ error: '没有收到头像文件，请重新选择。' });
+      return;
+    }
+
+    // 头像接口只接受浏览器裁剪器生成的图片格式，避免把任意文件写进 assistant 目录。
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(req.file.mimetype)) {
+      res.status(400).json({ error: '头像只支持 PNG、JPEG 或 WebP 图片。' });
+      return;
+    }
+    if (req.file.size > 10 * 1024 * 1024) {
+      res.status(413).json({ error: '头像文件过大，请重新裁剪后上传。' });
+      return;
+    }
+
+    const root = workspaceRoot(name);
+    const avatarDir = path.join(root, 'assistant');
+    const avatarPath = path.join(avatarDir, 'avatar.png');
+    await fs.mkdir(avatarDir, { recursive: true });
+    // 固定保存成 PNG；客户端已经将图片压缩到配置的目标尺寸，避免长期保存原始大图。
+    await fs.writeFile(avatarPath, req.file.buffer);
+
+    const current = await loadInvestigationControl(name);
+    const control = await updateInvestigationControl(
+      name,
+      {
+        research: current.research,
+        agent: {
+          ...current.agent,
+          avatarPath: 'assistant/avatar.png',
+          avatarMimeType: 'image/png',
+        },
+      },
+      'assistant avatar updated',
+    );
+
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'assistant.avatar.updated',
+      summary: 'Updated the investigation assistant avatar.',
+      configurationVersion: control.version,
+      details: {
+        avatarPath: control.agent.avatarPath,
+        avatarWidth: control.agent.avatarWidth,
+        avatarHeight: control.agent.avatarHeight,
+        sizeBytes: req.file.size,
+      },
+    });
+
+    res.json({ control });
+  });
+
+  /** 返回当前 Investigation 的秘书头像；头像文件只允许来自固定的 assistant/avatar.png。 */
+  app.get('/api/sessions/:name/assistant/avatar', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const control = await loadInvestigationControl(name);
+    if (control.agent.avatarPath !== 'assistant/avatar.png') {
+      res.status(404).end();
+      return;
+    }
+
+    try {
+      await fs.access(path.join(workspaceRoot(name), 'assistant', 'avatar.png'));
+    } catch {
+      res.status(404).end();
+      return;
+    }
+
+    res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(workspaceRoot(name), 'assistant', 'avatar.png'));
+  });
+
   app.get('/api/sessions/:name/datasets', async (req, res) => {
     const name = sessionKey(req.params.name);
     const refresh = req.query.refresh === 'true';
