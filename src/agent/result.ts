@@ -31,6 +31,11 @@ export const AgentAnswerSchema = z.object({
   routeOptions: z.array(JourneyRouteOptionSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
+  /** 当前 Workflow 节点完成后，由 Agent 提出的合法出口；服务端仍会重新校验。 */
+  workflow: z.object({
+    nodeId: z.string().trim().min(1),
+    outcome: z.string().trim().min(1),
+  }).optional(),
 });
 
 /** Zod Schema 推导出的结构化 Agent 答案类型。 */
