@@ -61,7 +61,7 @@ export function InvestigationConfigPage(props:{
     <header className='subpage-header'>
       <Flex align='center' gap={10}>
         <Button type='text' icon={<ArrowLeftOutlined/>} onClick={props.onBack}>返回调查</Button>
-        <Divider type='vertical'/>
+        <Divider orientation='vertical'/>
         <SettingOutlined/> <Title level={4} style={{margin:0}}>调查配置</Title>
         <Tag>v{props.control.version}</Tag>
       </Flex>
@@ -114,7 +114,7 @@ export function InvestigationConfigPage(props:{
             <Text strong>适合这个应用的外部 MCP</Text>
             <Paragraph type='secondary' style={{marginBottom:0}}>可以按需接入 Atlassian Rovo（Jira / Confluence）、Snowflake、dbt 或 PostgreSQL 等服务。认证和数据权限仍由对应服务负责。</Paragraph>
           </Card>
-          <Alert type='warning' showIcon message='不要在这里保存密钥' description='访问令牌、密码和其它凭证应由运行环境或 MCP 服务自己的安全配置管理。'/>
+          <Alert type='warning' showIcon title='不要在这里保存密钥' description='访问令牌、密码和其它凭证应由运行环境或 MCP 服务自己的安全配置管理。'/>
           {draft.agent.mcpServers.map((server,index)=><Card key={`${server.name}-${index}`} className='settings-card mcp-card'><Flex justify='space-between'><Text strong>{server.name}</Text><Button danger type='text' icon={<DeleteOutlined/>} onClick={()=>removeMcp(index)}>删除</Button></Flex>
             <div className='mcp-grid'><label>名称<Input value={server.name} onChange={e=>mutateMcp(index,{name:e.target.value})}/></label><label>连接方式<Select value={server.type} style={{width:'100%'}} options={[{value:'http',label:'HTTP'},{value:'local',label:'本地进程'}]} onChange={value=>mutateMcp(index,{type:value})}/></label></div>
             {server.type==='http'?<label>URL<Input value={server.url} onChange={e=>mutateMcp(index,{url:e.target.value})} placeholder='https://...'/></label>:<><label>启动命令<Input value={server.command} onChange={e=>mutateMcp(index,{command:e.target.value})} placeholder='node / python / ...'/></label><label>启动参数<Select mode='tags' style={{width:'100%'}} value={server.args??[]} onChange={value=>mutateMcp(index,{args:value})}/></label></>}
