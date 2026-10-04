@@ -1,35 +1,35 @@
 # Journey Workflow Editor
 
-> 架构增量：2026-10-03
+> 架构增量：2026-10-04
 
-## 1. 为什么要把工作地图变成编辑器
+## 1. 定位
 
-原来的 Journey Map 只是展示当前阶段，实际运行逻辑仍按节点数组顺序判断。这样有两个问题：
-
-1. React Flow 上看到的分支并不是真正的执行状态机。
-2. 用户可以在地图上理解一条路线，却不能把自己的工作方式保存下来并真正执行。
-
-现在 Workflow 分成三个层次：
+工作地图是 Workflow Definition 的可视化编辑器，不是另外一套执行引擎。
 
 ~~~text
-内置 Skill Markdown
-      ↓ parse
+Skill Markdown
+    ↓
 Workflow Definition
-      ↓
-React Flow 工作地图
-      ├─ 人工拖拽 / 连线 / 属性编辑
-      └─ 工作地图 AI 生成 / 修改
-      ↓ 保存
+    ↓
+X6 工作地图
+    ├─ 人工拖动 / 连线 / 属性修改
+    └─ AI 生成 / 修改
+    ↓
 服务端 validate
-      ↓
+    ↓
 Investigation Active Workflow
-      ↓
+    ↓
 Workflow Execution
-      ↓
+    ↓
 Agent turn
 ~~~
 
-React Flow 负责交互和布局；Workflow Definition 才是语义。这样 UI、Markdown 和运行时不会各自维护一套规则。
+职责边界：
+
+- Workflow Definition：唯一业务语义来源。
+- X6：节点、Port、Edge、选择、缩放、吸附、连线交互。
+- Layout：只负责把 Workflow Definition 排成适合人阅读的坐标。
+- Execution：只读取 Workflow Definition 和 Investigation 状态，不读取 X6 对象。
 
 ## 2. 内置 Workflow 与 Investigation 自定义 Workflow
 
@@ -39,7 +39,7 @@ React Flow 负责交互和布局；Workflow Definition 才是语义。这样 UI�
 skills/<workflow>/SKILL.md
 ~~~
 
-用户编辑工作地图时，不修改内置 Skill，而是在当前 Investigation 下直接保存：
+用户编辑工作地图时，不修改内置 Skill，而是在当前 Investigation 下保存：
 
 ~~~text
 <workspace>/<investigation>/
@@ -47,45 +47,23 @@ skills/<workflow>/SKILL.md
     ├── journey.md
     ├── journey-meta.json
     ├── journey-layout.json
-    └── journey-execution.json
+    ├── journey-execution.json
+    └── journey-run-events.jsonl
 ~~~
 
 含义：
 
 - journey.md：当前真正生效的自定义 Workflow。
 - journey-meta.json：对应哪个内置 Workflow，以及版本号。
-- journey-layout.json：React Flow 节点位置。
+- journey-layout.json：只保存节点坐标，不保存 X6 对象。
 - journey-execution.json：当前执行位置、已完成节点、runId 和 waiting 状态。
-- journey-run-events.jsonl：轻量运行事件历史；Workflow reset 不会删除这份历史。
+- journey-run-events.jsonl：轻量运行事件历史。
 
 没有自定义 Workflow 时，直接读取 Skill 内置 Markdown；版本为 0。
 
-工作地图进入后就是编辑状态。人工编辑和 AI 修改都只改变当前画布；点击“保存”后，服务端验证并创建新的 Investigation Workflow version。保存成功后会清除 Copilot Session，使下一轮 Agent 不继续使用旧工作流上下文。若当前执行节点仍存在于新 Workflow，会保留当前节点和仍然存在的已完成节点；只有当前节点被删除时才回到新 Workflow 的 start。
-## 3. DSL：保持小，但吸收高价值的 BPMN 语义
+## 3. Workflow DSL
 
-当前 DSL 仍然只保留少量核心构件，不追求完整 BPMN 2.0 XML：
-
-~~~text
-Workflow DSL
-   ↓
-轻量 BPMN-like 语义
-   ↓
-React Flow
-~~~
-
-当前只增加两个低成本、高收益的语义：
-- `actor`：声明这一步主要由 Agent、人或系统执行。
-- route `condition`：给分支增加一个确定性条件，形成轻量的 Conditional Sequence Flow。
-
-现有构件可以自然对应一小部分 BPMN 思维：
-- `task + actor: agent`：Agent task。
-- `task + actor: system`：系统/自动化 task。
-- `review + actor: human`：接近 User Task。
-- `gate`：接近 Exclusive Gateway，仍保持当前单 token 执行模型。
-- `end / stop`：接近 End Event。
-- `route condition`：接近 Conditional Sequence Flow。
-
-这不是完整 BPMN 2.0 runtime；暂不实现 parallel / inclusive gateway、timer / message event、subprocess、多 token join 等需要额外执行状态的能力。
+当前 DSL 只保留工作地图真正需要的少量语义：
 
 ~~~text
 @flow
@@ -94,662 +72,181 @@ React Flow
 @review
 @end
 @stop
-
-title:
-objective:
-visible:
-completion:
-completeWhen:
-requires:
-produces:
-tools:
-
-success -> next
-needs-input -> intake
-retry -> investigate
-rollback -> investigate
-success -> target if validation
 ~~~
 
-仍然没有新增 `@branch`、`@switch`、`@loop` 等节点语法；条件直接附着在已有 route 上。
+节点：
 
-### actor
+- task：普通工作步骤。
+- gate：判断点。
+- review + actor: human：人工确认。
+- end / stop：结束事件。
 
-~~~yaml
-actor: agent
-~~~
+节点可以有：
 
-可选值：`agent`、`human`、`system`。为保持旧 Workflow 兼容，未写 actor 时，`review` 默认按 human，其它节点默认按 agent。当前 actor 用于 Workflow 语义、地图显示和 Agent 指令，不额外引入人员分配系统。
+- actor
+- completion
+- completeWhen
+- requires
+- produces
+- tools
 
-### conditional route
+route 可以有：
+
+- outcome
+- target
+- condition
+
+这不是完整 BPMN runtime。当前不做 parallel / inclusive gateway、多 token join、timer / message event、subprocess 等复杂执行语义。
+
+## 4. X6 编辑器
+
+X6 是实际的图编辑器。
 
 ~~~text
-- success -> review if validation
-- needs-input -> intake
+Workflow Definition
+      ↓
+X6 Graph
+  ├─ React Shape node
+  ├─ Port
+  ├─ Edge
+  ├─ Selection
+  ├─ Snapline
+  ├─ MiniMap
+  └─ Keyboard
 ~~~
 
-`condition` 只能使用现有 deterministic completion 条件。对于 deterministic 节点，命中的条件出口优先于普通 `success / pass / done` 出口；多个条件按 DSL 出现顺序先匹配者优先。这相当于给现有 outcome 增加一个很轻的 Conditional Sequence Flow，而不是建立规则引擎。
+Workflow Definition 不依赖 X6 类型，因此以后即使替换画布实现，也不需要修改 Workflow runtime。
 
-### completion
+### Port
 
-新增：
+每个已有 route 都有稳定 source Port / target Port。
 
-~~~yaml
-completion: deterministic
-~~~
-
-或：
-
-~~~yaml
-completion: agent
-~~~
-
-语义非常简单：
-
-- deterministic：必须有 completeWhen，由代码根据已有 Investigation 状态判断是否满足。
-- agent：不能只因为 Agent 说“完成了”就推进，由 Agent 明确返回一个实际存在的 outcome，服务端再验证。
-
-为了兼容旧 Skill：
+source Port 的 label 就是 outcome，例如：
 
 ~~~text
-有 completeWhen
-  → 默认 deterministic
-
-没有 completeWhen
-  → 默认 agent
+┌──────────────────┐
+│ 找到数据真相      │──────── success
+│                  │──────── needs-input
+└──────────────────┘
 ~~~
 
-因此旧的 Markdown 不需要一次性重写。
+这样 outcome 始终跟着出口，不使用独立的 HTML edge label。
 
-### outcome
+X6 原生提供 Port Label，并支持 right / outside 等位置。 
 
-仍然使用最简单的：
+### Edge
+
+普通前进边使用：
 
 ~~~text
-- success -> target
+source Port
+    ↓
+manhattan router
+    ↓
+rounded connector
+    ↓
+arrow
 ~~~
 
-这条线就是 Workflow 的真实边。
+X6 的 manhattan 是带障碍规避能力的正交路由；rounded connector 负责拐角圆角。
 
-同一个节点的 outcome 必须唯一。目标节点必须存在。
-
-## 4. React Flow 编辑器
-
-编辑模式采用 React Flow 的 controlled flow：
+回退 / 循环边不让 router 自由穿过整张图，而是放到顶部或底部的 return lane：
 
 ~~~text
-nodes
-edges
-  ↓
-useNodesState
-useEdgesState
-  ↓
-ReactFlow
+source ─────┐
+            │
+            └──────────────── target
 ~~~
 
-官方文档建议用 useNodesState / useEdgesState 管理受控节点和边，并通过 onConnect + addEdge 增加连接。当前实现还支持 onReconnect + reconnectEdge 修改已有分支的目标。边上的 outcome 使用 EdgeLabelRenderer，因此可以直接点击分支标签编辑。当前编辑器还为每条 incoming/outgoing route 分配独立 Handle，并使用 ELK layered layout 与较宽松的节点间距减少线路交叉。布局在 React Flow 完成节点实测尺寸后会再跑一次，并增加最后一道碰撞保护，避免自定义节点实际高度超过布局估算后互相重叠。React Flow 官方的 ELK multiple-handles 示例明确使用独立 ports 和 FIXED_ORDER 来降低 edge crossings。
+回退边使用略淡的虚线，正常边使用实线。
 
-参考：
+## 5. 为什么不用 ELK
 
-- React Flow Adding Interactivity
-- useNodesState
-- useEdgesState
-- onConnect
-- onReconnect
-- reconnectEdge
-- EdgeLabelRenderer
-- NodeToolbar
+X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局算法属于另外的布局能力，官方 Gallery 也同时提供 Dagre、ELK 等不同实践。
 
-当前编辑器支持：
+当前工作地图不继续使用 ELK。
+
+原因：
+
+1. 业务结构固定：一条主要路线 + 少量分支 + 少量回退。
+2. 节点数量通常不大。
+3. 最重要的是阅读顺序，而不是任意 DAG 的全局最优。
+4. 当前旧方案使用 ELK 后又手工二次调整 rank / Y，容易把结果压成一条线。
+
+现在使用 workflow-v1：
+
+- rank：决定从左到右的列。
+- lane：决定主线、上分支、下分支。
+- back edge：只由图结构识别，不看 retry / rollback 字符串。
+- collision guard：最后只做一次简单矩形碰撞保护。
+
+旧的 elk / elk-v2 ... elk-v5 layout 值继续可读，新保存的自动布局统一写 workflow-v1。
+
+## 6. 自动排版规则
+
+目标不是把节点塞进最小面积，而是让人一眼看懂主线和分支：
 
 ~~~text
-进入即编辑
-拖动节点
-添加步骤
-添加分支
-从一个节点连接到另一个节点
-重新连接已有分支
-删除节点
-删除分支
-编辑节点属性
-编辑分支 outcome
-修改分支目标
-撤销 / 重做
-自动排版
-AI 生成工作地图
-AI 修改当前工作地图
-保存
-恢复内置 Workflow
+                         ┌──────────────┐
+                         │ 补充资料      │
+                         └──────┬───────┘
+                                │
+┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐
+│ 接到任务 │ → │ 看清旧系 │ → │ 找到数据 │ → │ 查关键问│
+└────────┘   └────────┘   └────────┘   └────────┘
+                                   │
+                        ┌──────────┘
+                        ↓
+                   ┌──────────────┐
+                   │ 重新调查      │
+                   └──────────────┘
 ~~~
-Node Toolbar 只在选中节点时出现，避免整张地图被按钮污染。
 
-工作地图现在是独立路由 `/investigations/:name/journey`，不再使用全屏 Modal；页面打开后直接可以拖动、连线和修改属性。
+主线只是视觉概念，不是第二套 Workflow。
 
-## 5. Save / Validate / AI
+拖动节点后不会自动重新布局；只有用户点击“自动排版”时才重新计算。
 
-编辑不会在浏览器里单独维护“只读版”和“草稿版”两套地图。进入工作地图后，画布就是当前编辑状态。
+## 7. 保存
 
-### 保存
+保存接口：
 
 ~~~http
 PUT /api/sessions/:name/workflow
 ~~~
 
-浏览器把当前 Workflow Definition 和 layout 一起提交。服务端再次执行完整 Workflow validation；通过后才写入 `journey.md`、layout、execution，并创建新的 Workflow version。
+客户端提交：
 
-保存失败时，画布保持当前状态，用户可以继续修正。
+- Workflow Definition。
+- 节点 x/y layout。
 
-### AI 生成 / 修改
+服务端重新执行完整 Workflow validation。
 
-~~~http
-POST /api/sessions/:name/workflow/ai
-~~~
+Workflow version 保存语义；layout 保存同一版语义对应的视觉坐标。
 
-`mode=generate` 表示重新设计整张图；`mode=modify` 表示基于当前地图做局部或结构性修改。
+## 8. AI
 
-工作地图 AI 是独立的业务能力，不参与数据分析。它不会读取 Dataset Registry、SQL、数据证据，也不会参与 Investigation 的正常执行推进。AI 只返回候选 Workflow Definition；服务端立即用与人工保存相同的 Workflow validation 检查它。
+工作地图 AI 只负责 Workflow 设计，不直接修改 Investigation 数据，也不参与正常 Investigation execution。
 
-AI 不直接保存。返回结果是 WorkflowChange[]，服务端先应用并验证，再返回候选 Definition。前端先展示 Diff/修改预览，用户点击“应用修改”后才更新当前画布，最后再点击“保存”创建新的 Workflow version。
-
-### 验证
-
-保存时服务端会检查：
+AI 返回：
 
 ~~~text
-1. Schema / 基本结构
-2. node ID
-3. start 是否存在
-4. edge target 是否存在
-5. outcome 是否重复
-6. 非终点节点是否至少有一个出口
-7. end / stop 是否还有出口
-8. 是否有不可达节点
-9. 是否存在无法到达 end / stop 的节点
-10. deterministic 是否有 completeWhen
-11. actor 是否属于 agent / human / system
-12. route condition 是否属于已知 deterministic 条件
-13. completeWhen 是否是已知条件
-14. 每个节点是否有画布位置
+WorkflowChange[]
 ~~~
 
-### 恢复内置
+前端先预览，再由用户应用，再保存。
 
-~~~http
-POST /api/sessions/:name/workflow/reset
-~~~
+AI 生成的 Definition 与人工编辑走同一套 validation。
 
-恢复操作删除当前 Investigation 的自定义 Workflow，重新使用内置 Skill 路线，并重新建立对应的执行状态。
-## 6. Workflow Runtime
+## 9. 当前刻意不做
 
-Workflow 现在真正拥有一个执行状态：
+不引入：
 
-~~~json
-{
-  "workflowId": "legacy-modernization",
-  "workflowVersion": 2,
-  "currentNodeId": "investigate",
-  "completedNodeIds": ["intake", "estate-map"],
-  "status": "active"
-}
-~~~
+- BPMN 全量 runtime。
+- parallel / inclusive gateway。
+- 多 token join。
+- Workflow Registry。
+- 通用 orchestration engine。
+- 通用图布局服务。
+- 为布局再引入一层图引擎。
 
-Agent 每一轮启动时只收到当前节点和合法出口：
-
-~~~text
-当前节点：investigate
-
-允许的出口：
-- success -> current-state
-- needs-input -> investigate
-~~~
-
-Agent 最终 JSON 可以增加：
-
-~~~json
-{
-  "workflow": {
-    "nodeId": "investigate",
-    "outcome": "success"
-  }
-}
-~~~
-
-服务端随后检查：
-
-~~~text
-nodeId 是否等于当前节点
-       ↓
-outcome 是否是当前节点真实存在的出口
-       ↓
-target 是否存在
-       ↓
-Workflow version 是否仍然一致
-       ↓
-写入 journey-execution.json
-~~~
-
-任何一步失败，都不推进。
-
-因此：
-
-~~~text
-Agent 可以决定“这次走 success 还是 needs-input”
-但是
-Agent 不能创造一个不存在的出口，也不能自己改变 Workflow 图
-~~~
-
-## 7. Deterministic completion 与 Agent completion 的边界
-
-两种完成方式不要混在一起。
-
-### Deterministic
-
-例如：
-
-~~~yaml
-completion: deterministic
-completeWhen: goal
-~~~
-
-代码根据 Investigation 当前状态决定是否完成。
-
-适合：
-
-- goal
-- current-state
-- data-truth
-- investigation
-- current-state-ready
-- target
-- mapping
-- validation
-- cutover
-- assessment-current-state
-- assessment-findings
-- assessment-recommendation
-- assessment-roadmap
-
-### Agent
-
-例如：
-
-~~~yaml
-completion: agent
-~~~
-
-表示这一阶段需要真正调查、分析、判断，再选择出口。
-
-适合：
-
-- 业务需求澄清
-- 金融业务模型判断
-- 架构设计
-- Semantic 设计
-- Agent 设计
-- 安全控制设计
-- Evaluation 设计
-
-这不是把判断交给“模型做安全控制”，而是把 Workflow 中本来就属于分析判断的选择显式化；最终能不能走，只接受 Workflow 中已有 outcome。
-
-## 8. 环与回退
-
-不能简单禁止 DAG。
-
-现有 Workflow 已经需要：
-
-~~~text
-retry
-rollback
-needs-input
-investigate -> 前一步
-~~~
-
-因此验证允许环，但必须满足：
-
-~~~text
-所有节点从 start 可达
-+
-所有节点至少存在一条最终到 end / stop 的路径
-~~~
-
-例如：
-
-~~~text
-investigate
-   ├─ retry ─────┐
-   │             ↓
-   └─ success → current-state → done
-~~~
-
-是合法的。
-
-而：
-
-~~~text
-A -> B
-B -> A
-~~~
-
-没有出口到终点，就会被验证拒绝。
-
-## 9. 下一步候选不等于 Workflow
-
-Agent 可以根据当前问题和证据给出 0～3 个下一步候选。它们不是第二套 Workflow：
-
-~~~text
-Workflow
-  = 当前 Investigation 的正式工作方式
-  = 有状态
-  = 可编辑
-  = 真正影响 Workflow execution
-
-下一步候选
-  = 本轮调查的可选动作
-  = 不改变 Workflow
-  = 用户点击后通过 routeId 选择
-  = 服务端只接受当前调查中仍然存在的候选
-  = 可以没有
-~~~
-
-UI 直接在最近一条 Agent 回答下面显示少量按钮：
-
-~~~text
-下一步
-  [先追 Position 数据血缘] [先确认业务定义]
-
-需要确认
-  [确认 EOD 的 Position 定义]
-~~~
-
-用户点击后，前端发送结构化 routeId；服务端重新读取当前候选，把对应的标题、原因和步骤作为结构化上下文交给 Agent。不会在浏览器里拼接一大段“我选择这条路线……”的自然语言提示。候选过期时直接要求根据最新回答重新选择。
-
-它和 Workflow 分支的区别仍然很重要：点击候选只决定“这次先做什么”，不会修改 Workflow，也不会绕过 Workflow 的状态控制。
-
-## 10. React Flow 为什么放在 UI，Markdown 为什么留在后端
-
-不把 React Flow JSON 当唯一存储格式，原因很实际：
-
-React Flow JSON 适合：
-
-- 节点位置
-- viewport
-- 画布交互
-- UI 状态
-
-Markdown DSL 适合：
-
-- Git diff
-- 人工 review
-- 文档化
-- Skill 打包
-- 测试
-- 离线修改
-- 长期兼容
-
-所以使用：
-
-~~~text
-Workflow semantics → Markdown / parsed definition
-Canvas layout      → JSON
-Execution state    → JSON
-~~~
-
-而不是：
-
-~~~text
-React Flow toObject()
-    ↓
-直接当 Workflow DSL
-~~~
-
-## 11. 当前 API
-
-~~~text
-GET  /api/sessions/:name/journey
-GET  /api/sessions/:name/workflow
-PUT  /api/sessions/:name/workflow
-POST /api/sessions/:name/workflow/ai
-POST /api/sessions/:name/workflow/transition
-POST /api/sessions/:name/workflow/reset
-~~~
-
-其中：
-
-- /journey：调查页面使用的简化状态。
-- /workflow：工作地图完整快照。
-- PUT /workflow：保存当前工作地图，并创建新版本。
-- /workflow/ai：工作地图专用多轮 AI；请求可带最近 12 条对话和当前未保存 Definition。
-- /workflow/transition：人工推进当前 waiting 节点；服务端检查节点、outcome、Workflow version 和执行状态。
-- /workflow/reset：恢复内置 Skill。
-- /workflow/instruction：普通 Investigation Agent 当前会收到的 Workflow 控制摘要。
-## 12. 与现有代码的边界
-
-### src/workflow/journey.ts
-
-负责：
-
-~~~text
-DSL parse
-completion
-route
-graph validation
-execution transition
-JourneyState
-~~~
-
-### src/workflow/journey-editor.ts
-
-负责：
-
-~~~text
-active custom Workflow
-layout
-version
-execution persistence
-serialization
-Agent transition
-~~~
-
-### web/src/components/JourneyMap.tsx
-
-负责：
-
-~~~text
-页面组合
-React Flow 容器
-工具栏 / 状态栏
-~~~
-
-### web/src/components/useJourneyWorkflowEditor.ts
-
-负责：
-
-~~~text
-编辑状态
-Graph mutation
-Undo / Redo
-AI 请求与 Patch 预览
-保存 / Reset
-Human transition
-~~~
-
-### web/src/components/JourneyMapInspector.tsx
-
-负责：
-
-~~~text
-属性 Tab
-节点 / 分支编辑表单
-waiting 人工操作
-~~~
-
-### web/src/components/JourneyMapAiChat.tsx
-
-负责：
-
-~~~text
-Workflow AI 对话 UI
-模式 / scope
-Patch 预览
-~~~
-
-### web/src/components/journey-map-graph.ts
-
-负责：
-
-~~~text
-Workflow Definition ↔ React Flow
-连接点 / 边
-结构诊断
-~~~
-
-### web/src/components/journey-map-layout.ts
-
-负责：
-
-~~~text
-ELK layout
-collision guard
-~~~
-
-### src/server.ts
-
-负责：
-
-~~~text
-Workflow Editor API
-GET /workflow
-PUT /workflow
-POST /workflow/ai
-POST /workflow/transition
-POST /workflow/reset
-~~~
-
-### src/server-main.ts
-
-只负责：
-
-~~~text
-Vite middleware
-HTTP server lifecycle
-process shutdown / resource cleanup
-~~~
-
-所有业务 API（包括 `/journey` 和 `/workflow/*`）都由 `src/server.ts` 注册，避免入口文件和业务 API 各维护一套路由。
-
-## 13. 后续可以做，但当前不要做
-
-当前已经吸收少量 BPMN-like 语义，但暂时不把它升级成完整 BPMN runtime。
-
-暂时不引入：
-
-- 完整 BPMN 2.0 XML / execution engine
-- parallel / inclusive gateway
-- timer / message event
-- subprocess / multi-token join
-- Temporal
-- 独立 Workflow Registry
-- 独立 Agent Registry
-- 通用规则引擎
-- React Flow Pro 依赖
-- 多用户 Workflow 权限体系
-- Workflow marketplace
-
-当前编辑器先把最核心的事情做好：
-
-~~~text
-看得见
-→ 改得动
-→ 加得了分支
-→ 服务端能验证
-→ 应用后真的按新路线执行
-→ 出问题能恢复内置版本
-~~~
-
-后续如果真实 Workflow 开始需要并行执行、消息/定时事件或子流程，再扩展执行状态模型，而不是先堆 DSL 语法。多人同时编辑时再增加 optimistic concurrency / revision check。
-
-## 14. 为什么这次改了布局
-
-之前的默认布局只是按图深度分列。对于简单线性流程还能工作，但一个节点存在多个 outcome 后，所有边从同一个右侧连接点出发，线路和标签很容易叠在一起。
-
-现在使用 ELK layered layout。React Flow 官方把 Dagre 作为简单方案，把 ELK 作为更可配置的方案；官方的 multiple-handles 示例还展示了通过 ports + FIXED_ORDER 降低 edge crossings 的做法。当前地图始终使用同一套节点、边、Handle 和布局；不存在单独的只读画布。（参考 React Flow 官方 Auto Layout / ELK 文档与 Multiple Handles 示例）
-
-本项目选择 ELK 的原因不是为了做复杂 BPMN，而只是解决当前编辑器最明显的两个问题：
-
-~~~text
-节点位置
-  ↓
-分层 + 间距 + crossing minimization
-
-连接点
-  ↓
-每条 outgoing / incoming route 独立 port
-
-边
-  ↓
-SmoothStep rendering
-
-标签
-  ↓
-按分支序号做轻微垂直偏移
-~~~
-
-因此新增分支后不再要求用户自己一点点挪节点躲线。自动布局同时为节点保留更大的安全间隔，并按新的 ELK-v2 layout 标记自动升级旧的布局数据。
-
-React Flow 的 EdgeLabelRenderer 默认没有 pointer events；当前项目为 label 设置 pointer-events: all，并使用 nodrag / nopan，让用户可以直接点击 outcome 编辑。（参考 React Flow 官方 EdgeLabelRenderer 文档）
-
-### 连接问题提示
-
-地图会直接在节点上标出结构性连接问题：普通节点没有入口或出口、或者存在指向不存在节点的 route，会显示红框和“需要修正连接”。`@end` / `@stop` 没有出口以及 Workflow start 没有入口属于正常情况，不会误报。
-
-
-
-### 新节点的交互
-
-- 新节点使用橙色虚线框 + “新建步骤”标签。
-- 创建后自动选中。
-- 如果当前节点已有 success 路线，“添加下一步”会把新节点插入现有 success 路线，而不是生成 success-1 之类难以理解的出口。
-- “添加分支”会创建一条新的 branch；存在主 success 目标时，新分支会先接回主流程。
-- 任何节点都可以通过“连接到现有步骤”直接选择目标和 outcome。
-- 也可以拖动右侧 source Handle 到目标节点左侧 target Handle。
-
-这些操作最后仍然只生成同一套 Markdown DSL；React Flow 不会成为第二套 Workflow 语义格式。
-
-### 15. 地图显示原则
-
-Workflow 的 `@end` / `@stop` 是真正的终点，不因为 DSL 中的 `visible:false` 就在工作地图里消失；否则最后一条边会视觉上像“断掉”。
-
-普通业务节点仍可按 `visible` 控制展示，而终点在地图中始终保留。这样地图展示的是完整 Workflow，而不是只展示当前正在操作的阶段。
-
-### 16. Journey Map 前端代码结构
-
-为了避免 `JourneyMap.tsx` 再次变成“大组件”，前端现在按职责拆成：
-
-```text
-JourneyMap.tsx
-  └── 页面组合与 React Flow 容器
-
-useJourneyWorkflowEditor.ts
-  └── 编辑状态、Undo/Redo、Graph mutation、Save / AI
-
-journey-map-types.ts
-  └── Workflow / React Flow shared types
-
-journey-map-graph.ts
-  └── Definition ↔ React Flow graph、Handle、连接诊断
-
-journey-map-layout.ts
-  └── ELK 自动布局 + measured size + collision guard
-
-JourneyFlowNode.tsx
-  └── 节点渲染 / Handle / toolbar
-
-JourneyFlowEdge.tsx
-  └── Edge / self-loop / outcome label
-
-JourneyMapInspector.tsx
-  ├── 节点与分支属性编辑
-  └── JourneyMapAiChat.tsx（Ant Design X 多轮对话）
-```
-
-其中自动布局使用 React Flow 完成节点尺寸测量后再执行最终布局；这和 React Flow 官方 `useNodesInitialized` 的推荐使用方式一致。ELK multiple-handles 方案也要求为 port 使用稳定 ID、正确 side 和 `FIXED_ORDER`，当前实现按这个模式处理分支连接点。（参考 React Flow 官方 useNodesInitialized、ELK Multiple Handles 文档）
+工作地图当前只解决一件事：把真实 Workflow 变成一个可编辑、可保存、可执行、看得懂的工作图。
