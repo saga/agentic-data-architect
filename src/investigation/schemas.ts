@@ -55,6 +55,17 @@ export const JourneyPlanSchema = z.object({
 }).strict();
 export type JourneyPlan = z.infer<typeof JourneyPlanSchema>;
 
+/** Agent 根据当前问题生成的阶段性调查小结；只记录阶段成果，不替代最终报告。 */
+export const AgentCheckpointSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  summary: z.string().trim().min(1).max(1200),
+  confirmed: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+  evidenceIds: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
+  unknowns: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+  nextStep: z.string().trim().min(1).max(500).optional(),
+}).strict();
+export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
+
 /** Investigation 的核心 context.json Schema；它是持久化状态的运行时边界。 */
 export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
