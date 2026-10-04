@@ -14,7 +14,7 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 如果当前 working directory 是陌生的代码仓库，且问题是“先看看旧系统/开始分析/理解这个项目”，优先调用 project_discover 完成第一次代码、SQL 和配置扫描；不要要求用户手工运行 discover。
 - **优先自己做能做的检索。** 只有在当前工具、代码库或权限确实拿不到所需资料时，才让用户补充代码仓库、数据目录、文件、业务定义或其他输入。
 - **需要用户参与时只问一个最关键的问题。** 问题必须具体到用户可以直接回答或粘贴内容，不能写“请提供更多信息”之类空话。
-- followUpQuestions 用来给前端生成回答后的引导输入。通常只返回 1 个最关键的问题；如果当前可以继续自动调查，则返回空数组。不要在 answer 里再次完整重复这个问题。
+- followUpQuestions 用来给前端生成“继续调查”的可点击动作。它们必须是用户点一下就能让 Agent 直接执行的具体调查指令，例如“查 Java 实体、Service 和 REST 接口如何读写这些表”，而不是需要用户回答或再次选择目标的问题。真正需要用户做选择时，使用 ask_user；不要把待回答的问题塞进 followUpQuestions。
 - unknowns 表示当前调查中真正还没有查清、但值得继续解决的事项。每一项都要写成可执行的具体问题或事实缺口，避免只写“需要更多信息”这类空话；用户点击某一项时，前端会让 Agent 直接围绕该事项继续调查。
 - routeOptions 用来生成“地图之外的可选路线”。根据用户刚提出的问题、已有 Evidence、unknowns 和当前工作方式，必要时给出 1～3 条真正不同的调查或设计路径；没有明显分歧时可以返回空数组。它们只是建议，不能当成强制 Workflow、权限决定或工具执行指令。
 - 工作方式不是普通对话偏好。除非用户明确表达“把这次调查/设计改成某种工作方式”，否则不要建议或暗示修改当前工作方式；“换个思路”“先做别的”“路线不合适”等模糊表达只应触发重新规划路线，不应改变持久化工作方式。
@@ -41,6 +41,8 @@ export function buildQuestionPrompt(args: {
   selectedRoute?: { id: string; title: string; reason: string; steps: string[] };
   evidenceIds: string[];
   unknowns: string[];
+  /** 用户点击了上一轮 Agent 给出的继续调查引导；这类输入已经是用户确认的执行动作。 */
+  selectedGuidance?: string;
 }): string {
   return [
     '调查执行规则：如果当前问题需要先理解陌生代码仓库，且尚未有 Discovery snapshot，优先使用 project_discover；没有 Evidence 不阻止继续调查，Evidence 用于约束最终可确认 Claim。',
@@ -58,6 +60,14 @@ export function buildQuestionPrompt(args: {
           '用户刚刚从界面选择了一个下一步调查动作。它已经是用户确认的选择，不要把它当成普通建议：',
           JSON.stringify(args.selectedRoute),
           '请执行这个选择；它代表用户已经确认的调查动作，不是让你重新讨论路线。即使当前 Workflow 的 deterministic completeWhen 尚未满足，也可以先完成调查并收集证据；只有真正满足条件后才推进 Workflow。若当前选择需要 project_discover，应直接调用它。',
+          '',
+        ]
+      : []),
+    ...(args.selectedGuidance
+      ? [
+          '用户刚刚点击了你上一轮回答里的“继续调查”引导。这个文本已经代表用户同意执行该调查动作，不是让你再次向用户确认目标，也不是让你重新判断是否应该做。',
+          '已选调查动作：' + args.selectedGuidance,
+          '请直接执行这个动作。能从代码、SQL、配置或其他可用资料查到的内容，先自行调用工具调查，再给出结果；不要因为当前 Evidence 还不完整就再次输出“目前还不能判断”然后停下来。只有真正没有可用工具、权限或输入时，才向用户提出一个新的、具体的问题。',
           '',
         ]
       : []),
