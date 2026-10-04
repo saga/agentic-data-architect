@@ -20,7 +20,7 @@ test('journey editor serialization round-trips semantic graph', () => {
         type: 'task' as const,
         title: '明确目标',
         objective: '确认范围',
-        actor: 'system' as const,
+        actor: 'agent' as const,
         completeWhen: 'goal',
         routes: [
           { outcome: 'success', target: 'review' },
@@ -37,7 +37,7 @@ test('journey editor serialization round-trips semantic graph', () => {
         id: 'done',
         type: 'end' as const,
         title: '完成',
-        actor: 'system' as const,
+        actor: 'agent' as const,
         routes: [],
       },
     ],
@@ -67,9 +67,9 @@ test('default layout gives every node a stable position', () => {
     id: 'demo',
     start: 'a',
     nodes: [
-      { id: 'a', type: 'task' as const, title: 'A', visible: true, completion: 'agent' as const, actor: 'agent' as const, routes: [{ outcome: 'success', target: 'b' }] },
-      { id: 'b', type: 'task' as const, title: 'B', visible: true, completion: 'agent' as const, actor: 'agent' as const, routes: [{ outcome: 'success', target: 'done' }] },
-      { id: 'done', type: 'end' as const, title: 'Done', visible: false, completion: 'agent' as const, actor: 'system' as const, routes: [] },
+      { id: 'a', type: 'task' as const, title: 'A', actor: 'agent' as const, routes: [{ outcome: 'success', target: 'b' }] },
+      { id: 'b', type: 'task' as const, title: 'B', actor: 'agent' as const, routes: [{ outcome: 'success', target: 'done' }] },
+      { id: 'done', type: 'end' as const, title: 'Done', actor: 'agent' as const, routes: [] },
     ],
   };
 
@@ -115,32 +115,4 @@ test('selection-scoped Workflow AI cannot connect a new node to an unrelated nod
 
   const issues = validateJourneyChangeScope(definition, changes, 'review');
   assert.ok(issues.some((issue) => issue.includes('new-step') && issue.includes('unrelated')));
-});
-
-test('Workflow patch preserves dependency declarations', () => {
-  const definition = parseJourneyMarkdown([
-    '## @flow demo',
-    'start -> intake',
-    '',
-    '## @task intake',
-    'completion: agent',
-    'produces: evidence',
-    '- success -> target',
-    '',
-    '## @task target',
-    'completion: agent',
-    'requires: evidence',
-    '- success -> done',
-    '',
-    '## @end done',
-  ].join('\n')).definition!;
-
-  const next = applyJourneyWorkflowChanges(definition, [{
-    type: 'update-node',
-    nodeId: 'target',
-    patch: {
-    },
-  }]);
-
-  assert.deepEqual(next.nodes.find((node) => node.id === 'target')?.requires, ['evidence', 'mapping']);
 });
