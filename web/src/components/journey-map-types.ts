@@ -1,4 +1,4 @@
-/** DSL 中允许出现的 Workflow 节点类型；只取 BPMN 里最有价值的一小部分语义。 */
+/** 工作地图使用的最小节点集合：普通任务、人工评审、结束。不要把画布样式概念加进这里。 */
 export type WorkflowNodeType = 'task' | 'review' | 'end';
 
 export type WorkflowActor = 'agent' | 'human';
@@ -8,8 +8,8 @@ export interface JourneyMapStage {
   title: string;
   objective: string;
   status: 'completed' | 'current' | 'locked' | 'future';
-  nodeType: string;
- }
+  nodeType: WorkflowNodeType;
+}
 
 export interface JourneyMapRoute {
   id: string;
@@ -21,7 +21,8 @@ export interface JourneyMapRoute {
 export interface JourneyRouteDefinition {
   outcome: string;
   target: string;
-   line?: number;
+   /** Markdown 中的原始行号，只用于错误提示；不参与运行语义。 */
+  line?: number;
 }
 
 export interface WorkflowNodeDefinition {
@@ -108,7 +109,7 @@ export interface WorkflowSnapshot {
   layout: WorkflowLayout;
   execution: WorkflowExecution;
   state: WorkflowState;
-   events: WorkflowRunEvent[];
+  events: WorkflowRunEvent[];
 }
 
 export type JourneyEdgeKind = 'success' | 'fail' | 'retry' | 'other';
