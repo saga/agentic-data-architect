@@ -1,8 +1,7 @@
 import { type ReactNode } from 'react';
 import { Button, Flex, Space, Tooltip, Typography } from 'antd';
 import {
-  ApiOutlined,
-  BranchesOutlined,
+   BranchesOutlined,
   DeleteOutlined,
   PlusOutlined,
   RobotOutlined,
@@ -28,16 +27,14 @@ const NODE_TYPE_META: Record<
   { label: string; icon: ReactNode }
 > = {
   task: { label: '任务', icon: <AimOutlined /> },
-  gate: { label: '判断', icon: <BranchesOutlined /> },
-  review: { label: '评审', icon: <UserOutlined /> },
+   review: { label: '评审', icon: <UserOutlined /> },
   end: { label: '完成', icon: <CheckCircleOutlined /> },
  };
 
 const ACTOR_META = {
   agent: { label: 'Agent', icon: <RobotOutlined /> },
   human: { label: '人工', icon: <UserOutlined /> },
-  system: { label: '系统', icon: <ApiOutlined /> },
-} as const;
+ } as const;
 
 function statusClass(status: JourneyMapStage['status']): string {
   return 'journey-flow-node-status-' + status;
@@ -55,7 +52,7 @@ interface JourneyX6NodeProps {
  */
 export function JourneyX6Node({ node }: JourneyX6NodeProps) {
   const data = node.getData<FlowNodeData>();
-  const terminal = data.nodeType === 'end' || data.nodeType === 'stop';
+  const terminal = data.nodeType === 'end';
   const selected = Boolean(data.selected);
   const nodeType = NODE_TYPE_META[data.nodeType];
   const actor = ACTOR_META[data.actor];
@@ -70,8 +67,7 @@ export function JourneyX6Node({ node }: JourneyX6NodeProps) {
       : '',
     data.isNew ? 'journey-flow-node-new' : '',
     selected ? 'journey-x6-node-selected' : '',
-    data.visible ? '' : 'journey-flow-node-deemphasized',
-  ]
+   ]
     .filter(Boolean)
     .join(' ');
 
