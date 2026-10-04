@@ -15,7 +15,7 @@ const EnvSchema = z.object({
   KNOWLEDGE_DIR: z.string().default('knowledge'),
   GITHUB_TOKEN: z.string().optional(),
   COPILOT_MODEL: z.string().default('gpt-5-mini'),
-  TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+  TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(360_000),
   GRAPHIFY_ENABLED: z.enum(['true', 'false']).default('true'),
   GRAPHIFY_MCP_COMMAND: z.string().min(1).default('graphify-mcp'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
