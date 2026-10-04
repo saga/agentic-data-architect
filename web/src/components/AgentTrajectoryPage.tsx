@@ -19,7 +19,6 @@ import {
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   DollarOutlined,
   ReloadOutlined,
   RobotOutlined,
@@ -33,7 +32,7 @@ interface TrajectoryEvent {
   id: string;
   turnId: string;
   timestamp: string;
-  type: 'user_input' | 'turn_start' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'permission' | 'compaction' | 'turn_end' | 'error' | 'status';
+  type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'status';
   name: string;
   status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
   durationMs?: number;
@@ -117,24 +116,6 @@ function formatJson(value: unknown, maxLength = 900) {
   return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
 }
 
-function waitingLabel(value?: TrajectorySummary['waitingOn']) {
-  switch (value) {
-    case 'permission': return '等待确认';
-    case 'user_input': return '等待用户输入';
-    case 'tool': return '工具仍在运行';
-    case 'model': return '模型仍在处理';
-    case 'session': return '等待 Session 收尾';
-    default: return '';
-  }
-}
-
-function stateLabel(summary: TrajectorySummary) {
-  if (summary.state === 'failed') return '异常';
-  if (summary.state === 'waiting') return waitingLabel(summary.waitingOn) || '等待中';
-  if (summary.state === 'completed') return '已完成';
-  return '处理中';
-}
-
 function eventLabel(event: TrajectoryEvent) {
   switch (event.type) {
     case 'user_input': return '用户提出问题';
@@ -162,14 +143,19 @@ function eventLabel(event: TrajectoryEvent) {
 }
 
 function eventColor(event: TrajectoryEvent) {
-  if (event.status === 'failed' || event.type === 'error') return 'red';
-  if (event.status === 'waiting' || event.type === 'permission') return 'orange';
+  if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'red';
+  if (event.status === 'waiting' || event.type === 'permission' || event.type === 'user_input_requested') return 'orange';
   if (event.type === 'model_call') return 'blue';
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') return 'blue';
   if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'permission_completed' || event.type === 'user_input_completed') return 'green';
   return undefined;
 }
 
+function eventMarker(event: TrajectoryEvent): 'error' | 'warning' | undefined {
+  if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'error';
+  if (event.status === 'waiting' || event.type === 'permission' || event.type === 'user_input_requested') return 'warning';
+  return undefined;
+}
 function eventDetail(event: TrajectoryEvent) {
   if (event.type === 'model_call') {
     const cached = typeof event.details.cachedInputTokens === 'number' ? event.details.cachedInputTokens : undefined;
@@ -381,22 +367,16 @@ function eventDetail(event: TrajectoryEvent) {
 
 function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: TrajectoryEvent[] }) {
   const summary = turn.summary;
-  const status = stateLabel(summary);
-  const diagnosticType = summary.state === 'failed' ? 'error' : summary.state === 'waiting' ? 'warning' : 'info';
-  const liveDuration = summary.finishedAt || !summary.lastActivityAt
-    ? summary.durationMs
-    : Math.max(0, Date.now() - new Date(summary.startedAt).getTime());
 
   return (
     <Card className="trajectory-turn-card">
       <Flex justify="space-between" align="flex-start" gap={16} wrap>
         <div className="trajectory-turn-heading">
           <Flex align="center" gap={8} wrap>
-            <Badge status={turn.failedEvents ? 'error' : summary.finishedAt ? 'success' : 'processing'} />
+            <Badge status={summary.finishedAt ? 'success' : 'processing'} />
             <Text strong className="trajectory-turn-title">
               {turn.userQuestion || '本轮 Agent 执行'}
             </Text>
-            <Tag>{status}</Tag>
           </Flex>
           <Text type="secondary">{formatTime(summary.startedAt)} · {turn.turnId}</Text>
         </div>
@@ -408,41 +388,6 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
           <Tag>{formatDuration(summary.durationMs)}</Tag>
         </Space>
       </Flex>
-
-      {(summary.state && summary.state !== 'completed') || turn.failedEvents ? (
-        <Alert
-          type={diagnosticType}
-          showIcon
-          className="trajectory-live-diagnostic"
-          title={
-            summary.state === 'failed'
-              ? '本轮执行异常'
-              : summary.state === 'waiting'
-                ? (waitingLabel(summary.waitingOn) || 'Agent 正在等待')
-                : '本轮仍在执行'
-          }
-          description={
-            <Flex vertical gap={3}>
-              <Text>
-                当前：{summary.lastActivity || '—'}
-                {summary.lastActivityAt ? ` · ${formatTime(summary.lastActivityAt)}` : ''}
-              </Text>
-              {summary.waitingOn === 'permission' && (summary.pendingPermissionCount ?? 0) > 0 ? (
-                <Text type="warning">还有 {summary.pendingPermissionCount} 个权限请求没有处理。</Text>
-              ) : null}
-              {summary.assistantTurnEnded && !summary.idleObserved ? (
-                <Text type="warning">模型已经完成这一轮输出，但 Session 还没有进入 idle。</Text>
-              ) : null}
-              {summary.waitingOn === 'tool' && (summary.pendingToolCount ?? 0) > 0 ? (
-                <Text type="secondary">还有 {summary.pendingToolCount} 个工具调用未返回。</Text>
-              ) : null}
-              <Text type="secondary">
-                已运行 {formatDuration(liveDuration)} · 事件 {summary.eventCount}
-              </Text>
-            </Flex>
-          }
-        />
-      ) : null}
 
       <div className="trajectory-turn-metrics">
         <span>输入 {formatTokens(summary.inputTokens)}</span>
@@ -456,25 +401,32 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
         className="trajectory-turn-timeline"
         items={events
           .filter((event) => event.type !== 'intent')
-          .map((event) => ({
-            label: formatTime(event.timestamp),
-            color: eventColor(event),
-            dot:
-              event.type === 'model_call' ? <RobotOutlined /> :
-              event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> :
-              event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> :
-              event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> :
-              undefined,
-            children: (
-              <div className="trajectory-event-row">
-                <Flex justify="space-between" gap={12} wrap>
-                  <Text strong>{eventLabel(event)}</Text>
-                  {event.durationMs !== undefined ? <Text type="secondary">{formatDuration(event.durationMs)}</Text> : null}
-                </Flex>
-                {eventDetail(event)}
-              </div>
-            ),
-          }))}
+          .map((event) => {
+            const marker = eventMarker(event);
+            return {
+              label: formatTime(event.timestamp),
+              color: eventColor(event),
+              dot:
+                event.type === 'model_call' ? <RobotOutlined /> :
+                event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> :
+                event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> :
+                event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> :
+                undefined,
+              children: (
+                <div className={`trajectory-event-row${marker ? ` trajectory-event-row--${marker}` : ''}`}>
+                  <Flex justify="space-between" align="center" gap={12} wrap>
+                    <Flex align="center" gap={6} wrap>
+                      {marker === 'error' ? <Tag color="red">异常</Tag> : null}
+                      {marker === 'warning' ? <Tag color="orange">需处理</Tag> : null}
+                      <Text strong>{eventLabel(event)}</Text>
+                    </Flex>
+                    {event.durationMs !== undefined ? <Text type="secondary">{formatDuration(event.durationMs)}</Text> : null}
+                  </Flex>
+                  {eventDetail(event)}
+                </div>
+              ),
+            };
+          })}}
       />
 
       {!events.some((event) => event.type === 'model_call') ? (
@@ -619,19 +571,6 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
                   );
                 })() : null}
               </Flex>
-              {summary?.state && summary.state !== 'completed' ? (
-                <Alert
-                  type={summary.state === 'failed' ? 'error' : summary.state === 'waiting' ? 'warning' : 'info'}
-                  showIcon
-                  title={stateLabel(summary)}
-                  description={
-                    <Flex vertical gap={2}>
-                      <Text>{summary.lastActivity || '—'}{summary.lastActivityAt ? ` · ${formatTime(summary.lastActivityAt)}` : ''}</Text>
-                      {summary.waitingOn ? <Text type="secondary">等待原因：{waitingLabel(summary.waitingOn)}</Text> : null}
-                    </Flex>
-                  }
-                />
-              ) : null}
               <Paragraph type="secondary" className="trajectory-note">
                 这里只展示可观察的执行事件，不展示模型隐藏推理过程。除了模型 Token/额度，还会记录工具参数摘要、工具返回摘要、权限请求、Session idle、Session error、上下文变化和最后活动，方便定位“为什么一直没结束”。
               </Paragraph>
