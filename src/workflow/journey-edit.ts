@@ -21,7 +21,7 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     type: z.literal('update-node'),
     nodeId: z.string().min(1),
     patch: z.object({
-      type: z.enum(['task', 'gate', 'review', 'end', 'stop']).optional(),
+      type: z.enum(['task', 'review', 'end']).optional(),
       title: z.string().min(1).optional(),
       objective: z.string().optional(),
       actor: z.enum(['agent', 'human']).optional(),
@@ -38,7 +38,6 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     route: z.object({
       outcome: z.string().min(1),
       target: z.string().min(1),
-      condition: z.string().min(1).optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -47,8 +46,6 @@ export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
     outcome: z.string().min(1),
     patch: z.object({
       target: z.string().min(1).optional(),
-      /** null 表示清除条件；undefined 表示不改。 */
-      condition: z.string().min(1).nullable().optional(),
     }).strict(),
   }).strict(),
   z.object({
@@ -63,10 +60,7 @@ export const JourneyWorkflowChangesSchema = z.array(JourneyWorkflowChangeSchema)
 
 export interface JourneyAnalysisIssue {
   severity: 'warning' | 'error';
-  code:
-    | 'multiple-conditional-routes'
-    | 'conditional-route-without-fallback'
-    ;
+  code: string;
   nodeId?: string;
   message: string;
 }
@@ -79,13 +73,10 @@ function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
       id: node.id,
       type: node.type,
       title: node.title,
-      visible: node.visible,
-      completion: node.completion,
       actor: node.actor,
       routes: node.routes.map((route) => ({
         outcome: route.outcome,
         target: route.target,
-        ...(route.condition ? { condition: route.condition } : {}),
         ...(route.line !== undefined ? { line: route.line } : {}),
       })),
       ...(node.objective ? { objective: node.objective } : {}),
@@ -125,20 +116,14 @@ export function applyJourneyWorkflowChanges(
           id: node.id,
           type: node.type,
           title: node.title,
-          visible: node.visible,
-          completion: node.completion,
-          actor: node.actor,
+              actor: node.actor,
           routes: node.routes.map((route) => ({
             outcome: route.outcome,
             target: route.target,
-            ...(route.condition ? { condition: route.condition } : {}),
             ...(route.line !== undefined ? { line: route.line } : {}),
           })),
           ...(node.objective ? { objective: node.objective } : {}),
           ...(node.completeWhen ? { completeWhen: node.completeWhen } : {}),
-          ...(node.tools?.length ? { tools: [...node.tools] } : {}),
-          ...(node.requires?.length ? { requires: [...node.requires] } : {}),
-          ...(node.produces?.length ? { produces: [...node.produces] } : {}),
           ...(node.line !== undefined ? { line: node.line } : {}),
         });
         break;
@@ -171,7 +156,6 @@ export function applyJourneyWorkflowChanges(
         node.routes.push({
           outcome: change.route.outcome,
           target: change.route.target,
-          ...(change.route.condition ? { condition: change.route.condition } : {}),
         });
         break;
       }
@@ -183,8 +167,6 @@ export function applyJourneyWorkflowChanges(
         if (index < 0) throw new Error(node.id + ' 不存在 outcome=' + change.outcome);
         const next: JourneyRoute = { ...(node.routes[index] as JourneyRoute) };
         if (change.patch.target !== undefined) next.target = change.patch.target;
-        if (change.patch.condition === null) delete next.condition;
-        else if (change.patch.condition !== undefined) next.condition = change.patch.condition;
         node.routes[index] = next;
         break;
       }
@@ -225,13 +207,8 @@ export function diffJourneyWorkflowDefinitions(
     type: node.type,
     title: node.title,
     objective: node.objective,
-    visible: node.visible,
-    completion: node.completion,
     actor: node.actor,
     completeWhen: node.completeWhen,
-    tools: node.tools,
-    requires: node.requires,
-    produces: node.produces,
   });
 
   for (const [id, oldNode] of beforeMap) {
@@ -264,12 +241,11 @@ export function diffJourneyWorkflowDefinitions(
           route: {
             outcome: newRoute.outcome,
             target: newRoute.target,
-            ...(newRoute.condition ? { condition: newRoute.condition } : {}),
-          },
+           },
         });
       } else if (
         oldRoute.target !== newRoute.target
-        || oldRoute.condition !== newRoute.condition
+        
       ) {
         changes.push({
           type: 'update-route',
@@ -277,8 +253,7 @@ export function diffJourneyWorkflowDefinitions(
           outcome: oldRoute.outcome,
           patch: {
             target: newRoute.target,
-            condition: newRoute.condition ?? null,
-          },
+           },
         });
       }
     }
@@ -287,41 +262,11 @@ export function diffJourneyWorkflowDefinitions(
   return changes;
 }
 
-/**
- * 对 Workflow 做轻量静态分析。
- * 不尝试计算真正的业务逻辑，只发现作者最容易写错的结构。
- */
+/** Workflow 结构分析目前只依赖服务端的图验证；保留统一入口供编辑器显示提醒。 */
 export function analyzeJourneyWorkflow(
-  definition: JourneyDefinition,
+  _definition: JourneyDefinition,
 ): JourneyAnalysisIssue[] {
-  const issues: JourneyAnalysisIssue[] = [];
-
-  for (const node of definition.nodes) {
-    const conditionalRoutes = node.routes.filter((route) => Boolean(route.condition));
-
-    if (conditionalRoutes.length > 1) {
-      issues.push({
-        severity: 'warning',
-        code: 'multiple-conditional-routes',
-        nodeId: node.id,
-        message: node.id + ' 有多个条件分支；条件同时成立时按 DSL 顺序命中前面的出口。',
-      });
-    }
-
-    if (conditionalRoutes.length > 0 && node.routes.every((route) => Boolean(route.condition))) {
-      issues.push({
-        severity: 'warning',
-        code: 'conditional-route-without-fallback',
-        nodeId: node.id,
-        message: node.id + ' 没有无条件 fallback 出口；没有条件命中时可能无法继续。',
-      });
-    }
-
-    }
-  }
-
-
-  return issues;
+  return [];
 }
 
 /** 只允许修改选中节点及其相邻节点/边，避免 AI 无意中重写整张图。 */
