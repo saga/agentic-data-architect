@@ -888,6 +888,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const autoContinuationTurns = Math.min(6, Math.max(0, Math.round(input.autoContinuationTurns ?? 2)));
     let finalContent = '';
     let continuationPrompt = input.prompt;
+    let currentWorkflowInstruction = workflowInstruction;
 
     for (let execution = 0; execution <= autoContinuationTurns; execution += 1) {
       if (input.shouldAbort?.()) {
@@ -915,7 +916,41 @@ export async function askCopilot(input: AskInput): Promise<string> {
       );
       finalContent = final?.data.content || content;
 
+      // 每个阶段结束后立即应用 Workflow outcome。这样自动续跑进入下一阶段时，
+      // 模型拿到的是最新的工作位置，而不是上一阶段的旧节点。
+      const workflowTransition = await applyAgentWorkflowTransition(
+        investigationName,
+        input.workflowSkill ?? null,
+        finalContent,
+      );
+      if (workflowTransition.error) {
+        input.onTrajectory?.({
+          type: 'status',
+          name: 'Workflow transition 未应用',
+          status: 'info',
+          details: { error: workflowTransition.error, execution },
+        });
+      }
+
       if (execution < autoContinuationTurns) {
+        if (workflowTransition.applied && workflowTransition.execution?.status === 'completed') {
+          break;
+        }
+        if (workflowTransition.applied && workflowTransition.execution?.status === 'waiting') {
+          break;
+        }
+
+        if (workflowTransition.applied && input.workflowSkill) {
+          try {
+            currentWorkflowInstruction = await buildJourneyAgentInstruction(
+              investigationName,
+              input.workflowSkill,
+            );
+          } catch {
+            // 下一阶段的工作提示是辅助上下文；如果读取失败，仍可依靠原有 Session 上下文继续。
+          }
+        }
+
         continuationPrompt = [
           '继续自主推进当前 Investigation，不要因为上一阶段产生了一个局部答案就停止。',
           '先重新看整个目标、已有 Evidence、unknowns，以及上一阶段遇到的限制。',
@@ -924,22 +959,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
           '能通过现有工具、代码、SQL、配置、文档或 Skill 完成的工作，直接执行，不要把它写成“下一步建议”交给用户。',
           '只有确实需要用户作决定、补充缺失输入、处理权限，或者整个目标已经没有有价值的调查动作时，才结束这一阶段。',
           '如果目标已经完成，直接结束，不要为了延长运行而虚构工作。',
+          ...(currentWorkflowInstruction ? [
+            '',
+            '当前 Workflow 最新位置（如果本阶段刚刚推进了地图，以这个位置为准）：',
+            currentWorkflowInstruction,
+          ] : []),
         ].join('\n');
       }
-    }
-
-    const workflowTransition = await applyAgentWorkflowTransition(
-      investigationName,
-      input.workflowSkill ?? null,
-      finalContent,
-    );
-    if (workflowTransition.error) {
-      input.onTrajectory?.({
-        type: 'status',
-        name: 'Workflow transition 未应用',
-        status: 'info',
-        details: { error: workflowTransition.error },
-      });
     }
     const usageAfter = await getSessionUsageMetrics(session);
     const turnUsage = diffUsageMetrics(usageAfter, usageBefore);
