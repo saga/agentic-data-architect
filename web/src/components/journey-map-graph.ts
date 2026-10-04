@@ -31,9 +31,9 @@ export function stageStatus(
   snapshot: WorkflowSnapshot,
   id: string,
 ): JourneyMapStage['status'] {
-  if (snapshot.state.completedNodeIds.includes(id)) return 'completed';
-  if (snapshot.state.currentNodeId === id) return 'current';
-  if (snapshot.state.unlockedNodeIds.includes(id)) return 'future';
+  if (snapshot.execution.completedNodeIds.includes(id)) return 'completed';
+  if (snapshot.execution.currentNodeId === id) return 'current';
+  if (snapshot.state.stages.some((stage) => stage.id === id && stage.status !== 'locked')) return 'future';
   return 'locked';
 }
 
