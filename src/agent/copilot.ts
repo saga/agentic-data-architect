@@ -570,9 +570,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
       (typeof request.path === 'string' && request.path.trim()) ||
       (typeof request.toolName === 'string' && request.toolName.trim()) ||
       ('需要确认 ' + kind);
-    pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
-    // 只有逐次确认模式才把请求放到工作台待处理列表；Allow All 由 SDK 自动处理。
-    if (input.permissionMode !== 'allow_all' || request.managedApprovalRequired === true) {
+    const managedApprovalRequired = request.managedApprovalRequired === true;
+    const autoApproved = input.permissionMode === 'allow_all' && !managedApprovalRequired;
+    if (!autoApproved) {
+      pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
+    }
+    // Allow All 仍然要尊重 Copilot/平台要求的 managedApproval；这种请求必须回到人工确认 UI。
+    if (!autoApproved) {
       pendingCopilotPermissions.set(requestId, {
         sessionName: investigationName,
         turnId: input.turnId ?? '',
@@ -597,19 +601,16 @@ export async function askCopilot(input: AskInput): Promise<string> {
         },
       });
     }
-    const managedApprovalRequired = request.managedApprovalRequired === true;
-    markActivity('permission', input.permissionMode === 'allow_all' && !managedApprovalRequired
-      ? 'Agent 自动批准操作'
-      : '等待确认：' + kind);
+    markActivity('permission', autoApproved ? 'Agent 自动批准操作' : '等待确认：' + kind);
     input.onStatus?.(
-      input.permissionMode === 'allow_all' && !managedApprovalRequired
+      autoApproved
         ? 'Agent 正在自动处理权限，请稍候…'
         : '这一步需要你的确认，请在主对话区处理。',
     );
     input.onTrajectory?.({
       type: 'permission',
-      name: '等待确认：' + kind,
-      status: 'waiting',
+      name: autoApproved ? '权限自动处理：' + kind : '等待确认：' + kind,
+      status: autoApproved ? 'info' : 'waiting',
       details: {
         requestId,
         kind,
