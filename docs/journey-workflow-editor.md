@@ -209,7 +209,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 3. 最重要的是阅读顺序，而不是任意 DAG 的全局最优。
 4. 当前旧方案使用 ELK 后又手工二次调整 rank / Y，容易把结果压成一条线。
 
-现在使用 workflow-v1：
+现在使用 workflow-v2：
 
 - rank：决定主流程上下层级。
 - lane：决定左右分支位置。
@@ -217,7 +217,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 - back edge：其它循环关系仍由图结构识别。
 - collision guard：最后只做一次简单矩形碰撞保护。
 
-布局只使用 workflow-v1；不再保留旧 ELK layout engine 的 schema 值。
+布局只使用 workflow-v2；不再保留旧 ELK layout engine 的 schema 值。
 
 ## 6. 自动排版规则
 
@@ -251,7 +251,7 @@ X6 核心负责 Graph 编辑、Port、Edge、router 和 connector；通用布局
 
 主线只是视觉概念，不是第二套 Workflow。
 
-拖动节点后不会自动重新布局；只有用户点击“自动排版”时才重新计算。
+拖动节点后不会自动重新布局；只有用户点击“自动排版”时才重新计算。旧 workflow-v1 保存坐标会在首次打开时自动迁移到 workflow-v2。
 
 ## 7. 保存
 
