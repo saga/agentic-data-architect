@@ -13,7 +13,7 @@ export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
 /** Evidence 来源类型枚举，用于区分 SQL、metadata、profiling 等证据。 */
 export const EvidenceTypeSchema = z.enum([
   'source_file', 'sql_statement', 'lineage', 'metadata',
-  'profiling', 'query_result', 'documentation', 'runtime', 'semantic_context', 'parse_failure',
+  'profiling', 'query_result', 'documentation', 'code_reference', 'runtime', 'semantic_context', 'parse_failure',
 ]);
 export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
 
