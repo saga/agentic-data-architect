@@ -95,7 +95,6 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     },
     agent: {
       model: config.model,
-      autoTier: undefined,
       permissionMode: 'permission',
       autoContinuationTurns: 4,
       displayName: '秘书',
