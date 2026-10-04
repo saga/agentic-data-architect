@@ -453,16 +453,27 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       return;
     }
 
-    const snapshot = await getJourneySnapshot(name, context.workflow);
-    res.json({
-      journey: snapshot.state,
-      routePlan: context.journeyPlan ?? null,
-      workflow: {
-        source: snapshot.source,
-        baseWorkflowId: snapshot.baseWorkflowId,
-        version: snapshot.version,
-      },
-    });
+    try {
+      const snapshot = await getJourneySnapshot(name, context.workflow);
+      res.json({
+        journey: snapshot.state,
+        routePlan: context.journeyPlan ?? null,
+        workflow: {
+          source: snapshot.source,
+          baseWorkflowId: snapshot.baseWorkflowId,
+          version: snapshot.version,
+        },
+      });
+    } catch (error) {
+      // /journey 是旧首页侧栏的兼容接口，不能因为历史自定义路线损坏而阻塞整个 Investigation 页面。
+      // 真正的工作地图仍通过 /workflow 返回，并继续使用完整 validation，因此这里不静默修复 Definition。
+      console.error('Failed to build legacy journey snapshot for session ' + name, error);
+      res.json({
+        journey: null,
+        routePlan: context.journeyPlan ?? null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   /** 给调试/测试和普通 Agent 路径使用的当前 Workflow 控制摘要。 */
