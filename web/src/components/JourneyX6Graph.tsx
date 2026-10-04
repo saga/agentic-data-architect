@@ -168,9 +168,6 @@ export function JourneyX6Graph({
   const buildPorts = (node: FlowNode) => {
     const terminal =
       node.data.nodeType === 'end' || node.data.nodeType === 'stop';
-    const size = terminal
-      ? JOURNEY_NODE_SIZE.terminal
-      : JOURNEY_NODE_SIZE.regular;
 
     const visibleSources = node.data.sourceHandles.filter(
       (handle) => handle.kind !== 'retry',
