@@ -501,9 +501,9 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       return;
     }
 
-    // 头像接口只接受浏览器裁剪器生成的图片格式，避免把任意文件写进 assistant 目录。
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(req.file.mimetype)) {
-      res.status(400).json({ error: '头像只支持 PNG、JPEG 或 WebP 图片。' });
+    // 裁剪器最终统一生成 PNG；服务端固定写入 avatar.png，因此不接受其它 MIME。
+    if (req.file.mimetype !== 'image/png') {
+      res.status(400).json({ error: '头像上传接口只接受 PNG 图片。' });
       return;
     }
     if (req.file.size > 10 * 1024 * 1024) {
@@ -519,6 +519,15 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     await fs.writeFile(avatarPath, req.file.buffer);
 
     const current = await loadInvestigationControl(name);
+    const requestedWidth = Number(req.body?.width);
+    const requestedHeight = Number(req.body?.height);
+    const avatarWidth = Number.isInteger(requestedWidth) && requestedWidth >= 40 && requestedWidth <= 800
+      ? requestedWidth
+      : current.agent.avatarWidth;
+    const avatarHeight = Number.isInteger(requestedHeight) && requestedHeight >= 40 && requestedHeight <= 1200
+      ? requestedHeight
+      : current.agent.avatarHeight;
+
     const control = await updateInvestigationControl(
       name,
       {
@@ -527,6 +536,8 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
           ...current.agent,
           avatarPath: 'assistant/avatar.png',
           avatarMimeType: 'image/png',
+          avatarWidth,
+          avatarHeight,
         },
       },
       'assistant avatar updated',
