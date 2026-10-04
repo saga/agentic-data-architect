@@ -4,6 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
+import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
@@ -112,8 +113,35 @@ const userMessage = saveConversationMessage({
     role: 'user',
     content: effectiveQuestion,
   });
-  const inv = await loadInvestigation(investigationName);
+  let inv = await loadInvestigation(investigationName);
   const control = await loadInvestigationControl(investigationName);
+
+  // 用户明确给了 GitHub repository 时，先把源码变成当前 Investigation 的真实研究输入。
+  // 这样 Agent 不需要自己记住“先 clone 再 discover”这条隐藏流程；失败时仍保留 GitHub Tool 兜底。
+  const githubRepositories = [...new Set([
+    ...control.research.githubRepositories,
+    ...extractGitHubRepositories([inv.goal, inv.userPrompt, effectiveQuestion].filter(Boolean).join('\n')),
+  ])].slice(0, 5);
+  if (githubRepositories.length && inv.discoveryRuns.length === 0) {
+    onStatus?.('正在准备代码仓库并建立初始调查资料，请稍候…');
+    for (const repository of githubRepositories) {
+      try {
+        await researchGitHubRepository(investigationName, repository);
+      } catch (error) {
+        await appendAuditEvent(investigationName, {
+          actor: 'system',
+          action: 'research.github.bootstrap_failed',
+          summary: 'GitHub 仓库自动准备失败，后续 Agent 仍可直接使用 GitHub 工具调查。',
+          configurationVersion: control.version,
+          details: {
+            repository,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+    }
+    inv = await loadInvestigation(investigationName);
+  }
   await appendAuditEvent(investigationName, {
     actor: 'user',
     action: 'investigation.question',
@@ -183,6 +211,15 @@ const prompt = buildQuestionPrompt({
     evidenceIds: ctx.evidenceIds,
     unknowns: inv.unknowns,
   });
+
+  const repositoryPrompt = githubRepositories.length
+    ? [
+        '## Primary code research sources',
+        '本次架构任务明确包含以下 GitHub repository，它们是首要研究对象：',
+        ...githubRepositories.map((repository) => '- ' + repository),
+        '优先研究这些仓库本身。代码、配置、SQL、DDL、REST、Service、Entity 和数据访问逻辑都应优先从仓库里自己查；某个局部证据暂时无法确认时，换其它可查方向，不要先问用户。',
+      ].join('\n')
+    : '';
     // The prompt and configuration snapshot are fixed for this turn; later
     // UI changes apply only to the next turn.
     if (selectedRoute) {
@@ -243,6 +280,7 @@ let trajectoryWrite: Promise<void> = Promise.resolve();
         : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
       knowledgeText,
       buildResearchConfigPrompt(control),
+      repositoryPrompt,
     ].filter(Boolean).join('\n\n'),
     ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId
       ? { sessionId: inv.copilotSessionId }
