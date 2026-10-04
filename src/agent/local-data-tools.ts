@@ -5,11 +5,12 @@
  * Agent 不直接拿到 DuckDB 文件路径，也没有 ATTACH / COPY / INSTALL / LOAD 能力。
  */
 import { defineTool } from '@github/copilot-sdk';
+import fs from 'node:fs/promises';
 import pathModule from 'node:path';
 import * as z from 'zod';
 import { runDiscovery } from '../workflow/discover.js';
 import { createGitHubResearchTool } from './research-github.js';
-import { loadInvestigation } from '../investigation/store.js';
+import { loadInvestigation, saveInvestigation } from '../investigation/store.js';
 import { workspaceRoot } from '../investigation/workspace.js';
 import {
   discoverLocalDatasets,
@@ -28,6 +29,59 @@ import {
 export function createLocalDataTools(sessionName: string) {
   return [
     createGitHubResearchTool(sessionName),
+    defineTool('record_code_evidence', {
+      description:
+        '把当前 workspace 中已经仔细检查过的一段代码登记为 Evidence。用于记录 REST、Service、EJB、Entity、JPA、配置和 SQL 调用关系；必须提供实际文件和行号，不能只记录一句模型判断。',
+      parameters: z.object({
+        path: z.string().min(1).describe('相对当前 Investigation workspace 的文件路径。'),
+        lineStart: z.number().int().min(1),
+        lineEnd: z.number().int().min(1),
+        summary: z.string().trim().min(1).max(1000).describe('说明这段源码直接证明了什么。'),
+      }),
+      skipPermission: true,
+      handler: async ({ path, lineStart, lineEnd, summary }) => {
+        const root = workspaceRoot(sessionName);
+        const candidate = pathModule.resolve(root, path);
+        const rootWithSep = root.endsWith(pathModule.sep) ? root : root + pathModule.sep;
+        if (candidate !== root && !candidate.startsWith(rootWithSep)) {
+          throw new Error('只能读取当前 Investigation workspace 内的代码。');
+        }
+        if (lineEnd < lineStart || lineEnd - lineStart > 200) {
+          throw new Error('代码 Evidence 最多记录连续 200 行。');
+        }
+
+        const raw = await fs.readFile(candidate, 'utf8');
+        const lines = raw.split(/\r?\n/);
+        if (lineStart > lines.length) throw new Error('起始行超出文件范围。');
+        const excerpt = lines.slice(lineStart - 1, Math.min(lineEnd, lines.length)).join('\n');
+        const stat = await fs.stat(candidate);
+        const { createHash } = await import('node:crypto');
+        const sourceHash = createHash('sha256').update(raw).digest('hex');
+        const current = await loadInvestigation(sessionName);
+        const discoveryRunId = current.discoveryRuns.at(-1)?.id ?? 'manual-code-review';
+        const evidence = {
+          id: nextId('ev'),
+          type: 'code_reference' as const,
+          investigationId: sessionName,
+          discoveryRunId,
+          source: path + ':' + lineStart + '-' + Math.min(lineEnd, lines.length),
+          file: path,
+          lineStart,
+          lineEnd: Math.min(lineEnd, lines.length),
+          statement: summary,
+          value: {
+            summary,
+            excerpt: excerpt.slice(0, 12000),
+            sizeBytes: stat.size,
+          },
+          sourceHash,
+          collectedAt: new Date().toISOString(),
+        };
+        current.evidence.push(evidence);
+        await saveInvestigation(current);
+        return evidence;
+      },
+    }),
     defineTool('project_discover', {
       description: '扫描当前 Investigation workspace 中的代码、SQL、配置和数据目录，生成一次完整的 Discovery 快照、SQL lineage、基础 findings 和可引用 Evidence。第一次分析一个陌生 legacy 项目时优先调用。',
       parameters: z.object({
