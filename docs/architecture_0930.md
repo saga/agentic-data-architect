@@ -2997,7 +2997,7 @@ journey-map-graph
   → Workflow Definition ↔ engine-neutral Graph / 连接问题诊断
 
 journey-map-layout
-  → ELK layered layout / 主流程阅读顺序
+  → workflow-v1 主流程阅读顺序 / 分支和回线布局
 
 JourneyMapInspector
   → node / edge property editing
@@ -3010,13 +3010,13 @@ Workflow Definition
         ↓
 engine-neutral Graph
         ↓
-ELK layered layout
+workflow-v1 domain layout
         ↓
-主流程左→右 + 分支上下展开
+主流程纵向 + 分支左右展开 + retry 外侧回线
         ↓
 X6 Node / Port / Edge
 ~~~
 
-X6 不再通过 HTML EdgeLabelRenderer 绘制 outcome。success / retry / need-input 是 source Port 的原生 Label，因此它与节点、Port 和 viewport 使用同一套图坐标系统。连线方向只由 X6 marker 表达。
+X6 不在画布上常驻显示 outcome 文案。选中 Edge 后，右侧属性面板显示真实 outcome、来源和目标；success / failed / retry 的颜色和线型只是视觉提示。
 
-布局请求使用递增 token 丢弃过期的异步 ELK 结果，避免快速连续编辑时旧布局覆盖新布局。
+布局请求使用递增 token 丢弃过期结果，避免快速连续编辑时旧布局覆盖新布局。
