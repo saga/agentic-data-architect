@@ -198,8 +198,8 @@ export const JOURNEY_GRAPH_ENGINE = 'x6' as const;
 /** X6 中隐藏的“新增出口”连接桩。 */
 export const NEW_SOURCE_HANDLE_ID = '__new__';
 
-/** X6 中统一复用的目标连接桩。 */
-export const TARGET_HANDLE_ID = '__in__';
+/** X6 中用于从任意节点新增一条入边的透明目标连接桩。 */
+export const NEW_TARGET_HANDLE_ID = '__new-in__';
 
 /** 节点状态对应的 CSS class；视觉细节留在 styles.css。 */
 export const STATUS_CLASS: Record<JourneyMapStage['status'], string> = {
