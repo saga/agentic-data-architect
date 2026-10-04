@@ -7,7 +7,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ permissionMode:'permission'|'allow_all'; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -84,6 +84,32 @@ export function InvestigationConfigPage(props:{
         </div>}
         {tab==='skills'&&<div className='settings-page'>
           <Title level={4}>Agent 指导</Title>
+          <Card title='Agent 权限' className='settings-card'>
+            <Paragraph type='secondary'>决定 Agent 执行命令、读写文件或调用需要确认的工具时，是否先向你确认。</Paragraph>
+            <Radio.Group
+              value={draft.agent.permissionMode}
+              optionType='button'
+              buttonStyle='solid'
+              options={[
+                { value:'permission', label:'按需确认（当前）' },
+                { value:'allow_all', label:'Allow All Access from Agent' },
+              ]}
+              onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
+            />
+            {draft.agent.permissionMode==='allow_all' ? (
+              <Alert
+                style={{marginTop:12}}
+                type='warning'
+                showIcon
+                title='Agent 将自动批准权限请求'
+                description='本次调查后续执行不再逐项弹出确认。修改配置并保存后，新一轮 Agent 执行才会使用这个设置。'
+              />
+            ) : (
+              <Text type='secondary' style={{display:'block',marginTop:10}}>
+                Agent 需要执行 shell、写文件等受控操作时，会在主对话区显示具体操作和“允许 / 拒绝”按钮。
+              </Text>
+            )}
+          </Card>
           <Paragraph type='secondary'>技能会由 Copilot 根据当前任务自动发现，不需要你逐项选择。这里只写这次调查额外需要记住的背景、关注点或输出要求。</Paragraph>
           <Card title='本次调查说明' className='settings-card'>
             <Text type='secondary'>这不是完整的系统提示，而是一段只对本次调查生效的补充说明。平台规则、证据要求和安全规则由系统维护。</Text>
