@@ -1877,13 +1877,6 @@ body {
   min-height: 0;
 }
 
-.journey-map-page .react-flow {
-  --xy-background-color: #f7f9fc;
-  --xy-node-border-radius-default: 12px;
-  --xy-node-border-default: 1px solid #dfe5ee;
-  --xy-node-background-color-default: #ffffff;
-  --xy-node-boxshadow-default: 0 5px 18px rgba(31, 42, 55, 0.07);
-}
 
 .journey-map-page-footer {
   display: flex;
