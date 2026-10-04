@@ -340,6 +340,15 @@ function ChatMarkdown({ content }: { content: string }) {
   );
 }
 
+function ChatMessageMeta(props: { speaker: string; capturedAt: string }) {
+  return (
+    <div className="chat-message-meta">
+      <Text strong>{props.speaker}</Text>
+      <Text type="secondary">{formatTime(props.capturedAt)}</Text>
+    </div>
+  );
+}
+
 function AssistantActionBar(props: {
   routeOptions: NonNullable<SessionContext['journeyPlan']>['routes'];
   followUpQuestions: string[];
