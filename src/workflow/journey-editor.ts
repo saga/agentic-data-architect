@@ -56,7 +56,7 @@ export const JourneyLayoutSchema = z.object({
   version: z.literal(1),
   nodes: z.record(z.string(), JourneyLayoutNodeSchema),
   /** 当前使用的自动布局算法；旧 layout 可以没有这个字段。 */
-  engine: z.enum(['workflow-v1', 'elk', 'elk-v2', 'elk-v3', 'elk-v4', 'elk-v5']).optional(),
+  engine: z.literal('workflow-v1').optional(),
   viewport: z.object({
     x: z.number().finite(),
     y: z.number().finite(),
@@ -196,13 +196,8 @@ export function serializeJourneyMarkdown(definitionInput: JourneyDefinition): st
     lines.push('## @' + node.type + ' ' + node.id);
     lines.push('title: ' + node.title);
     if (node.objective) lines.push('objective: ' + node.objective);
-    lines.push('visible: ' + String(node.visible));
-    lines.push('completion: ' + node.completion);
     lines.push('actor: ' + node.actor);
     if (node.completeWhen) lines.push('completeWhen: ' + node.completeWhen);
-    if (node.tools?.length) lines.push('tools: ' + node.tools.join(', '));
-    if (node.requires?.length) lines.push('requires: ' + node.requires.join(', '));
-    if (node.produces?.length) lines.push('produces: ' + node.produces.join(', '));
     for (const route of node.routes) {
       lines.push(
         '- ' + route.outcome + ' -> ' + route.target
