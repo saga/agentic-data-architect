@@ -169,9 +169,10 @@ export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayo
   const nodes: JourneyLayout['nodes'] = {};
   for (const [level, ids] of levels) {
     ids.forEach((id, index) => {
+      // 默认布局也采用“纵向主流程、同层左右展开”的坐标。
       nodes[id] = {
-        x: level * 310,
-        y: (index - (ids.length - 1) / 2) * 175,
+        x: 420 + (index - (ids.length - 1) / 2) * 376,
+        y: 56 + level * 272,
       };
     });
   }
