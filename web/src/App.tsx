@@ -51,13 +51,13 @@ import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
 const { Sider, Header, Content } = Layout;
+const { Text, Title, Paragraph } = Typography;
 
 const pageLoadingFallback = (
   <div className="subpage-app" style={{ display: 'grid', placeItems: 'center' }}>
     <Text type="secondary">正在打开页面…</Text>
   </div>
 );
-const { Text, Title, Paragraph } = Typography;
 
 interface SessionSummary {
   key: string;
@@ -1064,16 +1064,16 @@ function AppInner() {
       <Suspense fallback={pageLoadingFallback}>
         <div className="subpage-app">
           <InvestigationConfigPage
-          sessionName={active}
-          control={current.control}
-          workflow={current.context.workflow ?? ''}
-          onBack={() => navigatePage('chat')}
-          onWorkflowChange={async (workflow) => {
-            await changeWorkflow(workflow === '' ? null : workflow);
-          }}
-          onSaved={async () => {
-            await loadSession(active);
-          }}
+            sessionName={active}
+            control={current.control}
+            workflow={current.context.workflow ?? ''}
+            onBack={() => navigatePage('chat')}
+            onWorkflowChange={async (workflow) => {
+              await changeWorkflow(workflow === '' ? null : workflow);
+            }}
+            onSaved={async () => {
+              await loadSession(active);
+            }}
           />
         </div>
       </Suspense>
@@ -1084,16 +1084,22 @@ function AppInner() {
     return (
       <Suspense fallback={pageLoadingFallback}>
         <div className="subpage-app">
-          <AgentTrajectoryPage sessionName={active} onBack={() => navigatePage('chat')} />
-      </div>
+          <AgentTrajectoryPage
+            sessionName={active}
+            onBack={() => navigatePage('chat')}
+          />
+        </div>
+      </Suspense>
     );
   }
+
   if (page === 'journey') {
     return (
       <Suspense fallback={pageLoadingFallback}>
         <div className="subpage-app journey-map-subpage">
           <JourneyMap onBack={() => navigatePage('chat')} />
-      </div>
+        </div>
+      </Suspense>
     );
   }
 
