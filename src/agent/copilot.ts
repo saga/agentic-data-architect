@@ -5,6 +5,7 @@
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
 import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -24,7 +25,7 @@ const WORKFLOW_SKILL_NAMES = ['legacy-modernization', 'financial-ai-native-archi
 // Keep the host tool surface intentionally small; the CLI-like runtime provides
 // ambient Copilot skills and built-in MCPs, while the workbench adds only tools it needs.
 const WORKBENCH_TOOLS = new ToolSet()
-  .addBuiltIn(['ask_user', 'task_complete', 'exit_plan_mode', 'skill', 'grep', 'glob', 'view', 'bash'])
+  .addBuiltIn(['ask_user', 'task_complete', 'skill', 'grep', 'glob', 'view', 'bash'])
   .addMcp('*');
 
 /** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
@@ -135,6 +136,49 @@ interface PendingCopilotPermission {
 
 /** 当前进程中等待用户确认的权限请求；权限是临时运行态，不写入 Investigation 状态文件。 */
 const pendingCopilotPermissions = new Map<string, PendingCopilotPermission>();
+
+interface PendingCopilotUserInput {
+  sessionName: string;
+  turnId: string;
+  sessionId: string;
+  requestId: string;
+  question: string;
+  choices: string[];
+  allowFreeform: boolean;
+  requestedAt: string;
+  resolve: (response: { answer: string; wasFreeform: boolean }) => void;
+  reject: (error: Error) => void;
+}
+
+/** Agent 通过 ask_user 提出的待回答问题；和权限一样只存在当前进程的运行态。 */
+const pendingCopilotUserInputs = new Map<string, PendingCopilotUserInput>();
+
+/** 返回当前 Investigation 的待回答问题，供主对话区直接显示。 */
+export function listPendingCopilotUserInputs(sessionName: string): Array<Omit<PendingCopilotUserInput, 'resolve' | 'reject'>> {
+  return [...pendingCopilotUserInputs.values()]
+    .filter((item) => item.sessionName === sessionName)
+    .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
+    .map(({ resolve: _resolve, reject: _reject, ...item }) => ({ ...item }));
+}
+
+/** 把用户在前端填写的答案交回给 Copilot 的 ask_user handler。 */
+export function respondToCopilotUserInput(
+  sessionName: string,
+  turnId: string,
+  requestId: string,
+  answer: string,
+  wasFreeform: boolean,
+): boolean {
+  const pending = pendingCopilotUserInputs.get(requestId);
+  if (!pending || pending.sessionName !== sessionName || pending.turnId !== turnId) return false;
+  const value = answer.trim();
+  if (!value) return false;
+  if (!wasFreeform && !pending.choices.includes(value)) return false;
+
+  pendingCopilotUserInputs.delete(requestId);
+  pending.resolve({ answer: value, wasFreeform });
+  return true;
+}
 
 /** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
 export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
@@ -282,6 +326,39 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // Allow All Access 使用 SDK 官方 approveAll；默认 permission 模式不注册 handler，
     // 这样 permission.requested 会停在 pending，等待本工作台前端明确批准或拒绝。
     ...(input.permissionMode === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
+    /**
+     * ask_user 必须由宿主提供异步 handler。
+     * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
+     */
+    onUserInputRequest: async (request) => {
+      const requestId = randomUUID();
+      return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
+        pendingCopilotUserInputs.set(requestId, {
+          sessionName: investigationName,
+          turnId: input.turnId ?? '',
+          sessionId: session.sessionId,
+          requestId,
+          question: request.question,
+          choices: request.choices ?? [],
+          allowFreeform: request.allowFreeform !== false,
+          requestedAt: new Date().toISOString(),
+          resolve,
+          reject,
+        });
+        input.onStatus?.('Agent 正在等待你的回答。');
+        input.onTrajectory?.({
+          type: 'user_input_requested',
+          name: '等待用户回答',
+          status: 'waiting',
+          details: {
+            requestId,
+            question: redactTrajectoryValue(request.question),
+            ...(request.choices?.length ? { choices: redactTrajectoryValue(request.choices) } : {}),
+            allowFreeform: request.allowFreeform !== false,
+          },
+        });
+      });
+    },
     workingDirectory,
     systemMessage: {
       mode: 'append' as const,
@@ -504,7 +581,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       ('需要确认 ' + kind);
     pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
     // 只有逐次确认模式才把请求放到工作台待处理列表；Allow All 由 SDK 自动处理。
-    if (input.permissionMode !== 'allow_all') {
+    if (input.permissionMode !== 'allow_all' || request.managedApprovalRequired === true) {
       pendingCopilotPermissions.set(requestId, {
         sessionName: investigationName,
         turnId: input.turnId ?? '',
@@ -529,10 +606,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
         },
       });
     }
-    markActivity(input.permissionMode === 'allow_all' ? 'permission' : 'permission', input.permissionMode === 'allow_all'
+    const managedApprovalRequired = request.managedApprovalRequired === true;
+    markActivity('permission', input.permissionMode === 'allow_all' && !managedApprovalRequired
       ? 'Agent 自动批准操作'
       : '等待确认：' + kind);
-    input.onStatus?.('这一步需要你的确认，请在提示出现后继续操作。');
+    input.onStatus?.(
+      input.permissionMode === 'allow_all' && !managedApprovalRequired
+        ? 'Agent 正在自动处理权限，请稍候…'
+        : '这一步需要你的确认，请在主对话区处理。',
+    );
     input.onTrajectory?.({
       type: 'permission',
       name: '等待确认：' + kind,
@@ -673,12 +755,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
     pendingUserInputs.set(e.data.requestId, { requestedAt: Date.now(), question: e.data.question });
     markActivity('user_input_requested', '等待用户输入');
     input.onStatus?.('Agent 正在等待你的输入。');
+    // ask_user 的真正等待由 onUserInputRequest handler 实现；这里仅补充 SDK runtime requestId，
+    // 方便轨迹中的 user_input.completed 与本轮执行对应。
     input.onTrajectory?.({
       type: 'user_input_requested',
-      name: '等待用户输入',
+      name: 'Agent 请求用户输入',
       status: 'waiting',
       details: {
-        requestId: e.data.requestId,
+        runtimeRequestId: e.data.requestId,
         question: redactTrajectoryValue(e.data.question),
         ...(e.data.choices?.length ? { choices: redactTrajectoryValue(e.data.choices) } : {}),
         ...(typeof e.data.allowFreeform === 'boolean' ? { allowFreeform: e.data.allowFreeform } : {}),
@@ -690,6 +774,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const pending = pendingUserInputs.get(e.data.requestId);
     const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
     pendingUserInputs.delete(e.data.requestId);
+    const hostRequest = [...pendingCopilotUserInputs.values()].find(
+      (item) => item.sessionName === investigationName
+        && item.turnId === (input.turnId ?? '')
+        && item.question === pending?.question,
+    );
+    if (hostRequest) {
+      pendingCopilotUserInputs.delete(hostRequest.requestId);
+    }
     markActivity('user_input_completed', '用户输入已提供');
     input.onTrajectory?.({
       type: 'user_input_completed',
@@ -826,6 +918,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
     clearInterval(heartbeat);
     for (const [requestId, pending] of pendingCopilotPermissions) {
       if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
+    }
+    for (const [requestId, pending] of pendingCopilotUserInputs) {
+      if (pending.turnId === (input.turnId ?? '')) {
+        pendingCopilotUserInputs.delete(requestId);
+        pending.reject(new Error('Copilot session 已结束。'));
+      }
     }
     if (input.turnId) activeSessions.delete(input.turnId);
     offAssistantTurnStart();
