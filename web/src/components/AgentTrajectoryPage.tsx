@@ -144,7 +144,7 @@ function eventLabel(event: TrajectoryEvent) {
 
 function eventColor(event: TrajectoryEvent) {
   if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'red';
-  if (event.status === 'waiting' || event.type === 'permission' || event.type === 'user_input_requested') return 'orange';
+  if (event.status === 'waiting' && (event.type === 'permission' || event.type === 'user_input_requested')) return 'orange';
   if (event.type === 'model_call') return 'blue';
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') return 'blue';
   if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'permission_completed' || event.type === 'user_input_completed') return 'green';
@@ -153,7 +153,7 @@ function eventColor(event: TrajectoryEvent) {
 
 function eventMarker(event: TrajectoryEvent): 'error' | 'warning' | undefined {
   if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'error';
-  if (event.status === 'waiting' || event.type === 'permission' || event.type === 'user_input_requested') return 'warning';
+  if (event.status === 'waiting' && (event.type === 'permission' || event.type === 'user_input_requested')) return 'warning';
   return undefined;
 }
 function eventDetail(event: TrajectoryEvent) {
