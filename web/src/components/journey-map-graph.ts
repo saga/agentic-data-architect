@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 import {
   EDGE_TYPE,
-  NEW_SOURCE_HANDLE_ID,
   STATUS_CLASS,
   TARGET_HANDLE_ID,
   type FlowEdge,
@@ -391,14 +390,6 @@ export function graphFromDefinition(
       id: sourceHandleId(item.id, index),
       label: route.outcome,
     }));
-
-    // 非终点保留一个隐藏的“新分支” port；X6 会提供透明拖线热区。
-    if (!terminal) {
-      sourceHandles.push({
-        id: NEW_SOURCE_HANDLE_ID,
-        label: '',
-      });
-    }
 
     const targetHandles: HandleSpec[] = [
       {
