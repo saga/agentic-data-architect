@@ -57,6 +57,16 @@ interface TrajectorySummary {
   totalPremiumRequestCost?: number;
   models: Record<string, { inputTokens: number; outputTokens: number; totalNanoAiu?: number }>;
   eventCount: number;
+  state?: 'running' | 'waiting' | 'completed' | 'failed';
+  waitingOn?: 'permission' | 'user_input' | 'tool' | 'model' | 'session';
+  lastActivityAt?: string;
+  lastActivity?: string;
+  lastActivityType?: string;
+  idleObserved?: boolean;
+  assistantTurnEnded?: boolean;
+  pendingToolCount?: number;
+  pendingPermissionCount?: number;
+  pendingUserInputCount?: number;
 }
 
 interface TrajectoryTurnSummary {
@@ -96,16 +106,54 @@ function formatCost(value?: number) {
   return value === undefined ? '—' : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function formatJson(value: unknown, maxLength = 900) {
+  if (value === undefined) return '';
+  let text = '';
+  try {
+    text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  } catch {
+    text = String(value);
+  }
+  return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
+}
+
+function waitingLabel(value?: TrajectorySummary['waitingOn']) {
+  switch (value) {
+    case 'permission': return '等待确认';
+    case 'user_input': return '等待用户输入';
+    case 'tool': return '工具仍在运行';
+    case 'model': return '模型仍在处理';
+    case 'session': return '等待 Session 收尾';
+    default: return '';
+  }
+}
+
+function stateLabel(summary: TrajectorySummary) {
+  if (summary.state === 'failed') return '异常';
+  if (summary.state === 'waiting') return waitingLabel(summary.waitingOn) || '等待中';
+  if (summary.state === 'completed') return '已完成';
+  return '处理中';
+}
+
 function eventLabel(event: TrajectoryEvent) {
   switch (event.type) {
     case 'user_input': return '用户提出问题';
     case 'turn_start': return '开始处理';
+    case 'assistant_turn_start': return '模型处理开始';
+    case 'assistant_turn_end': return '模型处理完成';
     case 'intent': return '当前动作';
     case 'model_call': return '模型调用';
     case 'tool_call': return '调用工具';
     case 'tool_result': return '工具返回';
+    case 'tool_progress': return '工具进度';
     case 'permission': return '等待确认';
+    case 'permission_completed': return '确认已处理';
+    case 'user_input_requested': return '等待用户输入';
+    case 'user_input_completed': return '用户输入已提供';
     case 'compaction': return '整理上下文';
+    case 'session_idle': return 'Session 已 idle';
+    case 'session_error': return 'Session 错误';
+    case 'context_changed': return '运行上下文变化';
     case 'turn_end': return '本轮完成';
     case 'error': return '执行失败';
     case 'status': return event.name;
@@ -117,8 +165,8 @@ function eventColor(event: TrajectoryEvent) {
   if (event.status === 'failed' || event.type === 'error') return 'red';
   if (event.status === 'waiting' || event.type === 'permission') return 'orange';
   if (event.type === 'model_call') return 'blue';
-  if (event.type === 'tool_call' || event.type === 'tool_result') return 'blue';
-  if (event.type === 'turn_end') return 'green';
+  if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') return 'blue';
+  if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'permission_completed' || event.type === 'user_input_completed') return 'green';
   return undefined;
 }
 
@@ -135,26 +183,151 @@ function eventDetail(event: TrajectoryEvent) {
           <Tag>合计 {formatTokens((event.inputTokens ?? 0) + (event.outputTokens ?? 0))}</Tag>
           {event.premiumRequestCost !== undefined ? <Tag>Premium Request Cost {formatCost(event.premiumRequestCost)}</Tag> : null}
           {event.durationMs !== undefined ? <Tag>{formatDuration(event.durationMs)}</Tag> : null}
+          {typeof event.details.finishReason === 'string' ? <Tag>结束 {event.details.finishReason}</Tag> : null}
+          {typeof event.details.reasoningEffort === 'string' ? <Tag>推理强度 {event.details.reasoningEffort}</Tag> : null}
         </Flex>
-        {cached !== undefined || reasoning !== undefined ? (
+        {cached !== undefined || reasoning !== undefined || typeof event.details.cacheWriteTokens === 'number' ? (
           <Text type="secondary">
             {cached !== undefined ? `缓存命中 ${formatTokens(cached)}` : ''}
-            {cached !== undefined && reasoning !== undefined ? ' · ' : ''}
+            {cached !== undefined && typeof event.details.cacheWriteTokens === 'number' ? ' · ' : ''}
+            {typeof event.details.cacheWriteTokens === 'number' ? `缓存写入 ${formatTokens(event.details.cacheWriteTokens)}` : ''}
+            {(cached !== undefined || typeof event.details.cacheWriteTokens === 'number') && reasoning !== undefined ? ' · ' : ''}
             {reasoning !== undefined ? `推理 Token ${formatTokens(reasoning)}` : ''}
+          </Text>
+        ) : null}
+        {typeof event.details.timeToFirstTokenMs === 'number' || typeof event.details.interTokenLatencyMs === 'number' ? (
+          <Text type="secondary">
+            {typeof event.details.timeToFirstTokenMs === 'number' ? `首 Token ${formatDuration(event.details.timeToFirstTokenMs)}` : ''}
+            {typeof event.details.timeToFirstTokenMs === 'number' && typeof event.details.interTokenLatencyMs === 'number' ? ' · ' : ''}
+            {typeof event.details.interTokenLatencyMs === 'number' ? `Token 间隔 ${formatDuration(event.details.interTokenLatencyMs)}` : ''}
+          </Text>
+        ) : null}
+        {typeof event.details.apiEndpoint === 'string' || typeof event.details.providerCallId === 'string' || typeof event.details.serviceRequestId === 'string' ? (
+          <Text type="secondary">
+            {typeof event.details.apiEndpoint === 'string' ? `API ${event.details.apiEndpoint}` : ''}
+            {typeof event.details.providerCallId === 'string' ? ` · provider ${event.details.providerCallId}` : ''}
+            {typeof event.details.serviceRequestId === 'string' ? ` · service ${event.details.serviceRequestId}` : ''}
           </Text>
         ) : null}
       </Space>
     );
   }
 
-  if (event.type === 'tool_call' || event.type === 'tool_result') {
+  if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') {
     const server = typeof event.details.mcpServerName === 'string' ? event.details.mcpServerName : undefined;
-    const error = typeof event.details.error === 'string' ? event.details.error : undefined;
+    const mcpTool = typeof event.details.mcpToolName === 'string' ? event.details.mcpToolName : undefined;
+    const error = typeof event.details.error === 'string' ? event.details.error : formatJson(event.details.error, 500);
+    const args = event.details.arguments;
+    const resultPreview = typeof event.details.resultPreview === 'string' ? event.details.resultPreview : undefined;
+    const progress = typeof event.details.progressMessage === 'string' ? event.details.progressMessage : undefined;
+    return (
+      <Flex vertical gap={5}>
+        {server ? <Text type="secondary">MCP：{server}{mcpTool ? ` / ${mcpTool}` : ''}</Text> : null}
+        {event.durationMs !== undefined ? <Text type="secondary">耗时：{formatDuration(event.durationMs)}</Text> : null}
+        {progress ? <Text>{progress}</Text> : null}
+        {event.type === 'tool_call' && args !== undefined ? (
+          <Text type="secondary">参数：<code>{formatJson(args, 700)}</code></Text>
+        ) : null}
+        {resultPreview ? (
+          <Text type="secondary">结果摘要：<code>{formatJson(resultPreview, 700)}</code></Text>
+        ) : null}
+        {typeof event.details.resultLength === 'number' ? <Text type="secondary">结果长度：{event.details.resultLength.toLocaleString()} 字符</Text> : null}
+        {error ? <Text type="danger">{error}</Text> : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'permission') {
+    const kind = typeof event.details.kind === 'string' ? event.details.kind : 'unknown';
+    const intention = typeof event.details.intention === 'string' ? event.details.intention : undefined;
+    const command = typeof event.details.fullCommandText === 'string' ? event.details.fullCommandText : undefined;
+    const file = typeof event.details.path === 'string'
+      ? event.details.path
+      : typeof event.details.fileName === 'string' ? event.details.fileName : undefined;
+    const tool = typeof event.details.toolName === 'string' ? event.details.toolName : undefined;
+    return (
+      <Flex vertical gap={4}>
+        <Flex wrap gap={6}>
+          <Tag color="orange">{kind}</Tag>
+          {tool ? <Tag>{tool}</Tag> : null}
+          {typeof event.details.readOnly === 'boolean' ? <Tag>{event.details.readOnly ? '只读' : '可能修改'}</Tag> : null}
+        </Flex>
+        {intention ? <Text>用途：{intention}</Text> : null}
+        {command ? <Text type="secondary">命令：<code>{formatJson(command, 1000)}</code></Text> : null}
+        {file ? <Text type="secondary">目标：<code>{formatJson(file, 800)}</code></Text> : null}
+        {event.durationMs !== undefined ? <Text type="secondary">等待时长：{formatDuration(event.durationMs)}</Text> : null}
+        {typeof event.details.managedApprovalRequired === 'boolean' ? <Text type="secondary">需要受管审批：{event.details.managedApprovalRequired ? '是' : '否'}</Text> : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'permission_completed' || event.type === 'user_input_completed') {
     return (
       <Flex vertical gap={3}>
-        {server ? <Text type="secondary">MCP：{server}</Text> : null}
-        {event.durationMs !== undefined ? <Text type="secondary">耗时：{formatDuration(event.durationMs)}</Text> : null}
-        {error ? <Text type="danger">{error}</Text> : null}
+        {typeof event.details.kind === 'string' ? <Text type="secondary">类型：{event.details.kind}</Text> : null}
+        {typeof event.details.resultKind === 'string' ? <Text type="secondary">结果：{event.details.resultKind}</Text> : null}
+        {event.durationMs !== undefined ? <Text type="secondary">等待时长：{formatDuration(event.durationMs)}</Text> : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'user_input_requested') {
+    return (
+      <Flex vertical gap={4}>
+        {typeof event.details.question === 'string' ? <Text>{event.details.question}</Text> : null}
+        {Array.isArray(event.details.choices) && event.details.choices.length ? (
+          <Text type="secondary">选项：{event.details.choices.map(String).join(' / ')}</Text>
+        ) : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'session_idle') {
+    return (
+      <Text type="secondary">
+        aborted={event.details.aborted ? 'true' : 'false'} ·
+        待处理工具 {Number(event.details.pendingTools) || 0} ·
+        待确认 {Number(event.details.pendingPermissions) || 0} ·
+        待用户输入 {Number(event.details.pendingUserInputs) || 0}
+      </Text>
+    );
+  }
+
+  if (event.type === 'session_error') {
+    return (
+      <Flex vertical gap={3}>
+        {typeof event.details.errorType === 'string' ? <Text type="danger">类型：{event.details.errorType}</Text> : null}
+        {typeof event.details.message === 'string' ? <Text type="danger">{event.details.message}</Text> : null}
+        {typeof event.details.statusCode === 'number' ? <Text type="secondary">HTTP {event.details.statusCode}</Text> : null}
+        {typeof event.details.providerCallId === 'string' ? <Text type="secondary">providerCallId：{event.details.providerCallId}</Text> : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'context_changed') {
+    return (
+      <Text type="secondary">
+        {typeof event.details.repository === 'string' ? event.details.repository : ''}
+        {typeof event.details.branch === 'string' ? ` / ${event.details.branch}` : ''}
+        {typeof event.details.cwd === 'string' ? ` · ${event.details.cwd}` : ''}
+      </Text>
+    );
+  }
+
+  if (event.type === 'status' && event.name === 'Agent 状态') {
+    return (
+      <Flex vertical gap={3}>
+        <Text>已运行 {formatDuration(Number(event.details.elapsedMs) || 0)}</Text>
+        <Text type="secondary">
+          最后活动：{typeof event.details.lastActivity === 'string' ? event.details.lastActivity : '—'}
+          {typeof event.details.lastActivityAt === 'string' ? ` · ${formatTime(event.details.lastActivityAt)}` : ''}
+        </Text>
+        <Text type="secondary">
+          工具 {Number(event.details.pendingTools) || 0} ·
+          确认 {Number(event.details.pendingPermissions) || 0} ·
+          用户输入 {Number(event.details.pendingUserInputs) || 0} ·
+          模型调用 {Number(event.details.modelCallCount) || 0}
+        </Text>
       </Flex>
     );
   }
@@ -198,7 +371,11 @@ function eventDetail(event: TrajectoryEvent) {
 
 function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: TrajectoryEvent[] }) {
   const summary = turn.summary;
-  const status = turn.failedEvents ? '异常' : summary.finishedAt ? '已完成' : '处理中';
+  const status = stateLabel(summary);
+  const diagnosticType = summary.state === 'failed' ? 'error' : summary.state === 'waiting' ? 'warning' : 'info';
+  const liveDuration = summary.finishedAt || !summary.lastActivityAt
+    ? summary.durationMs
+    : Math.max(0, Date.now() - new Date(summary.startedAt).getTime());
 
   return (
     <Card className="trajectory-turn-card">
@@ -222,6 +399,41 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
         </Space>
       </Flex>
 
+      {(summary.state && summary.state !== 'completed') || turn.failedEvents ? (
+        <Alert
+          type={diagnosticType}
+          showIcon
+          className="trajectory-live-diagnostic"
+          title={
+            summary.state === 'failed'
+              ? '本轮执行异常'
+              : summary.state === 'waiting'
+                ? (waitingLabel(summary.waitingOn) || 'Agent 正在等待')
+                : '本轮仍在执行'
+          }
+          description={
+            <Flex vertical gap={3}>
+              <Text>
+                当前：{summary.lastActivity || '—'}
+                {summary.lastActivityAt ? ` · ${formatTime(summary.lastActivityAt)}` : ''}
+              </Text>
+              {summary.waitingOn === 'permission' && (summary.pendingPermissionCount ?? 0) > 0 ? (
+                <Text type="warning">还有 {summary.pendingPermissionCount} 个权限请求没有处理。</Text>
+              ) : null}
+              {summary.assistantTurnEnded && !summary.idleObserved ? (
+                <Text type="warning">模型已经完成这一轮输出，但 Session 还没有进入 idle。</Text>
+              ) : null}
+              {summary.waitingOn === 'tool' && (summary.pendingToolCount ?? 0) > 0 ? (
+                <Text type="secondary">还有 {summary.pendingToolCount} 个工具调用未返回。</Text>
+              ) : null}
+              <Text type="secondary">
+                已运行 {formatDuration(liveDuration)} · 事件 {summary.eventCount}
+              </Text>
+            </Flex>
+          }
+        />
+      ) : null}
+
       <div className="trajectory-turn-metrics">
         <span>输入 {formatTokens(summary.inputTokens)}</span>
         <span>输出 {formatTokens(summary.outputTokens)}</span>
@@ -239,9 +451,9 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
             color: eventColor(event),
             dot:
               event.type === 'model_call' ? <RobotOutlined /> :
-              event.type === 'tool_call' || event.type === 'tool_result' ? <ToolOutlined /> :
-              event.type === 'permission' ? <WarningOutlined /> :
-              event.type === 'turn_end' ? <CheckCircleOutlined /> :
+              event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> :
+              event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> :
+              event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> :
               undefined,
             children: (
               <div className="trajectory-event-row">
@@ -296,6 +508,11 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
 
   useEffect(() => {
     void load();
+    // 执行中的 Turn 需要自动刷新，否则“等待确认/卡住”只能靠手动刷新才能看到。
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, 3000);
+    return () => window.clearInterval(timer);
   }, [props.sessionName]);
 
   const turnEvents = useMemo(() => {
@@ -346,7 +563,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
         <Flex align="center" gap={10}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={props.onBack}>返回调查</Button>
           <Title level={4} style={{ margin: 0 }}>Agent 执行轨迹</Title>
-          <Tag color="blue">Copilot</Tag>
+          <Tag color="blue">Copilot · 实时</Tag>
         </Flex>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button>
       </header>
@@ -392,8 +609,21 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
                   );
                 })() : null}
               </Flex>
+              {summary?.state && summary.state !== 'completed' ? (
+                <Alert
+                  type={summary.state === 'failed' ? 'error' : summary.state === 'waiting' ? 'warning' : 'info'}
+                  showIcon
+                  title={stateLabel(summary)}
+                  description={
+                    <Flex vertical gap={2}>
+                      <Text>{summary.lastActivity || '—'}{summary.lastActivityAt ? ` · ${formatTime(summary.lastActivityAt)}` : ''}</Text>
+                      {summary.waitingOn ? <Text type="secondary">等待原因：{waitingLabel(summary.waitingOn)}</Text> : null}
+                    </Flex>
+                  }
+                />
+              ) : null}
               <Paragraph type="secondary" className="trajectory-note">
-                这里只展示可观察的执行事件，不展示模型隐藏推理过程。Token 来自 Copilot SDK 的模型调用用量；Premium Request Cost 是计费乘数，不是货币金额。GitHub Copilot SDK 提供的累计 AI 额度使用 nano-AIU 表示。
+                这里只展示可观察的执行事件，不展示模型隐藏推理过程。除了模型 Token/额度，还会记录工具参数摘要、工具返回摘要、权限请求、Session idle、Session error、上下文变化和最后活动，方便定位“为什么一直没结束”。
               </Paragraph>
             </Card>
 
