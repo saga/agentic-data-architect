@@ -149,8 +149,6 @@ export interface HandleSpec {
  * Workflow 节点 + position 数据，因此换图引擎不会污染 Workflow DSL。
  */
 export interface FlowNodeData extends Record<string, unknown> {
-  /** 视觉上不画 retry edge，而是由 X6 渲染 retry group。 */
-  retryGroupIds?: string[];
   title: string;
   objective?: string;
   nodeType: WorkflowNodeType;
