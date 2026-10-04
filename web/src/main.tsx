@@ -1,73 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { Alert } from 'antd';
 import { App } from './App';
 import './styles.css';
 
-/** 页面刷新后恢复 Investigation 的运行态；只读取当前 Node.js 进程的 live active turn。 */
-function ExecutionRecovery() {
-  const [running, setRunning] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const runningRef = useRef(false);
-
-  useEffect(() => {
-    const match = window.location.pathname.match(/^\/investigations\/([^/]+)/);
-    const session = match?.[1] ? decodeURIComponent(match[1]) : '';
-    if (!session) return;
-
-    const readStatus = async () => {
-      try {
-        const response = await window.fetch(`/api/sessions/${encodeURIComponent(session)}/execution`);
-        if (!response.ok) return;
-        const payload = await response.json() as { running?: boolean };
-        const next = payload.running === true;
-        runningRef.current = next;
-        setRunning(next);
-        if (!next) setVisible(true);
-      } catch {
-        // 刷新或服务重启瞬间读取失败时，不阻塞正常聊天。
-      }
-    };
-
-    void readStatus();
-    const timer = window.setInterval(() => void readStatus(), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const originalFetch = window.fetch.bind(window);
-    const patchedFetch: typeof window.fetch = async (input, init) => {
-      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (runningRef.current && /\/api\/sessions\/[^/]+\/messages\/stream(?:$|\?)/.test(url)) {
-        while (runningRef.current) {
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
-        }
-      }
-      return originalFetch(input, init);
-    };
-    window.fetch = patchedFetch;
-    return () => { window.fetch = originalFetch; };
-  }, []);
-
-  if (!running || !visible) return null;
-
-  return (
-    <div style={{ padding: '8px 16px 0' }}>
-      <Alert
-        type="warning"
-        showIcon
-        closable
-        onClose={() => setVisible(false)}
-        message="上一轮任务仍在执行"
-        description="刷新后已恢复运行状态。现在发送的问题会在上一轮完成后自动继续。"
-      />
-    </div>
-  );
-}
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ExecutionRecovery />
     <App />
   </React.StrictMode>,
 );
