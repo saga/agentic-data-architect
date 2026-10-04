@@ -54,7 +54,7 @@ export interface WorkflowDefinition {
 export interface WorkflowLayout {
   version: 1;
   nodes: Record<string, { x: number; y: number }>;
-  engine?: 'workflow-v1';
+  engine?: 'workflow-v1' | 'workflow-v2';
   viewport?: { x: number; y: number; zoom: number };
 }
 
