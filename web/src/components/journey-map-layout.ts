@@ -43,8 +43,7 @@ function nodeDimensions(node: FlowNode): { width: number; height: number } {
 }
 
 function isPrimaryRoute(edge: FlowEdge): boolean {
-  const outcome = String(edge.data?.outcome ?? '').trim().toLowerCase();
-  return ['success', 'done', 'pass', 'complete', 'completed', 'next'].includes(outcome);
+  return classifyJourneyEdge(edge.data?.outcome) === 'success';
 }
 
 /** 只用图结构识别循环边，不依赖 retry / rollback 等 outcome 字符串。 */
