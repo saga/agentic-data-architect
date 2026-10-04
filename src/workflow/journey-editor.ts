@@ -174,12 +174,21 @@ export function defaultJourneyLayout(definition: JourneyDefinition): JourneyLayo
   }
 
   const nodes: JourneyLayout['nodes'] = {};
+  const mainLanePattern = [0, 1, 0, -1] as const;
+
   for (const [level, ids] of levels) {
+    const mainLane = mainLanePattern[level % mainLanePattern.length] ?? 0;
+
     ids.forEach((id, index) => {
-      // 默认布局也采用“纵向主流程、同层左右展开”的坐标。
+      // 与前端 workflow-v2 保持同一种视觉语言：主节点沿 S 型轨迹，分支向两侧展开。
+      const side =
+        index === 0
+          ? mainLane
+          : mainLane + (index % 2 === 1 ? -1 : 1) * Math.ceil(index / 2);
+
       nodes[id] = {
-        x: 420 + (index - (ids.length - 1) / 2) * 376,
-        y: 56 + level * 272,
+        x: 440 + side * 286,
+        y: 56 + level * 172,
       };
     });
   }
