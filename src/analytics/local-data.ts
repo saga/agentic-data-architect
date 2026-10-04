@@ -74,6 +74,27 @@ export interface LocalTransformResult {
   evidenceId: string;
 }
 
+export interface LocalReconcileMeasureResult {
+  name: string;
+  sourceSum: number | null;
+  targetSum: number | null;
+  difference: number | null;
+  mismatchKeys: number;
+}
+
+export interface LocalReconcileResult {
+  source: { id: string; name: string; relation: string; rowCount: number };
+  target: { id: string; name: string; relation: string; rowCount: number };
+  keys: string[];
+  sourceDuplicateGroups: number;
+  targetDuplicateGroups: number;
+  missingRows: number;
+  extraRows: number;
+  matchRate: number | null;
+  measures: LocalReconcileMeasureResult[];
+  analysisRunId: string;
+  evidenceId: string;
+}
 interface DatasetRow {
   id: string;
   session_name: string;
@@ -637,6 +658,178 @@ class LocalDuckDBEngine {
     });
   }
 
+  /**
+   * 对两个已登记数据集执行确定性的迁移对账：记录数、重复主键、缺失/多余记录和 measure 汇总差异。
+   * 该操作直接使用 DuckDB 做全量计算，并把 source/target 版本、SQL 和结果写成 Evidence。
+   */
+  async reconcile(
+    sourceRef: string,
+    targetRef: string,
+    keys: string[],
+    measures: string[] = [],
+    tolerance = 0,
+  ): Promise<LocalReconcileResult> {
+    return this.exclusive(async () => {
+      await this.refreshViews();
+      const source = getDataset(this.sessionName, sourceRef);
+      const target = getDataset(this.sessionName, targetRef);
+      const normalizedKeys = [...new Set(keys.map((value) => value.trim()).filter(Boolean))];
+      const normalizedMeasures = [...new Set(measures.map((value) => value.trim()).filter(Boolean))];
+      if (normalizedKeys.length === 0) throw new Error('reconciliation 至少需要一个业务主键。');
+      if (normalizedKeys.length > 12) throw new Error('reconciliation 最多支持 12 个主键列。');
+      if (normalizedMeasures.length > 20) throw new Error('reconciliation 最多支持 20 个 measure。');
+      if (!Number.isFinite(tolerance) || tolerance < 0) throw new Error('reconciliation tolerance 必须是 >= 0 的数字。');
+
+      const sourceMetaReader = await this.connection.runAndReadAll('DESCRIBE SELECT * FROM ' + source.relation);
+      const targetMetaReader = await this.connection.runAndReadAll('DESCRIBE SELECT * FROM ' + target.relation);
+      const sourceMeta = sourceMetaReader.getRowObjectsJson() as Array<{ column_name: string; column_type: string }>;
+      const targetMeta = targetMetaReader.getRowObjectsJson() as Array<{ column_name: string; column_type: string }>;
+      const sourceColumns = new Map(sourceMeta.map((item) => [String(item.column_name).toLowerCase(), item]));
+      const targetColumns = new Map(targetMeta.map((item) => [String(item.column_name).toLowerCase(), item]));
+      for (const key of normalizedKeys) {
+        if (!sourceColumns.has(key.toLowerCase()) || !targetColumns.has(key.toLowerCase())) {
+          throw new Error('reconciliation 主键列必须同时存在于 source 和 target：' + key);
+        }
+      }
+      const numericTypes = /^(TINYINT|SMALLINT|INTEGER|BIGINT|HUGEINT|UTINYINT|USMALLINT|UINTEGER|UBIGINT|UHUGEINT|FLOAT|DOUBLE|DECIMAL|REAL|NUMERIC)/i;
+      for (const measure of normalizedMeasures) {
+        const sourceType = sourceColumns.get(measure.toLowerCase())?.column_type;
+        const targetType = targetColumns.get(measure.toLowerCase())?.column_type;
+        if (!sourceType || !targetType) throw new Error('reconciliation measure 必须同时存在于 source 和 target：' + measure);
+        if (!numericTypes.test(String(sourceType)) || !numericTypes.test(String(targetType))) {
+          throw new Error('reconciliation measure 必须是数值类型：' + measure);
+        }
+      }
+
+      const keySql = normalizedKeys.map(escapeIdentifier).join(', ');
+      const joinSql = normalizedKeys.map((key) =>
+        's.' + escapeIdentifier(key) + ' IS NOT DISTINCT FROM t.' + escapeIdentifier(key),
+      ).join(' AND ');
+      const started = Date.now();
+      const rowCountSql = 'SELECT (SELECT count(*) FROM ' + source.relation + ') AS source_rows, ' +
+        '(SELECT count(*) FROM ' + target.relation + ') AS target_rows';
+      const rowCountReader = await this.connection.runAndReadAll(rowCountSql);
+      const rowCount = (rowCountReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {};
+      const sourceRows = Number(rowCount.source_rows ?? 0);
+      const targetRows = Number(rowCount.target_rows ?? 0);
+
+      const duplicateSql = 'SELECT ' +
+        '(SELECT count(*) FROM (SELECT ' + keySql + ', count(*) AS __n FROM ' + source.relation + ' GROUP BY ' + keySql + ' HAVING count(*) > 1) q) AS source_duplicate_groups, ' +
+        '(SELECT count(*) FROM (SELECT ' + keySql + ', count(*) AS __n FROM ' + target.relation + ' GROUP BY ' + keySql + ' HAVING count(*) > 1) q) AS target_duplicate_groups';
+      const duplicateReader = await this.connection.runAndReadAll(duplicateSql);
+      const duplicateRow = (duplicateReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {};
+      const sourceDuplicateGroups = Number(duplicateRow.source_duplicate_groups ?? 0);
+      const targetDuplicateGroups = Number(duplicateRow.target_duplicate_groups ?? 0);
+
+      const missingSql = 'SELECT count(*) AS missing_rows FROM ' + source.relation + ' s WHERE NOT EXISTS ' +
+        '(SELECT 1 FROM ' + target.relation + ' t WHERE ' + joinSql + ')';
+      const extraSql = 'SELECT count(*) AS extra_rows FROM ' + target.relation + ' t WHERE NOT EXISTS ' +
+        '(SELECT 1 FROM ' + source.relation + ' s WHERE ' + joinSql + ')';
+      const missingReader = await this.connection.runAndReadAll(missingSql);
+      const extraReader = await this.connection.runAndReadAll(extraSql);
+      const missingRows = Number(((missingReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {}).missing_rows ?? 0);
+      const extraRows = Number(((extraReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {}).extra_rows ?? 0);
+
+      const measureResults: LocalReconcileMeasureResult[] = [];
+      for (const measure of normalizedMeasures) {
+        const sourceMeasure = escapeIdentifier(String(sourceColumns.get(measure.toLowerCase())!.column_name));
+        const targetMeasure = escapeIdentifier(String(targetColumns.get(measure.toLowerCase())!.column_name));
+        const aggregateSql = 'SELECT ' +
+          '(SELECT sum(CAST(' + sourceMeasure + ' AS DOUBLE)) FROM ' + source.relation + ') AS source_sum, ' +
+          '(SELECT sum(CAST(' + targetMeasure + ' AS DOUBLE)) FROM ' + target.relation + ') AS target_sum';
+        const aggregateReader = await this.connection.runAndReadAll(aggregateSql);
+        const aggregate = (aggregateReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {};
+        const sourceSum = aggregate.source_sum === null || aggregate.source_sum === undefined ? null : Number(aggregate.source_sum);
+        const targetSum = aggregate.target_sum === null || aggregate.target_sum === undefined ? null : Number(aggregate.target_sum);
+        const mismatchSql = 'WITH source_groups AS (' +
+          ' SELECT ' + keySql + ', sum(CAST(' + sourceMeasure + ' AS DOUBLE)) AS value FROM ' + source.relation + ' GROUP BY ' + keySql + '),' +
+          ' target_groups AS (' +
+          ' SELECT ' + keySql + ', sum(CAST(' + targetMeasure + ' AS DOUBLE)) AS value FROM ' + target.relation + ' GROUP BY ' + keySql + ')' +
+          ' SELECT count(*) AS mismatch_keys FROM source_groups s JOIN target_groups t ON ' + joinSql +
+          ' WHERE CASE WHEN s.value IS NULL AND t.value IS NULL THEN false' +
+          ' WHEN s.value IS NULL OR t.value IS NULL THEN true ELSE abs(s.value - t.value) > ' + String(Number(tolerance)) + ' END';
+        const mismatchReader = await this.connection.runAndReadAll(mismatchSql);
+        const mismatchKeys = Number(((mismatchReader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {}).mismatch_keys ?? 0);
+        measureResults.push({
+          name: measure,
+          sourceSum,
+          targetSum,
+          difference: sourceSum !== null && targetSum !== null ? targetSum - sourceSum : null,
+          mismatchKeys,
+        });
+      }
+
+      const denominator = Math.max(sourceRows, targetRows);
+      const matchRate = denominator === 0 ? null : Math.max(0, 1 - (missingRows + extraRows) / denominator);
+      const runId = nextId('analysis');
+      const evidenceId = nextId('ev');
+      const statement = JSON.stringify({ rowCountSql, duplicateSql, missingSql, extraSql, normalizedKeys, normalizedMeasures, tolerance });
+      const evidence: EvidenceRef = {
+        id: evidenceId,
+        type: 'query_result',
+        investigationId: this.sessionName,
+        discoveryRunId: 'local:' + runId,
+        source: 'duckdb:reconcile:' + source.name + ' → ' + target.name,
+        statement,
+        value: {
+          source: { id: source.id, version: source.version, sha256: source.sha256, relation: source.relation, rows: sourceRows },
+          target: { id: target.id, version: target.version, sha256: target.sha256, relation: target.relation, rows: targetRows },
+          keys: normalizedKeys,
+          sourceDuplicateGroups,
+          targetDuplicateGroups,
+          missingRows,
+          extraRows,
+          matchRate,
+          measures: measureResults,
+          tolerance,
+        },
+        collectedAt: new Date().toISOString(),
+      };
+      await appendInvestigationEvidence(this.sessionName, evidence);
+      const sqlHash = createHash('sha256').update(statement).digest('hex');
+      getRegistryDatabase().prepare(
+        "INSERT INTO local_analysis_runs (id, session_name, operation, dataset_id, sql, sql_hash, row_count, duration_ms, evidence_id, created_at) VALUES (?, ?, 'reconcile', NULL, ?, ?, ?, ?, ?, ?)"
+      ).run(runId, this.sessionName, statement, sqlHash, denominator, Date.now() - started, evidenceId, new Date().toISOString());
+      return {
+        source: { id: source.id, name: source.name, relation: source.relation, rowCount: sourceRows },
+        target: { id: target.id, name: target.name, relation: target.relation, rowCount: targetRows },
+        keys: normalizedKeys,
+        sourceDuplicateGroups,
+        targetDuplicateGroups,
+        missingRows,
+        extraRows,
+        matchRate,
+        measures: measureResults,
+        analysisRunId: runId,
+        evidenceId,
+      };
+    });
+  }
+
+  /**
+   * 输出 DuckDB 的实际执行计划和运行时间，专用于复杂 SQL 的性能排查。
+   * 用户 SQL 仍先经过只读/file-access guard，因此 Agent 不能借 explain 绕过本地数据边界。
+   */
+  async explain(sql: string): Promise<LocalQueryResult> {
+    return this.exclusive(async () => {
+      await this.refreshViews();
+      const safeSql = validateLocalReadOnlySql(sql);
+      const statement = 'EXPLAIN ANALYZE ' + safeSql;
+      const started = Date.now();
+      const reader = await this.connection.runAndReadAll(statement);
+      const rows = reader.getRowObjectsJson() as Record<string, unknown>[];
+      const result: LocalQueryResult = {
+        columns: reader.columnNames(),
+        rows: rows.slice(0, 50),
+        rowCount: rows.length,
+        truncated: rows.length > 50,
+        sql: statement,
+        analysisRunId: '',
+        evidenceId: '',
+      };
+      return this.recordResult('explain', statement, undefined, result, started);
+    });
+  }
   async transform(
     schema: 'analysis' | 'scratch',
     table: string,
@@ -815,7 +1008,7 @@ class LocalDuckDBEngine {
   }
 
   private async recordResult(
-    operation: 'describe' | 'sample' | 'profile' | 'query',
+    operation: 'describe' | 'sample' | 'profile' | 'query' | 'explain',
     originalSql: string,
     dataset: LocalDataset | undefined,
     result: LocalQueryResult,
@@ -883,6 +1076,20 @@ export async function getLocalAnalytics(sessionName: string): Promise<LocalDuckD
   return ensureEngine(sessionName);
 }
 
+export async function localReconcile(
+  sessionName: string,
+  source: string,
+  target: string,
+  keys: string[],
+  measures: string[] = [],
+  tolerance = 0,
+): Promise<LocalReconcileResult> {
+  return (await ensureEngine(sessionName)).reconcile(source, target, keys, measures, tolerance);
+}
+
+export async function localExplain(sessionName: string, sql: string): Promise<LocalQueryResult> {
+  return (await ensureEngine(sessionName)).explain(sql);
+}
 export async function localDescribe(sessionName: string, dataset: string): Promise<LocalQueryResult> {
   return (await ensureEngine(sessionName)).describe(dataset);
 }
