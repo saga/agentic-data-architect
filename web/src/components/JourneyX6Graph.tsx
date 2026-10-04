@@ -21,6 +21,43 @@ import { classifyJourneyEdge } from './journey-map-visuals.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
 
+function retryGroupGeometry(nodes: FlowNode[], groupId: string) {
+  const members = nodes.filter((node) =>
+    node.data.retryGroupIds?.includes(groupId),
+  );
+  if (!members.length) return undefined;
+
+  const minX = Math.min(...members.map((node) => node.position.x));
+  const minY = Math.min(...members.map((node) => node.position.y));
+  const maxX = Math.max(
+    ...members.map(
+      (node) =>
+        node.position.x
+        + (node.width
+          ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+            ? JOURNEY_NODE_SIZE.terminal.width
+            : JOURNEY_NODE_SIZE.regular.width)),
+    ),
+  );
+  const maxY = Math.max(
+    ...members.map(
+      (node) =>
+        node.position.y
+        + (node.height
+          ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
+            ? JOURNEY_NODE_SIZE.terminal.height
+            : JOURNEY_NODE_SIZE.regular.height)),
+    ),
+  );
+
+  return {
+    x: minX - 28,
+    y: minY - 28,
+    width: maxX - minX + 56,
+    height: maxY - minY + 56,
+  };
+}
+
 export interface JourneyX6GraphProps {
   nodes: FlowNode[];
   edges: FlowEdge[];
@@ -267,59 +304,38 @@ export function JourneyX6Graph({
       }
     }
 
-    const retryGroups = [...retryGroupMap.entries()].map(([id, members]) => {
-      const minX = Math.min(...members.map((node) => node.position.x));
-      const minY = Math.min(...members.map((node) => node.position.y));
-      const maxX = Math.max(
-        ...members.map(
-          (node) =>
-            node.position.x
-            + (node.width
-              ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
-                ? JOURNEY_NODE_SIZE.terminal.width
-                : JOURNEY_NODE_SIZE.regular.width)),
-        ),
-      );
-      const maxY = Math.max(
-        ...members.map(
-          (node) =>
-            node.position.y
-            + (node.height
-              ?? (node.data.nodeType === 'end' || node.data.nodeType === 'stop'
-                ? JOURNEY_NODE_SIZE.terminal.height
-                : JOURNEY_NODE_SIZE.regular.height)),
-        ),
-      );
+    const retryGroups = [...retryGroupMap.entries()]
+      .map(([id, members]) => {
+        const geometry = retryGroupGeometry(members, id);
+        if (!geometry) return undefined;
 
-      return {
-        id,
-        shape: 'rect',
-        x: minX - 28,
-        y: minY - 28,
-        width: maxX - minX + 56,
-        height: maxY - minY + 56,
-        zIndex: 0,
-        attrs: {
-          body: {
-            rx: 18,
-            ry: 18,
-            fill: '#f5f7fa',
-            fillOpacity: 0.58,
-            stroke: '#9aa8b8',
-            strokeWidth: 1.5,
-            strokeDasharray: '8 6',
-            pointerEvents: 'none',
+        return {
+          id,
+          shape: 'rect',
+          ...geometry,
+          zIndex: 0,
+          attrs: {
+            body: {
+              rx: 18,
+              ry: 18,
+              fill: '#f5f7fa',
+              fillOpacity: 0.58,
+              stroke: '#9aa8b8',
+              strokeWidth: 1.5,
+              strokeDasharray: '8 6',
+              pointerEvents: 'none',
+            },
+            label: {
+              text: '',
+            },
           },
-          label: {
-            text: '',
+          data: {
+            retryGroup: true,
+            retryGroupId: id,
           },
-        },
-        data: {
-          retryGroup: true,
-          retryGroupId: id,
-        },
-      };
-    });
+        };
+      })
+      .filter(Boolean);
 
     graph.batchUpdate(() => {
       graph.clearCells();
@@ -558,6 +574,7 @@ export function JourneyX6Graph({
     }
 
     graph.on('node:click', ({ node }) => {
+      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       callbacksRef.current.onNodeClick(node.id);
     });
 
@@ -580,11 +597,13 @@ export function JourneyX6Graph({
     });
 
     graph.on('node:selected', ({ node }) => {
+      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       const data = node.getData<FlowNodeData>();
       node.setData({ ...data, selected: true });
     });
 
     graph.on('node:unselected', ({ node }) => {
+      if (node.getData<Record<string, unknown>>()?.retryGroup) return;
       const data = node.getData<FlowNodeData>();
       node.setData({ ...data, selected: false });
     });
@@ -617,6 +636,13 @@ export function JourneyX6Graph({
     graph.bindKey(['delete', 'backspace'], () => {
       const selected = graph.getSelectedCells();
       for (const cell of selected) {
+        if (
+          cell.isNode()
+          && cell.getData<Record<string, unknown>>()?.retryGroup
+        ) {
+          continue;
+        }
+
         callbacksRef.current.onDeleteSelected(
           cell.id,
           cell.isEdge() ? 'edge' : 'node',
@@ -688,6 +714,19 @@ export function JourneyX6Graph({
       ) {
         cell.position(node.position.x, node.position.y);
       }
+    }
+
+    const retryGroupIds = new Set(
+      nodes.flatMap((node) => node.data.retryGroupIds ?? []),
+    );
+
+    for (const groupId of retryGroupIds) {
+      const cell = graph.getCellById(groupId);
+      const geometry = retryGroupGeometry(nodes, groupId);
+      if (!cell?.isNode() || !geometry) continue;
+
+      cell.position(geometry.x, geometry.y);
+      cell.resize(geometry.width, geometry.height);
     }
 
     for (const edge of edges) {
