@@ -13,7 +13,7 @@ Browser
                            ↘ Skills / Skill scripts
 ```
 
-前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 AntV X6 的 React shape、Port、Edge、Selection、Snapline 和 MiniMap；完整工作地图由 Workflow Definition 驱动，使用项目自己的 workflow-v1 布局。X6 负责画布、连接桩、路由、连线、缩放和交互，地图不是第二套 Workflow Engine，Workflow 语义和执行状态仍由服务端负责。
+前端：Vite + React + Ant Design 6 + Ant Design X 2.9 + XMarkdown 2.9。XMarkdown 负责 Markdown / code / formula / Mermaid 展示，Conversations / Bubble / Sender 负责聊天工作台。Journey 地图使用 AntV X6 的 React shape、Port、Edge、Selection、Snapline 和 MiniMap；完整工作地图由 Workflow Definition 驱动，使用项目自己的 workflow-v2 布局：主流程做轻微 S 型摆动，分支向两侧展开，避免把工作地图压成一条直线。X6 负责画布、连接桩、路由、连线、缩放和交互，地图不是第二套 Workflow Engine，Workflow 语义和执行状态仍由服务端负责。
 
 Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 Agent 逻辑。
 
