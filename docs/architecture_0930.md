@@ -2874,7 +2874,7 @@ Agent Turn
 
 - Skill 中的内置 SKILL.md 不被 UI 直接修改。
 - 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。X6 只编辑这份 Investigation 草稿，不修改内置 Skill。
-- Markdown 保存流程语义，React Flow layout 单独保存，execution 单独保存。
+- Markdown 保存流程语义，X6 canvas layout 单独保存，execution 单独保存。
 - Apply 前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
 - Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
 - Workflow version 改变后清除 Copilot session，避免继续使用旧的流程上下文。
@@ -2965,10 +2965,10 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 
 ### V1.7 Editor 交互
 
-- 查看模式与编辑模式使用同一份完整 Workflow graph；锁定模式仅关闭 node/edge 编辑事件，不再通过 hidden 过滤节点或 edge。
-- 布局采用 ELK-v2：增加 node/node 与 layer 间距，并考虑编辑态节点高度，避免自动排版后节点视觉贴合。
+- 完整 Workflow graph 统一由 AntV X6 绘制；Port 本身透明，只有需要表达分支语义的 source Port Label 显示 success / retry / need-input。
+- 布局继续采用 ELK-v5：主流程保持左→右，分支保留上下展开，不再用第二套碰撞算法把节点重新压成一行。
 - 节点连接问题直接由图结构计算并显示：非 start 节点无入口、非 terminal 节点无出口、route 指向不存在节点时标红；正常的 start 无入口、terminal 无出口不报错。
-- connection Handle 在锁定模式也可见，但设置为不可交互；这样用户看到的线和编辑模式一致。
+- X6 原生 Port 是真实连接热区但视觉透明；新建连线使用独立的 hidden source / target port，避免重复连接桩和多入口场景受限。
 - 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换；属性表单与工作地图 AI 不再同时占用右侧纵向空间。
 
 工作地图编辑器使用 X6 Graph。节点拖动、Port 连线、重新连接、节点属性编辑和分支 outcome 编辑都直接作用于当前画布。
@@ -2978,14 +2978,14 @@ V1.8 去掉了单独的 draft 文件。当前 Investigation：
 - elk.direction = RIGHT
 - elk.edgeRouting = ORTHOGONAL
 - elk.layered.crossingMinimization.strategy = LAYER_SWEEP
-- 每个 incoming / outgoing route 使用独立 port，并固定 port order。
+- 每个 incoming / outgoing route 使用独立 Port，并由 X6 原生 Port Label 表达出口 outcome；连接线使用 X6 orth router + rounded connector。
 
 X6 负责画布和连接交互，ELK 继续负责自动排版；当前项目选择 ELK 是为了减少分支线路交叉和节点重叠，而不是引入新的 Workflow Engine。图引擎与 Workflow 语义通过 engine-neutral graph adapter 隔离。
 
 新建节点使用明显的橙色虚线样式，并提供两种连接方式：
 
 ~~~text
-拖 source Handle → target Handle
+从节点右侧出口区域拖到目标步骤
 或
 属性 Tab → 连接到现有步骤
 ~~~
@@ -2993,45 +2993,47 @@ X6 负责画布和连接交互，ELK 继续负责自动排版；当前项目选�
 “添加下一步”在存在主 success 路线时会插入节点，避免产生 success-1 / success-2 之类难以理解的 outcome。
 ### V1.8 Journey Map 前端重构
 
-Journey Map 不再由一个组件同时负责 React Flow rendering、Graph 转换、ELK layout、编辑状态、表单和 API。
+Journey Map 现在把图引擎与 Workflow 业务状态彻底分开，X6 不进入 Workflow DSL。
 
 当前边界：
 
-```text
+~~~text
 JourneyMap
-  → 页面组合 / X6
+  → 页面组合 / X6 画布
+
+JourneyX6Graph
+  → X6 Graph / Port / Edge / Selection / Snapline / MiniMap
+
+JourneyX6Node
+  → React 节点卡片
 
 useJourneyWorkflowEditor
-  → 编辑状态 / Undo / Graph mutation / Draft Apply
+  → 编辑状态 / Undo / Graph mutation / Draft Apply / Save
 
 journey-map-graph
-  → Definition ↔ Graph / Handle / 连接问题诊断
+  → Workflow Definition ↔ engine-neutral Graph / 连接问题诊断
 
 journey-map-layout
-  → measured dimensions / ELK / collision guard
-
-JourneyFlowNode
-  → node rendering / handles / toolbar
-
-JourneyFlowEdge
-  → edge rendering / self-loop / labels
+  → ELK layered layout / 主流程阅读顺序
 
 JourneyMapInspector
   → node / edge property editing
-```
+~~~
 
-自动排版现在不是简单把节点交给 ELK 后直接使用位置，而是：
+自动排版现在是：
 
-```text
-React Flow 实测节点尺寸
+~~~text
+Workflow Definition
+        ↓
+engine-neutral Graph
         ↓
 ELK layered layout
         ↓
-较大的 node/layer spacing
+主流程左→右 + 分支上下展开
         ↓
-collision guard
-        ↓
-setNodes
-```
+X6 Node / Port / Edge
+~~~
 
-并通过 layout request token 丢弃过期的异步 ELK 结果，避免快速连续编辑时旧布局覆盖新布局。
+X6 不再通过 HTML EdgeLabelRenderer 绘制 outcome。success / retry / need-input 是 source Port 的原生 Label，因此它与节点、Port 和 viewport 使用同一套图坐标系统。连线方向只由 X6 marker 表达。
+
+布局请求使用递增 token 丢弃过期的异步 ELK 结果，避免快速连续编辑时旧布局覆盖新布局。
