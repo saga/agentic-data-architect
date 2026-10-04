@@ -33,7 +33,7 @@ test('parses the minimal workflow DSL', () => {
     '- success -> done',
     '',
     '## @end done',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.equal(result.issues.length, 0);
   assert.ok(result.definition);
@@ -76,7 +76,7 @@ test('deterministic retry self-loop does not mark the node completed', () => {
     baseFacts,
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(state.execution.currentNodeId, 'check');
+  assert.equal(state.execution.execution.currentNodeId, 'check');
   assert.deepEqual(state.execution.completedNodeIds, []);
 });
 
@@ -124,7 +124,7 @@ test('journey state follows execution and facts, not node array order', () => {
   const state = buildJourneyState(result.definition!, baseFacts, initial);
 
   assert.deepEqual(state.execution.completedNodeIds, ['intake']);
-  assert.equal(state.execution.currentNodeId, 'investigate');
+  assert.equal(state.execution.execution.currentNodeId, 'investigate');
   assert.equal(state.stages.find((stage) => stage.id === 'investigate')?.status, 'current');
   assert.equal(state.stages.find((stage) => stage.id === 'target')?.status, 'future');
 });
@@ -167,11 +167,11 @@ test('preserves an execution position across a graph edit when the node still ex
   const next = {
     ...execution,
     workflowVersion: 2,
-    currentNodeId: execution.currentNodeId,
+    currentNodeId: execution.execution.currentNodeId,
     completedNodeIds: execution.completedNodeIds.filter((id) => edited.nodes.some((node) => node.id === id)),
   };
 
-  assert.equal(next.currentNodeId, 'target');
+  assert.equal(next.execution.currentNodeId, 'target');
   assert.deepEqual(next.completedNodeIds, ['investigate']);
 });
 
@@ -199,11 +199,11 @@ test('applies only an actual outgoing workflow outcome', () => {
   );
 
   const retry = applyJourneyTransition(result.definition!, initial, 'investigate', 'retry');
-  assert.equal(retry.currentNodeId, 'investigate');
+  assert.equal(retry.execution.currentNodeId, 'investigate');
   assert.deepEqual(retry.completedNodeIds, []);
 
   const success = applyJourneyTransition(result.definition!, initial, 'investigate', 'success');
-  assert.equal(success.currentNodeId, 'target');
+  assert.equal(success.execution.currentNodeId, 'target');
   assert.deepEqual(success.completedNodeIds, ['investigate']);
 });
 
@@ -249,7 +249,7 @@ test('current-state gate requires an actual discovered dataset', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(empty.currentNodeId, 'current');
+  assert.equal(empty.execution.currentNodeId, 'current');
 
   const discovered = buildJourneyState(
     result.definition!,
@@ -263,7 +263,7 @@ test('current-state gate requires an actual discovered dataset', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(discovered.currentNodeId, 'done');
+  assert.equal(discovered.execution.currentNodeId, 'done');
 });
 
 test('data-truth does not use an arbitrary lineage percentage', () => {
@@ -294,7 +294,7 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(incompleteLineage.currentNodeId, 'done');
+  assert.equal(incompleteLineage.execution.currentNodeId, 'done');
 
   const completeEnoughWithoutThreshold = buildJourneyState(
     result.definition!,
@@ -309,7 +309,7 @@ test('data-truth does not use an arbitrary lineage percentage', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(completeEnoughWithoutThreshold.currentNodeId, 'done');
+  assert.equal(completeEnoughWithoutThreshold.execution.currentNodeId, 'done');
 });
 
 test('investigation ignores unknown count and blocks only on critical gaps', () => {
@@ -340,7 +340,7 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(manyLowImpactUnknowns.currentNodeId, 'done');
+  assert.equal(manyLowImpactUnknowns.execution.currentNodeId, 'done');
 
   const oneCriticalGap = buildJourneyState(
     result.definition!,
@@ -356,7 +356,7 @@ test('investigation ignores unknown count and blocks only on critical gaps', () 
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(oneCriticalGap.currentNodeId, 'investigate');
+  assert.equal(oneCriticalGap.execution.currentNodeId, 'investigate');
 });
 
 test('cutover is an explicit human review after validation', () => {
@@ -391,7 +391,7 @@ test('cutover is an explicit human review after validation', () => {
     execution,
   );
 
-  assert.equal(ready.currentNodeId, 'cutover');
+  assert.equal(ready.execution.currentNodeId, 'cutover');
   assert.equal(ready.execution.status, 'waiting');
 
   const approved = applyJourneyTransition(
@@ -400,7 +400,7 @@ test('cutover is an explicit human review after validation', () => {
     'cutover',
     'approved',
   );
-  assert.equal(approved.currentNodeId, 'done');
+  assert.equal(approved.execution.currentNodeId, 'done');
   assert.equal(approved.status, 'completed');
 });
 
@@ -431,7 +431,7 @@ test('assessment findings gate does not pass from current-state alone', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(noFinding.currentNodeId, 'findings');
+  assert.equal(noFinding.execution.currentNodeId, 'findings');
 
   const withFinding = buildJourneyState(
     result.definition!,
@@ -446,5 +446,5 @@ test('assessment findings gate does not pass from current-state alone', () => {
     },
     initialJourneyExecution(result.definition!),
   );
-  assert.equal(withFinding.currentNodeId, 'done');
+  assert.equal(withFinding.execution.currentNodeId, 'done');
 });
