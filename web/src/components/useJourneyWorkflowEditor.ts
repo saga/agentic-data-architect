@@ -819,7 +819,7 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       );
 
       const shouldAutoLayout =
-        current.source !== 'custom' || current.layout.engine !== 'elk-v5';
+        current.source !== 'custom' || current.layout.engine !== 'workflow-v1';
 
       const layoutedNodes = shouldAutoLayout
         ? await autoLayoutJourney(graph.nodes, graph.edges)
