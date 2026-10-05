@@ -19,6 +19,7 @@
     "flow:lint": "tsx src/workflow/lint.ts",
     "gate:modernization": "tsx scripts/legacy-modernization-gate.ts",
     "gate:scope": "tsx scripts/investigation-scope-gate.ts",
+    "gate:report": "tsx scripts/current-state-report-gate.ts",
     "python:sync": "uv sync",
     "python:lock": "uv lock",
     "python:check": "uv run python scripts/check-python-deps.py"
