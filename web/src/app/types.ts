@@ -24,6 +24,7 @@ export interface CopilotModelOption {
   supportedReasoningEfforts: string[];
   defaultReasoningEffort: string | null;
   policyState: string | null;
+  runtime?: 'copilot' | 'opencode';
 }
 
 export interface InvestigationControl {
