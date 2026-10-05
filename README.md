@@ -106,6 +106,12 @@ OPENCODE_ENABLED=true
 OPENCODE_BASE_URL=http://127.0.0.1:4096
 ~~~
 
+模型太多时可以用白名单收敛下拉框（逗号分隔，大小写不敏感，匹配模型 id 或显示名；为空 = 全部列出）：
+
+~~~bash
+OPENCODE_MODEL_ALLOWLIST=opencode:opencode/muse-spark-1.3-contributor-free
+~~~
+
 OpenCode 默认本机服务不需要工作台保存任何模型厂商 Secret。OpenCode 自己负责 provider、模型、工具、MCP 和认证配置；例如 Ollama 等本地模型应在 OpenCode 中配置完成，工作台不会复制一套 provider 配置。
 
 如果你自己给 `opencode serve` 开了 Basic Auth，工作台可复用 OpenCode 官方的本地服务环境变量：

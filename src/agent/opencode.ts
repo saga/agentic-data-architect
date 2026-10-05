@@ -158,6 +158,7 @@ export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
 
   const payload = await response.json() as { all?: OpenCodeProvider[]; connected?: string[] };
   const connected = new Set(payload.connected ?? []);
+  const allowlist = config.openCodeModelAllowlist;
   const result: OpenCodeModelOption[] = [];
 
   for (const provider of payload.all ?? []) {
@@ -167,12 +168,14 @@ export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
     for (const [modelKey, model] of Object.entries(provider.models ?? {})) {
       const modelId = model.id?.trim() || modelKey;
       if (!modelId) continue;
-      result.push({
-        id: `opencode:${provider.id}/${modelId}`,
-        name: `OpenCode · ${provider.name?.trim() || provider.id} · ${model.name?.trim() || modelId}`,
-        providerId: provider.id,
-        modelId,
-      });
+      const id = `opencode:${provider.id}/${modelId}`;
+      const name = `OpenCode · ${provider.name?.trim() || provider.id} · ${model.name?.trim() || modelId}`;
+      // 白名单为空 = 不过滤；否则 id 或显示名命中任一条才列出。
+      if (allowlist.length > 0) {
+        const haystack = (id + ' ' + name).toLowerCase();
+        if (!allowlist.some((entry) => haystack.includes(entry))) continue;
+      }
+      result.push({ id, name, providerId: provider.id, modelId });
     }
   }
 

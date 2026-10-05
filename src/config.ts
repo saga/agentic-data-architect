@@ -22,6 +22,12 @@ const EnvSchema = z.object({
   /** OpenCode Server 开启 Basic Auth 时，沿用 OpenCode 官方环境变量。通常本机开发无需填写。 */
   OPENCODE_SERVER_USERNAME: z.string().optional(),
   OPENCODE_SERVER_PASSWORD: z.string().optional(),
+  /**
+   * OpenCode 模型白名单（逗号分隔，大小写不敏感子串匹配）。
+   * 每项匹配模型 id（如 opencode:opencode/muse-spark-1.3-contributor-free）或显示名。
+   * 为空 = 不过滤，全部列出；填了就只列出命中的，下拉框不再是一大堆。
+   */
+  OPENCODE_MODEL_ALLOWLIST: z.string().default(''),
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(360_000),
   // Agent 真正执行的默认上限仍为 6 分钟；进入 ask_user 后改用单独的等待上限。
   USER_INPUT_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
@@ -49,6 +55,9 @@ export const config = {
   openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\/+$/, ''),
   openCodeUsername: envConfig.OPENCODE_SERVER_USERNAME?.trim() || undefined,
   openCodePassword: envConfig.OPENCODE_SERVER_PASSWORD || undefined,
+  openCodeModelAllowlist: envConfig.OPENCODE_MODEL_ALLOWLIST.split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0),
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   userInputWaitTimeoutMs: envConfig.USER_INPUT_WAIT_TIMEOUT_MS,
   permissionWaitTimeoutMs: envConfig.PERMISSION_WAIT_TIMEOUT_MS,
