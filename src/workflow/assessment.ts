@@ -7,6 +7,7 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
+import { assertMissionGate } from './mission-gate.js';
 
 /**
  * 架构评估结果是一个轻量的“可继续讨论的草案”，不是自动审批结论。
@@ -84,6 +85,7 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
   await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
+  assertMissionGate(inv.mission);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
