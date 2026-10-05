@@ -120,6 +120,29 @@ export interface PendingUserInput {
   requestedAt: string;
 }
 
+export interface MissionDeliverable {
+  id: string;
+  title: string;
+  description: string;
+  required: boolean;
+}
+
+export interface MissionContract {
+  version: 1;
+  purpose: string;
+  expectedResult: string;
+  deliverables: MissionDeliverable[];
+  status: 'confirmed';
+  confirmedAt: string;
+  confirmedBy: 'user';
+}
+
+export interface MissionDraft {
+  purpose: string;
+  expectedResult: string;
+  deliverableIds: string[];
+}
+
 export type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
 
 export const workflowOptions = [
@@ -131,6 +154,7 @@ export const workflowOptions = [
 
 export interface SessionContext {
   name: string;
+  mission?: MissionContract;
   workflow: WorkflowId | null;
   userPrompt: string;
   goal: string;
