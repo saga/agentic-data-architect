@@ -5,6 +5,15 @@ import { buildQuestionPrompt } from '../src/agent/prompts.js';
 test('selected guidance is treated as an approved execution action', () => {
   const prompt = buildQuestionPrompt({
     investigationName: 'test-investigation',
+    mission: {
+      purpose: '理解旧系统关键数据流，为后续架构工作提供依据。',
+      expectedResult: '形成关键数据来源、数据流和核心数据模型的可靠说明。',
+      deliverables: [
+        { id: 'data-source', title: 'Data Source', description: '说明关键数据来源。', required: true },
+        { id: 'data-flow', title: 'Data Flow', description: '说明关键数据流向。', required: true },
+        { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true },
+      ],
+    },
     goal: '理解旧系统关键数据流',
     scope: ['代码'],
     systems: ['旧系统'],
