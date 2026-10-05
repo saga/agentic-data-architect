@@ -92,14 +92,15 @@ export function InvestigationConfigPage(props:{
     }
   };
 
-  /** 接收 antd-img-crop 已经完成裁剪的文件，再上传到当前 Investigation。 */
-  const handleAvatarBeforeUpload = async (file: File) => {
+  /** 上传秘书头像。普通图片可裁剪并按配置尺寸输出；GIF/视频直传，保留原始动画/媒体格式。 */
+  const handleAvatarBeforeUpload = async (file: File, resizeImage = true) => {
     setAvatarUploading(true);
     setAvatarError(undefined);
     try {
-      const resized = await resizeAvatarToTarget(file);
+      // 只有图片裁剪入口需要重新编码；GIF/视频入口必须直传，否则视频会被 Image() 当成图片加载而失败。
+      const uploadFile = resizeImage ? await resizeAvatarToTarget(file) : file;
       const body = new FormData();
-      body.append('file', resized, 'avatar.png');
+      body.append('file', uploadFile, uploadFile.name);
       body.append('width', String(draft.agent.avatarWidth));
       body.append('height', String(draft.agent.avatarHeight));
 
@@ -203,11 +204,31 @@ export function InvestigationConfigPage(props:{
              <Flex align='flex-start' gap={18} wrap>
                {(() => {
                  const source = draft.agent.avatarSources?.[0];
-                 if (source?.kind === 'video') {
-                   return <video src={source.src} autoPlay loop muted playsInline style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover',borderRadius:8}} />;
-                 }
                  const imageSource = source?.src ?? draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0];
-                 return <Avatar shape='square' src={/^https?:\/\//i.test(imageSource ?? '') ? imageSource : undefined} icon={<PictureOutlined />} style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover'}} />;
+                 const remote = /^https?:\/\//i.test(imageSource ?? '');
+                 const localId = imageSource && !remote
+                   ? imageSource.split(/[\\/]/).pop()?.split(/[?#]/, 1)[0]?.replace(/\.[^.]+$/, '')
+                   : undefined;
+                 const previewUrl = imageSource
+                   ? remote
+                     ? imageSource
+                     : localId
+                       ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${encodeURIComponent(localId)}?v=${draft.version}`
+                       : `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${draft.version}`
+                   : undefined;
+                 const isVideo = source?.kind === 'video'
+                   || /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(imageSource ?? '');
+                 const mediaStyle = {
+                   width:72,
+                   height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),
+                   objectFit:'cover' as const,
+                   borderRadius:8,
+                   display:'block' as const,
+                 };
+                 if (isVideo && previewUrl) {
+                   return <video src={previewUrl} autoPlay loop muted playsInline style={mediaStyle} />;
+                 }
+                 return <Avatar shape='square' src={previewUrl} icon={<PictureOutlined />} style={mediaStyle} />;
                })()}
                <div style={{minWidth:260,flex:'1 1 320px'}}>
                  <Paragraph type='secondary'>支持本地图片、GIF 动图，以及远程图片 / GIF / 视频 URL。每条回复会随机选择一个头像来源。</Paragraph>
@@ -233,14 +254,14 @@ export function InvestigationConfigPage(props:{
                  </Flex>
                  <Flex gap={8} wrap style={{marginTop:12}}>
                    <ImgCrop aspect={draft.agent.avatarWidth/draft.agent.avatarHeight} zoomSlider rotationSlider showReset quality={1} modalTitle='裁剪助手头像' modalOk='使用此头像' modalCancel='取消' showGrid>
-                     <Upload accept='image/png,image/jpeg,image/webp,image/gif' showUploadList={false} beforeUpload={(file)=>{void handleAvatarBeforeUpload(file);return false;}}>
+                     <Upload accept='image/png,image/jpeg,image/webp,image/gif' showUploadList={false} beforeUpload={(file)=>{void handleAvatarBeforeUpload(file, true);return false;}}>
                        <Button icon={<UploadOutlined/>} loading={avatarUploading}>上传图片 / GIF</Button>
                      </Upload>
                    </ImgCrop>
                    <Upload
                      accept='image/gif,video/mp4,video/webm,video/quicktime'
                      showUploadList={false}
-                     beforeUpload={(file) => { void handleAvatarBeforeUpload(file); return false; }}
+                     beforeUpload={(file) => { void handleAvatarBeforeUpload(file, false); return false; }}
                    >
                      <Button icon={<UploadOutlined />} loading={avatarUploading}>上传 GIF / 视频</Button>
                    </Upload>
@@ -293,15 +314,20 @@ export function InvestigationConfigPage(props:{
                 value={draft.agent.permissionMode}
                 optionType='button'
                 buttonStyle='solid'
-              options={[
-                { value:'permission', label:'每次确认' },
-              ]}
+                options={[
+                  { value:'permission', label:'每次确认' },
+                  { value:'allow_all', label:'Allow All' },
+                ]}
                 onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
               />
-              <Tag color='blue'>当前：每次确认</Tag>
+              <Tag color={draft.agent.permissionMode === 'allow_all' ? 'green' : 'blue'}>
+                当前：{draft.agent.permissionMode === 'allow_all' ? 'Allow All' : '每次确认'}
+              </Tag>
             </div>
             <Text type='secondary' style={{display:'block',marginTop:10}}>
-              Agent 需要执行 shell、读写文件或调用受控工具时，必须在主对话区逐项确认。允许只对当前这一次操作生效，不会扩大为当前 Session 的持续授权。
+              {draft.agent.permissionMode === 'allow_all'
+                ? 'Agent 默认直接执行命令、读取文件和调用工具，不再逐项弹出确认。仅适合本地单用户工作台；受控审批仍可由工具自身要求。'
+                : 'Agent 执行 shell、读写文件或调用需要确认的工具时，在主对话区逐项确认。允许只对当前这一次操作生效。'}
             </Text>
           </Card>
           <Paragraph type='secondary'>技能会由 Copilot 根据当前任务自动发现，不需要你逐项选择。这里只写这次调查额外需要记住的背景、关注点或输出要求。</Paragraph>
