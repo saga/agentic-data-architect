@@ -1440,7 +1440,7 @@ function AppInner() {
             </div>
             <Space>
               <Tag
-                className="workspace-status"
+                className={`workspace-status${loading || executionStatus.running ? ' workspace-status-active' : ''}`}
                 variant="filled"
                 icon={(loading || executionStatus.running) ? <LoadingOutlined spin /> : undefined}
               >
