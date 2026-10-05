@@ -43,6 +43,9 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     newSessionGoal,
     newSessionWorkflow,
     unknownsOpen,
+    missionOpen,
+    missionDraft,
+    missionSaving,
     setValue,
     setAttachmentsOpen,
     setUserInputDrafts,
@@ -66,6 +69,10 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     onAttachmentChange,
     createSession,
     continueUnknown,
+    editMission,
+    confirmMission,
+    setMissionOpen,
+    setMissionDraft,
   } = controller;
 
   if (!active || !current) {
@@ -162,6 +169,13 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             modelSaving={modelSaving}
             executionStatus={executionStatus}
             error={error}
+            missionOpen={missionOpen}
+            missionDraft={missionDraft}
+            missionSaving={missionSaving}
+            onOpenMission={editMission}
+            onCloseMission={() => setMissionOpen(false)}
+            onChangeMission={setMissionDraft}
+            onConfirmMission={confirmMission}
             setValue={setValue}
             setAttachmentsOpen={setAttachmentsOpen}
             setUserInputDrafts={setUserInputDrafts}
