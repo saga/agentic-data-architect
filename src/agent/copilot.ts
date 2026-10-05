@@ -166,6 +166,8 @@ interface PendingCopilotUserInput {
   choices: string[];
   allowFreeform: boolean;
   requestedAt: string;
+  /** 用户提交答案时记录到当前 Agent 轨迹；不参与待处理请求 API 返回。 */
+  onAnswered?: (response: { answer: string; wasFreeform: boolean }) => void;
   resolve: (response: { answer: string; wasFreeform: boolean }) => void;
   reject: (error: Error) => void;
 }
@@ -178,7 +180,7 @@ export function listPendingCopilotUserInputs(sessionName: string): Array<Omit<Pe
   return [...pendingCopilotUserInputs.values()]
     .filter((item) => item.sessionName === sessionName)
     .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
-    .map(({ resolve: _resolve, reject: _reject, ...item }) => ({ ...item }));
+    .map(({ resolve: _resolve, reject: _reject, onAnswered: _onAnswered, ...item }) => ({ ...item }));
 }
 
 /** 把用户在前端填写的答案交回给 Copilot 的 ask_user handler。 */
@@ -196,6 +198,7 @@ export function respondToCopilotUserInput(
   if (!wasFreeform && !pending.choices.includes(value)) return false;
 
   pendingCopilotUserInputs.delete(requestId);
+  pending.onAnswered?.({ answer: value, wasFreeform });
   pending.resolve({ answer: value, wasFreeform });
   return true;
 }
@@ -420,6 +423,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
           choices: request.choices ?? [],
           allowFreeform: request.allowFreeform !== false,
           requestedAt: new Date().toISOString(),
+          onAnswered: ({ answer, wasFreeform }) => {
+            input.onTrajectory?.({
+              type: 'user_input_completed',
+              name: '用户输入已提供',
+              status: 'completed',
+              durationMs: Math.max(0, Date.now() - Date.parse(requestedAt)),
+              details: {
+                requestId,
+                question: request.question,
+                answer: redactTrajectoryValue(answer),
+                wasFreeform,
+              },
+            });
+          },
           resolve,
           reject,
         });
