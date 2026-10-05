@@ -187,7 +187,7 @@ test('scope-ready gate requires validated intake', () => {
     '- success -> done',
     '',
     '## @end done',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.ok(result.definition);
 
