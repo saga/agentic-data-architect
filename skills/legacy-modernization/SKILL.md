@@ -22,6 +22,7 @@ metadata:
 - 目标架构、新旧对应、验证结果都会保存到 `reports/modernization-plan.json`，结果页直接展示这些内容。
 - Gate 检查已经落盘的成果、真实 Evidence、Mapping 完整性和 Validation 实际结果；单独返回 `workflow.success` 永远不能完成这些阶段。
 - 出现新证据后可以回到前面的关卡重新调查。
+- “查关键问题”不是固定阶段。调查中的 unknown 只是当前不知道的内容，不自动变成必须解决的问题；是否继续深挖由用户目标、当前成果覆盖面和确定性 Gate 决定。
 
 ## 路线图
 
@@ -31,7 +32,7 @@ metadata:
    ↓
 找到数据真相
    ↓
-查关键问题
+梳理当前架构
    ↓
 定下现状
    ↓
@@ -101,47 +102,23 @@ completeWhen: data-truth
 
 发现业务定义缺失时，主动问一个具体问题，例如“这个字段的 A / R / P 各代表什么？”而不是“请提供更多信息”。
 
-- success -> investigate
-
-## @task investigate
-
-title: 查关键问题
-objective: 一次解决一个真正影响迁移的业务问题，把证据、SQL、ETL、数据和业务定义串起来。
-completeWhen: investigation
-
-每个问题都走：
-
-问题
- ↓
-找证据
- ↓
-查 SQL / ETL / lineage
- ↓
-profiling / 对比
- ↓
-业务定义
- ↓
-结论 / unknown / 下一步
-
-Web Search 只在本地代码、目录和内部资料无法解释问题时使用。
-
 - success -> current-state
 
 ## @task current-state
 
-title: 定下现状
-objective: 把已经查清楚的 source、lineage、business rules、semantic context 和主要问题整理成当前系统的完整说明。
+title: 梳理当前架构
+objective: 围绕用户真正要交付的内容，形成当前系统的 Data Source、Data Flow、Data Model，并补充关键 transformation、business meaning 和明显缺口。不要为了清空 unknowns 而无限深挖。
 completeWhen: current-state-ready
 
-Current State 至少回答：
+优先使用“现状架构分析”能力，从已经发现的代码、SQL、数据目录、Lineage 和 Evidence 中整理：
 
-- 数据从哪里来
-- 怎么流转
-- 哪些 SQL / ETL 在做关键业务计算
-- 哪些来源最可信
-- 关键业务定义是什么
-- 哪些问题还没解决
-- 哪些结论有冲突
+- Data Source：关键数据从哪里来，哪些来源是可信候选
+- Data Flow：数据经过哪些系统、表、服务、SQL / ETL 到哪里
+- Data Model：核心实体、表 / 视图、关键关系和业务含义
+- Transformation：关键计算和转换发生在哪里
+- Gap：哪些信息仍不清楚，以及它们是否真的影响用户当前目标
+
+不要求把所有 unknown 都解决。只有缺口会影响当前目标或下一阶段关键决策时，才继续深挖。Web Search 只在本地代码、目录和内部资料无法解释问题时使用。
 
 - success -> target
 
