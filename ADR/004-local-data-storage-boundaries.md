@@ -32,3 +32,37 @@ Agent 不直接拿 DuckDB 文件路径；本地数据通过 `local_catalog`、`l
 - Agent 不能绕过 Dataset Registry 和 Evidence provenance。
 
 代价是系统需要维护 Dataset Registry 与本地文件版本之间的关系，并在工具层承担 SQL/path guard。
+## Appendix A：形成决定时的分析记录（仅供参考）
+
+本地数据层的讨论围绕一个问题展开：为什么不直接让 DuckDB 成为整个应用的数据库。
+
+当前 Investigation 同时有两类完全不同的数据：
+
+- 应用状态：对话、Investigation、Workflow、analysis run metadata、Dataset Registry；
+- analytical data：CSV、JSON、Parquet 和分析结果。
+
+把两类内容合在一起会让“应用状态”和“分析引擎”互相耦合，因此形成：
+
+```text
+SQLite
+  = application state / metadata
+
+DuckDB
+  = analytical engine
+
+Parquet
+  = portable analytical data
+
+Filesystem
+  = user-owned source and output files
+```
+
+进一步讨论过是否直接让 Agent 获取 DuckDB 文件路径、是否引入通用 DuckDB MCP。
+
+结论是：当前项目已经有 Dataset Registry、workspace boundary、read-only SQL guard 和 Evidence provenance。如果直接暴露原始 DuckDB，会让 Agent 更容易绕过这些边界。
+
+因此当前 local_* 工具不是为了包装数据库 API 而包装，而是把“能分析什么、在哪里分析、如何留下 Evidence”固定在工具边界里。
+
+同时刻意没有引入统一 SQL abstraction、Repository/Unit of Work、共享 DuckDB writer、vector DB 或 Lakehouse catalog，因为这些在当前单用户本地场景没有独立价值。
+
+本附录记录设计讨论，不构成新的禁止事项。
