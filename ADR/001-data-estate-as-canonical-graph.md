@@ -63,3 +63,105 @@
 ### 每个 Analysis 自己直接遍历 DataEstate
 
 拒绝作为长期做法。短期简单，但重复 traversal 会重新形成当前已经出现的问题。
+## Appendix A：形成决定时的分析记录（仅供参考）
+
+这一决定来自对当前实现和 Duckle 的对比，而不是先假定项目需要一个 Data Catalog。
+
+### 1. 当前代码已经有 canonical graph
+
+src/model/estate.ts 定义了 DataEstate、EstateNode 和 EstateEdge。Discovery 在 src/workflow/discover.ts 中把 SQL lineage、数据库 metadata、dataset、column、job 和其他资产关系合并到这个图里。
+
+因此当前最自然的数据流已经是：
+
+```text
+Discovery
+  ↓
+Lineage / Metadata
+  ↓
+DataEstate
+  ↓
+Analysis
+```
+
+不存在“没有 Catalog 所以需要先建 Catalog”的问题。
+
+### 2. 真正发现的问题是查询实现重复
+
+检查代码后发现：
+
+- src/analysis/context.ts 自己从 LineageGraph 查询 dataset、dataset lineage、column lineage，再组合 semantic assets、source-of-truth candidates、findings 和 profiles。
+- src/analysis/current-state.ts 自己遍历 DataEstate.nodes/edges，同时又从 LineageGraph.edges 重新计算上下游。
+- 后续的 impact、producer/consumer、orphan、unresolved 等分析如果继续复制这类 traversal，会形成多个对同一关系的解释。
+
+所以解决目标应该是“统一 query logic”，而不是“增加 Catalog”。
+
+### 3. Duckle 的 Catalog 值得借鉴什么
+
+研究 slothflowlabs/duckle 时，最值得借鉴的是它把跨 pipeline 的资产关系整理成可查询的结构，并配合 revision、staleness、diff、schema drift 等确定性能力。
+
+但 Duckle 的 Catalog 是其 workflow/ETL 系统的独立数据结构。直接照搬到本项目会产生第二个资产模型，进而需要处理 DataEstate 与 Catalog 的同步、生命周期和一致性问题。
+
+因此最后保留“统一查询”的思想，不复制 Duckle 的 Catalog 模型。
+
+### 4. 也讨论过单独的 Projection Layer
+
+曾考虑：
+
+```text
+DataEstate
+  ↓
+Catalog Query / Projection
+  ↓
+Current State / Findings / Impact / Retrieval
+```
+
+进一步分析后认为，在当前规模和“个人本机 Investigation workbench”定位下，这一层没有独立的数据拥有权，也没有新的 persistence boundary。
+
+最终改为：
+
+```text
+DataEstate
+  ↓
+estate-query.ts
+  ↓
+Analysis
+```
+
+其中 estate-query.ts 只是纯查询函数集合，不是 domain model、repository、缓存层或 Catalog persistence。
+
+### 5. 一个重要的边界判断
+
+LineageGraph 没有被删除。
+
+它仍然是 SQL parser 的 rich analysis result，承载：
+
+- parsed statements
+- parse failures
+- parser-specific column lineage
+- SQL statement details
+
+但是跨分析模块使用的 dataset/column graph 事实统一回到 DataEstate。
+
+因此两者的关系是：
+
+```text
+SQL Parser
+   ↓
+LineageGraph
+   ↓
+Discovery normalization
+   ↓
+DataEstate
+```
+
+而不是两个并列的 canonical graph。
+
+### 6. 后续扩展原则
+
+以后需要增加查询能力时，优先判断是不是对同一个 DataEstate 关系的重复遍历：
+
+- 是：优先加入 estate-query.ts；
+- 不是：继续放在对应 Analysis domain；
+- 只有出现新的持久化事实模型或独立生命周期时，才重新考虑是否需要新的 projection/model。
+
+这个附录保留的是当时的设计推导过程，不是额外的架构规则。
