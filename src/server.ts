@@ -792,8 +792,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json({ plan: null, path: null });
       return;
     }
-    const result = await buildArchitectureAssessmentPlan(name);
-    res.json(result);
+    try {
+      const result = await buildArchitectureAssessmentPlan(name);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof ScopeGateError) {
+        res.status(409).json({ error: error.message, checks: error.result.checks });
+        return;
+      }
+      throw error;
+    }
   });
 
   app.get('/api/sessions/:name/modernization', async (req, res) => {
@@ -808,8 +816,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json({ plan: null, path: null });
       return;
     }
-    const result = await buildModernizationPlan(name);
-    res.json(result);
+    try {
+      const result = await buildModernizationPlan(name);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof ScopeGateError) {
+        res.status(409).json({ error: error.message, checks: error.result.checks });
+        return;
+      }
+      throw error;
+    }
   });
 
   app.get('/api/sessions/:name/report', async (req, res) => {
