@@ -6,7 +6,7 @@
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
-import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
+import { buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
@@ -197,8 +197,10 @@ export async function answerQuestion(
     const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
     const knowledge = await searchArchitectureKnowledge([inv.goal, effectiveQuestion].filter(Boolean).join('\n'), { workflow: inv.workflow, limit: 6 });
     const knowledgeText = renderArchitectureKnowledge(knowledge);
+    const missionPrompt = buildMissionContractPrompt(inv.mission!);
     const prompt = buildQuestionPrompt({
       investigationName: inv.name,
+      mission: inv.mission!,
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
@@ -256,6 +258,8 @@ export async function answerQuestion(
     const raw = await askCopilot({
       prompt,
       systemPrompt: [
+        // Mission Contract 始终位于动态 system message 最前面，是本次调查唯一的最高优先级目标。
+        missionPrompt,
         LEAD_SYSTEM_PROMPT,
         inv.workflow
           ? '当前工作方式：' + inv.workflow + '。它是当前 Investigation 的可执行工作流；Agent 必须围绕当前节点工作，并且只能使用工作流定义中存在的 outcome 推进。是否推进由本轮实际结果和证据决定，不能猜。'
@@ -356,6 +360,7 @@ export async function answerQuestion(
         }
       },
       ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
+      missionPrompt,
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
