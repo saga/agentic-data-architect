@@ -11,7 +11,7 @@ import * as z from 'zod';
 import { askCopilot } from '../agent/copilot.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
-import { workspaceRoot } from '../investigation/workspace.js';
+import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
 
 export const ReviewArtifactTypeSchema = z.enum([
   'report',
@@ -166,7 +166,7 @@ export async function saveArtifactReview(
     : `${review.artifactType.replaceAll('_', '-')}-review.json`;
   const filePath = path.join(reportsDir(investigationName), fileName);
   await fs.mkdir(reportsDir(investigationName), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(review, null, 2) + '\n', 'utf8');
+  await writeJsonAtomic(filePath, review);
   return filePath;
 }
 
