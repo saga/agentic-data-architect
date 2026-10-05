@@ -344,6 +344,7 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
 
   return {
     goal: context.goal || context.userPrompt,
+    scopeReady: context.scopeValidation?.status === 'validated',
     currentState: snapshot?.currentState
       ? {
           datasets: snapshot.currentState.coverage.datasets,
