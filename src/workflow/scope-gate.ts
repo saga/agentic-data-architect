@@ -112,9 +112,16 @@ export function evaluateInvestigationScopeGate(
         ? evidenceValid
         : validation.userConfirmed && evidenceValid;
   }
+  const validationDateValid = Boolean(validation && Number.isFinite(Date.parse(validation.validatedAt)));
+  add(
+    '确认时间有效',
+    validationDateValid,
+    validation ? 'validatedAt=' + validation.validatedAt : '没有确认记录。',
+  );
+
   add(
     '确认来源可以追溯',
-    sourceValid,
+    sourceValid && validationDateValid,
     validation
       ? validation.source === 'user'
         ? (validation.userConfirmed ? '用户已确认。' : '记录不是用户确认。')
@@ -151,6 +158,7 @@ export async function persistAgentIntake(
   const systems = normalized(intake.systems ?? inv.systems);
 
   if (!goal || !scope.length || !systems.length) return false;
+  if ([goal, ...scope, ...systems].some(hasPlaceholder)) return false;
 
   const source = intake.source;
   const evidenceIds = [...new Set(intake.evidenceIds)];
