@@ -9,11 +9,25 @@
  * 它放在动态 system prompt 最前面，避免长期 Copilot Session 中后续工具结果和局部问题
  * 把最初的任务目的、期望结果冲淡。
  */
-export function buildMissionContractPrompt(mission: {
-  purpose: string;
-  expectedResult: string;
-  deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
-}): string {
+export function buildMissionContractPrompt(
+  mission: {
+    purpose: string;
+    expectedResult: string;
+    deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+  },
+  progress?: {
+    covered: number;
+    total: number;
+    percent: number;
+    deliverables: Array<{
+      id: string;
+      title: string;
+      status: string;
+      detail: string;
+      required: boolean;
+    }>;
+  },
+): string {
   const deliverables = mission.deliverables
     .filter((item) => item.required)
     .map((item) => '- ' + item.title + '：' + item.description)
@@ -32,12 +46,30 @@ export function buildMissionContractPrompt(mission: {
     '### 必须关注的交付物',
     deliverables || '- 按照“期望结果”形成用户真正需要的结果。',
     '',
+    '### 当前交付覆盖',
+    ...(progress
+      ? [
+          '已覆盖 ' + String(progress.covered) + '/' + String(progress.total) + ' 项（' + String(progress.percent) + '%）。',
+          ...progress.deliverables
+            .filter((item) => item.required)
+            .map((item) =>
+              '- [' + ({
+                covered: '已覆盖',
+                in_progress: '进行中',
+                not_started: '未开始',
+                not_tracked: '未自动追踪',
+              } as Record<string, string>)[item.status] ?? item.status
+              + '] ' + item.title + '：' + item.detail),
+        ]
+      : ['当前还没有可用的交付覆盖信息。']),
+    '',
     '### 每次行动前都检查',
-    '1. 这个动作是否直接帮助完成上述期望结果？',
+    '1. 这个动作是否直接帮助完成上述期望结果中的某一项交付物？',
     '2. 如果不做这个动作，当前交付是否真的会受影响？',
     '3. 是否还有更直接的方式完成尚未覆盖的交付物？',
     '4. unknown 只是未知状态，不是自动生成的待办事项。',
     '5. 如果期望结果已经得到足够证据支持，即使还有局部 unknown，也可以停止。',
+    '6. 不要为了把覆盖数字做满而制造工作；覆盖信息只是导航依据，真实事实仍以 Evidence 为准。',
   ].join('\n');
 }
 
@@ -101,6 +133,18 @@ export function buildQuestionPrompt(args: {
     expectedResult: string;
     deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
   };
+  missionProgress?: {
+    covered: number;
+    total: number;
+    percent: number;
+    deliverables: Array<{
+      id: string;
+      title: string;
+      status: string;
+      detail: string;
+      required: boolean;
+    }>;
+  };
   goal: string;
   scope: string[];
   systems: string[];
@@ -118,6 +162,16 @@ export function buildQuestionPrompt(args: {
     '期望结果：' + args.mission.expectedResult,
     '必须围绕这个 Mission 工作；当前问题、Workflow、unknowns、routeOptions 都只是实现手段，不能改变 Mission。',
     '本轮行动必须优先帮助完成尚未覆盖的交付物；如果某个 unknown 与 Mission 无关，不要为了清空它而继续调查。',
+    ...(args.missionProgress
+      ? [
+          '',
+          '当前交付覆盖：',
+          '已覆盖 ' + String(args.missionProgress.covered) + '/' + String(args.missionProgress.total) + ' 项（' + String(args.missionProgress.percent) + '%）。',
+          ...args.missionProgress.deliverables
+            .filter((item) => item.required)
+            .map((item) => '- [' + item.status + '] ' + item.title + '：' + item.detail),
+        ]
+      : []),
     '',
     '本次任务的主要交付物：',
     args.mission.deliverables
