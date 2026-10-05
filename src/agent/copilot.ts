@@ -109,7 +109,7 @@ export interface AskInput {
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
-  onStageResult?: (result: { content: string; execution: number }) => void;
+  onStageResult?: (result: { content: string; execution: number }) => void | Promise<void>;
   /** 在 Workflow transition / Gate 前同步保存本阶段形成的 Intake，避免 Gate 读取到旧的 Scope。 */
   onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
@@ -1165,7 +1165,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         rejectUserInputTimeout = undefined;
       }
       finalContent = final?.data.content || content;
-      input.onStageResult?.({ content: finalContent, execution });
+      await input.onStageResult?.({ content: finalContent, execution });
       if (input.onBeforeWorkflowTransition) {
         await input.onBeforeWorkflowTransition({ content: finalContent, execution });
       }
