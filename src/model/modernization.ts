@@ -154,17 +154,9 @@ export const ValidationCheckSchema = z.object({
   status: z.enum(['planned', 'ready', 'passed', 'failed', 'blocked']),
   blocking: z.boolean(),
   evidenceIds: z.array(z.string()),
-  /** passed / failed 不能只有状态；必须留下本次实际检查的可读结果。 */
+  /** passed / failed 应当留下实际检查结果；Gate 会强制检查这一点。 */
   result: z.string().trim().optional(),
-}).strict().superRefine((value, ctx) => {
-  if ((value.status === 'passed' || value.status === 'failed') && !value.result?.trim()) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['result'],
-      message: '已执行的 Validation Check 必须留下实际结果。',
-    });
-  }
-});
+}).strict();
 export type ValidationCheck = z.infer<typeof ValidationCheckSchema>;
 
 /**
