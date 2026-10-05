@@ -154,3 +154,20 @@ test('specific current-state deliverables do not create a redundant umbrella del
     ['data-source', 'data-flow', 'data-model'],
   );
 });
+
+
+test('Mission gate treats user confirmation as a state requirement', () => {
+  const purpose = '理解 IBM 老系统当前的数据架构，为后续判断提供依据。';
+  const expectedResult = '只需要当前 Data Source、Data Flow 和 Data Model。';
+  const mission = {
+    version: 1 as const,
+    purpose,
+    expectedResult,
+    deliverables: inferMissionDeliverables(purpose, expectedResult),
+    status: 'confirmed' as const,
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user' as const,
+  };
+  const result = evaluateMissionGate(mission);
+  assert.equal(result.checks.some((item) => item.name === '已由用户确认' && item.passed), true);
+});
