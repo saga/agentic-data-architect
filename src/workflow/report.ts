@@ -12,9 +12,9 @@ import { assertMissionGate } from './mission-gate.js';
 export async function runReport(
   name: string,
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
-  const report = await buildReport(name);
   const investigation = await loadInvestigation(name);
   assertMissionGate(investigation.mission);
+  const report = await buildReport(name);
   const review = await reviewArtifact({
     investigationName: name,
     goal: investigation.mission?.purpose || investigation.goal || investigation.userPrompt,
