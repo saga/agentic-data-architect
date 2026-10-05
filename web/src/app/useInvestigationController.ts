@@ -11,6 +11,8 @@ import {
   type InvestigationCheckpoint,
   type InvestigationControl,
   type JourneyState,
+  type MissionContract,
+  type MissionDraft,
   type PendingPermission,
   type PendingUserInput,
   type SessionContext,
@@ -126,6 +128,14 @@ export function useInvestigationController() {
   const [unknownsOpen, setUnknownsOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [journey, setJourney] = useState<JourneyState>();
+  const [missionOpen, setMissionOpen] = useState(false);
+  const [missionDraft, setMissionDraft] = useState<MissionDraft>({
+    purpose: '',
+    expectedResult: '',
+    deliverableIds: [],
+  });
+  const [missionSaving, setMissionSaving] = useState(false);
+  const [pendingMissionMessage, setPendingMissionMessage] = useState<string>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -498,21 +508,6 @@ export function useInvestigationController() {
       activeTurnRef.current = { key: key as string, turnId, controller };
       setStreamingAnswer({ key: key as string, content: '' });
 
-      setCurrent((existing) => existing ? {
-        ...existing,
-        messages: [
-          ...existing.messages,
-          {
-            id: `${turnId}:user`,
-            role: 'user',
-            content: routeId
-              ? '选择下一步：' + (selectedRoute?.title ?? routeId)
-              : message,
-            capturedAt: new Date().toISOString(),
-          },
-        ],
-      } : existing);
-
       const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -522,7 +517,26 @@ export function useInvestigationController() {
 
       if (!response.ok) {
         const body = await response.text();
-        throw new Error(body || response.statusText);
+        let parsedBody: { code?: string; error?: string; draft?: MissionDraft } | undefined;
+        try {
+          parsedBody = JSON.parse(body) as typeof parsedBody;
+        } catch {
+          parsedBody = undefined;
+        }
+
+        if (response.status === 409 && parsedBody?.code === 'MISSION_REQUIRED') {
+          setMissionDraft(parsedBody.draft ?? {
+            purpose: current?.context.mission?.purpose ?? '',
+            expectedResult: current?.context.mission?.expectedResult ?? '',
+            deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
+          });
+          setPendingMissionMessage(message);
+          setMissionOpen(true);
+          setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
+          return;
+        }
+
+        throw new Error(parsedBody?.error || body || response.statusText);
       }
 
       let result: {
@@ -618,6 +632,70 @@ export function useInvestigationController() {
       setTurnStatus('助手正在处理你的问题，请稍候…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
+    }
+  };
+
+  /** 打开 Mission 编辑/确认窗口；已确认 Mission 也可以从这里修改。 */
+  const editMission = () => {
+    const mission = current?.context.mission;
+    setMissionDraft(mission
+      ? {
+          purpose: mission.purpose,
+          expectedResult: mission.expectedResult,
+          deliverableIds: mission.deliverables.map((item) => item.id),
+        }
+      : {
+          purpose: current?.context.goal || current?.context.userPrompt || '',
+          expectedResult: '',
+          deliverableIds: [],
+        });
+    setMissionOpen(true);
+  };
+
+  /** 用户确认 Mission 后保存；若刚才有请求被 Gate 拦住，则自动继续执行。 */
+  const confirmMission = async () => {
+    if (!active || missionSaving) return;
+    const purpose = missionDraft.purpose.trim();
+    const expectedResult = missionDraft.expectedResult.trim();
+    if (!purpose || !expectedResult) {
+      setError('请先填写任务目的和期望结果。');
+      return;
+    }
+
+    setMissionSaving(true);
+    setError(undefined);
+    try {
+      const result = await getJson<{ context: SessionContext; mission: MissionContract }>(
+        '/api/sessions/' + encodeURIComponent(active) + '/mission',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ purpose, expectedResult }),
+        },
+      );
+
+      setCurrent((existing) => existing ? { ...existing, context: result.context } : existing);
+      setMissionOpen(false);
+      setMissionDraft({
+        purpose: result.mission.purpose,
+        expectedResult: result.mission.expectedResult,
+        deliverableIds: result.mission.deliverables.map((item) => item.id),
+      });
+
+      const nextMessage = pendingMissionMessage;
+      setPendingMissionMessage(undefined);
+      setTurnStatus('任务已确认，开始执行。');
+
+      await loadSession(active);
+      await reloadSessions(false);
+
+      if (nextMessage) {
+        void send(nextMessage);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '无法保存任务目标');
+    } finally {
+      setMissionSaving(false);
     }
   };
 
@@ -759,6 +837,9 @@ export function useInvestigationController() {
     workflowConfirmText,
     unknownsOpen,
     error,
+    missionOpen,
+    missionDraft,
+    missionSaving,
     journey,
     attachmentsOpen,
     attachments,
@@ -795,6 +876,10 @@ export function useInvestigationController() {
     setWorkflowConfirmText,
     setUnknownsOpen,
     setError,
+    editMission,
+    confirmMission,
+    setMissionOpen,
+    setMissionDraft,
     setResizing,
     setShowLeftTip,
   };
