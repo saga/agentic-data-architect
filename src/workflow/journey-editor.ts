@@ -826,27 +826,15 @@ export async function applyAgentWorkflowTransition(
   const mission = assertMissionGate((await loadInvestigation(name)).mission);
 
   /**
-   * 先解析并持久化工作成果，再处理 Workflow outcome。
+   * 先解析 Agent 提出的 outcome，并检查 Mission / Workflow 边界。
    *
-   * 这里必须位于 ask.ts 的最终 Investigation commit 之前：Workflow 是严格的状态边界，
-   * 所以不能允许“先跳图、后发现结果没保存”这种错误顺序。
+   * 重要顺序：
+   * 1. 先确定 Agent 到底想推进哪条边；
+   * 2. 先检查 Mission 是否允许进入目标节点；
+   * 3. 再保存这一阶段的 Modernization 工作成果。
+   *
+   * 这样“用户没有要求的结果”不会先落盘，再被 Gate 拒绝。
    */
-  let persistedModernization = false;
-  if (workflowId === 'legacy-modernization') {
-    try {
-      const latestInvestigation = await loadInvestigation(name);
-      const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
-      const parsed = parseAgentAnswer(rawAnswer, evidenceMap);
-      const persisted = await persistModernizationAgentResult(name, parsed.modernization);
-      persistedModernization = persisted.saved;
-    } catch (error) {
-      return {
-        applied: false,
-        error: '保存 Modernization 工作成果失败：' + (error instanceof Error ? error.message : String(error)),
-      };
-    }
-  }
-
   const transition = extractWorkflowTransition(rawAnswer);
   if (!transition) return { applied: false };
 
@@ -865,6 +853,60 @@ export async function applyAgentWorkflowTransition(
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
+
+    const route = currentNode?.routes.find((item) =>
+      item.outcome.toLowerCase() === transition.outcome.toLowerCase(),
+    );
+
+    // Mission / Scope / Workflow 边界必须先通过，再允许落盘本阶段的方案成果。
+    if (transition.outcome === 'success' && route) {
+      const context = await loadInvestigation(name);
+      const currentStateOnly = isCurrentStateOnlyScope(context.goal, context.scope);
+      if (
+        currentStateOnly
+        && ['target', 'mapping', 'validation', 'cutover'].includes(route.target)
+      ) {
+        throw new Error('本次调查范围明确只包含当前状态分析，不能进入目标架构、迁移映射或切换阶段；如需继续，请先由用户明确调整范围。');
+      }
+
+      const missionBoundary = isMissionWorkflowTargetAllowed(
+        mission,
+        route.target,
+        active.definition.nodes.find((node) => node.id === route.target)?.title,
+      );
+      if (!missionBoundary.allowed) {
+        throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
+      }
+
+      const targetNode = active.definition.nodes.find((node) => node.id === route.target);
+      if (targetNode?.type === 'end') {
+        const progress = await buildMissionProgress(name, mission);
+        const uncovered = progress?.deliverables.filter(
+          (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+        ) ?? [];
+        if (uncovered.length) {
+          throw new Error(
+            '本次任务还有未完成的结果：'
+            + uncovered.map((item) => item.title).join('、')
+            + '。请先完成这些结果，再结束 Workflow。',
+          );
+        }
+      }
+    }
+
+    if (workflowId === 'legacy-modernization') {
+      try {
+        const latestInvestigation = await loadInvestigation(name);
+        const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
+        const parsed = parseAgentAnswer(rawAnswer, evidenceMap);
+        await persistModernizationAgentResult(name, parsed.modernization);
+      } catch (error) {
+        return {
+          applied: false,
+          error: '保存 Modernization 工作成果失败：' + (error instanceof Error ? error.message : String(error)),
+        };
+      }
     }
 
     // 用户明确要求只分析现状时，即使 Agent 返回合法的 Workflow outcome，也不能越过范围进入设计阶段。
