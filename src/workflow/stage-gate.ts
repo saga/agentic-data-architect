@@ -45,6 +45,8 @@ export interface StageGateResult {
   checks: StageGateCheck[];
   newEvidenceIds: string[];
   newFindingIds: string[];
+  /** 本阶段真正让 Mission 哪些交付物向前推进；这是 Script Gate 的确定性结果。 */
+  advancedDeliverables: Array<{ id: string; title: string; from: string; to: string }>;
   evidenceBackedClaimCount: number;
 }
 
@@ -185,6 +187,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     checks,
     newEvidenceIds,
     newFindingIds,
+    advancedDeliverables,
     evidenceBackedClaimCount: evidenceBackedClaims.length,
   };
 }
