@@ -153,7 +153,7 @@ export async function answerQuestion(
     const ctx = buildQuestionContext({
       question: effectiveQuestion,
       estate: snapshot?.estate ?? { nodes: [], edges: [] },
-      lineage: snapshot?.lineage ?? null,
+      hasSqlLineage: snapshot?.lineage != null,
       profiles: snapshot?.profiles ?? [],
       findings: inv.findings,
       evidence: inv.evidence,
