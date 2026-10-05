@@ -23,6 +23,7 @@ import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadModernizationJourney } from './journey.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
+import { assertInvestigationScopeGate } from './scope-gate.js';
 
 function productId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
@@ -196,6 +197,8 @@ function buildTargetArchitecture(
 
 /** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
+  // 正式阶段成果不能在范围仍是 unset 时生成；先通过独立 Scope Gate。
+  await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
