@@ -339,6 +339,7 @@ export function useInvestigationController() {
     setMissionOpen(false);
     setMissionError(undefined);
     setPendingMissionMessage(undefined);
+    setPendingMissionTurnId(undefined);
     setMissionDraft({ purpose: '', expectedResult: '', deliverableIds: [] });
     setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
     if (active) {
@@ -817,6 +818,10 @@ export function useInvestigationController() {
   const createSession = async () => {
     const name = newSessionName.trim();
     if (!name) return;
+    // 防止上一次创建失败留下的临时启动状态污染下一次新建调查。
+    pendingInitialMissionDraftRef.current = undefined;
+    pendingInitialAutoStartRef.current = undefined;
+    pendingInitialMissionErrorRef.current = undefined;
     try {
       const purpose = newSessionGoal.trim();
       const expectedResult = newSessionExpectedResult.trim();
