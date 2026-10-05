@@ -143,6 +143,28 @@ export interface MissionDraft {
   deliverableIds: string[];
 }
 
+export type MissionDeliverableStatus =
+  | 'covered'
+  | 'in_progress'
+  | 'not_started'
+  | 'not_tracked';
+
+export interface MissionDeliverableProgress {
+  id: string;
+  title: string;
+  description: string;
+  required: boolean;
+  status: MissionDeliverableStatus;
+  detail: string;
+}
+
+export interface MissionProgress {
+  covered: number;
+  total: number;
+  percent: number;
+  deliverables: MissionDeliverableProgress[];
+}
+
 export type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
 
 export const workflowOptions = [
@@ -203,6 +225,8 @@ export interface InvestigationCheckpoint {
 
 export interface SessionData {
   context: SessionContext;
+  /** 根据 Mission 交付物和已落盘状态计算的当前覆盖情况。 */
+  missionProgress?: MissionProgress | null;
   control: InvestigationControl;
   recentAudit: AuditEvent[];
   messages: Message[];
