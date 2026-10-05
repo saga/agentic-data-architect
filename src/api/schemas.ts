@@ -50,7 +50,7 @@ export const AbortBodySchema = z.object({
   turnId: z.string().trim().min(1),
 }).strict();
 
-/** 前端处理 Agent 权限请求；scope=session 表示批准当前 Copilot Session 后续继续使用这项权限。 */
+/** 前端处理 Agent 权限请求；每次只能处理当前这一项权限。 */
 export const PermissionResponseBodySchema = z.object({
   turnId: z.string().trim().min(1),
   requestId: z.string().trim().min(1),
