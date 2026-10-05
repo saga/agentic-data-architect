@@ -44,6 +44,7 @@ export function InvestigationChatPanel(props: {
   missionOpen: boolean;
   missionDraft: MissionDraft;
   missionSaving: boolean;
+  missionError?: string;
   onOpenMission: () => void;
   onCloseMission: () => void;
   onChangeMission: (draft: MissionDraft) => void;
@@ -209,6 +210,7 @@ export function InvestigationChatPanel(props: {
         open={props.missionOpen}
         saving={props.missionSaving}
         loading={props.loading}
+        error={props.missionError}
         onOpen={props.onOpenMission}
         onClose={props.onCloseMission}
         onChange={props.onChangeMission}
