@@ -29,7 +29,7 @@ export function newInvestigation(name: string, userPrompt = '', workflow: Invest
     name,
     userPrompt,
     workflow,
-    // 用户创建 Investigation 时输入的第一句话就是任务目标；同时保留 userPrompt 作为原始输入。
+    // 原始输入只作为 Mission 候选，必须经过用户确认后才进入正式执行。
     goal: userPrompt.trim(),
     scope: [],
     systems: [],
@@ -86,6 +86,7 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
+      ...(inv.mission ? { mission: inv.mission } : {}),
       ...(inv.scopeValidation ? { scopeValidation: inv.scopeValidation } : {}),
       questions: inv.questions,
       discoveryRuns: inv.discoveryRuns,
@@ -138,6 +139,37 @@ export async function loadInvestigation(name: string): Promise<Investigation> {
   }
 
   throw new Error('Investigation 不存在：' + name);
+}
+
+/**
+ * 保存并确认本次 Investigation 的 Mission Contract。
+ *
+ * Mission 改变后，原来的 Scope Confirmation、Agent Session 和动态路线都可能已经过时，
+ * 因此一律失效，要求从新的 Mission 重新整理。
+ */
+export async function confirmInvestigationMission(
+  name: string,
+  mission: Investigation['mission'],
+): Promise<Investigation> {
+  if (!mission) throw new Error('Mission 不能为空。');
+
+  return withWorkspaceContextLock(name, async () => {
+    const current = await loadWorkspaceContext(name);
+    const next = WorkspaceContextSchema.parse({
+      ...current,
+      mission,
+      // 兼容现有代码：goal 继续保存任务目的，但 Mission 是新的最高优先级来源。
+      goal: mission.purpose,
+      updatedAt: new Date().toISOString(),
+    });
+    const nextState = { ...next };
+    delete nextState.scopeValidation;
+    delete nextState.copilotSessionId;
+    delete nextState.copilotConfigurationVersion;
+    delete nextState.journeyPlan;
+    await writeJsonAtomic(contextFile(name), nextState);
+    return nextState;
+  });
 }
 
 /** 修改当前 Investigation 的工作路线；不改变 Evidence、消息或其它调查状态。 */
@@ -206,6 +238,7 @@ function normalizeInvestigation(name: string, raw: Partial<Investigation>): Inve
     goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
+    ...(raw.mission ? { mission: raw.mission } : {}),
     ...(raw.scopeValidation ? { scopeValidation: raw.scopeValidation } : {}),
     questions: raw.questions ?? [],
     discoveryRuns: raw.discoveryRuns ?? [],
