@@ -24,6 +24,7 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadModernizationJourney } from './journey.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
+import { assertMissionGate } from './mission-gate.js';
 
 function productId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
@@ -200,6 +201,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   // 正式阶段成果不能在范围仍是 unset 时生成；先通过独立 Scope Gate。
   await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
+  assertMissionGate(inv.mission);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({
