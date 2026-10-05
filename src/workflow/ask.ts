@@ -397,18 +397,18 @@ export async function answerQuestion(
           workingDirectory: workspaceRoot(inv.name),
         });
 
-        // Smart Function 不可用时不把它伪装成权限边界；仍允许首次动作执行，
-        // 但 Stage Gate 会在阶段结束时检查真实成果是否确实推进 Mission。
+        // 行动前检查属于 Mission 执行约束；语义判断不可用时宁可停下来，
+        // 也不能在“没有目标校准”的情况下继续调用调查工具。
         if (!review) {
           recordTrajectory({
             type: 'status',
-            name: 'Mission 行动语义检查暂不可用',
-            status: 'info',
+            name: 'Mission 行动检查不可用，暂停执行',
+            status: 'failed',
             details: { execution, toolName },
           });
           return {
-            allowed: true,
-            reason: 'Mission Action Review 暂不可用，本次由阶段成果 Gate 兜底。',
+            allowed: false,
+            reason: 'Mission Action Review 暂不可用，无法确认这个动作是否直接、必要地服务当前 Mission；暂不执行。',
           };
         }
 
