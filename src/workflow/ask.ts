@@ -31,7 +31,7 @@ import {
   evaluateInvestigationStageGate,
   snapshotInvestigationForStageGate,
 } from './stage-gate.js';
-import { buildMissionProgress } from './mission-progress.js';
+import { buildMissionProgress, missionHasOpenDeliverables } from './mission-progress.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -399,9 +399,7 @@ export async function answerQuestion(
         assertMissionGate(latest.mission);
         const progress = await buildMissionProgress(investigationName, latest.mission);
         if (!progress) return true;
-        return progress.deliverables.some(
-          (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
-        );
+        return missionHasOpenDeliverables(progress);
       },
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
