@@ -460,65 +460,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
   if (input.turnId) {
     activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
   }
-  const heartbeat = setInterval(() => {
-    input.onTrajectory?.({
-      type: 'status',
-      name: 'Agent 状态',
-      status: 'info',
-      details: {
-        elapsedMs: Date.now() - turnStartedAt,
-        lastActivityAt,
-        lastActivityType,
-        lastActivity,
-        pendingTools: trajectoryToolStarts.size,
-        pendingPermissions: pendingPermissions.size,
-        pendingUserInputs: pendingUserInputs.size,
-        assistantTurnEnded,
-        sessionIdleObserved,
-        modelCallCount,
-      },
-    });
-  }, 15_000);
-
-  executionWatchdogId = setInterval(executionWatchdog, 250);
-  executionWatchdogId.unref?.();
-
-  try {
-    if (input.shouldAbort?.()) {
-      await session.abort();
-      throw new Error('Turn aborted.');
-    }
-    await session.rpc.skills.reload();
-  } catch {
-    // Skill reload is best-effort; session creation still works on older runtimes.
-  }
-
-  const usageBefore = await getSessionUsageMetrics(session);
-
-  input.onTrajectory?.({
-    type: 'turn_start',
-    name: 'Agent 本轮开始',
-    status: 'started',
-    model: selectedModel,
-    details: {
-      sessionId: session.sessionId,
-      ...(input.autoTier ? { autoTier: input.autoTier } : {}),
-    },
-  });
-
-  let content = '';
-  // 运行态诊断只记录“当前在哪一步”，不记录模型隐藏推理正文。
-  const turnStartedAt = Date.now();
-  const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
-  const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
-  const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
   let pendingUserInputWaits = 0;
 
   /**
-   * 三类 timeout 完全独立，不共享 waitMode 或 timer ID：
+   * 三类 timeout 完全独立：
    * - Agent 执行 watchdog：只累计真正执行中的时间；
-   * - Permission watchdog：独立 1 小时，负责等待人工确认；
-   * - User-input watchdog：独立 1 小时，负责 ask_user。
+   * - Permission watchdog：独立等待人工确认；
+   * - User-input watchdog：独立等待 ask_user。
    *
    * watchdog 本身不会暂停；它一直运行，只是不把人工等待计入 Agent 执行预算。
    */
@@ -580,6 +528,58 @@ export async function askCopilot(input: AskInput): Promise<string> {
     userInputWaitTimeoutId = undefined;
   };
 
+  const heartbeat = setInterval(() => {
+    input.onTrajectory?.({
+      type: 'status',
+      name: 'Agent 状态',
+      status: 'info',
+      details: {
+        elapsedMs: Date.now() - turnStartedAt,
+        lastActivityAt,
+        lastActivityType,
+        lastActivity,
+        pendingTools: trajectoryToolStarts.size,
+        pendingPermissions: pendingPermissions.size,
+        pendingUserInputs: pendingUserInputs.size,
+        assistantTurnEnded,
+        sessionIdleObserved,
+        modelCallCount,
+      },
+    });
+  }, 15_000);
+
+  executionWatchdogId = setInterval(executionWatchdog, 250);
+  executionWatchdogId.unref?.();
+
+  try {
+    if (input.shouldAbort?.()) {
+      await session.abort();
+      throw new Error('Turn aborted.');
+    }
+    await session.rpc.skills.reload();
+  } catch {
+    // Skill reload is best-effort; session creation still works on older runtimes.
+  }
+
+  const usageBefore = await getSessionUsageMetrics(session);
+
+  input.onTrajectory?.({
+    type: 'turn_start',
+    name: 'Agent 本轮开始',
+    status: 'started',
+    model: selectedModel,
+    details: {
+      sessionId: session.sessionId,
+      ...(input.autoTier ? { autoTier: input.autoTier } : {}),
+    },
+  });
+
+  let content = '';
+  // 运行态诊断只记录“当前在哪一步”，不记录模型隐藏推理正文。
+  const turnStartedAt = Date.now();
+  const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
+  const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
+  const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
   let lastActivityAt = new Date(turnStartedAt).toISOString();
   let lastActivityType = 'turn_start';
   let lastActivity = 'Agent 本轮开始';
