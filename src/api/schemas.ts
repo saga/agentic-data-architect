@@ -55,17 +55,9 @@ export const PermissionResponseBodySchema = z.object({
   turnId: z.string().trim().min(1),
   requestId: z.string().trim().min(1),
   allowed: z.boolean(),
-  /** once = 只允许这一次；session = 使用 Copilot SDK 的会话级批准。 */
-  scope: z.enum(['once', 'session']).default('once'),
-}).strict().superRefine((value, ctx) => {
-  if (!value.allowed && value.scope === 'session') {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['scope'],
-      message: '拒绝操作时不能使用会话级批准。',
-    });
-  }
-});
+  /** 只能允许当前这一次；不支持 session 级持续授权。 */
+  scope: z.literal('once').default('once'),
+}).strict();
 
 /** 回答 Agent 的 ask_user 请求；requestId 是工作台生成的运行态请求 ID。 */
 export const UserInputResponseBodySchema = z.object({
