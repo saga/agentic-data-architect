@@ -36,6 +36,13 @@ export interface MissionProgress {
   deliverables: MissionDeliverableProgress[];
 }
 
+/** 只根据 Mission 交付物状态判断是否还有必要自动继续，不看 Agent 自己的“完成”声明。 */
+export function missionHasOpenDeliverables(progress: MissionProgress): boolean {
+  return progress.deliverables.some(
+    (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+  );
+}
+
 interface ProgressSignals {
   currentState: DiscoverySnapshot['currentState'] | null;
   estateNodeCount: number;
