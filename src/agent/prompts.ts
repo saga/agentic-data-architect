@@ -3,6 +3,44 @@
  * 模型必须返回严格 JSON，claim 只能引用目录里出现的 evidence id。
  */
 
+/**
+ * Mission Contract 是每一轮调查都必须重新看到的最高优先级上下文。
+ *
+ * 它放在动态 system prompt 最前面，避免长期 Copilot Session 中后续工具结果和局部问题
+ * 把最初的任务目的、期望结果冲淡。
+ */
+export function buildMissionContractPrompt(mission: {
+  purpose: string;
+  expectedResult: string;
+  deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+}): string {
+  const deliverables = mission.deliverables
+    .filter((item) => item.required)
+    .map((item) => '- ' + item.title + '：' + item.description)
+    .join('\n');
+
+  return [
+    '## 最高优先级：本次任务 Mission',
+    '你现在做的所有调查，都必须服务于下面这个任务。不要因为当前问题、Workflow 节点、unknown 或某个工具结果看起来有意思，就改变任务。',
+    '',
+    '### 任务目的：为什么做',
+    mission.purpose.trim(),
+    '',
+    '### 期望结果：最后要拿到什么',
+    mission.expectedResult.trim(),
+    '',
+    '### 必须关注的交付物',
+    deliverables || '- 按照“期望结果”形成用户真正需要的结果。',
+    '',
+    '### 每次行动前都检查',
+    '1. 这个动作是否直接帮助完成上述期望结果？',
+    '2. 如果不做这个动作，当前交付是否真的会受影响？',
+    '3. 是否还有更直接的方式完成尚未覆盖的交付物？',
+    '4. unknown 只是未知状态，不是自动生成的待办事项。',
+    '5. 如果期望结果已经得到足够证据支持，即使还有局部 unknown，也可以停止。',
+  ].join('\n');
+}
+
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
 
 规则：
