@@ -426,6 +426,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       shouldContinueMission: input.shouldContinueMission,
       onStageResult: input.onStageResult,
       onBeforeWorkflowTransition: input.onBeforeWorkflowTransition,
+      responseSchema: input.responseSchema,
       workflowSkill: input.workflowSkill,
       investigationName,
     });
