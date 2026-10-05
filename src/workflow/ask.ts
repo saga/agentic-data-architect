@@ -300,6 +300,17 @@ export async function answerQuestion(
       if (!inv.evidence.some((item) => item.id === evidence.id)) inv.evidence.push(evidence);
     }
     const parsed = parseAgentAnswer(raw, evidenceAfterTools);
+    if (parsed.warnings.length) {
+      recordTrajectory({
+        type: 'status',
+        name: '结构化结果已自动修正',
+        status: 'info',
+        details: {
+          warnings: parsed.warnings,
+          droppedEvidenceRefs: parsed.droppedEvidenceRefs,
+        },
+      });
+    }
     const claims = toClaims(parsed, () => nextId('c'));
     inv.claims.push(...claims);
     if (!inv.questions.includes(effectiveQuestion)) inv.questions.push(effectiveQuestion);
