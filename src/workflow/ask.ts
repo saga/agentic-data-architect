@@ -25,6 +25,7 @@ import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
 import { persistAgentIntake } from './scope-gate.js';
+import { assertMissionGate } from './mission-gate.js';
 import {
   buildStageCheckpoint,
   evaluateInvestigationStageGate,
@@ -81,6 +82,10 @@ export async function answerQuestion(
     : question;
 
   if (!turnId) turnId = nextId('turn');
+
+  // API 层已有 Mission Gate；这里再做一次内部防线，防止其它调用方绕过 HTTP 直接执行 Agent。
+  const missionPreflight = await loadInvestigation(investigationName);
+  assertMissionGate(missionPreflight.mission);
 
   const reservedTurn = activeInvestigationTurns.get(investigationName);
   if (reservedTurn && reservedTurn.turnId !== turnId) {
