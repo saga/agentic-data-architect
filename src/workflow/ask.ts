@@ -24,6 +24,7 @@ import { workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
+import { persistAgentIntake } from './scope-gate.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -281,6 +282,15 @@ export async function answerQuestion(
         });
         onStatus?.('阶段小结：' + checkpoint.title);
       },
+      onBeforeWorkflowTransition: async ({ content }) => {
+        // 每个阶段在 Gate 前先把本轮已经形成的、且通过 Evidence 校验的 intake 写入 context。
+        const latest = await loadInvestigation(investigationName);
+        const evidenceMap = new Map(latest.evidence.map((item) => [item.id, item]));
+        const stageParsed = parseAgentAnswer(content, evidenceMap);
+        if (stageParsed.intake) {
+          await persistAgentIntake(investigationName, stageParsed.intake);
+        }
+      },
       ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
@@ -301,11 +311,9 @@ export async function answerQuestion(
     if (activeAfterExecution?.turnId === turnId) activeAfterExecution.phase = 'committing';
     abortRequestedTurns.delete(turnId);
 
-    const latestAfterTools = await loadInvestigation(investigationName);
-    const evidenceAfterTools = new Map(latestAfterTools.evidence.map((e) => [e.id, e]));
-    for (const evidence of latestAfterTools.evidence) {
-      if (!inv.evidence.some((item) => item.id === evidence.id)) inv.evidence.push(evidence);
-    }
+    // Agent 在 Gate 前可能刚刚确认了 Scope；重新加载最新 Investigation，避免旧内存快照把新范围覆盖回去。
+    inv = await loadInvestigation(investigationName);
+    const evidenceAfterTools = new Map(inv.evidence.map((e) => [e.id, e]));
     const parsed = parseAgentAnswer(raw, evidenceAfterTools);
     if (parsed.warnings.length) {
       recordTrajectory({
