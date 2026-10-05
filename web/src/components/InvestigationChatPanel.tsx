@@ -204,6 +204,7 @@ export function InvestigationChatPanel(props: {
     <div className="chat-main">
       <MissionContractPanel
         mission={props.current.context.mission}
+        progress={props.current.missionProgress}
         draft={props.missionDraft}
         open={props.missionOpen}
         saving={props.missionSaving}
