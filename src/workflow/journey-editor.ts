@@ -29,7 +29,6 @@ import { runModernizationGate, type ModernizationGateStage } from './modernizati
 import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate, isMissionWorkflowTargetAllowed } from './mission-gate.js';
 import { buildMissionProgress } from './mission-progress.js';
-import { assertMissionGate } from './mission-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { isJourneyCompletionConditionSatisfied } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -824,8 +823,7 @@ export async function applyAgentWorkflowTransition(
   rawAnswer: string,
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
   if (!workflowId) return { applied: false };
-  const missionContext = await loadInvestigation(name);
-  assertMissionGate(missionContext.mission);
+  const mission = assertMissionGate((await loadInvestigation(name)).mission);
 
   /**
    * 先解析并持久化工作成果，再处理 Workflow outcome。
@@ -887,7 +885,7 @@ export async function applyAgentWorkflowTransition(
       // Data Model，就不能因为 legacy-modernization 默认路线存在 target 节点而进入方案设计。
       if (transition.outcome === 'success' && route) {
         const missionBoundary = isMissionWorkflowTargetAllowed(
-          context.mission!,
+          mission,
           route.target,
           active.definition.nodes.find((node) => node.id === route.target)?.title,
         );
