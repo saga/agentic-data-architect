@@ -74,17 +74,26 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     inventory = await discoverDirectory(opts.path, 'pending');
     const reusable = await findReusablePathDiscoveryRun(name, inv, opts.path, inventory);
     if (reusable) {
+      const snapshotPath = path.join(discoveryDir(name), reusable.id + '.json');
+      let columnsFound = 0;
+      try {
+        const snapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8')) as DiscoverySnapshot;
+        columnsFound = snapshot.lineage?.columns.length
+          ?? snapshot.estate.nodes.filter((node) => node.type === 'column').length;
+      } catch {
+        // 旧 snapshot 损坏时不阻塞调用；下一次文件变化会触发新的 Discovery。
+      }
       return {
         runId: reusable.id,
         filesScanned: reusable.filesScanned,
         datasetsFound: reusable.datasetsFound,
         lineageEdgesFound: reusable.lineageEdgesFound,
-        columnsFound: reusable.datasetsFound,
+        columnsFound,
         findingsFound: inv.findings.length,
         parseFailures: reusable.sqlParseFailures ?? 0,
         semanticAssetsFound: reusable.semanticAssetsFound ?? 0,
         unknowns: inv.unknowns,
-        snapshotPath: path.join(discoveryDir(name), reusable.id + '.json'),
+        snapshotPath,
       };
     }
   }
