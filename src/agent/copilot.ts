@@ -33,6 +33,13 @@ const WORKBENCH_TOOLS = new ToolSet()
   .addBuiltIn(['ask_user', 'task_complete', 'skill', 'grep', 'glob', 'view', 'bash'])
   .addMcp('*');
 
+const MISSION_ACTION_SKIP_TOOLS = new Set(['ask_user', 'task_complete', 'skill']);
+
+/** 这些工具控制对话/能力本身，不代表调查动作；真正的调查工具需要经过首个动作检查。 */
+function shouldCheckMissionAction(toolName: string): boolean {
+  return !MISSION_ACTION_SKIP_TOOLS.has(toolName);
+}
+
 /** 获取并启动进程级 CopilotClient；首次调用启动，后续调用复用。 */
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
@@ -119,6 +126,15 @@ export interface AskInput {
    * 这是停止自动续跑的确定性导航条件，不替代 Workflow Gate。
    */
   shouldContinueMission?: () => boolean | Promise<boolean>;
+  /**
+   * 在每个自动续跑阶段的第一个实质工具动作执行前做一次 Mission 语义检查。
+   * 不是权限边界，也不对每个工具调用重复跑模型；后续由 Stage Gate 兜底。
+   */
+  missionActionGate?: (input: {
+    execution: number;
+    toolName: string;
+    toolArgs: unknown;
+  }) => Promise<{ allowed: boolean; reason: string; targetDeliverableId?: string | null }>;
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
@@ -385,6 +401,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // 必须在 watchdog 闭包初始化前记录 turn 起始时间，避免块级变量先用后声明。
   const turnStartedAt = Date.now();
 
+  // 当前自动续跑阶段；onPreToolUse 会读取它，不需要把 execution 泄漏到 SDK Session 状态。
+  let currentExecution = 0;
+  let missionActionReviewedExecution = -1;
+
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
@@ -410,6 +430,63 @@ export async function askCopilot(input: AskInput): Promise<string> {
       });
       return { kind: 'cancelled' as const };
     },
+    ...(input.missionActionGate ? {
+      hooks: {
+        /**
+         * 第一项实质工具动作执行前做一次 Mission Action Review。
+         *
+         * 同一阶段后续的 grep / view / bash 等操作不重复调用模型；
+         * 阶段结束后再由 Stage Gate 检查实际产物，避免额外成本变成另一种循环。
+         */
+        onPreToolUse: async (toolInput) => {
+          if (!shouldCheckMissionAction(toolInput.toolName)) return null;
+          if (missionActionReviewedExecution === currentExecution) return null;
+
+          const decision = await input.missionActionGate?.({
+            execution: currentExecution,
+            toolName: toolInput.toolName,
+            toolArgs: toolInput.toolArgs,
+          });
+          if (!decision) return null;
+
+          if (decision.allowed) {
+            missionActionReviewedExecution = currentExecution;
+            input.onTrajectory?.({
+              type: 'status',
+              name: 'Mission 行动检查通过',
+              status: 'completed',
+              details: {
+                execution: currentExecution,
+                toolName: toolInput.toolName,
+                ...(decision.targetDeliverableId ? { targetDeliverableId: decision.targetDeliverableId } : {}),
+              },
+            });
+            return { permissionDecision: 'allow' };
+          }
+
+          input.onTrajectory?.({
+            type: 'status',
+            name: 'Mission 行动被拦截',
+            status: 'info',
+            details: {
+              execution: currentExecution,
+              toolName: toolInput.toolName,
+              reason: decision.reason,
+            },
+          });
+
+          return {
+            permissionDecision: 'deny',
+            permissionDecisionReason: decision.reason,
+            additionalContext: [
+              '这个工具动作被 Mission Action Gate 拦截。',
+              '不要重复执行同一个动作，也不要为了完成“继续调查”而随便换一个无关工具。',
+              '重新回到 Mission，选择直接服务某个尚未解决交付物、且现在确有必要的动作。',
+            ].join('\n'),
+          };
+        },
+      },
+    } : {}),
     /**
      * ask_user 必须由宿主提供异步 handler。
      * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
@@ -1120,6 +1197,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     let currentWorkflowInstruction = workflowInstruction;
 
     for (let execution = 0; execution <= autoContinuationTurns; execution += 1) {
+      currentExecution = execution;
+      missionActionReviewedExecution = -1;
+
       if (input.shouldAbort?.()) {
         await session.abort();
         throw new Error('Turn aborted.');
