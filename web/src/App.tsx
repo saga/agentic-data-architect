@@ -33,6 +33,7 @@ import {
   SettingOutlined,
   ToolOutlined,
   CopyOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import {
   Attachments,
@@ -48,6 +49,7 @@ import { XMarkdown } from '@ant-design/x-markdown';
 const JourneyMap = lazy(() => import('./components/JourneyMap').then((module) => ({ default: module.JourneyMap })));
 const InvestigationConfigPage = lazy(() => import('./components/InvestigationConfigPage').then((module) => ({ default: module.InvestigationConfigPage })));
 const AgentTrajectoryPage = lazy(() => import('./components/AgentTrajectoryPage').then((module) => ({ default: module.AgentTrajectoryPage })));
+const InvestigationResultsPage = lazy(() => import('./components/InvestigationResultsPage').then((module) => ({ default: module.InvestigationResultsPage })));
 import zhCN from 'antd/locale/zh_CN';
 import '@ant-design/x-markdown/themes/light.css';
 
@@ -484,15 +486,15 @@ function AssistantActionBar(props: {
 
 function AppInner() {
   const routeInfo = () => {
-    const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory|journey))?\/?$/);
+    const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory|journey|results))?\/?$/);
     return match
       ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' | 'journey' }
       : undefined;
   };
 
   const routeSession = () => routeInfo()?.session;
-  const [page, setPage] = useState<'chat' | 'config' | 'trajectory' | 'journey'>(() => routeInfo()?.page ?? 'chat');
-  const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory' | 'journey') => {
+  const [page, setPage] = useState<'chat' | 'config' | 'trajectory' | 'journey' | 'results'>(() => routeInfo()?.page ?? 'chat');
+  const navigatePage = (nextPage: 'chat' | 'config' | 'trajectory' | 'journey' | 'results') => {
     if (!active) return;
     const suffix = nextPage === 'chat' ? '' : '/' + nextPage;
     const nextPath = '/investigations/' + encodeURIComponent(active) + suffix;
@@ -565,8 +567,6 @@ function AppInner() {
   const [pendingUserInputs, setPendingUserInputs] = useState<PendingUserInput[]>([]);
   const [userInputDrafts, setUserInputDrafts] = useState<Record<string, string>>({});
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
-  // 阶段小结不是运行日志：只保留少量最近结果，避免主聊天区再次变成流水账。
-  const [checkpoints, setCheckpoints] = useState<InvestigationCheckpoint[]>([]);
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -620,7 +620,6 @@ function AppInner() {
       setValue('');
       setNextGuidance([]);
       setJourney(undefined);
-      setCheckpoints([]);
       setAttachmentsOpen(false);
     }
     const [result, journeyResult] = await Promise.all([
@@ -735,7 +734,6 @@ function AppInner() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
-    setCheckpoints([]);
     setNextGuidance([]);
     setJourney(undefined);
     setPendingPermissions([]);
@@ -1339,6 +1337,19 @@ function AppInner() {
     );
   }
 
+  if (page === 'results') {
+    return (
+      <Suspense fallback={pageLoadingFallback}>
+        <InvestigationResultsPage
+          sessionName={active}
+          onBack={() => navigatePage('chat')}
+          onOpenConfig={() => navigatePage('config')}
+          onOpenTrajectory={() => navigatePage('trajectory')}
+        />
+      </Suspense>
+    );
+  }
+
   if (page === 'trajectory') {
     return (
       <Suspense fallback={pageLoadingFallback}>
@@ -1446,6 +1457,9 @@ function AppInner() {
               >
                 复制对话
               </Button>
+              <Button type="text" size="small" icon={<FileTextOutlined />} onClick={() => navigatePage('results')}>
+                调查结果
+              </Button>
               <Button type="text" size="small" icon={<ToolOutlined />} onClick={() => navigatePage('trajectory')}>
                 Agent 轨迹
               </Button>
@@ -1513,44 +1527,6 @@ function AppInner() {
                 </div>
               </div>
             )}
-
-            {checkpoints.length ? (
-              <div className="checkpoint-list" aria-label="阶段小结">
-                {checkpoints.slice(-4).map((checkpoint, index, items) => (
-                  <Card
-                    key={checkpoint.id}
-                    size="small"
-                    className={`checkpoint-card${index === items.length - 1 ? ' checkpoint-card--latest' : ''}`}
-                    title={
-                      <Flex align="center" gap={8}>
-                        <Text strong>阶段小结</Text>
-                        <Text type="secondary">{checkpoint.title}</Text>
-                      </Flex>
-                    }
-                  >
-                    <div className="checkpoint-summary">{checkpoint.summary}</div>
-                    {checkpoint.confirmed.length ? (
-                      <div className="checkpoint-detail">
-                        <Text type="secondary">已确认</Text>
-                        {checkpoint.confirmed.slice(0, 4).map((item) => <div key={item}>· {item}</div>)}
-                      </div>
-                    ) : null}
-                    <div className="checkpoint-meta">
-                      <Text type="secondary">
-                        Evidence {checkpoint.evidenceIds.length} 条
-                        {checkpoint.unknowns.length ? ` · 未确认 ${checkpoint.unknowns.length} 项` : ''}
-                      </Text>
-                    </div>
-                    {checkpoint.nextStep ? (
-                      <div className="checkpoint-next-step">
-                        <Text type="secondary">下一步：</Text>{checkpoint.nextStep}
-                      </div>
-                    ) : null}
-                  </Card>
-                ))}
-              </div>
-            ) : null}
-
             {error ? (
               <Card size="small" className="error-card">
                 <Text type="danger">{error}</Text>
