@@ -343,6 +343,7 @@ async function updateInvestigationControlImpl(
       permissionMode: next.agent.permissionMode,
       autoContinuationTurns: normalizeAvatarDimension(next.agent.autoContinuationTurns, current.agent.autoContinuationTurns, 0, 6),
       displayName: next.agent.displayName.trim().slice(0, 40),
+      personality: next.agent.personality.slice(0, 4000),
       ...(next.agent.avatarPath ? { avatarPath: next.agent.avatarPath } : {}),
       ...(next.agent.avatarMimeType ? { avatarMimeType: next.agent.avatarMimeType } : {}),
       avatarWidth: normalizeAvatarDimension(next.agent.avatarWidth, current.agent.avatarWidth, 40, 800),
