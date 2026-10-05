@@ -7,7 +7,7 @@ import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilo
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
-import { buildAgentCheckpoint, extractAgentCheckpoint, parseAgentAnswer, toClaims } from '../agent/result.js';
+import { buildAgentCheckpoint, parseAgentAnswer, toClaims } from '../agent/result.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
