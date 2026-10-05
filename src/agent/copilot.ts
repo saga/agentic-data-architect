@@ -1117,6 +1117,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
         continuationPrompt = [
           '继续自主推进当前 Investigation，不要因为上一阶段产生了一个局部答案就停止。',
+          ...(workflowTransition.error ? [
+            '',
+            '上一阶段尝试完成，但服务端的确定性 Script Gate 没有通过：',
+            workflowTransition.error,
+            '不要再次只返回 workflow.success。继续当前阶段，补齐缺少的真实工作成果、Evidence 或实际验证结果。',
+          ] : []),
           '先重新看整个目标、已有 Evidence、unknowns，以及上一阶段遇到的限制。',
           '如果某条调查路径受阻、缺少运行环境或暂时无法验证，不要反复纠结这一条；记录限制，然后换到其它仍然有价值、可以独立推进的方向。',
           '优先补齐目标中的其它主要对象或关系，再深入局部细节；不要连续花多个阶段追一个当前无法解决的小问题。',
