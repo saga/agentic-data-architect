@@ -178,6 +178,28 @@ export async function persistAgentIntake(
   return true;
 }
 
+/** 用户在 init 时已经明确提供完整 Goal / Scope / Systems；无需再伪造一次 ask_user。 */
+export function createUserScopeValidation(
+  goal: string,
+  scope: string[],
+  systems: string[],
+) {
+  const cleanGoal = goal.trim();
+  const cleanScope = normalized(scope);
+  const cleanSystems = normalized(systems);
+  if (!cleanGoal || !cleanScope.length || !cleanSystems.length) return undefined;
+  return {
+    status: 'validated' as const,
+    goal: cleanGoal,
+    scope: cleanScope,
+    systems: cleanSystems,
+    source: 'user' as const,
+    userConfirmed: true,
+    evidenceIds: [],
+    validatedAt: new Date().toISOString(),
+  };
+}
+
 /** 对当前 Investigation 执行 Gate。 */
 export async function runInvestigationScopeGate(name: string): Promise<ScopeGateResult> {
   const inv = await loadInvestigation(name);
