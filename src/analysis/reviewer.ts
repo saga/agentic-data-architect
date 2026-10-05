@@ -38,6 +38,8 @@ export const ReviewIssueSchema = z.object({
 export const ArtifactReviewSchema = z.object({
   artifactType: ReviewArtifactTypeSchema,
   status: z.enum(['pass', 'fail']),
+  /** Reviewer 是否实际完成审核；unavailable 表示没有返回可验证结果。 */
+  availability: z.enum(['completed', 'unavailable']).default('completed'),
   score: z.number().int().min(0).max(100),
   summary: z.string().trim().min(1),
   issues: z.array(ReviewIssueSchema),
@@ -58,16 +60,22 @@ const REVIEWER_SYSTEM_PROMPT = [
   '输出必须是严格 JSON，不要输出 Markdown 或代码围栏。',
 ].join('\n');
 
-function extractJson(raw: string): unknown {
+/** 普通文本兜底解析；正常路径优先使用 Copilot SDK 的 responseSchema。 */
+function extractJson(raw: string): unknown | undefined {
   const fenced = raw.match(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/);
   const text = fenced?.[1]?.trim() ?? raw.trim();
+  if (!text) return undefined;
   try {
     return JSON.parse(text);
   } catch {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('Reviewer 没有返回可识别的审核结果。');
-    return JSON.parse(text.slice(start, end + 1));
+    if (start < 0 || end <= start) return undefined;
+    try {
+      return JSON.parse(text.slice(start, end + 1));
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -128,22 +136,37 @@ function buildReviewPrompt(input: {
   ].join('\n');
 }
 
-export async function reviewArtifact(input: {
-  investigationName: string;
-  goal: string;
-  artifactType: ReviewArtifactType;
-  artifact: string;
-  facts?: string;
-}): Promise<ArtifactReview> {
+async function runReviewerOnce(
+  input: {
+    investigationName: string;
+    goal: string;
+    artifactType: ReviewArtifactType;
+    artifact: string;
+    facts?: string;
+  },
+  structured: boolean,
+): Promise<ArtifactReview> {
+  const prompt = structured
+    ? buildReviewPrompt(input)
+    : buildReviewPrompt(input)
+      + '\\n\\n再次提醒：只返回 JSON 对象，不要 Markdown、不要解释、不要前后加任何文字。';
+
   const raw = await askCopilot({
-    prompt: buildReviewPrompt(input),
+    prompt,
     systemPrompt: REVIEWER_SYSTEM_PROMPT,
     purpose: 'review',
     model: config.model,
     workingDirectory: workspaceRoot(input.investigationName),
+    autoContinuationTurns: 0,
+    ...(structured ? { responseSchema: ArtifactReviewSchema } : {}),
   });
 
-  const parsed = ArtifactReviewSchema.parse(extractJson(raw));
+  const candidate = extractJson(raw);
+  if (candidate === undefined) {
+    throw new Error('Reviewer 没有返回可解析的审核结果。');
+  }
+
+  const parsed = ArtifactReviewSchema.parse(candidate);
   if (parsed.artifactType !== input.artifactType) {
     throw new Error('Reviewer 返回的成果类型与当前审核对象不一致。');
   }
@@ -152,9 +175,41 @@ export async function reviewArtifact(input: {
   const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
+    availability: 'completed',
     status: normalizedStatus,
     reviewedAt: new Date().toISOString(),
   };
+}
+
+export async function reviewArtifact(input: {
+  investigationName: string;
+  goal: string;
+  artifactType: ReviewArtifactType;
+  artifact: string;
+  facts?: string;
+}): Promise<ArtifactReview> {
+  try {
+    return await runReviewerOnce(input, true);
+  } catch (structuredError) {
+    try {
+      return await runReviewerOnce(input, false);
+    } catch {
+      return {
+        artifactType: input.artifactType,
+        status: 'fail',
+        availability: 'unavailable',
+        score: 0,
+        summary: '独立 Reviewer 暂时没有返回可验证的审核结果。',
+        issues: [{
+          category: 'consistency',
+          severity: 'high',
+          description: 'Reviewer 没有返回可验证的结构化审核结果。',
+          suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
+        }],
+        reviewedAt: new Date().toISOString(),
+      };
+    }
+  }
 }
 
 export async function saveArtifactReview(
