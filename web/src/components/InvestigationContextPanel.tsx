@@ -81,7 +81,7 @@ export function InvestigationContextPanel(props: {
             <Text strong>当前事实</Text>
             {props.current.context.unknowns.length ? (
               <Button type="link" size="small" onClick={props.onOpenUnknowns}>
-                查看待查
+                查看未查清事项
               </Button>
             ) : null}
           </Flex>
@@ -106,7 +106,7 @@ export function InvestigationContextPanel(props: {
                 </strong>
               </div>
               <div className="right-fact">
-                <span className="right-fact-label">待查</span>
+                <span className="right-fact-label">未查清</span>
                 <strong className="right-fact-value">{props.current.context.unknowns.length}</strong>
               </div>
             </div>
