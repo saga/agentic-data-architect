@@ -1175,8 +1175,10 @@ function AppInner() {
         : [];
       setNextGuidance(questions);
 
+      // 非阻断的结构化结果告警已经由服务端自动修正，并记录到 Agent 轨迹。
+      // 不把这类内部校验信息显示成用户错误，否则会让用户误以为需要处理。
       if (result.warnings.length) {
-        setError(result.warnings.join('; '));
+        setTurnStatus('结果已保存，部分内部引用已自动修正。');
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
@@ -1975,7 +1977,22 @@ function AppInner() {
 
 export function App() {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          fontSizeSM: 12,
+          fontSize: 14,
+          fontSizeLG: 16,
+          fontSizeXL: 16,
+          fontSizeHeading1: 16,
+          fontSizeHeading2: 16,
+          fontSizeHeading3: 16,
+          fontSizeHeading4: 16,
+          fontSizeHeading5: 16,
+        },
+      }}
+    >
       <XProvider>
       <AntApp>
         <AppInner />
