@@ -145,6 +145,17 @@ function buildOpenQuestions(
   return result.slice(0, 8);
 }
 
+function claimStatusText(status: string): string {
+  switch (status) {
+    case 'verified': return '已验证';
+    case 'supported': return '证据较充分';
+    case 'inferred': return '目前是推断';
+    case 'unknown': return '还不能确认';
+    case 'contradicted': return '证据存在冲突';
+    default: return status;
+  }
+}
+
 function buildReplatformImplications(
   findings: Array<{ type: string }>,
   modernization: Awaited<ReturnType<typeof loadModernizationPlan>>,
@@ -255,19 +266,30 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
           '',
         ])
       : ['当前没有记录需要单独处理的问题。', '']),
-    '## 5. Replatform 影响',
+    '## 5. 已形成的关键结论',
+    '',
+    ...(inv.claims.length
+      ? inv.claims.slice(0, 8).flatMap((claim) => [
+          '### ' + claimStatusText(claim.status),
+          '',
+          claim.claim.split('\n')[0].trim(),
+          evidenceText(claim.evidenceIds),
+          '',
+        ])
+      : ['当前还没有形成单独保存的关键结论。', '']),
+    '## 6. Replatform 影响',
     '',
     ...implications.map((item) => '- ' + item),
     '',
     '下一步：进入目标架构设计，重点处理目前尚未闭合的 ' + (openQuestions.length ? '问题和 ' + String(openQuestions.length) + ' 个待确认事项' : '范围') + '。',
     '',
-    '## 6. 待确认问题',
+    '## 7. 待确认问题',
     '',
     ...(openQuestions.length
       ? openQuestions.map((question) => '- ' + question)
       : ['当前没有记录需要业务方直接回答的问题；这不代表所有信息都已经确认。']),
     '',
-    '## 7. 证据与覆盖情况',
+    '## 8. 证据与覆盖情况',
     '',
     'SQL：' + sqlCoverage,
     '数据集血缘：' + connectedDatasets + ' 已建立结构连接；这不等于已经确认业务上的权威来源。',
@@ -280,7 +302,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
 
   if (modernization) {
     lines.push(
-      '## 8. Modernization 状态',
+      '## 9. Modernization 状态',
       '',
       modernization.targetArchitecture.components.length
         ? '目标架构已经有 ' + String(modernization.targetArchitecture.components.length) + ' 个组件草案。'
