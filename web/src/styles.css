@@ -704,8 +704,55 @@ body {
 }
 
 .workspace-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-inline-end: 0;
+  padding: 4px 11px;
+  border: 1px solid rgba(5, 5, 5, 0.08) !important;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
   color: #15803d !important;
   background: #f0fdf4 !important;
+}
+
+.workspace-status-active {
+  min-width: 260px;
+  justify-content: center;
+  padding-inline: 13px;
+  border-color: #91caff !important;
+  color: #0958d9 !important;
+  background: #e6f4ff !important;
+  box-shadow:
+    0 0 0 3px rgba(22, 119, 255, 0.08),
+    0 4px 14px rgba(22, 119, 255, 0.12);
+  font-weight: 600;
+  animation: workspace-status-pulse 2s ease-in-out infinite;
+}
+
+.workspace-status-active .anticon {
+  font-size: 14px;
+}
+
+@keyframes workspace-status-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(22, 119, 255, 0.07),
+      0 4px 14px rgba(22, 119, 255, 0.10);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(22, 119, 255, 0.11),
+      0 6px 18px rgba(22, 119, 255, 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-status-active {
+    animation: none;
+  }
 }
 
 .chat-layout {
