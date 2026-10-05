@@ -117,8 +117,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     newEvidenceIds.length > 0
       || newFindingIds.length > 0
       || newDiscoveryRuns > 0
-      || scopeValidated
-      || evidenceBackedClaims.length > 0,
+      || scopeValidated,
     [
       '新增 Evidence=' + String(newEvidenceIds.length),
       '新增 Finding=' + String(newFindingIds.length),
@@ -136,7 +135,6 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
         || newFindingIds.length > 0
         || newDiscoveryRuns > 0
         || scopeValidated
-        || evidenceBackedClaims.length > 0
       ),
     checks,
     newEvidenceIds,
