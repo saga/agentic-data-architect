@@ -122,7 +122,8 @@ export interface AskInput {
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
-  onStageResult?: (result: { content: string; execution: number }) => void | Promise<void>;
+  onStageResult?: (result: { content: string; execution: number }) =>
+    void | Promise<void | { passed?: boolean; error?: string }>;
   /** 在 Workflow transition / Gate 前同步保存本阶段形成的 Intake，避免 Gate 读取到旧的 Scope。 */
   onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
@@ -1197,16 +1198,21 @@ export async function askCopilot(input: AskInput): Promise<string> {
         await input.onBeforeWorkflowTransition({ content: finalContent, execution });
       }
 
-      // 每个阶段结束后立即应用 Workflow outcome。这样自动续跑进入下一阶段时，
-      // 模型拿到的是最新的工作位置，而不是上一阶段的旧节点。
-      const workflowTransition = await applyAgentWorkflowTransition(
-        investigationName,
-        input.workflowSkill ?? null,
-        finalContent,
-      );
-
-      // Stage Gate 必须读取 transition 已经保存的工作成果。
-      await input.onStageResult?.({ content: finalContent, execution });
+      // Stage Gate 必须先于 Workflow transition。
+      // 这样 Agent 的“success”只有在真实成果和 Mission 对齐检查通过后才能改变 Workflow 位置。
+      const stageGateDecision = await input.onStageResult?.({ content: finalContent, execution });
+      const workflowTransition =
+        stageGateDecision && 'passed' in stageGateDecision && stageGateDecision.passed === false
+          ? {
+              applied: false,
+              error: stageGateDecision.error ?? 'Stage Gate 未通过，当前 Workflow 保持不变。',
+            }
+          : await applyAgentWorkflowTransition(
+              investigationName,
+              input.workflowSkill ?? null,
+              finalContent,
+              { persistModernizationResult: false },
+            );
 
       await runRecorder?.write('model_response', {
         execution,
