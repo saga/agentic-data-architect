@@ -180,6 +180,10 @@ export const ControlAgentSchema = z.object({
   autoContinuationTurns: z.number().int().min(0).max(6).default(4),
   /** 对话中显示的助手名称；默认“秘书”，只影响展示和复制文本，不参与 Agent 推理。 */
   displayName: z.string().trim().min(1).max(40).default('秘书'),
+  /** 助手的人格 / Soul；影响用户可见表达，不改变工具权限、证据规则或 Workflow。 */
+  personality: z.string().max(4000).default(
+    '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。'
+  ),
   /** 兼容旧版的单头像路径；新配置使用 avatarPaths。 */
   avatarPath: z.string().trim().min(1).optional(),
   /** 秘书头像文件列表；可以上传任意数量，回复时由前端随机选择。 */
