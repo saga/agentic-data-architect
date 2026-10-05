@@ -48,6 +48,71 @@ export const MISSION_DELIVERABLE_CATALOG = {
 
 export type MissionDeliverableId = keyof typeof MISSION_DELIVERABLE_CATALOG;
 
+/**
+ * Workflow 某个目标节点需要哪些 Mission 交付物。
+ *
+ * 这是硬边界：例如用户只要求“当前系统的数据架构”，没有“目标架构”这个交付物，
+ * Agent 即使返回合法的 Workflow success，也不能被带进“设计新方案”。
+ * 未知的自定义节点不做强行猜测，交给自定义 Workflow 本身处理。
+ */
+const WORKFLOW_TARGET_DELIVERABLES: Record<string, MissionDeliverableId[]> = {
+  'estate-map': ['current-state-architecture', 'data-source', 'data-flow', 'data-model'],
+  '看清旧系统': ['current-state-architecture', 'data-source', 'data-flow', 'data-model'],
+  'data-truth': ['current-state-architecture', 'data-source', 'data-model', 'transformation'],
+  '找到数据真相': ['current-state-architecture', 'data-source', 'data-model', 'transformation'],
+  'current-state': ['current-state-architecture', 'data-source', 'data-flow', 'data-model', 'transformation', 'findings'],
+  '梳理当前架构': ['current-state-architecture', 'data-source', 'data-flow', 'data-model', 'transformation'],
+  'target': ['target-architecture'],
+  '设计新方案': ['target-architecture'],
+  'mapping': ['mapping'],
+  '新旧对应': ['mapping'],
+  'validation': ['validation'],
+  '验证结果': ['validation'],
+  'findings': ['findings'],
+  '找出主要问题': ['findings'],
+  'recommendation': ['recommendations'],
+  '给出改进建议': ['recommendations'],
+  'roadmap': ['roadmap'],
+  '排出实施顺序': ['roadmap'],
+  'cutover': ['validation'],
+  '切换确认': ['validation'],
+};
+
+/** 判断某个 Workflow 目标节点是否符合当前 Mission 的结果边界。 */
+export function isMissionWorkflowTargetAllowed(
+  mission: MissionContract,
+  targetNodeId: string,
+  targetNodeTitle?: string,
+): { allowed: boolean; requiredDeliverableIds: MissionDeliverableId[]; reason?: string } {
+  const requiredDeliverableIds =
+    WORKFLOW_TARGET_DELIVERABLES[targetNodeId]
+    ?? (targetNodeTitle ? WORKFLOW_TARGET_DELIVERABLES[targetNodeTitle] : undefined);
+
+  if (!requiredDeliverableIds) {
+    // 自定义 Workflow 节点无法由通用规则可靠映射时，不猜测、不阻断。
+    return { allowed: true, requiredDeliverableIds: [] };
+  }
+
+  const missionIds = new Set(mission.deliverables.map((item) => item.id));
+  const missing = requiredDeliverableIds.filter((id) => !missionIds.has(id));
+  if (!missing.length) {
+    return { allowed: true, requiredDeliverableIds };
+  }
+
+  return {
+    allowed: false,
+    requiredDeliverableIds,
+    reason:
+      '当前任务的期望结果没有包含“'
+      + missing
+        .map((id) => MISSION_DELIVERABLE_CATALOG[id][0])
+        .join('、')
+      + '”，不能进入“'
+      + (targetNodeTitle || targetNodeId)
+      + '”。如果确实需要这部分结果，请先修改并确认本次任务。',
+  };
+}
+
 const KEYWORD_RULES: Array<{ id: MissionDeliverableId; keywords: string[] }> = [
   { id: 'current-state-architecture', keywords: ['当前架构', '现状架构', '现有系统', 'current state', 'current-state'] },
   { id: 'data-source', keywords: ['data source', '数据源', '数据来源', 'source of truth', '权威来源'] },
