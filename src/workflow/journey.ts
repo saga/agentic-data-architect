@@ -322,6 +322,14 @@ export const KNOWN_COMPLETION_CONDITIONS = [
   'assessment-roadmap',
 ] as const;
 
+/** 对外暴露 Workflow 的确定性完成判断；Agent 的 success 只能在这里返回 true 时生效。 */
+export function isJourneyCompletionConditionSatisfied(
+  condition: string | undefined,
+  facts: JourneyFacts,
+): boolean {
+  return conditionPassed(condition, facts);
+}
+
 function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
   switch (condition) {
     case 'goal':
