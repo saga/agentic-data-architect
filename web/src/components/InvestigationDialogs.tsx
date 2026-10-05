@@ -20,6 +20,7 @@ export function InvestigationDialogs(props: {
   userInputDrafts: Record<string, string>;
   setNewSessionName: (value: string) => void;
   setNewSessionGoal: (value: string) => void;
+  setNewSessionExpectedResult: (value: string) => void;
   setNewSessionWorkflow: (value: WorkflowId | null) => void;
   setNewSessionOpen: (value: boolean) => void;
   setUnknownsOpen: (value: boolean) => void;
