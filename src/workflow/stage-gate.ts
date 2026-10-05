@@ -11,7 +11,8 @@
  * 4. Gate 结果本身可以序列化到 trajectory，脚本可以重新检查，避免运行时和事后判断不一致。
  */
 import type { ParsedAnswer } from '../agent/result.js';
-import type { AgentCheckpoint } from '../investigation/schemas.js';
+import type { AgentCheckpoint, MissionContract } from '../investigation/schemas.js';
+import { evaluateMissionGate } from './mission-gate.js';
 import type { Investigation } from '../investigation/store.js';
 
 export interface StageGateSnapshot {
@@ -23,6 +24,7 @@ export interface StageGateSnapshot {
 
 export interface StageGateInput {
   execution: number;
+  mission: MissionContract;
   before: StageGateSnapshot;
   after: StageGateSnapshot;
   parsed: Pick<ParsedAnswer, 'answer' | 'claims' | 'unknowns' | 'followUpQuestions' | 'routeOptions'>;
@@ -75,6 +77,15 @@ export function snapshotInvestigationForStageGate(
 export function evaluateInvestigationStageGate(input: StageGateInput): StageGateResult {
   const checks: StageGateCheck[] = [];
   const add = (name: string, passed: boolean, detail: string) => checks.push({ name, passed, detail });
+
+  const missionGate = evaluateMissionGate(input.mission);
+  add(
+    'Mission 仍然有效',
+    missionGate.passed,
+    missionGate.passed
+      ? '本阶段仍绑定到已经确认的任务目的和期望结果。'
+      : 'Mission 不完整或未确认，不能把本阶段成果算入任务结果。',
+  );
 
   const knownEvidence = new Set(input.after.evidenceIds);
   const invalidClaimEvidence = input.parsed.claims.filter((claim) =>
