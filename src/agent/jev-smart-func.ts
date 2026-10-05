@@ -133,7 +133,7 @@ const noulAnswerSchema = z.object({
 export function buildJevSmartFuncResponseSchema(
   questions: Record<string, JevQuestion>,
 ): z.ZodObject<z.ZodRawShape> {
-  const shape: z.ZodRawShape = {};
+  const shape: Record<string, z.ZodTypeAny> = {};
   for (const [key, question] of Object.entries(questions)) {
     if (!/^[_a-zA-Z][_a-zA-Z0-9-]*$/.test(key)) {
       throw new Error('Smart Function question key 不合法：' + key);
