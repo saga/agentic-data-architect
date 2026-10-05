@@ -91,6 +91,7 @@ import {
   respondToCopilotUserInput,
   stopClient,
 } from './agent/copilot.js';
+import { listOpenCodeModels, abortOpenCodeTurn } from './agent/opencode.js';
 import {
   appendAuditEvent,
   loadInvestigationControl,
@@ -401,18 +402,51 @@ app.post('/api/sessions', async (req, res) => {
    * 当前 Investigation 的 live execution state。
    * trajectory.jsonl 是历史记录，不能用来判断“现在是否还在跑”。
    */
-  /** 返回当前 Copilot 可用模型；主输入框用它填充模型切换菜单。 */
+  /**
+   * 返回工作台可用模型。
+   *
+   * Copilot 和本机 OpenCode 是两个独立来源；任意一个暂时不可用都不应该阻塞另一个。
+   * OpenCode 模型统一加 `opencode:` 前缀，前端选择后会自动切换运行时。
+   */
   app.get('/api/copilot/models', async (_req, res) => {
-    const models = await (await getClient()).listModels();
-    res.json({
-      models: models.map((model) => ({
+    const models: Array<{
+      id: string;
+      name: string;
+      supportedReasoningEfforts: string[];
+      defaultReasoningEffort: string | null;
+      policyState: string | null;
+      runtime: 'copilot' | 'opencode';
+    }> = [];
+
+    try {
+      const copilotModels = await (await getClient()).listModels();
+      models.push(...copilotModels.map((model) => ({
         id: model.id,
         name: model.name,
         supportedReasoningEfforts: model.supportedReasoningEfforts ?? [],
         defaultReasoningEffort: model.defaultReasoningEffort ?? null,
         policyState: model.policy?.state ?? null,
-      })),
-    });
+        runtime: 'copilot' as const,
+      })));
+    } catch {
+      // Copilot 登录/服务异常时仍然允许本机 OpenCode 工作。
+    }
+
+    try {
+      const openCodeModels = await listOpenCodeModels();
+      models.push(...openCodeModels.map((model) => ({
+        id: model.id,
+        name: model.name,
+        supportedReasoningEfforts: [],
+        defaultReasoningEffort: null,
+        policyState: null,
+        runtime: 'opencode' as const,
+      })));
+    } catch {
+      // OpenCode 未启动很常见；模型菜单仍然可以正常显示 Copilot。
+    }
+
+    res.json({ models });
   });
 
   app.get('/api/sessions/:name/execution', async (req, res) => {
@@ -1212,7 +1246,7 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
       return;
     }
     const requested = requestAbort(name, turnId);
-    const aborted = requested || await abortCopilotTurn(turnId);
+    const aborted = requested || await abortCopilotTurn(turnId) || await abortOpenCodeTurn(turnId);
     res.json({ aborted });
   });
 
