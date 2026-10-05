@@ -21,7 +21,7 @@ export interface MissionCompletionInput {
     claimCount: number;
     unknowns: string[];
   };
-  unknownReviews?: MissionUnknownReview[];
+  unknownReviews?: MissionUnknownReview[] | undefined;
   model?: string;
   workingDirectory?: string;
 }
