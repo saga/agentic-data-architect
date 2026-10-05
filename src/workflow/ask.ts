@@ -158,6 +158,7 @@ export async function answerQuestion(
     await appendTranscript(investigationName, 'user', userVisibleQuestion);
     let inv = await loadInvestigation(investigationName);
     const control = await loadInvestigationControl(investigationName);
+    const mission = inv.mission!;
 
     const githubRepositories = [...new Set([
       ...control.research.githubRepositories,
@@ -233,12 +234,12 @@ export async function answerQuestion(
       effectiveQuestion,
     ].filter(Boolean).join('\n'), { workflow: inv.workflow, limit: 6 });
     const knowledgeText = renderArchitectureKnowledge(knowledge);
-    const missionProgress = await buildMissionProgress(inv.name, inv.mission);
-    const missionPrompt = buildMissionContractPrompt(inv.mission!, missionProgress ?? undefined);
+    const missionProgress = await buildMissionProgress(inv.name, mission);
+    const missionPrompt = buildMissionContractPrompt(mission, missionProgress ?? undefined);
     const prompt = buildQuestionPrompt({
       investigationName: inv.name,
-      mission: inv.mission!,
-      missionProgress: missionProgress ?? undefined,
+      mission,
+      ...(missionProgress ? { missionProgress } : {}),
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
@@ -272,9 +273,9 @@ export async function answerQuestion(
     let stageGateBaseline = snapshotInvestigationForStageGate(inv);
     let stageMissionProgressBaseline = missionProgress ?? {
       covered: 0,
-      total: inv.mission!.deliverables.length,
+      total: mission.deliverables.length,
       percent: 0,
-      deliverables: inv.mission!.deliverables.map((item) => ({
+      deliverables: mission.deliverables.map((item) => ({
         id: item.id,
         title: item.title,
         description: item.description,
@@ -379,10 +380,11 @@ export async function answerQuestion(
       missionActionGate: async ({ execution, toolName, toolArgs }) => {
         const latest = await loadInvestigation(investigationName);
         assertMissionGate(latest.mission);
-        const progress = await buildMissionProgress(investigationName, latest.mission);
+        const latestMission = latest.mission!;
+        const progress = await buildMissionProgress(investigationName, latestMission);
 
         const review = await reviewMissionAction({
-          mission: latest.mission,
+          mission: latestMission,
           candidate: { toolName, toolArgs },
           context: {
             execution,
@@ -422,10 +424,10 @@ export async function answerQuestion(
         const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
         const stageAfter = snapshotInvestigationForStageGate(latestStage);
-        const missionProgressAfterStage = await buildMissionProgress(
+        const missionProgressAfterStage = (await buildMissionProgress(
           investigationName,
-          inv.mission!,
-        );
+          mission,
+        )) ?? stageMissionProgressBaseline;
         const hasRealStateChange =
           stageAfter.evidenceIds.length > stageGateBaseline.evidenceIds.length
           || stageAfter.findingIds.length > stageGateBaseline.findingIds.length
@@ -435,7 +437,7 @@ export async function answerQuestion(
 
         const missionUnknownReviews = stageParsed.unknowns.length
           ? await reviewUnknownImpact({
-              mission: inv.mission!,
+              mission,
               unknowns: stageParsed.unknowns,
               context: {
                 execution,
@@ -463,7 +465,7 @@ export async function answerQuestion(
 
         const missionAlignment = hasRealStateChange
           ? await reviewMissionAlignment({
-              mission: inv.mission!,
+              mission,
               candidate: [
                 '本轮回答：' + stageParsed.answer,
                 '本轮 Claims：' + JSON.stringify(stageParsed.claims),
@@ -484,7 +486,7 @@ export async function answerQuestion(
 
         const stageGateInput = {
           execution,
-          mission: inv.mission!,
+          mission,
           before: stageGateBaseline,
           after: stageAfter,
           missionProgressBefore: stageMissionProgressBaseline,
@@ -503,7 +505,7 @@ export async function answerQuestion(
         // Agent 提交 workflow.completed 只是“完成申请”；真正完成 Mission 必须再经过 Completion Gate。
         if (stageParsed.workflow?.outcome === 'completed') {
           const completion = await reviewMissionCompletion({
-            mission: inv.mission!,
+            mission,
             progress: missionProgressAfterStage,
             resultSummary: {
               evidenceCount: latestStage.evidence.length,
@@ -596,16 +598,18 @@ export async function answerQuestion(
       refreshMissionPrompt: async () => {
         const latest = await loadInvestigation(investigationName);
         assertMissionGate(latest.mission);
-        const progress = await buildMissionProgress(investigationName, latest.mission);
+        const latestMission = latest.mission!;
+        const progress = await buildMissionProgress(investigationName, latestMission);
         return [
-          buildMissionContractPrompt(latest.mission, progress ?? undefined),
+          buildMissionContractPrompt(latestMission, progress ?? undefined),
           buildUnknownContinuationGuidance(),
         ].filter(Boolean).join('\n\n');
       },
       shouldContinueMission: async () => {
         const latest = await loadInvestigation(investigationName);
         assertMissionGate(latest.mission);
-        const progress = await buildMissionProgress(investigationName, latest.mission);
+        const latestMission = latest.mission!;
+        const progress = await buildMissionProgress(investigationName, latestMission);
         if (!progress) return true;
 
         // 先执行确定性的结构判断；有明确未完成交付物，不能提前停止。
@@ -618,7 +622,7 @@ export async function answerQuestion(
 
         // 必需交付物都没有可量化缺口后，最终是否停止交给 Completion Gate。
         const completion = await reviewMissionCompletion({
-          mission: latest.mission,
+          mission: latestMission,
           progress,
           resultSummary: {
             evidenceCount: latest.evidence.length,
