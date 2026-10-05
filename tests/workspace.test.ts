@@ -15,6 +15,7 @@ const {
   loadWorkspaceContext,
   redactSensitiveUri,
   addSharedDocument,
+  setCopilotSessionId,
 } = await import('../src/investigation/workspace.js');
 
 test('workspace creates a minimal session root and shared index', async () => {
@@ -97,3 +98,11 @@ async function exists(file: string): Promise<boolean> {
     return false;
   }
 }
+
+test('workspace persists Copilot session with configuration version', async () => {
+  await ensureWorkspace('copilot-session-demo');
+  await setCopilotSessionId('copilot-session-demo', 'session-123', 7);
+  const context = await loadWorkspaceContext('copilot-session-demo');
+  assert.equal(context.copilotSessionId, 'session-123');
+  assert.equal(context.copilotConfigurationVersion, 7);
+});
