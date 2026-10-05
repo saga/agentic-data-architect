@@ -297,6 +297,9 @@ export function useInvestigationController() {
     setUserInputDrafts({});
     setStreamingReasoning('');
     setReasoningByMessage({});
+    setMissionOpen(false);
+    setPendingMissionMessage(undefined);
+    setMissionDraft({ purpose: '', expectedResult: '', deliverableIds: [] });
     setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
@@ -487,6 +490,7 @@ export function useInvestigationController() {
     setError(undefined);
     const turnId = crypto.randomUUID();
     const controller = new AbortController();
+    let missionBlocked = false;
 
     try {
       let key = active;
@@ -532,6 +536,7 @@ export function useInvestigationController() {
           });
           setPendingMissionMessage(message);
           setMissionOpen(true);
+          missionBlocked = true;
           setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
           return;
         }
@@ -629,7 +634,9 @@ export function useInvestigationController() {
     } finally {
       setStreamingAnswer(undefined);
       setStreamingReasoning('');
-      setTurnStatus('助手正在处理你的问题，请稍候…');
+      setTurnStatus(missionBlocked
+        ? '开始调查前，请先确认任务目的和期望结果。'
+        : '助手正在处理你的问题，请稍候…');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
