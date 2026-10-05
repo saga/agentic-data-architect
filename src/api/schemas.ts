@@ -15,6 +15,12 @@ export const CreateSessionBodySchema = z.object({
   workflow: WorkflowSelectionSchema.optional(),
 }).strict();
 
+/** 确认 Investigation Mission；确认后服务端才允许开始正式调查。 */
+export const UpdateMissionBodySchema = z.object({
+  purpose: z.string().trim().min(10).max(2000),
+  expectedResult: z.string().trim().min(10).max(4000),
+}).strict();
+
 /** 修改 Investigation 当前采用的可选工作路线。null 表示回到自主调查。 */
 export const UpdateWorkflowBodySchema = z.object({
   workflow: WorkflowSelectionSchema,
