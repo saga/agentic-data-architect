@@ -10,6 +10,20 @@ import {
 function input(overrides: Partial<StageGateInput> = {}): StageGateInput {
   return {
     execution: 0,
+    mission: {
+      version: 1,
+      purpose: '理解旧系统，为迁移决策提供依据。',
+      expectedResult: '形成当前数据来源、数据流和数据模型的可靠说明。',
+      deliverables: [
+        { id: 'current-state-architecture', title: '当前架构', description: '梳理当前系统的主要数据架构。', required: true },
+        { id: 'data-source', title: 'Data Source', description: '说明关键数据来源。', required: true },
+        { id: 'data-flow', title: 'Data Flow', description: '说明关键数据流向。', required: true },
+        { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true },
+      ],
+      status: 'confirmed',
+      confirmedAt: '2026-10-05T00:00:00.000Z',
+      confirmedBy: 'user',
+    },
     before: {
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
