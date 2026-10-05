@@ -4,11 +4,16 @@
  * 这段代码不替人做最终决定，只负责先把现状、问题、建议和检查方法整理出来，
  * 让分析师和架构师可以继续修改、确认和使用。
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import {
   ModernizationPlanSchema,
+  SourceToTargetMappingSchema,
+  ValidationCheckSchema,
+  ValidationPlanSchema,
+  type AgentModernizationResult,
   type AnalysisCase,
   type ModernizationPlan,
   type TargetArchitecture,
@@ -17,6 +22,7 @@ import {
 import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadModernizationJourney } from './journey.js';
+import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
 
 function productId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
@@ -264,6 +270,189 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   const fp = path.join(dir, 'modernization-plan.json');
   await fs.writeFile(fp, JSON.stringify(plan, null, 2), 'utf-8');
   return { plan, path: fp };
+}
+
+/**
+ * 保存 Agent 在 target / mapping / validation 阶段形成的结构化工作成果。
+ *
+ * 注意顺序：这个函数必须在 Workflow transition 前执行。即使 Agent 回复了
+ * workflow.success，没有落盘的成果也不可能通过后面的 Script Gate。
+ *
+ * 服务端自己生成 work product 的 id/version/time；Agent 不能靠 approved 直接
+ * 取得人工批准状态。Evidence 只接受 Investigation 中已经存在的 id。
+ */
+export async function persistModernizationAgentResult(
+  name: string,
+  result: AgentModernizationResult | undefined,
+): Promise<{ saved: boolean; path?: string; changedSections: string[] }> {
+  if (!result) return { saved: false, changedSections: [] };
+
+  return withWorkspaceContextLock(name, async () => {
+    let plan = await loadModernizationPlan(name);
+    if (!plan) plan = (await buildModernizationPlan(name)).plan;
+
+    const inv = await loadInvestigation(name);
+    const knownEvidence = new Set(inv.evidence.map((item) => item.id));
+    const timestamp = now();
+    const changedSections: string[] = [];
+
+    let targetArchitecture = plan.targetArchitecture;
+    if (result.targetArchitecture) {
+      const input = result.targetArchitecture;
+      const evidenceIds = [...new Set([
+        ...targetArchitecture.evidenceIds,
+        ...(input.evidenceIds ?? []).filter((id) => knownEvidence.has(id)),
+      ])];
+
+      targetArchitecture = ModernizationPlanSchema.shape.targetArchitecture.parse({
+        ...targetArchitecture,
+        title: input.title ?? targetArchitecture.title,
+        status: input.status === 'approved'
+          ? 'in_review'
+          : input.status ?? targetArchitecture.status,
+        version: targetArchitecture.version + 1,
+        updatedAt: timestamp,
+        evidenceIds,
+        principles: input.principles ?? targetArchitecture.principles,
+        components: input.components ?? targetArchitecture.components,
+        openQuestions: input.openQuestions ?? targetArchitecture.openQuestions,
+      });
+      changedSections.push('targetArchitecture');
+    }
+
+    let mappings = plan.mappings;
+    if (result.mappings?.length) {
+      const byId = new Map(mappings.map((mapping) => [mapping.id, mapping]));
+
+      for (const input of result.mappings) {
+        const stableId = input.id
+          ?? 'mapping-' + crypto.createHash('sha1')
+            .update(input.sourceAsset + '\n' + input.targetAsset)
+            .digest('hex')
+            .slice(0, 16);
+
+        const existing = byId.get(stableId)
+          ?? mappings.find((mapping) =>
+            mapping.sourceAsset === input.sourceAsset
+            && mapping.targetAsset === input.targetAsset,
+          );
+
+        const evidenceIds = [...new Set([
+          ...(existing?.evidenceIds ?? []),
+          ...(input.evidenceIds ?? []).filter((id) => knownEvidence.has(id)),
+        ])];
+
+        // reviewed / approved 是人工语义，Agent 只能留下 proposed。
+        const status = input.status === 'approved' || input.status === 'reviewed'
+          ? 'proposed' as const
+          : input.status ?? existing?.status ?? 'proposed';
+
+        const mapping = SourceToTargetMappingSchema.parse({
+          ...(existing ?? {}),
+          id: existing?.id ?? stableId,
+          type: 'source_to_target' as const,
+          title: existing?.title ?? (input.sourceAsset + ' → ' + input.targetAsset),
+          status,
+          version: (existing?.version ?? 0) + 1,
+          createdAt: existing?.createdAt ?? timestamp,
+          updatedAt: timestamp,
+          evidenceIds,
+          findingIds: existing?.findingIds ?? [],
+          decisionIds: existing?.decisionIds ?? [],
+          sourceAsset: input.sourceAsset,
+          targetAsset: input.targetAsset,
+          ...(input.transformation !== undefined ? { transformation: input.transformation } : {}),
+          ...(input.businessRule !== undefined ? { businessRule: input.businessRule } : {}),
+          ...(input.validationRule !== undefined ? { validationRule: input.validationRule } : {}),
+        });
+
+        byId.set(mapping.id, mapping);
+      }
+
+      mappings = [...byId.values()];
+      changedSections.push('mappings');
+    }
+
+    const mappingCoverage = result.mappingCoverage
+      ? {
+          sourceAssets: [...new Set(result.mappingCoverage.sourceAssets)],
+          unmappedAssets: [...new Set(result.mappingCoverage.unmappedAssets)],
+        }
+      : plan.mappingCoverage;
+
+    let validationPlan = plan.validationPlan;
+    if (result.validation) {
+      const checksById = new Map(validationPlan.checks.map((check) => [check.id, check]));
+
+      for (const input of result.validation.checks) {
+        const existing = checksById.get(input.id);
+        const evidenceIds = [...new Set([
+          ...(existing?.evidenceIds ?? []),
+          ...(input.evidenceIds ?? []).filter((id) => knownEvidence.has(id)),
+        ])];
+
+        const check = ValidationCheckSchema.parse({
+          ...(existing ?? {}),
+          id: input.id,
+          type: input.type,
+          name: input.name,
+          description: input.description,
+          // 已存在的 blocking 规则不能由 Agent 在运行时修改。
+          blocking: existing?.blocking ?? input.blocking,
+          status: input.status,
+          evidenceIds,
+          ...(input.result !== undefined
+            ? { result: input.result }
+            : existing?.result !== undefined
+              ? { result: existing.result }
+              : {}),
+        });
+
+        checksById.set(check.id, check);
+      }
+
+      validationPlan = ValidationPlanSchema.parse({
+        ...validationPlan,
+        status: 'in_review',
+        version: validationPlan.version + 1,
+        updatedAt: timestamp,
+        checks: [...checksById.values()],
+        ...(result.validation.cutoverCriteria
+          ? { cutoverCriteria: result.validation.cutoverCriteria }
+          : {}),
+        ...(result.validation.rollbackCriteria
+          ? { rollbackCriteria: result.validation.rollbackCriteria }
+          : {}),
+      });
+      changedSections.push('validationPlan');
+    }
+
+    const nextPlan = ModernizationPlanSchema.parse({
+      ...plan,
+      version: plan.version + 1,
+      targetArchitecture,
+      mappings,
+      validationPlan,
+      ...(mappingCoverage ? { mappingCoverage } : {}),
+      evidenceIds: [...new Set([
+        ...plan.evidenceIds,
+        ...targetArchitecture.evidenceIds,
+        ...mappings.flatMap((mapping) => mapping.evidenceIds),
+        ...validationPlan.checks.flatMap((check) => check.evidenceIds),
+      ])],
+    });
+
+    const dir = reportsDir(name);
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, 'modernization-plan.json');
+    await writeJsonAtomic(filePath, nextPlan);
+
+    return {
+      saved: true,
+      path: filePath,
+      changedSections,
+    };
+  });
 }
 
 /** 读取已经保存的改造计划；还没有生成时就返回空。 */
