@@ -53,6 +53,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     setUserInputDrafts,
     setNewSessionName,
     setNewSessionGoal,
+    setNewSessionExpectedResult,
     setNewSessionWorkflow,
     setNewSessionOpen,
     setUnknownsOpen,
