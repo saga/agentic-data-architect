@@ -41,6 +41,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     newSessionOpen,
     newSessionName,
     newSessionGoal,
+    newSessionExpectedResult,
     newSessionWorkflow,
     unknownsOpen,
     missionOpen,
@@ -99,6 +100,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
           newSessionOpen={newSessionOpen}
           newSessionName={newSessionName}
           newSessionGoal={newSessionGoal}
+          newSessionExpectedResult={newSessionExpectedResult}
           newSessionWorkflow={newSessionWorkflow}
           unknownsOpen={unknownsOpen}
           userInputDrafts={userInputDrafts}
@@ -212,6 +214,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
         newSessionOpen={newSessionOpen}
         newSessionName={newSessionName}
         newSessionGoal={newSessionGoal}
+        newSessionExpectedResult={newSessionExpectedResult}
         newSessionWorkflow={newSessionWorkflow}
         unknownsOpen={unknownsOpen}
         userInputDrafts={userInputDrafts}
