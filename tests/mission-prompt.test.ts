@@ -39,3 +39,22 @@ test('question prompt repeats Mission before question-specific context', () => {
   assert.ok(prompt.indexOf('期望结果：') < prompt.indexOf('当前未知项'));
   assert.ok(prompt.indexOf('当前未知项') < prompt.indexOf('当前执行请求：'));
 });
+
+
+test('Mission prompt keeps deliverable coverage ahead of unknowns', () => {
+  const prompt = buildMissionContractPrompt(mission, {
+    covered: 1,
+    total: 3,
+    percent: 33,
+    deliverables: [
+      { id: 'data-source', title: 'Data Source', description: '说明关键数据来源。', required: true, status: 'covered', detail: '已经发现关键数据集。' },
+      { id: 'data-flow', title: 'Data Flow', description: '说明关键数据流向。', required: true, status: 'not_started', detail: '还没有形成关键链路。' },
+      { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true, status: 'in_progress', detail: '已经发现表和列。' },
+    ],
+  });
+
+  assert.ok(prompt.indexOf('当前交付覆盖') < prompt.indexOf('每次行动前都检查'));
+  assert.match(prompt, /已覆盖 1\/3 项/);
+  assert.match(prompt, /\[已覆盖\] Data Source/);
+  assert.match(prompt, /\[未开始\] Data Flow/);
+});
