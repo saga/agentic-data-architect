@@ -14,6 +14,7 @@ import type { ParsedAnswer } from '../agent/result.js';
 import type { AgentCheckpoint, MissionContract } from '../investigation/schemas.js';
 import { evaluateMissionGate } from './mission-gate.js';
 import type { MissionProgress } from './mission-progress.js';
+import type { MissionAlignmentReview } from '../agent/jev-smart-func.js';
 import type { Investigation } from '../investigation/store.js';
 
 export interface StageGateSnapshot {
@@ -31,6 +32,8 @@ export interface StageGateInput {
   missionProgressBefore: MissionProgress;
   missionProgressAfter: MissionProgress;
   parsed: Pick<ParsedAnswer, 'answer' | 'claims' | 'unknowns' | 'followUpQuestions' | 'routeOptions'>;
+  /** Smart Function 对本阶段成果与 Mission 的语义判断；null 表示语义判断暂时不可用。 */
+  missionAlignment?: MissionAlignmentReview | null;
 }
 
 export interface StageGateCheck {
@@ -48,6 +51,9 @@ export interface StageGateResult {
   /** 本阶段真正让 Mission 哪些交付物向前推进；这是 Script Gate 的确定性结果。 */
   advancedDeliverables: Array<{ id: string; title: string; from: string; to: string }>;
   evidenceBackedClaimCount: number;
+  /** 是否值得继续自动推进；有未覆盖必需交付物时由 Script 强制继续。 */
+  shouldContinue: boolean;
+  missionAlignment?: MissionAlignmentReview | null;
 }
 
 function unique(values: string[]): string[] {
@@ -147,6 +153,14 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
   );
 
   add(
+    '阶段成果与 Mission 对齐',
+    input.missionAlignment?.aligned ?? true,
+    input.missionAlignment
+      ? input.missionAlignment.reason
+      : 'Smart Function 暂时不可用；本项不单独阻断，继续由确定性结果判断。',
+  );
+
+  add(
     'Claim 的 Evidence 引用有效',
     invalidClaimEvidence.length === 0,
     invalidClaimEvidence.length
@@ -183,6 +197,12 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
         : '本阶段虽然产生了调查变化，但没有推动任何已定义的 Mission 交付物。',
   );
 
+  const hasOpenRequiredDeliverables = input.missionProgressAfter.deliverables.some(
+    (item) => item.required && (item.status === 'not_started' || item.status === 'in_progress'),
+  );
+  const shouldContinue = hasOpenRequiredDeliverables
+    || (input.missionAlignment?.worthContinuing ?? false);
+
   return {
     execution: input.execution,
     passed: checks.every((item) => item.passed),
@@ -191,6 +211,8 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     newFindingIds,
     advancedDeliverables,
     evidenceBackedClaimCount: evidenceBackedClaims.length,
+    shouldContinue,
+    ...(input.missionAlignment ? { missionAlignment: input.missionAlignment } : {}),
   };
 }
 
