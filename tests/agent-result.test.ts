@@ -30,3 +30,33 @@ test('does not fall back to raw structured JSON when workflow is empty', () => {
   ]);
   assert.equal(parsed.workflow, undefined);
 });
+
+
+test('parses and sanitizes structured investigation intake', () => {
+  const raw = JSON.stringify({
+    answer: '已经从用户问题和仓库资料整理出范围。',
+    intake: {
+      goal: '替换老的投票工作流',
+      scope: ['Proxy Voting'],
+      systems: ['ISS Portal'],
+      source: 'mixed',
+      userConfirmed: true,
+      evidenceIds: ['ev-001', 'missing'],
+    },
+    claims: [],
+    unknowns: [],
+    followUpQuestions: [],
+    routeOptions: [],
+  });
+
+  const parsed = parseAgentAnswer(raw, new Set(['ev-001']));
+  assert.deepEqual(parsed.intake, {
+    goal: '替换老的投票工作流',
+    scope: ['Proxy Voting'],
+    systems: ['ISS Portal'],
+    source: 'mixed',
+    userConfirmed: true,
+    evidenceIds: ['ev-001'],
+  });
+  assert.ok(parsed.warnings.some((warning) => warning.includes('调查范围引用了不存在的 Evidence')));
+});
