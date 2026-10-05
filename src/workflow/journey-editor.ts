@@ -21,10 +21,9 @@ import {
   workspaceRoot,
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
-import { loadLatestSnapshot } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
-import { loadInvestigation } from '../investigation/store.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
