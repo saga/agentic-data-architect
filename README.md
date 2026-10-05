@@ -389,3 +389,10 @@ V1.2 Current-State Intelligence 的数据模型和设计见：
 ## 架构知识
 
 项目内的 `knowledge/` 保存可复用的 Data Architect 实践经验，并标明来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不替代当前 Investigation 的 Evidence。
+
+## Mission-driven Investigation
+
+每次调查先确认“为什么做”和“最后希望拿到什么”，这两项组成 Mission Contract。没有用户确认的 Mission，Agent 不会开始正式调查；后续每一轮都会重新以 Mission 为最高优先级判断是否继续、查什么和什么时候停止。
+
+详见 [Mission Contract 设计](docs/mission-contract.md)。
+
