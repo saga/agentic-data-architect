@@ -181,3 +181,28 @@ test('checkpoint can only be built after the gate passes', () => {
     /Stage Gate 未通过/,
   );
 });
+
+
+test('unrelated investigation changes do not create a stage summary', () => {
+  const base = input();
+  const result = evaluateInvestigationStageGate({
+    ...base,
+    after: {
+      evidenceIds: ['ev-old', 'ev-unrelated'],
+      findingIds: ['finding-old'],
+      discoveryRunCount: 2,
+    },
+    missionProgressBefore: base.missionProgressBefore,
+    missionProgressAfter: base.missionProgressBefore,
+    parsed: {
+      answer: '找到了一些额外资料，但这些资料不改变本次任务要交付的结果。',
+      claims: [],
+      unknowns: ['额外的历史细节还不清楚。'],
+      followUpQuestions: [],
+      routeOptions: [],
+    },
+  });
+
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '本阶段推进了 Mission 交付物' && !item.passed));
+});
