@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; personality:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; personality:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:string; avatarSources?:Array<{src:string;kind:'image'|'video'|'remote';mimeType?:string}>; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -201,85 +201,52 @@ export function InvestigationConfigPage(props:{
            </Card>
            <Card title='头像' className='settings-card'>
              <Flex align='flex-start' gap={18} wrap>
-               <Avatar
-                 shape='square'
-                 src={
-                   (draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0])
-                     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${(draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0])?.split('/').pop()?.replace(/\.png$/i, '')}?v=${props.control.version}`
-                     : undefined
-                 }
+               <Avatar shape='square'
+                 src={(() => {
+                   const source = draft.agent.avatarSources?.[0]?.src ?? draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0];
+                   return /^https?:\\/\\//i.test(source ?? '') ? source : undefined;
+                 })()}
                  icon={<PictureOutlined />}
-                 style={{
-                   width: 72,
-                   height: Math.round(72 * draft.agent.avatarHeight / draft.agent.avatarWidth),
-                   maxHeight: 180,
-                   flex: '0 0 auto',
-                   objectFit: 'cover',
-                 }}
+                 style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover'}}
                />
                <div style={{minWidth:260,flex:'1 1 320px'}}>
-                 <Paragraph type='secondary'>可以上传任意数量的头像。每条秘书回复会随机选择一个头像；上传新的头像不会覆盖已有头像。</Paragraph>
-                 <Flex gap={8} wrap>
-                   <ImgCrop
-                     aspect={draft.agent.avatarWidth / draft.agent.avatarHeight}
-                     zoomSlider
-                     rotationSlider
-                     showReset
-                     quality={1}
-                     modalTitle='裁剪助手头像'
-                     modalOk='使用此头像'
-                     modalCancel='取消'
-                     showGrid
-                   >
-                     <Upload
-                       accept='image/png,image/jpeg,image/webp'
-                       showUploadList={false}
-                       beforeUpload={(file) => {
-                         void handleAvatarBeforeUpload(file);
-                         return false;
-                       }}
-                     >
-                       <Button icon={<UploadOutlined />} loading={avatarUploading}>上传头像</Button>
+                 <Paragraph type='secondary'>支持本地图片、GIF 动图，以及远程图片 / GIF / 视频 URL。每条回复会随机选择一个头像来源。</Paragraph>
+                 <Input.Search
+                   placeholder='粘贴远程图片 / GIF / MP4 / WebM URL'
+                   enterButton='添加远程头像'
+                   onSearch={(value) => {
+                     const src = value.trim();
+                     if (!/^https?:\\/\\//i.test(src)) return;
+                     update(next => {
+                       const kind = /\\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(src) ? 'video' : 'remote';
+                       next.agent.avatarSources = [...(next.agent.avatarSources ?? []), {src, kind}];
+                       if (!next.agent.avatarPath) next.agent.avatarPath = src;
+                     });
+                   }}
+                 />
+                 <Flex wrap gap={8} style={{marginTop:12}}>
+                   {(draft.agent.avatarSources ?? []).map((source,index) => (
+                     <Tag key={`${source.src}-${index}`} closable onClose={() => update(next => { next.agent.avatarSources = (next.agent.avatarSources ?? []).filter((_,i)=>i!==index); })}>
+                       {source.kind === 'video' ? '视频' : '远程'} {source.src}
+                     </Tag>
+                   ))}
+                 </Flex>
+                 <Flex gap={8} wrap style={{marginTop:12}}>
+                   <ImgCrop aspect={draft.agent.avatarWidth/draft.agent.avatarHeight} zoomSlider rotationSlider showReset quality={1} modalTitle='裁剪助手头像' modalOk='使用此头像' modalCancel='取消' showGrid>
+                     <Upload accept='image/png,image/jpeg,image/webp,image/gif' showUploadList={false} beforeUpload={(file)=>{void handleAvatarBeforeUpload(file);return false;}}>
+                       <Button icon={<UploadOutlined/>} loading={avatarUploading}>上传图片 / GIF</Button>
                      </Upload>
                    </ImgCrop>
                  </Flex>
-                 {(draft.agent.avatarPaths?.length ?? (draft.agent.avatarPath ? 1 : 0)) > 0 ? (
-                   <Flex wrap gap={8} style={{marginTop:12}}>
-                     {(draft.agent.avatarPaths ?? (draft.agent.avatarPath ? [draft.agent.avatarPath] : [])).map((avatarPath) => {
-                       const avatarId = avatarPath.split('/').pop()?.replace(/\.png$/i, '');
-                       return (
-                         <Avatar
-                           key={avatarPath}
-                           shape='square'
-                           src={avatarId
-                             ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
-                             : undefined}
-                           icon={<PictureOutlined />}
-                           style={{width:48,height:Math.round(48 * draft.agent.avatarHeight / draft.agent.avatarWidth),objectFit:'cover'}}
-                         />
-                       );
-                     })}
-                   </Flex>
-                 ) : null}
-                 <Text type='secondary' style={{display:'block',marginTop:8}}>
-                   已上传 {(draft.agent.avatarPaths?.length ?? (draft.agent.avatarPath ? 1 : 0))} 个头像
-                 </Text>
+                 <Text type='secondary' style={{display:'block',marginTop:8}}>视频建议直接使用远程 URL。保存配置后立即生效。</Text>
                </div>
              </Flex>
              {avatarError ? <Alert type='error' showIcon title={avatarError} style={{marginTop:14}} /> : null}
              <Divider style={{margin:'18px 0 14px'}} />
              <Flex gap={12} wrap>
-               <div>
-                 <div className='field-label'>输出宽度（像素）</div>
-                 <InputNumber min={40} max={800} value={draft.agent.avatarWidth} onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 180);})} />
-               </div>
-               <div>
-                 <div className='field-label'>输出高度（像素）</div>
-                 <InputNumber min={40} max={1200} value={draft.agent.avatarHeight} onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 240);})} />
-               </div>
-               <div style={{alignSelf:'end',paddingBottom:4}}>
-                 <Text type='secondary'>默认 180 × 240。修改尺寸后，下一次裁剪按新的比例处理。</Text>
-               </div>
+               <div><div className='field-label'>输出宽度（像素）</div><InputNumber min={40} max={800} value={draft.agent.avatarWidth} onChange={value=>update(next=>{next.agent.avatarWidth=Number(value ?? 180);})}/></div>
+               <div><div className='field-label'>输出高度（像素）</div><InputNumber min={40} max={1200} value={draft.agent.avatarHeight} onChange={value=>update(next=>{next.agent.avatarHeight=Number(value ?? 240);})}/></div>
+               <Text type='secondary' style={{alignSelf:'end',paddingBottom:4}}>默认 180 × 240。修改尺寸后，下一次裁剪按新的比例处理。</Text>
              </Flex>
            </Card>
            <Card title='Soul / 人格' className='settings-card'>
