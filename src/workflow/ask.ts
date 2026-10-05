@@ -181,6 +181,7 @@ export async function answerQuestion(
       investigationName: inv.name,
       goal: inv.goal,
       scope: inv.scope,
+      systems: inv.systems,
       question: effectiveQuestion,
       contextText: questionContextText,
       ...(selectedRoute ? { selectedRoute } : {}),
