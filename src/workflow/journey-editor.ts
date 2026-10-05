@@ -28,6 +28,11 @@ import { loadModernizationPlan, persistModernizationAgentResult } from './modern
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import { runInvestigationScopeGate } from './scope-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
+import {
+  buildJourneyState,
+  isJourneyCompletionConditionSatisfied,
+  type JourneyFacts,
+} from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
   applyJourneyTransition,
@@ -861,6 +866,19 @@ export async function applyAgentWorkflowTransition(
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
+
+    if (transition.outcome === 'success' && currentNode) {
+      const facts = await buildJourneyFacts(name);
+      if (
+        currentNode.completeWhen
+        && !isJourneyCompletionConditionSatisfied(currentNode.completeWhen, facts)
+      ) {
+        throw new Error(
+          '当前步骤的完成条件还没有满足，不能由 Agent 自行宣布完成：'
+          + ' completeWhen=' + currentNode.completeWhen,
+        );
+      }
     }
 
     if (transition.outcome === 'success' && currentNode?.id === active.definition.start) {
