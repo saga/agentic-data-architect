@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   createUserScopeValidation,
   evaluateInvestigationScopeGate,
+  isCurrentStateOnlyScope,
 } from '../src/workflow/scope-gate.js';
 
 function investigation(overrides: Record<string, unknown> = {}) {
@@ -82,6 +83,24 @@ test('material-backed scope passes only with known evidence', () => {
   );
   assert.equal(
     evaluateInvestigationScopeGate(investigationWithValidation as never, new Set()).passed,
+    false,
+  );
+});
+
+
+test('explicit current-state-only scope is recognized', () => {
+  assert.equal(
+    isCurrentStateOnlyScope(
+      '梳理旧系统当前状态，不制定迁移计划',
+      ['不设计目标架构、迁移步骤或新旧映射。'],
+    ),
+    true,
+  );
+  assert.equal(
+    isCurrentStateOnlyScope(
+      '为旧系统制定 replatform 方案',
+      ['覆盖数据模型、数据源和数据流。'],
+    ),
     false,
   );
 });
