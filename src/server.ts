@@ -392,6 +392,9 @@ app.post('/api/sessions', async (req, res) => {
   app.post('/api/sessions/:name/user-inputs/respond', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(UserInputResponseBodySchema, req.body);
+    const pending = listPendingCopilotUserInputs(name).find(
+      (item) => item.turnId === body.turnId && item.requestId === body.requestId,
+    );
     const handled = respondToCopilotUserInput(name, body.turnId, body.requestId, body.answer, body.wasFreeform);
     if (!handled) {
       res.status(404).json({ error: '这个用户输入请求已经处理、已结束，或答案不符合请求要求。' });
@@ -404,6 +407,8 @@ app.post('/api/sessions', async (req, res) => {
       details: {
         turnId: body.turnId,
         requestId: body.requestId,
+        ...(pending?.question ? { question: pending.question } : {}),
+        answer: body.answer.trim().slice(0, 2000),
         wasFreeform: body.wasFreeform,
       },
     });
