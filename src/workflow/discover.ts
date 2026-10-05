@@ -18,6 +18,7 @@ import { nextId, type DiscoveryRun, type EvidenceRef, type GraphifyRunMetadata }
 import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
+import { assertMissionGate } from './mission-gate.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -66,6 +67,9 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   }
 
   const inv = await loadInvestigation(name);
+  // Discovery 会改变 Investigation 的事实状态，因此不能绕过 Mission Gate。
+  // 先确认“为什么做、最后要什么”，再开始扫描文件、数据库或建立 lineage。
+  assertMissionGate(inv.mission);
   const startedAt = new Date().toISOString();
   // 路径 Discovery 先做当前文件指纹，再判断是否真的需要产生新的 run。
   // 同一目录、同一批文件 hash、同一 parser 版本不会再次制造数千条重复 Evidence。
