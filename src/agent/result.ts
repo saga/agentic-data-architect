@@ -6,6 +6,10 @@
 import * as z from 'zod';
 import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
 import { AgentCheckpointSchema, JourneyRouteOptionSchema, type AgentCheckpoint } from '../investigation/schemas.js';
+import {
+  AgentModernizationResultSchema,
+  type AgentModernizationResult,
+} from '../model/modernization.js';
 
 /**
  * 结构化 Agent 结果：
@@ -33,6 +37,8 @@ export const AgentAnswerSchema = z.object({
   routeOptions: z.array(JourneyRouteOptionSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item) => item !== null).slice(0, 3)),
+  /** Legacy Modernization 阶段工作成果；真正保存和通关仍由服务端决定。 */
+  modernization: AgentModernizationResultSchema.optional().catch(undefined),
   /** 当前 Workflow 节点完成后，由 Agent 提出的合法出口；服务端仍会重新校验。 */
   workflow: z.object({
     nodeId: z.string().trim().min(1),
@@ -111,6 +117,10 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     };
   }
 
+  const modernization = parsed.data.modernization
+    ? sanitizeModernizationEvidence(parsed.data.modernization, existingEvidence, warnings, droppedEvidenceRefs)
+    : undefined;
+
   const claims: AgentClaimDraft[] = [];
   for (const draft of parsed.data.claims) {
     const kept = draft.evidenceIds.filter((id) => {
@@ -132,10 +142,78 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
     routeOptions: parsed.data.routeOptions,
+    ...(parsed.data.modernization ? { modernization } : {}),
     ...(parsed.data.checkpoint ? { checkpoint: parsed.data.checkpoint } : {}),
     warnings,
     droppedEvidenceRefs,
   };
+}
+
+/**
+ * 清理 Agent 工作成果里的 Evidence 引用。
+ *
+ * 不存在的 Evidence 会被删除；结果内容仍可保存，但后续 Gate 会因为缺少真实
+ * Evidence 而拒绝放行，不会把无效引用当成验证依据。
+ */
+function sanitizeModernizationEvidence(
+  result: AgentModernizationResult,
+  existingEvidence: Set<string> | Map<string, EvidenceRef>,
+  warnings: string[],
+  droppedEvidenceRefs: string[],
+): AgentModernizationResult {
+  const hasEvidence = (id: string): boolean =>
+    existingEvidence instanceof Set ? existingEvidence.has(id) : existingEvidence.has(id);
+
+  const filterEvidence = (ids: string[] | undefined): string[] => {
+    const values = (ids ?? []).filter((id) => {
+      if (hasEvidence(id)) return true;
+      droppedEvidenceRefs.push(id);
+      return false;
+    });
+    return [...new Set(values)];
+  };
+
+  const droppedBefore = droppedEvidenceRefs.length;
+  const sanitized: AgentModernizationResult = {
+    ...(result.targetArchitecture
+      ? {
+          targetArchitecture: {
+            ...result.targetArchitecture,
+            evidenceIds: filterEvidence(result.targetArchitecture.evidenceIds),
+          },
+        }
+      : {}),
+    ...(result.mappings
+      ? {
+          mappings: result.mappings.map((mapping) => ({
+            ...mapping,
+            evidenceIds: filterEvidence(mapping.evidenceIds),
+          })),
+        }
+      : {}),
+    ...(result.mappingCoverage ? { mappingCoverage: result.mappingCoverage } : {}),
+    ...(result.validation
+      ? {
+          validation: {
+            ...result.validation,
+            checks: result.validation.checks.map((item) => ({
+              ...item,
+              evidenceIds: filterEvidence(item.evidenceIds),
+            })),
+          },
+        }
+      : {}),
+  };
+
+  if (droppedEvidenceRefs.length > droppedBefore) {
+    warnings.push(
+      '工作成果引用了不存在的 Evidence，系统已删除 ' +
+      String(droppedEvidenceRefs.length - droppedBefore) +
+      ' 个无效引用；对应 Gate 不会因此自动通过。',
+    );
+  }
+
+  return sanitized;
 }
 
 /** 从完整 Agent JSON 中只提取阶段性 checkpoint；解析失败时直接忽略，不影响最终答案。 */
