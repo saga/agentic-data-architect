@@ -204,8 +204,8 @@ export function InvestigationConfigPage(props:{
                <Avatar
                  shape='square'
                  src={
-                   draft.agent.avatarPath
-                     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
+                   (draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0])
+                     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${(draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0])?.split('/').pop()?.replace(/\\.png$/i, '')}?v=${props.control.version}`
                      : undefined
                  }
                  icon={<PictureOutlined />}
