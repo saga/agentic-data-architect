@@ -107,7 +107,8 @@ interface InvestigationControl {
     personality: string;
     avatarPath?: string;
     avatarPaths?: string[];
-    avatarMimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
+    avatarMimeType?: string;
+    avatarSources?: Array<{ src: string; kind: 'image' | 'video' | 'remote'; mimeType?: string }>;
     autoContinuationTurns: number;
     avatarWidth: number;
     avatarHeight: number;
@@ -413,26 +414,45 @@ function AssistantAvatar(props: {
 }) {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
-  const avatarPath = props.avatarPath
+  const source = props.avatarPath
+    ?? props.control.agent.avatarSources?.[0]?.src
     ?? props.control.agent.avatarPath
     ?? props.control.agent.avatarPaths?.[0];
-  // avatarPath 是 workspace 相对路径；这里只取 UUID，不能把 .png 一起传给后端。
-  const avatarId = avatarPath?.split('/').pop()?.replace(/\.png$/i, '');
-  const avatarUrl = avatarPath === 'assistant/avatar.png'
-    ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`
-    : avatarId
-      ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${avatarId}?v=${props.control.version}`
-      : undefined;
+
+  if (!source) {
+    return <Avatar shape="square" icon={<RobotOutlined />} style={{ width, height, flex: '0 0 auto' }} />;
+  }
+
+  const isRemote = /^https?:\\/\\//i.test(source);
+  const localId = source.split('/').pop()?.replace(/\\.[^.]+$/, '');
+  const url = isRemote
+    ? source
+    : `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${localId}?v=${props.control.version}`;
+  const isVideo = props.control.agent.avatarSources?.find((item) => item.src === source)?.kind === 'video'
+    || /\\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(source);
+
+  if (isVideo) {
+    return (
+      <video
+        src={url}
+        autoPlay
+        loop
+        muted
+        playsInline
+        title={props.control.agent.displayName || '助手头像'}
+        style={{ width, height, objectFit: 'cover', flex: '0 0 auto', borderRadius: 8, display: 'block' }}
+      />
+    );
+  }
+
   return (
-    <Avatar
-      shape="square"
-      src={avatarUrl}
-      icon={<RobotOutlined />}
-      style={{ width, height, objectFit: 'cover', flex: '0 0 auto' }}
+    <img
+      src={url}
+      alt={props.control.agent.displayName || '助手头像'}
+      style={{ width, height, objectFit: 'cover', flex: '0 0 auto', borderRadius: 8, display: 'block' }}
     />
   );
 }
-
 function AssistantActionBar(props: {
   routeOptions: NonNullable<SessionContext['journeyPlan']>['routes'];
   followUpQuestions: string[];
@@ -529,7 +549,7 @@ function AppInner() {
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
     const sessionName = current?.context.name;
-    const avatarPaths = current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
+    const avatarPaths = current?.control.agent.avatarSources?.map((item) => item.src) ?? current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
     if (!sessionName || !avatarPaths.length) return;
 
     const storageKey = `ada.avatarAssignments.${sessionName}`;
@@ -558,7 +578,7 @@ function AppInner() {
     } catch {
       // 不影响聊天。
     }
-  }, [current?.context.name, current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.messages]);
+  }, [current?.context.name, current?.control.agent.avatarPath, current?.control.agent.avatarPaths, current?.control.agent.avatarSources, current?.messages]);
 
 
 
