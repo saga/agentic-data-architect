@@ -107,6 +107,8 @@ export interface AskInput {
   model?: string;
   /** model=auto 时的路由偏好。 */
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
+  /** 自动续跑时每一轮都重新注入的最高优先级 Mission 文本。 */
+  missionPrompt?: string;
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
@@ -1220,6 +1222,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
         }
 
         continuationPrompt = [
+          ...(input.missionPrompt
+            ? ['## Mission Contract（最高优先级）', input.missionPrompt]
+            : []),
           '继续自主推进当前 Investigation，不要因为上一阶段产生了一个局部答案就停止。',
           ...(workflowTransition.error ? [
             '',
