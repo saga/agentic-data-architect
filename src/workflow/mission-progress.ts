@@ -11,7 +11,7 @@
 import type { MissionContract, MissionDeliverable } from '../investigation/schemas.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { loadArchitectureAssessmentPlan } from './assessment.js';
-import { loadInvestigation } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
 
 export type MissionDeliverableStatus =
@@ -243,7 +243,7 @@ export async function buildMissionProgress(
   const signals: ProgressSignals = {
     currentState: snapshot?.currentState ?? null,
     estateNodeCount: estate?.nodes.length ?? 0,
-    estateColumnCount: estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
+    estateColumnCount: estate?.nodes.filter((node: { type: string }) => node.type === 'column').length ?? 0,
     findingsCount: investigation.findings.length,
     sourceOfTruthCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
     lineageEdgeCount: snapshot?.lineage?.edges.length ?? estate?.edges.length ?? 0,
