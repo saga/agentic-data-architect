@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   buildJevSmartFuncResponseSchema,
+  buildMissionAlignmentPrompt,
+  normalizeMissionAlignment,
   type JevQuestion,
 } from '../src/agent/jev-smart-func.js';
 
@@ -96,4 +98,45 @@ test('validates question keys before creating a schema', () => {
     }),
     /question key 不合法/,
   );
+});
+
+
+test('Mission Alignment distinguishes relevance from whether more work is worthwhile', () => {
+  const mission = {
+    purpose: '理解 IBM 老系统，为 replatform 决策提供依据。',
+    expectedResult: '形成当前数据来源、数据流和数据模型。',
+    deliverables: [
+      { id: 'data-source', title: 'Data Source', description: '关键数据来源。', required: true },
+      { id: 'data-flow', title: 'Data Flow', description: '关键数据流向。', required: true },
+      { id: 'data-model', title: 'Data Model', description: '核心数据模型。', required: true },
+    ],
+  };
+
+  const prompt = buildMissionAlignmentPrompt({
+    mission,
+    candidate: '找到 Position 的来源表和主链路。',
+    context: { progress: '1/3', newEvidenceIds: ['ev-2'] },
+  });
+  assert.match(prompt, /Mission/);
+  assert.match(prompt, /aligned=true/);
+  assert.match(prompt, /worth_continuing=true/);
+  assert.match(prompt, /找到 Position 的来源表/);
+
+  const result = normalizeMissionAlignment({
+    aligned: { type: 'noul', noul: 0.9 },
+    worth_continuing: { type: 'noul', noul: 0.8 },
+  });
+  assert.equal(result.aligned, true);
+  assert.equal(result.worthContinuing, true);
+  assert.ok(result.alignment > result.continuationValue - 0.2);
+});
+
+test('Mission Alignment stops once the Mission is sufficiently supported', () => {
+  const result = normalizeMissionAlignment({
+    aligned: { type: 'noul', noul: 0.93 },
+    worth_continuing: { type: 'noul', noul: 0.2 },
+  });
+  assert.equal(result.aligned, true);
+  assert.equal(result.worthContinuing, false);
+  assert.match(result.reason, /没有必要/);
 });

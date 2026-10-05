@@ -8,6 +8,8 @@ import { extractGitHubRepositories, researchGitHubRepository } from '../agent/re
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
+import { persistModernizationAgentResult } from './modernization.js';
+import { reviewMissionAlignment } from '../agent/jev-smart-func.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
@@ -276,6 +278,10 @@ export async function answerQuestion(
       })),
     };
 
+    // Smart Alignment 只在本阶段确实产生状态变化时调用，避免每个空回答都多做一次模型判断。
+    // 当 Smart Function 暂不可用时，Stage Script Gate 仍然可以依靠 Evidence / 交付物等确定性状态继续工作。
+    let stageContinuationRecommendation = true;
+
     const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
     await appendAuditEvent(investigationName, {
       actor: 'system',
@@ -345,6 +351,34 @@ export async function answerQuestion(
           investigationName,
           inv.mission!,
         );
+        const hasRealStateChange =
+          stageAfter.evidenceIds.length > stageGateBaseline.evidenceIds.length
+          || stageAfter.findingIds.length > stageGateBaseline.findingIds.length
+          || stageAfter.discoveryRunCount > stageGateBaseline.discoveryRunCount
+          || stageAfter.scopeValidatedAt !== stageGateBaseline.scopeValidatedAt
+          || missionProgressAfterStage.percent !== stageMissionProgressBaseline.percent;
+
+        const missionAlignment = hasRealStateChange
+          ? await reviewMissionAlignment({
+              mission: inv.mission!,
+              candidate: [
+                '本轮回答：' + stageParsed.answer,
+                '本轮 Claims：' + JSON.stringify(stageParsed.claims),
+                '本轮 Unknowns：' + JSON.stringify(stageParsed.unknowns),
+              ].join('\\n'),
+              context: {
+                execution,
+                workflow: inv.workflow,
+                progressBefore: stageMissionProgressBaseline,
+                progressAfter: missionProgressAfterStage,
+                newEvidenceIds: stageAfter.evidenceIds.filter((id) => !stageGateBaseline.evidenceIds.includes(id)),
+                newFindingIds: stageAfter.findingIds.filter((id) => !stageGateBaseline.findingIds.includes(id)),
+              },
+              model: control.agent.model,
+              workingDirectory: workspaceRoot(inv.name),
+            })
+          : null;
+
         const stageGateInput = {
           execution,
           mission: inv.mission!,
@@ -359,6 +393,7 @@ export async function answerQuestion(
             followUpQuestions: stageParsed.followUpQuestions,
             routeOptions: stageParsed.routeOptions,
           },
+          missionAlignment,
         };
         const gate = evaluateInvestigationStageGate(stageGateInput);
 
@@ -376,6 +411,7 @@ export async function answerQuestion(
 
         // 只有 Script Gate 通过，才能生成 checkpoint。Agent 返回的 checkpoint 字段不参与决定。
         if (gate.passed) {
+          stageContinuationRecommendation = gate.shouldContinue;
           const checkpoint = buildStageCheckpoint(stageGateInput, gate);
           const createdAt = new Date().toISOString();
           recordTrajectory({
@@ -399,6 +435,14 @@ export async function answerQuestion(
 
         stageGateBaseline = stageAfter;
         stageMissionProgressBaseline = missionProgressAfterStage;
+
+        return gate.passed
+          ? { passed: true }
+          : {
+              passed: false,
+              error: 'Stage Gate 未通过：'
+                + gate.checks.filter((item) => !item.passed).map((item) => item.name + '：' + item.detail).join('；'),
+            };
       },
       onBeforeWorkflowTransition: async ({ content }) => {
         // 每个阶段在 Gate 前先把本轮已经形成的、且通过 Evidence 校验的 intake 写入 context。
@@ -407,6 +451,10 @@ export async function answerQuestion(
         const stageParsed = parseAgentAnswer(content, evidenceMap);
         if (stageParsed.intake) {
           await persistAgentIntake(investigationName, stageParsed.intake);
+        }
+        if (latest.workflow === 'legacy-modernization' && stageParsed.modernization) {
+          // 先保存结构化 work product，Stage Gate 才能用真实状态判断交付物是否前进。
+          await persistModernizationAgentResult(investigationName, stageParsed.modernization);
         }
       },
       ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
@@ -422,7 +470,8 @@ export async function answerQuestion(
         assertMissionGate(latest.mission);
         const progress = await buildMissionProgress(investigationName, latest.mission);
         if (!progress) return true;
-        return missionHasOpenDeliverables(progress);
+        // 有未覆盖的必需交付物时，确定性地继续；否则采用本阶段 Smart Function 的“是否值得继续”建议。
+        return missionHasOpenDeliverables(progress) || stageContinuationRecommendation;
       },
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),

@@ -79,6 +79,64 @@ test('stage gate passes from actual evidence-backed work', () => {
   assert.equal(result.passed, true);
   assert.equal(result.newEvidenceIds[0], 'ev-new');
   assert.equal(result.evidenceBackedClaimCount, 1);
+  assert.equal(result.shouldContinue, true);
+});
+
+test('Stage Gate rejects real but Mission-unrelated work when Smart Alignment says it is unrelated', () => {
+  const result = evaluateInvestigationStageGate(input({
+    missionAlignment: {
+      aligned: false,
+      alignment: 0.2,
+      worthContinuing: true,
+      continuationValue: 0.9,
+      reason: '本轮主要在追逐无关的历史细节。',
+    },
+  }));
+
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && !item.passed));
+});
+
+test('Stage Gate uses deterministic open deliverables before Smart continuation advice', () => {
+  const result = evaluateInvestigationStageGate(input({
+    missionAlignment: {
+      aligned: true,
+      alignment: 0.9,
+      worthContinuing: false,
+      continuationValue: 0.1,
+      reason: '本阶段有效，但剩余结果仍未覆盖。',
+    },
+  }));
+
+  assert.equal(result.passed, true);
+  assert.equal(result.shouldContinue, true);
+});
+
+test('Stage Gate can stop auto-continuation when required deliverables are covered and Smart says stop', () => {
+  const base = input();
+  const result = evaluateInvestigationStageGate({
+    ...base,
+    missionProgressAfter: {
+      covered: 4,
+      total: 4,
+      percent: 100,
+      deliverables: base.missionProgressBefore.deliverables.map((item) => ({
+        ...item,
+        status: 'covered' as const,
+        detail: '已覆盖',
+      })),
+    },
+    missionAlignment: {
+      aligned: true,
+      alignment: 0.95,
+      worthContinuing: false,
+      continuationValue: 0.1,
+      reason: 'Mission 已经得到足够支持。',
+    },
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.shouldContinue, false);
 });
 
 test('a polished answer alone cannot pass the stage gate', () => {

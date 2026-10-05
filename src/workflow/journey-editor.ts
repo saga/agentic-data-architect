@@ -816,11 +816,16 @@ async function appendJourneyTransitionEvents(
  *
  * Agent 只能提出当前节点已经声明的 outcome；真正的 target 由 applyJourneyTransition
  * 根据 Workflow Definition 查找。这样模型不会直接控制 Workflow 的跳转边界。
+ *
+ * persistModernizationResult=false 只用于 Investigation Agent 的 pre-transition Stage Gate：
+ * Ask Flow 已经先保存本轮 work product，避免重复写入同一结果并把 version 无意义地加一。
+ * 其它直接调用方保持旧行为，默认仍会保存 Modernization work product。
  */
 export async function applyAgentWorkflowTransition(
   name: string,
   workflowId: WorkflowId | null,
   rawAnswer: string,
+  options: { persistModernizationResult?: boolean } = {},
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
   if (!workflowId) return { applied: false };
   const mission = assertMissionGate((await loadInvestigation(name)).mission);
@@ -895,7 +900,7 @@ export async function applyAgentWorkflowTransition(
       }
     }
 
-    if (workflowId === 'legacy-modernization') {
+    if (workflowId === 'legacy-modernization' && options.persistModernizationResult !== false) {
       try {
         const latestInvestigation = await loadInvestigation(name);
         const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
