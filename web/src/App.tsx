@@ -413,7 +413,9 @@ function AssistantAvatar(props: {
 }) {
   const width = Math.max(40, props.control.agent.avatarWidth || 180);
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
-  const avatarPath = props.avatarPath ?? props.control.agent.avatarPath;
+  const avatarPath = props.avatarPath
+    ?? props.control.agent.avatarPath
+    ?? props.control.agent.avatarPaths?.[0];
   // avatarPath 是 workspace 相对路径；这里只取 UUID，不能把 .png 一起传给后端。
   const avatarId = avatarPath?.split('/').pop()?.replace(/\.png$/i, '');
   const avatarUrl = avatarPath === 'assistant/avatar.png'
