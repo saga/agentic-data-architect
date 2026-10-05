@@ -112,6 +112,18 @@ export async function reviewMissionCompletion(
     };
   }
 
+  // 必需交付物还有明确缺口时，直接用 Script 结果阻断，不浪费一次 Smart Function。
+  if (!requiredDeliverablesResolved) {
+    return {
+      completed: false,
+      requiredDeliverablesResolved: false,
+      resultSupported: false,
+      blockedByUser: false,
+      support: 0,
+      reason: '仍有必需交付物没有完成，不能停止调查。',
+    };
+  }
+
   try {
     const raw = await jevSmartFunc({
       prompt: buildMissionCompletionPrompt(input),
