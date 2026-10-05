@@ -17,8 +17,8 @@ test('Mission prompt puts purpose and expected result before execution context',
   const prompt = buildMissionContractPrompt(mission);
 
   assert.equal(prompt.indexOf('## 最高优先级：本次任务 Mission'), 0);
-  assert.ok(prompt.indexOf('理解老系统当前的数据架构') < prompt.indexOf('当前交付覆盖'));
-  assert.ok(prompt.indexOf('拿到当前 Data Source、Data Flow、Data Model') < prompt.indexOf('当前交付覆盖'));
+  assert.ok(prompt.indexOf('理解老系统当前的数据架构') < prompt.indexOf('### 必须关注的交付物'));
+  assert.ok(prompt.indexOf('拿到当前 Data Source、Data Flow、Data Model') < prompt.indexOf('### 必须关注的交付物'));
 });
 
 test('question prompt starts from Mission and treats the user question as execution context', () => {
