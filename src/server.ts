@@ -650,6 +650,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const avatarPath = path.join(root, relativePath);
     await fs.writeFile(avatarPath, req.file.buffer);
 
+    // 同步更新工作台默认头像。之后新建的 Investigation 会继承这张头像。
+    const sharedAvatarDir = path.join(config.sharedDir, 'assistant');
+    await fs.mkdir(sharedAvatarDir, { recursive: true });
+    const sharedAvatarPath = path.join(sharedAvatarDir, 'default.png');
+    const sharedMetaPath = path.join(sharedAvatarDir, 'default.json');
+    await fs.copyFile(avatarPath, sharedAvatarPath);
+
     const current = await loadInvestigationControl(name);
     const requestedWidth = Number(req.body?.width);
     const requestedHeight = Number(req.body?.height);
@@ -677,6 +684,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         },
       },
       'assistant avatar added',
+    );
+
+    await fs.writeFile(
+      sharedMetaPath,
+      JSON.stringify({
+        sourcePath: 'assistant/default.png',
+        width: control.agent.avatarWidth,
+        height: control.agent.avatarHeight,
+      }, null, 2) + '\n',
+      'utf8',
     );
 
     await appendAuditEvent(name, {
