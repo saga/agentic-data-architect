@@ -55,6 +55,14 @@ export type MissionDeliverableId = keyof typeof MISSION_DELIVERABLE_CATALOG;
  * Agent 即使返回合法的 Workflow success，也不能被带进“设计新方案”。
  * 未知的自定义节点不做强行猜测，交给自定义 Workflow 本身处理。
  */
+const CURRENT_STATE_DELIVERABLES: MissionDeliverableId[] = [
+  'current-state-architecture',
+  'data-source',
+  'data-flow',
+  'data-model',
+  'transformation',
+];
+
 const WORKFLOW_TARGET_DELIVERABLES: Record<string, MissionDeliverableId[]> = {
   'estate-map': ['current-state-architecture', 'data-source', 'data-flow', 'data-model'],
   '看清旧系统': ['current-state-architecture', 'data-source', 'data-flow', 'data-model'],
@@ -94,22 +102,45 @@ export function isMissionWorkflowTargetAllowed(
   }
 
   const missionIds = new Set(mission.deliverables.map((item) => item.id));
-  const missing = requiredDeliverableIds.filter((id) => !missionIds.has(id));
-  if (!missing.length) {
-    return { allowed: true, requiredDeliverableIds };
+
+  // 现状调查的几个 Workflow 节点共享同一个结果组。用户只要求其中几个具体结果时，
+  // 不需要额外声明“当前架构”这个父项，也不应该因为缺少一个非核心细项而阻断调查。
+  const isCurrentStateTarget =
+    requiredDeliverableIds.some((id) => CURRENT_STATE_DELIVERABLES.includes(id))
+    && requiredDeliverableIds.every((id) => CURRENT_STATE_DELIVERABLES.includes(id));
+
+  if (isCurrentStateTarget) {
+    const hasCurrentStateResult = CURRENT_STATE_DELIVERABLES.some((id) => missionIds.has(id));
+    if (hasCurrentStateResult) {
+      return { allowed: true, requiredDeliverableIds };
+    }
+  } else {
+    const missing = requiredDeliverableIds.filter((id) => !missionIds.has(id));
+    if (!missing.length) {
+      return { allowed: true, requiredDeliverableIds };
+    }
+
+    return {
+      allowed: false,
+      requiredDeliverableIds,
+      reason:
+        '当前任务的期望结果没有包含“'
+        + missing
+          .map((id) => MISSION_DELIVERABLE_CATALOG[id][0])
+          .join('、')
+        + '”，不能进入“'
+        + (targetNodeTitle || targetNodeId)
+        + '”。如果确实需要这部分结果，请先修改并确认本次任务。',
+    };
   }
 
   return {
     allowed: false,
     requiredDeliverableIds,
     reason:
-      '当前任务的期望结果没有包含“'
-      + missing
-        .map((id) => MISSION_DELIVERABLE_CATALOG[id][0])
-        .join('、')
-      + '”，不能进入“'
+      '当前任务还没有包含“现状架构”相关结果，不能进入“'
       + (targetNodeTitle || targetNodeId)
-      + '”。如果确实需要这部分结果，请先修改并确认本次任务。',
+      + '”。如果确实需要继续了解当前系统，请先确认 Data Source、Data Flow、Data Model 等结果。',
   };
 }
 
