@@ -120,7 +120,7 @@ export interface AskInput {
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
   /** 当前 Investigation 的 Agent 权限模式；未显式指定时默认 Allow All。 */
-  permissionMode?: 'permission' | 'allow_all';
+  permissionMode?: 'permission';
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
   onStatus?: (status: string) => void;
