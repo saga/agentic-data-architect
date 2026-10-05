@@ -5,7 +5,7 @@
  */
 import * as z from 'zod';
 import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
-import { AgentCheckpointSchema, JourneyRouteOptionSchema, type AgentCheckpoint } from '../investigation/schemas.js';
+import { AgentCheckpointSchema, AgentIntakeSchema, JourneyRouteOptionSchema, type AgentCheckpoint, type AgentIntake } from '../investigation/schemas.js';
 import {
   AgentModernizationResultSchema,
   type AgentModernizationResult,
@@ -27,6 +27,8 @@ export type AgentClaimDraft = z.infer<typeof AgentClaimDraftSchema>;
 /** Agent 最终结构化答案的运行时 Schema；允许单个坏 Claim 通过 catch 降级而不丢掉整份答案。 */
 export const AgentAnswerSchema = z.object({
   answer: z.string().max(8000).catch(''),
+  /** Agent 从用户问题、仓库、文档和 Discovery 中整理出的调查范围候选。 */
+  intake: AgentIntakeSchema.optional().catch(undefined),
   /** 有实质调查成果时输出；这是中间 checkpoint，不是最终报告。 */
   checkpoint: AgentCheckpointSchema.optional().catch(undefined),
   claims: z.array(AgentClaimDraftSchema.nullable().catch(null))
@@ -121,6 +123,10 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     ? sanitizeModernizationEvidence(parsed.data.modernization, existingEvidence, warnings, droppedEvidenceRefs)
     : undefined;
 
+  const intake = parsed.data.intake
+    ? sanitizeIntakeEvidence(parsed.data.intake, existingEvidence, warnings, droppedEvidenceRefs)
+    : undefined;
+
   const claims: AgentClaimDraft[] = [];
   for (const draft of parsed.data.claims) {
     const kept = draft.evidenceIds.filter((id) => {
@@ -142,11 +148,36 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     unknowns: parsed.data.unknowns,
     followUpQuestions: parsed.data.followUpQuestions,
     routeOptions: parsed.data.routeOptions,
+    ...(intake ? { intake } : {}),
     ...(parsed.data.modernization ? { modernization } : {}),
     ...(parsed.data.checkpoint ? { checkpoint: parsed.data.checkpoint } : {}),
     warnings,
     droppedEvidenceRefs,
   };
+}
+
+/**
+ * 清理 Agent 范围整理中的 Evidence 引用。
+ *
+ * Scope Gate 只接受真实存在的 Evidence；无效引用会被删掉并进入 warnings。
+ */
+function sanitizeIntakeEvidence(
+  intake: AgentIntake,
+  existingEvidence: Set<string> | Map<string, EvidenceRef>,
+  warnings: string[],
+  droppedEvidenceRefs: string[],
+): AgentIntake {
+  const hasEvidence = (id: string): boolean =>
+    existingEvidence instanceof Set ? existingEvidence.has(id) : existingEvidence.has(id);
+  const evidenceIds = intake.evidenceIds.filter((id) => {
+    if (hasEvidence(id)) return true;
+    droppedEvidenceRefs.push(id);
+    return false;
+  });
+  if (evidenceIds.length !== intake.evidenceIds.length) {
+    warnings.push('调查范围引用了不存在的 Evidence，系统已删除无效引用；范围确认不会因此自动通过。');
+  }
+  return { ...intake, evidenceIds: [...new Set(evidenceIds)] };
 }
 
 /**
