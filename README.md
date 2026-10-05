@@ -89,6 +89,43 @@ sequenceDiagram
     WF->>UI: 输出 current-state + target-state work products
 ~~~
 
+## 本机 OpenCode / 本地模型
+
+工作台支持把本机 OpenCode 作为第二个 Agent Runtime。OpenCode 用 `opencode serve` 提供 HTTP API，工作台会读取它当前已经配置的 provider / model，并显示在主对话区的“模型”菜单里。
+
+启动本机 OpenCode：
+
+~~~bash
+opencode serve
+~~~
+
+默认监听 `127.0.0.1:4096`。如需其它地址，在项目环境变量中配置：
+
+~~~bash
+OPENCODE_ENABLED=true
+OPENCODE_BASE_URL=http://127.0.0.1:4096
+~~~
+
+如果 OpenCode Server 开启了 Basic Auth，再配置：
+
+~~~bash
+OPENCODE_USERNAME=opencode
+OPENCODE_PASSWORD=...
+~~~
+
+OpenCode 自己负责 provider、模型、工具、MCP 和认证配置；例如 Ollama 等本地模型应在 OpenCode 中配置完成，工作台不会复制一套 provider 配置。
+
+主对话区选择本机模型后，模型值形如：
+
+~~~text
+opencode:ollama/<model>
+opencode:openai/<model>
+~~~
+
+这里的模型选择按 Investigation 保存，下一轮执行即可切换。OpenCode 当前 provider/model 列表来自 `GET /provider`，执行使用 `POST /session` 和 `POST /session/:id/message`，过程通过 SSE 事件回传。
+
+注意：OpenCode 是独立 Runtime，它的工具、MCP 和权限由 OpenCode 本身管理；本项目仍负责 Mission、Evidence、Stage Gate 和 Investigation 结果持久化。
+
 ## 快速开始
 
 Python 依赖由 `pyproject.toml` 管理，运行环境由 `uv` 创建和同步；不要再直接执行 `pip install -r requirements*.txt`。首次运行或依赖变化后执行：
