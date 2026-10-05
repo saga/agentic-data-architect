@@ -1311,6 +1311,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }
 
       if (execution < autoContinuationTurns) {
+        // Workflow 已经走到终点时，这次 Completion Review 的结果直接复用到下面，
+        // 避免同一个阶段连续调用两次相同的 Smart Function。
+        let missionNeedsContinuation: boolean | undefined;
         const workflowCompleted =
           workflowTransition.applied && workflowTransition.execution?.status === 'completed';
 
@@ -1320,10 +1323,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
            * Mission 是否真的完成仍由上层 Completion Gate 决定；否则一个固定 Workflow
            * 很容易把“阶段做完”错误地当成“用户最终结果已经拿到”。
            */
-          const shouldContinueAfterWorkflowCompletion = input.shouldContinueMission
+          missionNeedsContinuation = input.shouldContinueMission
             ? await input.shouldContinueMission()
             : false;
-          if (!shouldContinueAfterWorkflowCompletion) {
+          if (!missionNeedsContinuation) {
             break;
           }
           // Workflow 已经没有下一节点，但 Mission 还有缺口：继续自主调查，不再注入完成态 Workflow 指令。
@@ -1345,9 +1348,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
           }
         }
 
-        const shouldContinueMission = input.shouldContinueMission
-          ? await input.shouldContinueMission()
-          : true;
+        const shouldContinueMission = missionNeedsContinuation
+          ?? (input.shouldContinueMission ? await input.shouldContinueMission() : true);
         if (!shouldContinueMission) {
           input.onStatus?.('Mission 需要的交付物已经覆盖，停止自动续跑。');
           input.onTrajectory?.({
