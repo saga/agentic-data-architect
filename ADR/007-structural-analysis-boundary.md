@@ -30,3 +30,33 @@ Graphify 的 runtime version、graph hash 等运行信息进入 audit。
 Agent 可以高效导航大型 repository，同时不会因为 structural graph 存在就绕过 Evidence-first 规则。
 
 代价是同一条关系可能存在“结构候选”和“可验证事实”两个阶段，Agent/Skill 必须理解这两个边界。
+## Appendix A：形成决定时的分析记录（仅供参考）
+
+项目研究大型 legacy repository 时，一个实际问题是：逐文件阅读效率太低。
+
+因此引入 Graphify 作为 structural-analysis capability，主要解决“先找到应该读什么”的问题，例如：
+
+- 模块之间怎么连接；
+- 哪个文件实现了某个调用；
+- SQL 和代码有哪些结构关系；
+- 哪些节点值得优先深入。
+
+讨论过程中明确区分了两个阶段：
+
+```text
+Structural observation
+        ↓
+调查候选
+        ↓
+人工 / Agent 深入检查
+        ↓
+本项目 Evidence
+        ↓
+可用于 Claim / Finding 的事实
+```
+
+所以 Graphify 不应该成为第二个事实系统。
+
+这也是为什么 runtime version、command、graph hash 需要进入 audit，而 Graphify graph 本身不能直接绕过本项目的 Evidence validation。
+
+本附录只记录为什么划这个边界。
