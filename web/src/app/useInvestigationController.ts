@@ -121,6 +121,7 @@ export function useInvestigationController() {
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState('');
+  const [newSessionExpectedResult, setNewSessionExpectedResult] = useState('');
   const [workflowSaving, setWorkflowSaving] = useState(false);
   // undefined = 尚未选择；'' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
   const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | '' | undefined>(undefined);
@@ -148,6 +149,8 @@ export function useInvestigationController() {
   });
   const activeRef = useRef<string | undefined>(undefined);
   const loadRequestRef = useRef(0);
+  /** 新建调查时临时保存用户已经写好的 Mission 草稿，等 Session 加载完成后交给 Mission 确认窗口。 */
+  const pendingInitialMissionDraftRef = useRef<MissionDraft | undefined>(undefined);
   const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController } | undefined>(undefined);
 
   useEffect(() => {
@@ -191,11 +194,17 @@ export function useInvestigationController() {
     // Mission 是正式调查的前置条件。旧 Session 如果还没有 Mission，
     // 首次打开就直接让用户确认，而不是先允许 Agent 自己猜目标。
     if (!result.context.mission) {
-      setMissionDraft({
-        purpose: result.context.goal || result.context.userPrompt || '',
-        expectedResult: '',
-        deliverableIds: [],
-      });
+      const initialDraft = pendingInitialMissionDraftRef.current;
+      if (initialDraft) {
+        setMissionDraft(initialDraft);
+        pendingInitialMissionDraftRef.current = undefined;
+      } else {
+        setMissionDraft({
+          purpose: result.context.goal || result.context.userPrompt || '',
+          expectedResult: '',
+          deliverableIds: [],
+        });
+      }
       setMissionOpen(true);
     }
 
@@ -785,18 +794,27 @@ export function useInvestigationController() {
     const name = newSessionName.trim();
     if (!name) return;
     try {
+      const purpose = newSessionGoal.trim();
+      const expectedResult = newSessionExpectedResult.trim();
+      pendingInitialMissionDraftRef.current = {
+        purpose,
+        expectedResult,
+        deliverableIds: [],
+      };
+
       const created = await getJson<{ context: SessionContext }>('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          userPrompt: newSessionGoal.trim() || undefined,
+          userPrompt: purpose || undefined,
           workflow: newSessionWorkflow,
         }),
       });
       setNewSessionOpen(false);
       setNewSessionName('');
       setNewSessionGoal('');
+      setNewSessionExpectedResult('');
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
@@ -871,6 +889,7 @@ export function useInvestigationController() {
     newSessionName,
     newSessionWorkflow,
     newSessionGoal,
+    newSessionExpectedResult,
     workflowSaving,
     workflowTarget,
     workflowConfirmText,
@@ -911,6 +930,7 @@ export function useInvestigationController() {
     setNewSessionOpen,
     setNewSessionName,
     setNewSessionGoal,
+    setNewSessionExpectedResult,
     setNewSessionWorkflow,
     setWorkflowTarget,
     setWorkflowConfirmText,
