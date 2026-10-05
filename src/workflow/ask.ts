@@ -7,7 +7,7 @@ import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilo
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
-import { buildAgentCheckpoint, parseAgentAnswer, toClaims } from '../agent/result.js';
+import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
@@ -311,15 +311,9 @@ export async function answerQuestion(
           name: gate.passed ? '阶段成果检查通过' : '阶段成果检查未通过',
           status: gate.passed ? 'completed' : 'info',
           details: {
-            execution,
             ...gate,
             input: stageGateInput,
           },
-        });
-        void runRecorder?.write('stage_gate', {
-          execution,
-          ...gate,
-          input: stageGateInput,
         });
 
         // 只有 Script Gate 通过，才能生成 checkpoint。Agent 返回的 checkpoint 字段不参与决定。
