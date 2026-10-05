@@ -4,7 +4,7 @@
  * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
-import { CopilotClient, ToolSet } from '@github/copilot-sdk';
+import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -120,7 +120,7 @@ export interface AskInput {
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
   /** 当前 Investigation 的 Agent 权限模式；未显式指定时默认 Allow All。 */
-  permissionMode?: 'permission';
+  permissionMode?: 'permission' | 'allow_all';
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
   onStatus?: (status: string) => void;
@@ -366,7 +366,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
     // 默认直接 Allow All，避免本地单用户工作台对每个 read/grep/bash 都重复确认。
     // 只有上层显式传 permission 时，才启用逐次人工审批。
-    ...(false ? { onPermissionRequest: approveAll } : {}),
+    ...((input.permissionMode ?? 'allow_all') === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
     /**
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
@@ -600,7 +600,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(input.autoTier ? { autoTier: input.autoTier } : {}),
         workingDirectory,
         workflowSkill: input.workflowSkill ?? null,
-        permissionMode: input.permissionMode ?? 'permission',
+        permissionMode: input.permissionMode ?? 'allow_all',
         mcpServers: Object.keys(mcpServers),
       })
     : null;
@@ -764,8 +764,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       ('需要确认 ' + kind);
     void runRecorder?.write('permission_request', { requestId, permissionRequest: request });
     const managedApprovalRequired = request.managedApprovalRequired === true;
-    // 当前安全模型要求每一个 permission request 都经过人工确认。
-    const autoApproved = false;
+    const autoApproved = (input.permissionMode ?? 'allow_all') === 'allow_all' && !managedApprovalRequired;
     if (!autoApproved) {
       pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
       startPermissionWaitTimeout();
