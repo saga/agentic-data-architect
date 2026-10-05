@@ -95,13 +95,34 @@ Uploaded / discovered files
 
 DuckDB 仍然不是权限边界、业务真相或 Investigation State。Agent 只能通过受限的 `local_*` tools 使用已经登记的数据集，分析结果必须保留 Dataset version / SHA-256 / SQL / Evidence。
 
+## Mission-first Investigation
+
+Current-State Intelligence 不是为了不断找未知，而是为了支撑用户明确的 Mission。
+
+对于“看懂当前系统的数据架构”这类任务，通常先覆盖：
+
+~~~text
+Data Source
+  ↓
+Data Flow
+  ↓
+Data Model
+  ↓
+Transformation
+  ↓
+Business Meaning
+~~~
+
+少量 unknown 可以保留；只有会影响用户期望结果时才继续调查。具体能力由 skills/current-state-architecture/SKILL.md 提供，不需要新增固定 Workflow。
+
 ## Investigation Skills
 
-当前 capability Skill 进一步分成四类：
+当前 capability Skill 进一步分成五类：
 
 - `investigation-session`：维护多轮调查状态，区分事实、Evidence、推断和未知。
 - `domain-modeling`：当业务术语影响模型、Mapping 或架构决定时统一 canonical language，并关联 Evidence。
 - `research`：调查外部事实和第三方能力，优先使用第一方资料并留下可复核的 Research Artifact。
 - `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
+- `current-state-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状。
 
 这些 Skill 不增加 Workflow DSL 的复杂度，也不替代权限、Policy 或业务审批。
