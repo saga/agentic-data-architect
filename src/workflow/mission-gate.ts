@@ -23,6 +23,14 @@ export interface MissionGateResult {
   draft: MissionDraft;
 }
 
+export class MissionGateError extends Error {
+  constructor(readonly result: MissionGateResult) {
+    super(formatMissionGateFailure(result));
+    this.name = 'MissionGateError';
+  }
+}
+
+
 export const MISSION_DELIVERABLE_CATALOG = {
   'current-state-architecture': ['当前架构', '梳理当前系统的数据架构、主要组件、数据关系和依赖。'],
   'data-source': ['Data Source', '说明关键数据从哪里来，以及可信来源候选。'],
@@ -139,7 +147,7 @@ export function evaluateMissionGate(mission: MissionContract | undefined): Missi
 export function assertMissionGate(mission: MissionContract | undefined): MissionContract {
   const result = evaluateMissionGate(mission);
   if (!result.passed) {
-    throw new Error(formatMissionGateFailure(result));
+    throw new MissionGateError(result);
   }
   return mission!;
 }
