@@ -1,5 +1,6 @@
 import React from 'react';
-import { Alert, Button, Conversations, Flex, Layout, Typography } from 'antd';
+import { Alert, Button, Layout, Typography } from 'antd';
+import { Conversations } from '@ant-design/x';
 import { InfoCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { SessionSummary } from '../app/types';
 
