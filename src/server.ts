@@ -54,6 +54,8 @@ import {
   inferMissionDeliverables,
   MissionGateError,
 } from './workflow/mission-gate.js';
+import { reviewMissionClarity } from './workflow/mission-evaluation.js';
+import { buildMissionProgress } from './workflow/mission-progress.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
   appendContextInput,
@@ -271,8 +273,10 @@ app.post('/api/sessions', async (req, res) => {
     const snapshot = await loadLatestSnapshot<any>(name);
     const conversation = getConversationSummary(name);
     const trajectory = await readTrajectory(name, { limit: 5000 });
+    const missionProgress = await buildMissionProgress(name, context.mission);
     res.json({
       context,
+      missionProgress,
       control: await loadInvestigationControl(name),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
@@ -291,9 +295,11 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     const gate = evaluateMissionGate(context.mission);
+    const progress = await buildMissionProgress(name, context.mission);
     res.json({
       mission: context.mission ?? null,
       gate,
+      progress,
       ...(context.mission ? {} : {
         draft: buildMissionDraft(context.goal || context.userPrompt),
       }),
@@ -304,6 +310,21 @@ app.post('/api/sessions', async (req, res) => {
   app.patch('/api/sessions/:name/mission', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(UpdateMissionBodySchema, req.body);
+    const clarity = await reviewMissionClarity(
+      body.purpose,
+      body.expectedResult,
+      { model: (await loadInvestigationControl(name)).agent.model, workingDirectory: workspaceRoot(name) },
+    );
+    if (clarity && !clarity.clear) {
+      res.status(409).json({
+        code: 'MISSION_CLARITY_REQUIRED',
+        error: clarity.reason,
+        clarity,
+        draft: buildMissionDraft(body.purpose, body.expectedResult),
+      });
+      return;
+    }
+
     const mission = {
       version: 1 as const,
       purpose: body.purpose,
@@ -326,7 +347,12 @@ app.post('/api/sessions', async (req, res) => {
       },
     });
 
-    res.json({ context, mission, gate: evaluateMissionGate(mission) });
+    res.json({
+      context,
+      mission,
+      gate: evaluateMissionGate(mission),
+      progress: await buildMissionProgress(name, mission),
+    });
   });
 
   /**
@@ -1055,7 +1081,18 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(MessageBodySchema, req.body);
+    await ensureWorkspace(name);
     const context = await loadWorkspaceContext(name);
+    const missionGate = evaluateMissionGate(context.mission);
+    if (!missionGate.passed) {
+      res.status(409).json({
+        code: 'MISSION_REQUIRED',
+        error: formatMissionGateFailure(missionGate),
+        draft: buildMissionDraft(context.goal || context.userPrompt),
+      });
+      return;
+    }
+
     let selectedRoute = body.routeId
       ? context.journeyPlan?.routes.find((route) => route.id === body.routeId)
       : undefined;
@@ -1067,7 +1104,6 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       ?? (selectedRoute ? '选择下一步：' + selectedRoute.title : '');
     const turnId = body.turnId ?? randomUUID();
 
-    await ensureWorkspace(name);
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
