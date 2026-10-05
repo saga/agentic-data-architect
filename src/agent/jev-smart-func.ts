@@ -75,6 +75,27 @@ interface NoulAnswer {
 
 export type JevSmartAnswer = ChoiceAnswer | ScoreAnswer | NoulAnswer;
 
+/** Mission Alignment 的语义判断结果；只提供判断信号，不替代确定性 Gate。 */
+export interface MissionAlignmentReview {
+  aligned: boolean;
+  alignment: number;
+  worthContinuing: boolean;
+  continuationValue: number;
+  reason: string;
+}
+
+export interface MissionAlignmentInput {
+  mission: {
+    purpose: string;
+    expectedResult: string;
+    deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+  };
+  candidate: string;
+  context?: string | string[] | Record<string, unknown>;
+  model?: string;
+  workingDirectory?: string;
+}
+
 export interface JevSmartFuncInput {
   /** 这次要做什么判断；不要把状态内容重复写进 prompt。 */
   prompt: string;
@@ -295,6 +316,105 @@ function normalizeScoreProbabilities(
     level,
     probability: values.find((item) => item.level === level)!.probability,
   }));
+}
+
+/**
+ * 构造通用 Mission Alignment 判断 Prompt。
+ *
+ * 这个判断只回答两个问题：本轮成果是否直接服务 Mission，以及如果当前结果已经足够，
+ * 是否还有继续深挖的价值。最终是否允许推进仍由 Script Gate 决定。
+ */
+export function buildMissionAlignmentPrompt(input: MissionAlignmentInput): string {
+  return [
+    "判断本轮 Investigation 成果是否真正服务于已经确认的 Mission。",
+    "",
+    "Mission：",
+    "任务目的：" + input.mission.purpose.trim(),
+    "期望结果：" + input.mission.expectedResult.trim(),
+    "必须交付：",
+    ...input.mission.deliverables.map((item) =>
+      "- " + item.title + "：" + item.description + (item.required ? "（必须）" : "（可选）")),
+    "",
+    "本轮候选成果：",
+    input.candidate.trim(),
+    ...(input.context !== undefined ? ["", "补充状态：", renderContext(input.context)] : []),
+    "",
+    "判断标准：",
+    "1. aligned=true：本轮成果直接帮助完成 Mission 的目的、期望结果或明确交付物。",
+    "2. aligned=false：主要是在追逐局部发现、无关 unknown、漂亮总结或与 Mission 无直接关系的旁支。",
+    "3. worth_continuing=true：仍有明确的 Mission 交付物未完成，或者现有结果还不足以支持用户最终需要的判断。",
+    "4. worth_continuing=false：Mission 已经得到足够支持，继续调查主要是在填充无关细节。",
+  ].join("\n");
+}
+
+/** 把 Smart Function 的概率信号转换为工作台可消费的保守结果。 */
+export function normalizeMissionAlignment(
+  raw: Record<string, { type: string; noul?: number }>,
+): MissionAlignmentReview {
+  const alignment = raw.aligned?.noul ?? 0;
+  const continuationValue = raw.worth_continuing?.noul ?? 0;
+  const aligned = alignment >= 0.72;
+  const worthContinuing = continuationValue >= 0.72;
+
+  let reason = aligned
+    ? "本轮成果与 Mission 直接相关。"
+    : "本轮成果与 Mission 的直接关系不足。";
+  if (aligned && !worthContinuing) {
+    reason += "当前结果已经接近足够，没有必要为了清空未知项继续深挖。";
+  } else if (aligned && worthContinuing) {
+    reason += "当前仍有值得完成的工作。";
+  }
+
+  return {
+    aligned,
+    alignment,
+    worthContinuing,
+    continuationValue,
+    reason,
+  };
+}
+
+/**
+ * 通用 Mission Alignment：供阶段 Gate、自动续跑等需要“有没有价值”判断的地方复用。
+ */
+export async function reviewMissionAlignment(
+  input: MissionAlignmentInput,
+): Promise<MissionAlignmentReview | null> {
+  try {
+    const raw = await jevSmartFunc({
+      prompt: buildMissionAlignmentPrompt(input),
+      context: {
+        mission: input.mission,
+        candidate: input.candidate,
+        ...(input.context !== undefined ? { state: input.context } : {}),
+      },
+      questions: {
+        aligned: {
+          type: "noul",
+          instructions: "本轮成果是否直接服务于 Mission 的任务目的、期望结果或明确交付物？",
+          criteria: {
+            true: "结果直接帮助完成用户明确要求的结果。",
+            false: "结果主要是旁支发现、无关 unknown、局部细节或与 Mission 无直接关系的工作。",
+          },
+        },
+        worth_continuing: {
+          type: "noul",
+          instructions: "完成本轮结果后，是否仍然值得继续调查？",
+          criteria: {
+            true: "仍有明确的 Mission 交付物未完成，或者现有结果还不足以支持用户最终需要的判断。",
+            false: "Mission 已经得到足够支持，继续调查主要只是在寻找更多细节。",
+          },
+        },
+      },
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    });
+
+    return normalizeMissionAlignment(raw as Record<string, { type: string; noul?: number }>);
+  } catch {
+    // Smart Function 只是语义判断辅助；服务异常时由确定性 Stage Script Gate 继续裁决。
+    return null;
+  }
 }
 
 /**
