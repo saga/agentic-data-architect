@@ -169,6 +169,21 @@ test('human review starts in waiting state', () => {
   assert.equal(execution.pendingInteraction?.nodeId, 'review');
 });
 
+test('legacy modernization uses current-state architecture instead of a fixed key-question stage', async () => {
+  const definition = await loadWorkflowJourney('legacy-modernization');
+
+  assert.equal(definition.nodes.some((node) => node.id === 'investigate' || node.title === '查关键问题'), false);
+
+  const dataTruth = definition.nodes.find((node) => node.id === 'data-truth');
+  assert.equal(dataTruth?.routes.some((route) => route.target === 'current-state'), true);
+
+  const currentState = definition.nodes.find((node) => node.id === 'current-state');
+  assert.match(currentState?.title ?? '', /当前架构/);
+  assert.match(currentState?.objective ?? '', /Data Source/);
+  assert.match(currentState?.objective ?? '', /Data Flow/);
+  assert.match(currentState?.objective ?? '', /Data Model/);
+});
+
 test('loads the architecture assessment markdown workflow', async () => {
   const definition = await loadWorkflowJourney('data-architecture-assessment');
   assert.equal(definition.id, 'data-architecture-assessment');
