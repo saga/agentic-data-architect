@@ -137,6 +137,7 @@ export async function loadArchitectureAssessmentPlan(name: string): Promise<Arch
 async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeof loadInvestigation>>, current: DiscoverySnapshot['currentState'] | null, plan: ArchitectureAssessmentPlan): Promise<JourneyState> {
   return buildJourneyState(await loadWorkflowJourney('data-architecture-assessment'), {
     goal: inv.goal || inv.userPrompt,
+    scopeReady: inv.scopeValidation?.status === 'validated',
     currentState: current ? { datasets: current.coverage.datasets, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
     unknowns: inv.unknowns,
     highGapKinds: buildModernizationGaps({
