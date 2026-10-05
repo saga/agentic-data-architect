@@ -413,6 +413,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
         },
       });
 
+      const requestedAt = new Date().toISOString();
+
       return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
         pendingCopilotUserInputs.set(requestId, {
           sessionName: investigationName,
@@ -422,7 +424,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           question: request.question,
           choices: request.choices ?? [],
           allowFreeform: request.allowFreeform !== false,
-          requestedAt: new Date().toISOString(),
+          requestedAt,
           onAnswered: ({ answer, wasFreeform }) => {
             input.onTrajectory?.({
               type: 'user_input_completed',
