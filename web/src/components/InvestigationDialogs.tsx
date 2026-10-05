@@ -14,6 +14,7 @@ export function InvestigationDialogs(props: {
   newSessionOpen: boolean;
   newSessionName: string;
   newSessionGoal: string;
+  newSessionExpectedResult: string;
   newSessionWorkflow: WorkflowId | null;
   unknownsOpen: boolean;
   userInputDrafts: Record<string, string>;
@@ -42,12 +43,26 @@ export function InvestigationDialogs(props: {
             onChange={(event) => props.setNewSessionName(event.target.value)}
             placeholder="工作名称，例如：portfolio-position-lineage"
           />
-          <Input.TextArea
-            value={props.newSessionGoal}
-            onChange={(event) => props.setNewSessionGoal(event.target.value)}
-            placeholder="任务目的：为什么要做这次调查，例如：弄清老系统的数据架构，为 replatform 提供依据。（可选）"
-            autoSize={{ minRows: 3, maxRows: 6 }}
-          />
+          <div>
+            <Text strong>任务目的</Text>
+            <Input.TextArea
+              value={props.newSessionGoal}
+              onChange={(event) => props.setNewSessionGoal(event.target.value)}
+              placeholder="为什么要做这次调查，例如：弄清老系统的数据架构，为 replatform 提供依据。"
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              style={{ marginTop: 6 }}
+            />
+          </div>
+          <div>
+            <Text strong>期望结果</Text>
+            <Input.TextArea
+              value={props.newSessionExpectedResult}
+              onChange={(event) => props.setNewSessionExpectedResult(event.target.value)}
+              placeholder="最后希望拿到什么，例如：当前 Data Source、Data Flow、Data Model，以及 replatform 方案。"
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              style={{ marginTop: 6 }}
+            />
+          </div>
           <Select
             value={props.newSessionWorkflow ?? ''}
             onChange={(value) => props.setNewSessionWorkflow(value ? value as WorkflowId : null)}
@@ -58,7 +73,7 @@ export function InvestigationDialogs(props: {
             className="modal-tip"
             type="info"
             showIcon
-            title="创建后，第一次真正开始调查前会先确认任务目的和期望结果。工作路线只是实现任务的方式，不会替代任务本身。"
+            title="创建工作空间不会直接开始调查。第一次执行前还会让你确认这两个内容；没有确认之前，Agent 不会开始查资料或调用工具。"
           />
         </Space>
       </Modal>
