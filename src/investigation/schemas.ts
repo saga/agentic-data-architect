@@ -212,12 +212,18 @@ export const ControlAgentSchema = z.object({
   personality: z.string().max(4000).default(
     '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。'
   ),
-  /** 兼容旧版的单头像路径；新配置使用 avatarPaths。 */
+  /** 兼容旧版的单头像路径；新配置仍可使用 avatarPaths。 */
   avatarPath: z.string().trim().min(1).optional(),
-  /** 秘书头像文件列表；可以上传任意数量，回复时由前端随机选择。 */
+  /** 本地头像文件列表；兼容旧版配置。 */
   avatarPaths: z.array(z.string().trim().min(1)).optional(),
-  /** 头像 MIME 类型，服务端读取文件时用于返回正确 Content-Type。 */
-  avatarMimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']).optional(),
+  /** 头像来源；支持本地图片/GIF/视频，以及 HTTPS 远程 URL。 */
+  avatarSources: z.array(z.object({
+    src: z.string().trim().min(1).max(4000),
+    kind: z.enum(['image', 'video', 'remote']).default('remote'),
+    mimeType: z.string().trim().min(1).max(100).optional(),
+  }).strict()).optional(),
+  /** 旧版单一头像 MIME 类型。 */
+  avatarMimeType: z.string().trim().min(1).max(100).optional(),
   /** 头像目标宽度；同时决定裁剪比例和最终图片像素宽度。 */
   avatarWidth: z.number().int().min(40).max(800).default(180),
   /** 头像目标高度；同时决定裁剪比例和最终图片像素高度。 */
