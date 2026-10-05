@@ -27,7 +27,7 @@ test('mission has open work while a required deliverable is not covered', () => 
   assert.equal(missionHasOpenDeliverables(progress(['covered', 'not_started'])), true);
 });
 
-test('mission is complete only when every required deliverable is explicitly covered', () => {
+test('mission stops auto-continuation when the remaining result cannot be measured automatically', () => {
   assert.equal(missionHasOpenDeliverables(progress(['covered', 'covered'])), false);
-  assert.equal(missionHasOpenDeliverables(progress(['covered', 'not_tracked'])), true);
+  assert.equal(missionHasOpenDeliverables(progress(['covered', 'not_tracked'])), false);
 });
