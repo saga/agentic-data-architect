@@ -34,6 +34,28 @@ function input(overrides: Partial<StageGateInput> = {}): StageGateInput {
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
     },
+    missionProgressBefore: {
+      covered: 0,
+      total: 4,
+      percent: 0,
+      deliverables: [
+        { id: 'current-state-architecture', title: '当前架构', description: '梳理当前系统的主要数据架构。', required: true, status: 'not_started', detail: '未开始' },
+        { id: 'data-source', title: 'Data Source', description: '说明关键数据来源。', required: true, status: 'not_started', detail: '未开始' },
+        { id: 'data-flow', title: 'Data Flow', description: '说明关键数据流向。', required: true, status: 'not_started', detail: '未开始' },
+        { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true, status: 'not_started', detail: '未开始' },
+      ],
+    },
+    missionProgressAfter: {
+      covered: 1,
+      total: 4,
+      percent: 25,
+      deliverables: [
+        { id: 'current-state-architecture', title: '当前架构', description: '梳理当前系统的主要数据架构。', required: true, status: 'in_progress', detail: 'Source 已开始' },
+        { id: 'data-source', title: 'Data Source', description: '说明关键数据来源。', required: true, status: 'covered', detail: '已发现数据集' },
+        { id: 'data-flow', title: 'Data Flow', description: '说明关键数据流向。', required: true, status: 'not_started', detail: '未开始' },
+        { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true, status: 'not_started', detail: '未开始' },
+      ],
+    },
     parsed: {
       answer: '已经查清 Position 的主要来源。',
       claims: [
@@ -99,6 +121,12 @@ test('invalid evidence references block the stage gate', () => {
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
     },
+    missionProgressAfter: {
+      covered: 0,
+      total: 4,
+      percent: 0,
+      deliverables: input().missionProgressBefore.deliverables,
+    },
   }));
 
   assert.equal(result.passed, false);
@@ -120,6 +148,12 @@ test('checkpoint can only be built after the gate passes', () => {
           evidenceIds: ['ev-old'],
           findingIds: ['finding-old'],
           discoveryRunCount: 1,
+        },
+        missionProgressAfter: {
+          covered: 0,
+          total: 4,
+          percent: 0,
+          deliverables: input().missionProgressBefore.deliverables,
         },
         parsed: {
           answer: '只是写了一段漂亮总结。',
