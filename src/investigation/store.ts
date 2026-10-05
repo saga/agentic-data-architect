@@ -86,7 +86,9 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
-      ...(inv.mission ? { mission: inv.mission } : {}),
+      // Mission 只能通过 confirmInvestigationMission 修改。这里必须保留锁内读到的最新 Mission，
+      // 防止旧 Agent turn 在用户修改 Mission 后把旧任务契约写回去。
+      ...(current.mission ? { mission: current.mission } : {}),
       ...(inv.scopeValidation ? { scopeValidation: inv.scopeValidation } : {}),
       questions: inv.questions,
       discoveryRuns: inv.discoveryRuns,
