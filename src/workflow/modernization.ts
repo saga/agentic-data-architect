@@ -293,6 +293,10 @@ export async function persistModernizationAgentResult(
 ): Promise<{ saved: boolean; path?: string; changedSections: string[] }> {
   if (!result) return { saved: false, changedSections: [] };
 
+  // 这个函数也可能被 Workflow / CLI 直接调用；Modernization 工作成果必须绑定已确认 Mission。
+  const preflight = await loadInvestigation(name);
+  assertMissionGate(preflight.mission);
+
   return withWorkspaceContextLock(name, async () => {
     let plan = await loadModernizationPlan(name);
     if (!plan) plan = (await buildModernizationPlan(name)).plan;
