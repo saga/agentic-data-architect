@@ -32,13 +32,13 @@ export function AssistantAvatar(props: {
     return <Avatar shape="square" icon={<RobotOutlined />} style={{ width, height, flex: '0 0 auto' }} />;
   }
 
-  const isRemote = /^https?:\\/\\//i.test(source);
-  const localId = source.split('/').pop()?.replace(/\\.[^.]+$/, '');
+  const isRemote = /^https?:\/\//i.test(source);
+  const localId = source.split('/').pop()?.replace(/\.[^.]+$/, '');
   const url = isRemote
     ? source
     : `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${localId}?v=${props.control.version}`;
   const isVideo = props.control.agent.avatarSources?.find((item) => item.src === source)?.kind === 'video'
-    || /\\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(source);
+    || /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(source);
 
   if (isVideo) {
     return (
