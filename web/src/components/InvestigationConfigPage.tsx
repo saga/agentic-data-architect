@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 export interface ConfigPageControl {
   version:number; updatedAt:string;
   research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
+  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; personality:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:'image/png'|'image/jpeg'|'image/webp'; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
   history:Array<{version:number;updatedAt:string;reason:string}>;
 }
 export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
@@ -245,7 +245,17 @@ export function InvestigationConfigPage(props:{
                </div>
              </Flex>
            </Card>
-           <Card title='自动继续' className='settings-card'>
+           <Card title='Soul / 人格' className='settings-card'>
+              <Paragraph type='secondary'>只影响秘书的说话方式和相处感，不改变调查目标、Evidence 规则、权限或 Workflow。可以写得更温柔、俏皮或更正式。</Paragraph>
+              <Input.TextArea
+                autoSize={{minRows:4,maxRows:10}}
+                maxLength={4000}
+                showCount
+                value={draft.agent.personality}
+                onChange={e=>update(next=>{next.agent.personality=e.target.value;})}
+              />
+            </Card>
+            <Card title='自动继续' className='settings-card'>
             <Paragraph type='secondary'>Agent 完成一个阶段后，可以继续自动调查。这里控制一轮最多自动再推进几个阶段；设置为 0 表示每个阶段完成后都等你下一次输入。</Paragraph>
             <Flex align='center' gap={12} wrap>
               <Select
