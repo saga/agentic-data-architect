@@ -199,9 +199,9 @@ function buildTargetArchitecture(
 /** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
   // 正式阶段成果不能在范围仍是 unset 时生成；先通过独立 Scope Gate。
-  await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
   assertMissionGate(inv.mission);
+  await assertInvestigationScopeGate(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({
