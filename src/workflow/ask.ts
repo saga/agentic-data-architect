@@ -318,6 +318,10 @@ export async function answerQuestion(
         const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
         const stageAfter = snapshotInvestigationForStageGate(latestStage);
+        const missionProgressAfterStage = await buildMissionProgress(
+          investigationName,
+          inv.mission!,
+        );
         const stageGateInput = {
           execution,
           mission: inv.mission!,
@@ -334,10 +338,6 @@ export async function answerQuestion(
           },
         };
         const gate = evaluateInvestigationStageGate(stageGateInput);
-        const missionProgressAfterStage = await buildMissionProgress(
-          investigationName,
-          inv.mission!,
-        );
 
         // Gate 失败也要留下记录，方便轨迹明确告诉用户“为什么没有形成阶段成果”。
         recordTrajectory({
