@@ -52,6 +52,7 @@ import {
   evaluateMissionGate,
   formatMissionGateFailure,
   inferMissionDeliverables,
+  MissionGateError,
 } from './workflow/mission-gate.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
@@ -949,7 +950,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       const result = await buildArchitectureAssessmentPlan(name);
       res.json(result);
     } catch (error) {
-      if (error instanceof ScopeGateError) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json({ error: error.message, checks: error.result.checks });
         return;
       }
@@ -987,7 +988,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       const report = await runReport(name);
       res.type('text/markdown').send(report.markdown);
     } catch (error) {
-      if (error instanceof ScopeGateError) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json({
           error: error.message,
           checks: error.result.checks,
