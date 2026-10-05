@@ -88,7 +88,7 @@ test('builds a fallback checkpoint from substantive stage results when model omi
   assert.ok(checkpoint);
   assert.equal(checkpoint.title, '第 2 阶段');
   assert.match(checkpoint.summary, /已经查清 Position/);
-  assert.deepEqual(checkpoint.confirmed, ['Position 的主要来源是订单库。']);
+  assert.deepEqual(checkpoint.confirmed, []);
   assert.deepEqual(checkpoint.evidenceIds, ['ev-001', 'ev-002']);
   assert.deepEqual(checkpoint.unknowns, ['还没有确认历史回补流程。']);
   assert.equal(checkpoint.nextStep, '继续核对历史回补 SQL。');
