@@ -102,7 +102,7 @@ export function isOpenCodeModel(model: string): boolean {
 /** 把 UI 里的 OpenCode 模型引用拆成 providerID / modelID。 */
 export function parseOpenCodeModel(model: string): { providerId: string; modelId: string } {
   const value = model.trim();
-  const match = /^opencode:([^/]+)\\/(.+)$/.exec(value);
+  const match = /^opencode:([^/]+)\/(.+)$/.exec(value);
   if (!match) {
     throw new Error('OpenCode 模型格式不正确，应为 opencode:<provider>/<model>。');
   }
@@ -125,7 +125,7 @@ function directoryHeaders(workingDirectory?: string): Record<string, string> {
 }
 
 function baseUrl(): string {
-  return config.openCodeBaseUrl.replace(/\\/+$/, '');
+  return config.openCodeBaseUrl.replace(/\/+$/, '');
 }
 
 async function openCodeFetch(
@@ -174,10 +174,10 @@ export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
 
 function parseSseBlock(block: string): OpenCodeEvent | undefined {
   const data = block
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter((line) => line.startsWith('data:'))
     .map((line) => line.slice(5).trimStart())
-    .join('\\n');
+    .join('\n');
   if (!data) return undefined;
 
   try {
@@ -224,7 +224,7 @@ async function consumeOpenCodeEvents(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split(/\\r?\\n\\r?\\n/);
+      const blocks = buffer.split(/\r?\n\r?\n/);
       buffer = blocks.pop() ?? '';
 
       for (const block of blocks) {
@@ -346,19 +346,21 @@ function extractTextParts(value: unknown): { answer: string; reasoning: string; 
     if (part.type === 'reasoning' && typeof part.text === 'string') reasoningParts.push(part.text);
   }
   const info = (value as { info?: unknown }).info;
-  const usage = info && typeof info === 'object'
-    ? (info as { tokens?: unknown; cost?: unknown }).tokens
-      ? {
-          ...((info as { tokens?: unknown }).tokens && typeof (info as { tokens?: unknown }).tokens === 'object'
-            ? (info as { tokens: Record<string, unknown> }).tokens
-            : {}),
-          ...('cost' in (info as Record<string, unknown>) ? { cost: (info as Record<string, unknown>).cost } : {}),
-        }
-      : undefined
+  const infoRecord = info && typeof info === 'object'
+    ? info as Record<string, unknown>
+    : undefined;
+  const tokens = infoRecord?.tokens && typeof infoRecord.tokens === 'object'
+    ? infoRecord.tokens as Record<string, unknown>
+    : undefined;
+  const usage = tokens
+    ? {
+        ...tokens,
+        ...(typeof infoRecord?.cost === 'number' ? { cost: infoRecord.cost } : {}),
+      }
     : undefined;
   return {
-    answer: answerParts.join('\\n').trim(),
-    reasoning: reasoningParts.join('\\n').trim(),
+    answer: answerParts.join('\n').trim(),
+    reasoning: reasoningParts.join('\n').trim(),
     ...(usage ? { usage } : {}),
   };
 }
@@ -460,7 +462,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
               input.missionPrompt,
               input.systemPrompt,
               currentWorkflowInstruction,
-            ].filter(Boolean).join('\\n\\n'),
+            ].filter(Boolean).join('\n\n'),
             parts: [{ type: 'text', text: currentPrompt }],
           }),
         },
@@ -540,13 +542,13 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
           refreshed,
           '只做直接服务于 Mission 剩余交付物的工作；能通过现有工具、代码、SQL、配置、文档或 Skill 完成的就直接执行，不要只给建议。',
           ...(workflowTransition.error ? ['', '上一阶段 Gate 没通过：', workflowTransition.error] : []),
-        ].filter(Boolean).join('\\n');
+        ].filter(Boolean).join('\n');
       } else {
         currentPrompt = [
           '继续自主推进当前 Investigation。',
           input.missionPrompt ?? '',
           ...(workflowTransition.error ? ['', '上一阶段 Gate 没通过：', workflowTransition.error] : []),
-        ].filter(Boolean).join('\\n');
+        ].filter(Boolean).join('\n');
       }
 
       if (input.workflowSkill && input.investigationName) {
