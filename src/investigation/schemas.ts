@@ -66,6 +66,32 @@ export const AgentCheckpointSchema = z.object({
 }).strict();
 export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
 
+/** Agent 对这次调查范围的整理结果；只有完整且有来源的结果才能写入正式调查状态。 */
+export const AgentIntakeSchema = z.object({
+  goal: z.string().trim().min(1).optional(),
+  scope: z.array(z.string().trim().min(1)).min(1).optional(),
+  systems: z.array(z.string().trim().min(1)).min(1).optional(),
+  /** user = 用户明确提供；materials = 材料明确支持；mixed = 两者共同支持。 */
+  source: z.enum(['user', 'materials', 'mixed']).default('materials'),
+  /** true 表示用户已经明确确认过这组范围；不是模型自己的判断。 */
+  userConfirmed: z.boolean().default(false),
+  evidenceIds: z.array(z.string().trim().min(1)).max(24).default([]),
+}).strict();
+export type AgentIntake = z.infer<typeof AgentIntakeSchema>;
+
+/** 正式报告和 Workflow 使用的范围确认快照。字段变化后旧确认自动失效。 */
+export const ScopeValidationSchema = z.object({
+  status: z.literal('validated'),
+  goal: z.string().trim().min(1),
+  scope: z.array(z.string().trim().min(1)).min(1),
+  systems: z.array(z.string().trim().min(1)).min(1),
+  source: z.enum(['user', 'materials', 'mixed']),
+  userConfirmed: z.boolean(),
+  evidenceIds: z.array(z.string().trim().min(1)),
+  validatedAt: z.string().min(1),
+}).strict();
+export type ScopeValidation = z.infer<typeof ScopeValidation>;
+
 /** Investigation 的核心 context.json Schema；它是持久化状态的运行时边界。 */
 export const WorkspaceContextSchema = z.object({
   schemaVersion: z.literal(3),
@@ -75,6 +101,8 @@ export const WorkspaceContextSchema = z.object({
   goal: z.string(),
   scope: z.array(z.string()),
   systems: z.array(z.string()),
+  /** 只有这里记录的 validated 快照仍与当前 goal/scope/systems 一致时，正式产物才能生成。 */
+  scopeValidation: ScopeValidationSchema.optional(),
   questions: z.array(z.string()),
   discoveryRuns: z.array(DiscoveryRunSchema),
   evidence: z.array(EvidenceRefSchema),
