@@ -27,7 +27,7 @@ import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate.js';
-import { isMissionWorkflowTargetAllowed } from './mission-gate.js';
+import { assertMissionGate, isMissionWorkflowTargetAllowed } from './mission-gate.js';
 import { buildMissionProgress } from './mission-progress.js';
 import { assertMissionGate } from './mission-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
@@ -1057,6 +1057,8 @@ export async function applyHumanWorkflowTransition(
   let eventWorkflowVersion = 0;
 
   try {
+    const context = await loadWorkspaceContext(name);
+    const mission = assertMissionGate(context.mission);
     const active = await loadActiveJourney(name, workflowId);
     const execution = await loadJourneyExecution(name, active.definition, active.version);
     eventRunId = execution.runId;
@@ -1071,6 +1073,20 @@ export async function applyHumanWorkflowTransition(
     }
     if (currentNode.id !== nodeId) {
       throw new Error('提交的人工节点不是当前 waiting 节点。');
+    }
+
+    if (outcome === 'approved') {
+      const route = currentNode.routes.find((item) => item.outcome.toLowerCase() === outcome.toLowerCase());
+      if (route) {
+        const missionBoundary = isMissionWorkflowTargetAllowed(
+          mission,
+          route.target,
+          active.definition.nodes.find((node) => node.id === route.target)?.title,
+        );
+        if (!missionBoundary.allowed) {
+          throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
+        }
+      }
     }
 
     const next = applyJourneyTransition(
