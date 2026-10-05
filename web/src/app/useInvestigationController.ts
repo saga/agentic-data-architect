@@ -376,7 +376,7 @@ export function useInvestigationController() {
     activeTurn?.controller.abort();
   };
 
-  /** 处理权限请求；session scope 使用 Copilot SDK 原生的“当前会话继续允许”。 */
+  /** 处理权限请求；每次权限请求都必须单独确认。 */
   const respondToPermission = async (
     permission: PendingPermission,
     allowed: boolean,
