@@ -600,7 +600,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(input.autoTier ? { autoTier: input.autoTier } : {}),
         workingDirectory,
         workflowSkill: input.workflowSkill ?? null,
-        permissionMode: input.permissionMode ?? 'allow_all',
+        permissionMode: input.permissionMode ?? 'permission',
         mcpServers: Object.keys(mcpServers),
       })
     : null;
