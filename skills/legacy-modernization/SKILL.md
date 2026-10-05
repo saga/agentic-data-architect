@@ -18,7 +18,9 @@ metadata:
 - 每一关都要有明确工作结果和通关条件；通关条件只判断是否已有足够事实，不用任意百分比或“生成了一个对象”冒充完成。
 - Workflow 决定先做什么、什么时候能进入下一关；Skill/Tool 决定这一关具体怎么查。数值指标只提供调查线索，不单独决定关键业务 Gate。
 - Web Search 是调查动作，不是独立阶段。没有本地证据时可以主动去 GitHub、Confluence、Web 或问业务人员。
-- Agent 的“我已经完成了”不是通关依据，通关由 Investigation / discovery / validation 状态决定。
+- Agent 的“我已经完成了”不是通关依据。关键阶段必须先产生持久化工作成果，再通过服务端的确定性 Script Gate。
+- 目标架构、新旧对应、验证结果都会保存到 `reports/modernization-plan.json`，结果页直接展示这些内容。
+- Gate 检查已经落盘的成果、真实 Evidence、Mapping 完整性和 Validation 实际结果；单独返回 `workflow.success` 永远不能完成这些阶段。
 - 出现新证据后可以回到前面的关卡重新调查。
 
 ## 路线图
@@ -142,7 +144,10 @@ Current State 至少回答：
 - success -> target
 
 
-这些阶段不设置 completeWhen：目标架构、映射和验证都需要结合本轮真实产物判断完成，不能因为某个计数器有值就自动“通关”。Agent 在完成阶段主要工作后，返回当前节点已有的 success / retry 等合法 outcome，由服务端推进地图。
+这些阶段不设置 completeWhen：目标架构、映射和验证都必须走“工作成果 → Script Gate → Workflow transition”。
+Agent 返回 success 只是完成申请；服务端先把结果落盘，再执行确定性 Gate。Gate 不通过就留在当前阶段，Agent 需要继续补齐结果。
+本地可以直接检查：`npm run gate:modernization -- <session> <target|mapping|validation|all>`。
+
 
 ## @task target
 
