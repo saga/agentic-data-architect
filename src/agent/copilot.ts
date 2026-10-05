@@ -366,7 +366,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
     // 默认直接 Allow All，避免本地单用户工作台对每个 read/grep/bash 都重复确认。
     // 只有上层显式传 permission 时，才启用逐次人工审批。
-    ...((input.permissionMode ?? 'allow_all') === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
+    ...(false ? { onPermissionRequest: approveAll } : {}),
     /**
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
