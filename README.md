@@ -4,13 +4,13 @@
 
 它不是一个单纯的 Chat，而是围绕 Data Architect 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping / Architecture Assessment，并为后续验证留下 Evidence。
 
-核心不是“聊天”，而是围绕三类工作路线推进调查、评估和设计；其中已有系统改造路线带有有状态的 Journey：
+核心不是“聊天”，而是先确认这次为什么做、最后要拿到什么，再围绕这些结果推进调查、评估和设计。Workflow 只是实现任务的路线，Skill 是可组合的能力；任何一个局部问题都不能替代 Mission。已有系统改造路线带有有状态的 Journey：
 
 ~~~text
-接到任务
+确认任务目的和期望结果
   → 看清旧系统
   → 找到数据真相
-  → 查关键问题
+  → 梳理当前架构
   → 定下现状
   → 设计新方案
   → 新旧对应
@@ -123,7 +123,9 @@ npm run dev
 
 ~~~text
 New Investigation
-  → 目标 / 问题
+  → 确认“为什么做”
+  → 确认“最后要拿到什么”
+  → 拆出主要交付物
   → 默认：自主调查
   → 可选：采用一套工作路线
 
@@ -373,6 +375,7 @@ metadata:
 ~~~text
 capability: investigation-session / financial-data-review / structural-analysis / search-github / search-confluence / search-leanix / working-directory
 workflow: legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
+capability: current-state-architecture / investigation-session / domain-modeling / research / grilling / structural-analysis / ...
 ~~~
 ## 进一步说明
 
