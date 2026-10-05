@@ -8,7 +8,7 @@ export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
   timestamp: z.string().datetime(),
-  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','checkpoint','status']),
+  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','checkpoint','stage_gate','status']),
   name: z.string().min(1),
   status: z.enum(['started','completed','failed','waiting','info']).optional(),
   durationMs: z.number().nonnegative().optional(),
