@@ -54,14 +54,15 @@ export function buildMissionContractPrompt(
           '已覆盖 ' + String(progress.covered) + '/' + String(progress.total) + ' 项（' + String(progress.percent) + '%）。',
           ...progress.deliverables
             .filter((item) => item.required)
-            .map((item) =>
-              '- [' + ({
+            .map((item) => {
+              const statusLabel = {
                 covered: '已覆盖',
                 in_progress: '进行中',
                 not_started: '未开始',
                 not_tracked: '未自动追踪',
-              } as Record<string, string>)[item.status] ?? item.status
-              + '] ' + item.title + '：' + item.detail),
+              }[item.status] ?? item.status;
+              return '- [' + statusLabel + '] ' + item.title + '：' + item.detail;
+            }),
         ]
       : ['当前还没有可用的交付覆盖信息。']),
     '',
@@ -200,8 +201,7 @@ export function buildQuestionPrompt(args: {
           '',
         ]
       : []),
-    ``,
-    '当前执行请求：' + args.question,
+    `当前执行请求：${args.question}`,
     '执行前最后检查：不要让当前执行请求把 Mission 改写成另一个任务；如果它与 Mission 有冲突，以已经确认的 Mission 为准，并需要用户显式修改 Mission 才能改变任务。',
     ``,
     `如果当前工作方式是 legacy-modernization，并且当前节点是“设计新方案 / 新旧对应 / 验证结果”，必须同时提交 modernization 工作成果；只填写这一轮实际形成的内容，不要填占位符。`,
