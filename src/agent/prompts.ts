@@ -96,6 +96,11 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 /** 根据 Investigation 状态、当前问题、检索证据和未知项生成一次 Agent 请求 Prompt。 */
 export function buildQuestionPrompt(args: {
   investigationName: string;
+  mission: {
+    purpose: string;
+    expectedResult: string;
+    deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+  };
   goal: string;
   scope: string[];
   systems: string[];
@@ -108,6 +113,18 @@ export function buildQuestionPrompt(args: {
   selectedGuidance?: string;
 }): string {
   return [
+    '## Mission Contract（本轮最高优先级）',
+    '任务目的：' + args.mission.purpose,
+    '期望结果：' + args.mission.expectedResult,
+    '必须围绕这个 Mission 工作；当前问题、Workflow、unknowns、routeOptions 都只是实现手段，不能改变 Mission。',
+    '本轮行动必须优先帮助完成尚未覆盖的交付物；如果某个 unknown 与 Mission 无关，不要为了清空它而继续调查。',
+    '',
+    '本次任务的主要交付物：',
+    args.mission.deliverables
+      .filter((item) => item.required)
+      .map((item) => '- ' + item.title + '：' + item.description)
+      .join('\n'),
+    '',
     '调查执行规则：如果当前问题需要先理解陌生代码仓库，且尚未有 Discovery snapshot，优先使用 project_discover；没有 Evidence 不阻止继续调查，Evidence 用于约束最终可确认 Claim。对于“看懂当前系统的数据架构 / 数据模型 / Data Flow / Data Source”类请求，先覆盖 Source、Flow、Model，再补关键转换和业务含义，不要先寻找一个所谓“关键问题”。',
     '范围确认规则：正式结果必须有 Goal、Scope、Systems。先从现有材料挖掘，再在有歧义时 ask_user；不要输出（unset）或把模型猜测当成已确认。',
     `调查名称：${args.investigationName}`,
