@@ -31,6 +31,14 @@
 
 Mission 会作为独立的最高优先级 system block 注入 Copilot Session；每个自动续跑阶段都会重新计算交付物覆盖后再注入一次。长期 Session 即使发生 compaction，也不能让局部问题取代 Mission。
 
+Mission 同时还是服务端的硬边界：
+
+- answerQuestion() 自己执行 Mission Gate，内部调用不能绕过确认。
+- Workflow 不能进入 Mission 没有要求的目标阶段。
+- 明确可追踪的交付物没有完成，Workflow 不能提前结束。
+- Agent 执行期间不能修改 Mission，避免旧 turn 覆盖新任务。
+- 无法自动量化的 not_tracked 交付物不会单独触发无限自动续跑。
+
 Agent 每次选择工具或下一步动作时，都应该先回答：
 
 > 这个动作是不是直接帮助完成期望结果？
