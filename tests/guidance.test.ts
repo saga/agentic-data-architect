@@ -7,6 +7,7 @@ test('selected guidance is treated as an approved execution action', () => {
     investigationName: 'test-investigation',
     goal: '理解旧系统关键数据流',
     scope: ['代码'],
+    systems: ['旧系统'],
     question: '查这些关键数据如何被使用',
     contextText: 'CUSTOMER、CATEGORY 与 CREDIT_INFO 出现在 SQL 脚本中。',
     evidenceIds: [],
