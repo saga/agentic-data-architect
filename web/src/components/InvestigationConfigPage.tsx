@@ -237,6 +237,13 @@ export function InvestigationConfigPage(props:{
                        <Button icon={<UploadOutlined/>} loading={avatarUploading}>上传图片 / GIF</Button>
                      </Upload>
                    </ImgCrop>
+                   <Upload
+                     accept='image/gif,video/mp4,video/webm,video/quicktime'
+                     showUploadList={false}
+                     beforeUpload={(file) => { void handleAvatarBeforeUpload(file); return false; }}
+                   >
+                     <Button icon={<UploadOutlined />} loading={avatarUploading}>上传 GIF / 视频</Button>
+                   </Upload>
                  </Flex>
                  <Text type='secondary' style={{display:'block',marginTop:8}}>视频建议直接使用远程 URL。保存配置后立即生效。</Text>
                </div>
