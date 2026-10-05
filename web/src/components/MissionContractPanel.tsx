@@ -32,18 +32,24 @@ export function MissionContractPanel(props: {
               <Text strong>本次任务</Text>
               {confirmed ? <Tag color="green">已确认</Tag> : <Tag color="orange">待确认</Tag>}
             </Flex>
-            <Paragraph ellipsis={{ rows: 2 }} style={{ margin: '4px 0 0' }}>
-              {confirmed?.purpose || props.draft.purpose || '开始调查前先说明为什么做这件事。'}
-            </Paragraph>
-            {confirmed ? (
-              <Text type="secondary">
-                期望结果：{confirmed.expectedResult}
-              </Text>
-            ) : (
-              <Text type="secondary">
-                还需要确认“为什么做”和“最后希望拿到什么”。
-              </Text>
-            )}
+            <Flex vertical gap={4} style={{ marginTop: 6 }}>
+              <div>
+                <Text type="secondary">为什么做</Text>
+                <Paragraph ellipsis={{ rows: 2 }} style={{ margin: '2px 0 0' }}>
+                  {confirmed?.purpose || props.draft.purpose || '开始调查前先说明为什么做这件事。'}
+                </Paragraph>
+              </div>
+              <div>
+                <Text type="secondary">最后希望拿到什么</Text>
+                <Paragraph
+                  type={confirmed?.expectedResult ? undefined : 'secondary'}
+                  ellipsis={{ rows: 2 }}
+                  style={{ margin: '2px 0 0' }}
+                >
+                  {confirmed?.expectedResult || '还没有确认期望结果。确认后，后续调查都围绕这里展开。'}
+                </Paragraph>
+              </div>
+            </Flex>
             {confirmed && props.progress ? (
               <div style={{ marginTop: 8, maxWidth: 640 }}>
                 <Flex align="center" justify="space-between" gap={12}>
@@ -80,6 +86,12 @@ export function MissionContractPanel(props: {
         destroyOnHidden
       >
         <Flex vertical gap={16}>
+          <Alert
+            type="info"
+            showIcon
+            message="先把任务说清楚，再开始调查"
+            description="“为什么做”和“最后希望拿到什么”会作为整次调查的固定目标。后面 Agent 可以调整调查方法，但不能自行改掉这两项。"
+          />
           {props.error ? (
             <Alert
               type="warning"
