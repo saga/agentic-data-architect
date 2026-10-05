@@ -402,6 +402,37 @@ app.post('/api/sessions', async (req, res) => {
    * 当前 Investigation 的 live execution state。
    * trajectory.jsonl 是历史记录，不能用来判断“现在是否还在跑”。
    */
+  /** 返回本机 OpenCode 连接状态，不返回密码等敏感配置。 */
+  app.get('/api/opencode/status', async (_req, res) => {
+    if (!config.openCodeEnabled) {
+      res.json({
+        enabled: false,
+        reachable: false,
+        baseUrl: config.openCodeBaseUrl,
+        modelCount: 0,
+      });
+      return;
+    }
+
+    try {
+      const models = await listOpenCodeModels();
+      res.json({
+        enabled: true,
+        reachable: true,
+        baseUrl: config.openCodeBaseUrl,
+        modelCount: models.length,
+      });
+    } catch (error) {
+      res.json({
+        enabled: true,
+        reachable: false,
+        baseUrl: config.openCodeBaseUrl,
+        modelCount: 0,
+        error: error instanceof Error ? error.message : 'OpenCode 服务不可用。',
+      });
+    }
+  });
+
   /**
    * 返回工作台可用模型。
    *
