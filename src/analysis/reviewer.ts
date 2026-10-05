@@ -149,7 +149,7 @@ export async function reviewArtifact(input: {
   }
 
   const hasHigh = parsed.issues.some((issue) => issue.severity === 'high');
-  const normalizedStatus = !hasHigh && parsed.status === 'pass' ? 'pass' : 'fail';
+  const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
     status: normalizedStatus,
