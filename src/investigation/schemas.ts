@@ -55,7 +55,7 @@ export const JourneyPlanSchema = z.object({
 }).strict();
 export type JourneyPlan = z.infer<typeof JourneyPlanSchema>;
 
-/** Agent 根据当前问题生成的阶段性调查小结；只记录阶段成果，不替代最终报告。 */
+/** 阶段性调查小结的持久化结构；是否生成由服务器 Stage Script Gate 决定，不由 Agent 自行宣布。 */
 export const AgentCheckpointSchema = z.object({
   title: z.string().trim().min(1).max(120),
   summary: z.string().trim().min(1).max(1200),
