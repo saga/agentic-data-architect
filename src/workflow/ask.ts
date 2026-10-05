@@ -20,7 +20,7 @@ import {
 } from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
 import { appendTrajectoryEvent } from '../investigation/trajectory.js';
-import { appendContextInput, appendTranscript, workspaceRoot } from '../investigation/workspace.js';
+import { appendContextInput, appendTranscript, setCopilotSessionId, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
@@ -227,6 +227,7 @@ export async function answerQuestion(
     });
 
     let trajectoryWrite: Promise<void> = Promise.resolve();
+    let sessionPersistence: Promise<void> = Promise.resolve();
     type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
     const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
       trajectoryWrite = trajectoryWrite
@@ -258,8 +259,12 @@ export async function answerQuestion(
       ].filter(Boolean).join('\n\n'),
       ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId ? { sessionId: inv.copilotSessionId } : {}),
       onSessionId: (sessionId) => {
-        if (sessionId !== inv.copilotSessionId) inv.copilotSessionId = sessionId;
+        inv.copilotSessionId = sessionId;
         inv.copilotConfigurationVersion = control.version;
+        // onSessionId 本身是同步回调；把实际写盘串起来，确保下一轮真的可以复用 Session。
+        sessionPersistence = sessionPersistence
+          .then(() => setCopilotSessionId(investigationName, sessionId, control.version))
+          .catch(() => undefined);
       },
       workingDirectory: workspaceRoot(inv.name),
       model: control.agent.model,
@@ -306,6 +311,7 @@ export async function answerQuestion(
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
+    await sessionPersistence;
     await trajectoryWrite;
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
