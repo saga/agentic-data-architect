@@ -158,7 +158,52 @@ async function createSession(
   }
   const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? null);
   await saveInvestigation(investigation);
-  await loadInvestigationControl(key);
+
+  // 新 Investigation 继承工作台最近配置的默认头像，避免每次新建调查都退回机器人图标。
+  // 头像文件仍复制到当前 Investigation，保持现有“每个调查独立资料”的边界。
+  const control = await loadInvestigationControl(key);
+  const defaultAvatarMetaPath = path.join(config.sharedDir, 'assistant', 'default.json');
+  try {
+    const meta = JSON.parse(await fs.readFile(defaultAvatarMetaPath, 'utf8')) as {
+      sourcePath?: string;
+      width?: number;
+      height?: number;
+    };
+    if (meta.sourcePath) {
+      const sourcePath = path.resolve(config.sharedDir, meta.sourcePath);
+      const sharedRoot = path.resolve(config.sharedDir);
+      if (sourcePath === sharedRoot || !sourcePath.startsWith(sharedRoot + path.sep)) {
+        throw new Error('默认头像路径无效。');
+      }
+      const avatarId = randomUUID();
+      const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.png');
+      const targetPath = path.join(workspaceRoot(key), relativePath);
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.copyFile(sourcePath, targetPath);
+      const inherited = await updateInvestigationControl(
+        key,
+        {
+          research: control.research,
+          agent: {
+            ...control.agent,
+            avatarPath: relativePath,
+            avatarPaths: [relativePath],
+            avatarMimeType: 'image/png',
+            avatarWidth: Number.isFinite(meta.width) ? Math.max(40, Math.min(800, Math.round(meta.width!))) : control.agent.avatarWidth,
+            avatarHeight: Number.isFinite(meta.height) ? Math.max(40, Math.min(1200, Math.round(meta.height!))) : control.agent.avatarHeight,
+          },
+        },
+        'inherited default assistant avatar',
+      );
+      void inherited;
+    }
+  } catch (error) {
+    // 没有配置默认头像是正常情况；不能因此阻止新调查创建。
+    if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
   await appendAuditEvent(key, {
     actor: 'user',
     action: 'investigation.created',
