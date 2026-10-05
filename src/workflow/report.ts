@@ -17,7 +17,7 @@ export async function runReport(
   assertMissionGate(investigation.mission);
   const review = await reviewArtifact({
     investigationName: name,
-    goal: investigation.userPrompt || investigation.goal,
+    goal: investigation.mission?.purpose || investigation.goal || investigation.userPrompt,
     artifactType: 'report',
     artifact: report.markdown,
     facts: JSON.stringify({
