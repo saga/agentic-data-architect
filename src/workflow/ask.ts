@@ -7,7 +7,7 @@ import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilo
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
-import { extractAgentCheckpoint, parseAgentAnswer, toClaims } from '../agent/result.js';
+import { buildAgentCheckpoint, extractAgentCheckpoint, parseAgentAnswer, toClaims } from '../agent/result.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
@@ -277,9 +277,15 @@ export async function answerQuestion(
       ...(onDelta ? { onDelta } : {}),
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
-      onStageResult: ({ content, execution }) => {
-        const checkpoint = extractAgentCheckpoint(content);
+      onStageResult: async ({ content, execution }) => {
+        // 优先使用模型明确返回的 checkpoint；模型漏填时，用这一阶段已经解析并通过
+        // Evidence 校验的结果生成兜底小结，避免“已经做完几阶段，但结果页显示 0 个阶段”。
+        const latestStage = await loadInvestigation(investigationName);
+        const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
+        const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
+        const checkpoint = stageParsed.checkpoint ?? buildAgentCheckpoint(stageParsed, execution);
         if (!checkpoint) return;
+
         const createdAt = new Date().toISOString();
         recordTrajectory({
           type: 'checkpoint',
