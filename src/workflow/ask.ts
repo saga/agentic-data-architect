@@ -31,6 +31,7 @@ import {
   evaluateInvestigationStageGate,
   snapshotInvestigationForStageGate,
 } from './stage-gate.js';
+import { buildMissionProgress } from './mission-progress.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -201,10 +202,12 @@ export async function answerQuestion(
     const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
     const knowledge = await searchArchitectureKnowledge([inv.goal, effectiveQuestion].filter(Boolean).join('\n'), { workflow: inv.workflow, limit: 6 });
     const knowledgeText = renderArchitectureKnowledge(knowledge);
-    const missionPrompt = buildMissionContractPrompt(inv.mission!);
+    const missionProgress = await buildMissionProgress(inv.name, inv.mission);
+    const missionPrompt = buildMissionContractPrompt(inv.mission!, missionProgress ?? undefined);
     const prompt = buildQuestionPrompt({
       investigationName: inv.name,
       mission: inv.mission!,
+      missionProgress: missionProgress ?? undefined,
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
@@ -316,6 +319,10 @@ export async function answerQuestion(
           },
         };
         const gate = evaluateInvestigationStageGate(stageGateInput);
+        const missionProgressAfterStage = await buildMissionProgress(
+          investigationName,
+          inv.mission!,
+        );
 
         // Gate 失败也要留下记录，方便轨迹明确告诉用户“为什么没有形成阶段成果”。
         recordTrajectory({
@@ -324,6 +331,7 @@ export async function answerQuestion(
           status: gate.passed ? 'completed' : 'info',
           details: {
             ...gate,
+            missionProgress: missionProgressAfterStage,
             input: stageGateInput,
           },
         });
