@@ -36,7 +36,7 @@ start -> intake
 
 title: 明确业务目标
 objective: 明确用户、业务目标、范围和最终交付物。
-completeWhen: goal
+completeWhen: scope-ready
 
 先回答：
 
