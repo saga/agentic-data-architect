@@ -1261,21 +1261,26 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
         continuationPrompt = [
           ...(refreshedMissionPrompt
-            ? ['## Mission Contract（最高优先级）', refreshedMissionPrompt]
+            ? [
+                '## Mission Contract（每一阶段重新确认，最高优先级）',
+                refreshedMissionPrompt,
+                '先重新回答两个问题，再开始下一阶段：为什么做这次调查？最后希望拿到什么？',
+              ]
             : []),
-          '继续自主推进当前 Investigation，不要因为上一阶段产生了一个局部答案就停止。',
+          '继续自主推进当前 Investigation，但只做直接服务于 Mission 的工作；不要因为上一阶段产生了局部发现就自动寻找另一个“关键问题”。',
           ...(workflowTransition.error ? [
             '',
             '上一阶段尝试完成，但服务端的确定性 Script Gate 没有通过：',
             workflowTransition.error,
             '不要再次只返回 workflow.success。继续当前阶段，补齐缺少的真实工作成果、Evidence 或实际验证结果。',
           ] : []),
-          '先重新看整个目标、已有 Evidence、unknowns，以及上一阶段遇到的限制。',
-          '如果某条调查路径受阻、缺少运行环境或暂时无法验证，不要反复纠结这一条；记录限制，然后换到其它仍然有价值、可以独立推进的方向。',
-          '优先补齐目标中的其它主要对象或关系，再深入局部细节；不要连续花多个阶段追一个当前无法解决的小问题。',
+          '重新检查当前 Mission 的任务目的、期望结果和每个交付物覆盖情况，再决定本阶段做什么。',
+          '如果某条调查路径受阻、缺少运行环境或暂时无法验证，不要把这条路径本身变成任务；换到其它仍然直接服务 Mission 的方向。',
+          '优先补齐尚未覆盖的核心交付物，再深入已经基本完成的局部细节。',
+          '如果一个 unknown 不影响 Mission 的期望结果，不要因为它存在而继续调查。',
           '能通过现有工具、代码、SQL、配置、文档或 Skill 完成的工作，直接执行，不要把它写成“下一步建议”交给用户。',
-          '只有确实需要用户作决定、补充缺失输入、处理权限，或者整个目标已经没有有价值的调查动作时，才结束这一阶段。',
-          '如果目标已经完成，直接结束，不要为了延长运行而虚构工作。',
+          '只有确实需要用户作决定、补充缺失输入、处理权限，或者 Mission 的剩余交付物已经没有有价值的调查动作时，才结束这一阶段。',
+          '如果 Mission 已经得到足够支持，直接结束，不要为了延长运行而虚构工作。',
           ...(currentWorkflowInstruction ? [
             '',
             '当前 Workflow 最新位置（如果本阶段刚刚推进了地图，以这个位置为准）：',
