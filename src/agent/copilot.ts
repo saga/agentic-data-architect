@@ -109,6 +109,11 @@ export interface AskInput {
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
   /** 自动续跑时每一轮都重新注入的最高优先级 Mission 文本。 */
   missionPrompt?: string;
+  /**
+   * 自动续跑前刷新 Mission；用于重新计算当前交付物覆盖。
+   * Mission 本身仍由 Workspace 持久化状态提供，刷新失败时继续使用上一份。
+   */
+  refreshMissionPrompt?: () => string | Promise<string>;
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
@@ -1224,9 +1229,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
           }
         }
 
+        const refreshedMissionPrompt = input.refreshMissionPrompt
+          ? await input.refreshMissionPrompt()
+          : input.missionPrompt;
+
         continuationPrompt = [
-          ...(input.missionPrompt
-            ? ['## Mission Contract（最高优先级）', input.missionPrompt]
+          ...(refreshedMissionPrompt
+            ? ['## Mission Contract（最高优先级）', refreshedMissionPrompt]
             : []),
           '继续自主推进当前 Investigation，不要因为上一阶段产生了一个局部答案就停止。',
           ...(workflowTransition.error ? [
