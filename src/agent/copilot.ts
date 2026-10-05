@@ -115,7 +115,7 @@ export interface AskInput {
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
   workflowSkill?: WorkflowId;
   /** 工作地图 AI 使用独立的最小 Agent 能力，不带数据分析工具。 */
-  purpose?: 'investigation' | 'journey-map';
+  purpose?: 'investigation' | 'journey-map' | 'review';
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
@@ -336,8 +336,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // introduce genuinely different agent roles.
   const workingDirectory = input.workingDirectory ?? process.cwd();
   const journeyMapPurpose = input.purpose === 'journey-map';
+  const reviewerPurpose = input.purpose === 'review';
+  const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
-  const graphifyEnabled = !journeyMapPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
+  const graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
   if (graphifyEnabled) {
     // 把项目 .venv/bin 放进 PATH，让 Skill 中的 graphify 命令与 MCP 使用同一份依赖。
@@ -346,7 +348,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   }
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   const investigationName = path.basename(workingDirectory);
-  const workflowInstruction = journeyMapPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
+  const workflowInstruction = isolatedPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
   const mcpServers = {
@@ -442,13 +444,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
       mode: 'append' as const,
       content: [input.systemPrompt, workflowInstruction].filter(Boolean).join('\n\n'),
     },
-    skillDirectories: journeyMapPurpose ? [] : (input.skillDirectories ?? [config.skillsDir]),
+    skillDirectories: isolatedPurpose ? [] : (input.skillDirectories ?? [config.skillsDir]),
     // Capability Skills stay available for Copilot's automatic task-based selection.
     // Only the other Workflow Skills are disabled so two routes are not mixed.
     disabledSkills: journeyMapPurpose ? WORKFLOW_SKILL_NAMES : disabledWorkflowSkills,
     // Local data tools are app-owned and remain constrained by Dataset Registry + DuckDB guards.
-    ...(journeyMapPurpose ? {} : { tools: createLocalDataTools(path.basename(workingDirectory)) }),
-    availableTools: journeyMapPurpose ? new ToolSet().addBuiltIn(['task_complete']) : WORKBENCH_TOOLS,
+    ...(isolatedPurpose ? {} : { tools: createLocalDataTools(path.basename(workingDirectory)) }),
+    availableTools: isolatedPurpose ? new ToolSet() : WORKBENCH_TOOLS,
       ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
