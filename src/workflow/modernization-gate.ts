@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, reportsDir } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
+import { runInvestigationScopeGate } from './scope-gate.js';
 import type { ModernizationPlan } from '../model/modernization.js';
 
 export type ModernizationGateStage = 'target' | 'mapping' | 'validation';
