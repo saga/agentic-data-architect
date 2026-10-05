@@ -81,9 +81,13 @@ export async function answerQuestion(
   // Route 只是为了完成 Mission 选择的一个调查动作，不能覆盖用户原始任务。
   const effectiveQuestion = selectedRoute
     ? [
-        '请执行用户选定的调查动作，并始终围绕本次 Mission：',
-        selectedRoute.title,
-      ].join('\n')
+        question.trim(),
+        '',
+        '用户选择的当前调查动作：' + selectedRoute.title,
+        selectedRoute.reason,
+        ...selectedRoute.steps.map((step, index) => '步骤 ' + String(index + 1) + '：' + step),
+        '请把这个动作作为当前子任务执行，但始终以本次 Mission 的任务目的和期望结果为最高优先级。',
+      ].filter(Boolean).join('\n')
     : question;
 
   if (!turnId) turnId = nextId('turn');
