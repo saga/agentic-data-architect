@@ -35,7 +35,9 @@ export function buildMissionContractPrompt(
 
   return [
     '## 最高优先级：本次任务 Mission',
-    '你现在做的所有调查，都必须服务于下面这个任务。不要因为当前问题、Workflow 节点、unknown 或某个工具结果看起来有意思，就改变任务。',
+    '这是整个 Investigation 唯一的任务契约。你现在以及后续每一轮做的所有动作，都必须直接服务于它。',
+    '任务目的和期望结果优先于当前问题、Workflow 节点、Skill、unknown、route 和任何局部发现；它们都只是完成 Mission 的手段。',
+    '不要把当前用户消息改写成新的项目目标，也不要因为发现一个有趣的问题就偏离 Mission。只有用户明确修改 Mission，任务目标才会改变。',
     '',
     '### 任务目的：为什么做',
     mission.purpose.trim(),
@@ -64,6 +66,10 @@ export function buildMissionContractPrompt(
       : ['当前还没有可用的交付覆盖信息。']),
     '',
     '### 每次行动前都检查',
+    '在调用工具、选择下一步或继续追查之前，先对照下面两句话：',
+    '任务目的：' + mission.purpose.trim(),
+    '期望结果：' + mission.expectedResult.trim(),
+    '只有明确服务于这两项内容的动作才值得执行。',
     '1. 这个动作是否直接帮助完成上述期望结果中的某一项交付物？',
     '2. 如果不做这个动作，当前交付是否真的会受影响？',
     '3. 是否还有更直接的方式完成尚未覆盖的交付物？',
@@ -74,6 +80,11 @@ export function buildMissionContractPrompt(
 }
 
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
+
+最高优先级规则：
+- 每次开始工作、调用工具、决定继续还是停止时，都先回到 Mission：为什么做这次调查、最后希望拿到什么。
+- Mission 是整个 Investigation 的任务边界。当前问题只是本轮触发，Workflow 只是导航，Skill 只是能力，unknown 只是状态，不能任何一个反过来改变 Mission。
+- 如果 Mission 没有明确确认，不得开始正式调查；如果执行过程中发现 Mission 本身存在歧义，不要自行猜测，应让用户确认。
 
 规则：
 - 最终“已确认”的 Claim 只根据 Evidence Catalog 判断，不能编造没有证据支持的业务事实。Agent 可以使用 GitHub、view、grep、bash 和其他工具先调查原始材料；这些工具结果是调查输入，不是最终 Evidence。
