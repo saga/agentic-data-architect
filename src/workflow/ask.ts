@@ -239,6 +239,19 @@ export async function answerQuestion(
     // Stage Gate 的基线必须建立在本次 Agent turn 真正开始前；这样每个自动续跑阶段
     // 都只能因为本阶段新增的 Evidence / Finding / Discovery 等真实结果而形成小结。
     let stageGateBaseline = snapshotInvestigationForStageGate(inv);
+    let stageMissionProgressBaseline = missionProgress ?? {
+      covered: 0,
+      total: inv.mission!.deliverables.length,
+      percent: 0,
+      deliverables: inv.mission!.deliverables.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        required: item.required,
+        status: 'not_started' as const,
+        detail: '本轮开始前还没有形成可观察成果。',
+      })),
+    };
 
     const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
     await appendAuditEvent(investigationName, {
@@ -310,6 +323,8 @@ export async function answerQuestion(
           mission: inv.mission!,
           before: stageGateBaseline,
           after: stageAfter,
+          missionProgressBefore: stageMissionProgressBaseline,
+          missionProgressAfter: missionProgressAfterStage,
           parsed: {
             answer: stageParsed.answer,
             claims: stageParsed.claims,
@@ -360,6 +375,7 @@ export async function answerQuestion(
         }
 
         stageGateBaseline = stageAfter;
+        stageMissionProgressBaseline = missionProgressAfterStage;
       },
       onBeforeWorkflowTransition: async ({ content }) => {
         // 每个阶段在 Gate 前先把本轮已经形成的、且通过 Evidence 校验的 intake 写入 context。
