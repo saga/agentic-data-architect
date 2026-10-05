@@ -130,21 +130,24 @@ export async function answerQuestion(
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
+    const userVisibleQuestion = selectedRoute
+      ? '选择下一步：' + selectedRoute.title
+      : question;
     const userMessage = saveConversationMessage({
       id: turnId + ':user',
       sessionName: investigationName,
       role: 'user',
-      content: effectiveQuestion,
+      content: userVisibleQuestion,
     });
     // SQLite 用于全文检索；Workspace 同步保留用户输入和 transcript，导出后仍能还原调查过程。
     await appendContextInput(investigationName, {
       kind: 'user_message',
       title: '用户问题',
-      content: effectiveQuestion,
+      content: userVisibleQuestion,
       source: 'conversation',
       important: false,
     });
-    await appendTranscript(investigationName, 'user', effectiveQuestion);
+    await appendTranscript(investigationName, 'user', userVisibleQuestion);
     let inv = await loadInvestigation(investigationName);
     const control = await loadInvestigationControl(investigationName);
 
