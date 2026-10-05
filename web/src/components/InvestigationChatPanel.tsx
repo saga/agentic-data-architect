@@ -11,6 +11,7 @@ import { MissionContractPanel } from './MissionContractPanel';
 import type {
   AutoTier,
   ExecutionStatus,
+  MissionDraft,
   PendingPermission,
   PendingUserInput,
   SessionData,
