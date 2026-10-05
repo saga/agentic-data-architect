@@ -38,8 +38,9 @@ export interface MissionProgress {
 
 /** 只根据 Mission 交付物状态判断是否还有必要自动继续，不看 Agent 自己的“完成”声明。 */
 export function missionHasOpenDeliverables(progress: MissionProgress): boolean {
+  // not_tracked 不是完成，而是“系统无法自动量化”；为了避免误停，仍视为有待处理工作。
   return progress.deliverables.some(
-    (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+    (item) => item.required && item.status !== 'covered',
   );
 }
 
