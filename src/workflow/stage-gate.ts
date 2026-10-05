@@ -13,6 +13,7 @@
 import type { ParsedAnswer } from '../agent/result.js';
 import type { AgentCheckpoint, MissionContract } from '../investigation/schemas.js';
 import { evaluateMissionGate } from './mission-gate.js';
+import type { MissionProgress } from './mission-progress.js';
 import type { Investigation } from '../investigation/store.js';
 
 export interface StageGateSnapshot {
@@ -27,6 +28,8 @@ export interface StageGateInput {
   mission: MissionContract;
   before: StageGateSnapshot;
   after: StageGateSnapshot;
+  missionProgressBefore: MissionProgress;
+  missionProgressAfter: MissionProgress;
   parsed: Pick<ParsedAnswer, 'answer' | 'claims' | 'unknowns' | 'followUpQuestions' | 'routeOptions'>;
 }
 
@@ -52,6 +55,28 @@ function unique(values: string[]): string[] {
 function newIds(before: string[], after: string[]): string[] {
   const previous = new Set(before);
   return after.filter((id) => !previous.has(id));
+}
+
+/** 只把交付物状态向前推进视为“本阶段真的帮助了 Mission”。 */
+function deliverableAdvanced(
+  before: MissionProgress,
+  after: MissionProgress,
+): Array<{ id: string; title: string; from: string; to: string }> {
+  const rank: Record<string, number> = {
+    not_started: 0,
+    in_progress: 1,
+    covered: 2,
+    not_tracked: -1,
+  };
+  return after.deliverables.flatMap((item) => {
+    const previous = before.deliverables.find((candidate) => candidate.id === item.id);
+    if (!previous || !item.required) return [];
+    const from = rank[previous.status] ?? -1;
+    const to = rank[item.status] ?? -1;
+    return to > from
+      ? [{ id: item.id, title: item.title, from: previous.status, to: item.status }]
+      : [];
+  });
 }
 
 /** 从 Investigation 状态提取只读快照；快照用于比较本阶段是否产生了真实持久化变化。 */
@@ -108,6 +133,10 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.after.scopeValidatedAt
     && input.after.scopeValidatedAt !== input.before.scopeValidatedAt,
   );
+  const advancedDeliverables = deliverableAdvanced(
+    input.missionProgressBefore,
+    input.missionProgressAfter,
+  );
 
   add(
     '阶段回答存在',
@@ -138,14 +167,20 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     ].join('，'),
   );
 
+  add(
+    '本阶段推进了 Mission 交付物',
+    advancedDeliverables.length > 0,
+    advancedDeliverables.length
+      ? advancedDeliverables.map((item) => item.title + '：' + item.from + ' → ' + item.to).join('，')
+      : '本阶段虽然产生了调查变化，但没有推动任何已定义的 Mission 交付物。',
+  );
+
   return {
     execution: input.execution,
     passed: checks.every((item) => item.passed)
       && (
-        newEvidenceIds.length > 0
-        || newFindingIds.length > 0
-        || newDiscoveryRuns > 0
-        || scopeValidated
+        advancedDeliverables.length > 0
+        || input.missionProgressAfter.deliverables.every((item) => !item.required || item.status === 'not_tracked')
       ),
     checks,
     newEvidenceIds,
