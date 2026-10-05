@@ -8,6 +8,13 @@ import type { Inventory } from '../discovery/scanner.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import type { DataEstate } from '../model/estate.js';
 import type { LineageGraph } from './lineage.js';
+import {
+  datasetLineageRelations,
+  incidentEdges,
+  nodesOfType,
+  upstreamDatasetRelations,
+  downstreamDatasetRelations,
+} from '../model/estate-query.js';
 import type {
   CurrentStateCoverage,
   CurrentStateIntelligence,
@@ -33,9 +40,13 @@ function columnKind(name: string): SemanticCandidate['kind'] | null {
   return null;
 }
 
-function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null): SourceOfTruthCandidate[] {
-  const datasets = estate.nodes.filter((node) => node.type === 'dataset');
-  const edges = lineage?.edges || [];
+/**
+ * Source-of-Truth candidates are calculated from the canonical DataEstate.
+ * LineageGraph remains an analysis result for parser-specific details, but is
+ * no longer queried here for graph traversal.
+ */
+function buildSourceCandidates(estate: DataEstate): SourceOfTruthCandidate[] {
+  const datasets = nodesOfType(estate, 'dataset');
   const grouped = new Map<string, typeof datasets>();
 
   for (const dataset of datasets) {
@@ -54,9 +65,8 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
     if (items.length < 2) continue;
 
     const scored = items.map((dataset) => {
-      const lower = dataset.name.toLowerCase();
-      const upstream = edges.filter((edge) => edge.target.toLowerCase() === lower).length;
-      const downstream = edges.filter((edge) => edge.source.toLowerCase() === lower).length;
+      const upstream = upstreamDatasetRelations(estate, dataset.id).length;
+      const downstream = downstreamDatasetRelations(estate, dataset.id).length;
       const metadataSignals = Object.keys(dataset.attributes).length;
       const priorityScore = downstream * 3 - upstream + Math.min(metadataSignals, 3);
 
@@ -65,12 +75,7 @@ function buildSourceCandidates(estate: DataEstate, lineage: LineageGraph | null)
       if (upstream > 0) reasons.push('上游有 ' + upstream + ' 条已发现依赖');
       if (metadataSignals > 0) reasons.push('已有数据元信息');
 
-      const evidenceIds = estate.edges
-        .filter((edge) => {
-          const related = [edge.from, edge.to].map((value) => value.toLowerCase());
-          return related.includes('dataset:' + lower);
-        })
-        .flatMap((edge) => edge.evidenceIds);
+      const evidenceIds = incidentEdges(estate, dataset.id).flatMap((edge) => edge.evidenceIds);
 
       return { dataset, priorityScore, reasons, evidenceIds };
     }).sort((a, b) => b.priorityScore - a.priorityScore);
@@ -155,21 +160,17 @@ export function buildCurrentStateIntelligence(args: {
   semanticAssets?: SemanticAsset[];
 }): CurrentStateIntelligence {
   const semanticAssets = args.semanticAssets || [];
-  const datasets = args.estate.nodes
-    .filter((node) => node.type === 'dataset')
-    .map((node) => node.name);
+  const datasetNodes = nodesOfType(args.estate, 'dataset');
+  const datasets = datasetNodes.map((node) => node.name);
 
-  const datasetNames = new Set(datasets.map((name) => name.toLowerCase()));
   // 这里只统计当前 estate 中已知 dataset 的连接，避免把外部/未建模对象算进 datasets。
   const connected = new Set<string>();
-  for (const edge of args.lineage?.edges || []) {
-    for (const endpoint of [edge.source, edge.target]) {
-      const normalized = endpoint.toLowerCase();
-      if (datasetNames.has(normalized)) connected.add(normalized);
-    }
+  for (const relation of datasetLineageRelations(args.estate)) {
+    connected.add(relation.source.id);
+    connected.add(relation.target.id);
   }
 
-  const sourceOfTruthCandidates = buildSourceCandidates(args.estate, args.lineage);
+  const sourceOfTruthCandidates = buildSourceCandidates(args.estate);
   const semanticCandidates = buildSemanticCandidates(args.estate, semanticAssets);
 
   const coverage: CurrentStateCoverage = {
