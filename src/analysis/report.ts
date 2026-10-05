@@ -133,7 +133,7 @@ function summarizeDatasetFlows(estate: DataEstate, limit = 8): string[] {
 
 function buildOpenQuestions(
   unknowns: string[],
-  findings: Array<{ type: string; affectedAssets: string[]; questions?: string[] }>,
+  findings: Array<{ type: string; affectedAssets: string[]; questions?: string[] | undefined }>,
 ): string[] {
   const result = unique([
     ...unknowns,
