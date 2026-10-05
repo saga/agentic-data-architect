@@ -82,10 +82,10 @@ function dedupe(values: string[]): string[] { return [...new Set(values.filter(B
 
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
-  // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
-  await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
   assertMissionGate(inv.mission);
+  // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
+  await assertInvestigationScopeGate(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
