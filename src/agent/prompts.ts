@@ -36,6 +36,10 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - Graphify structural-analysis 的结果只用于结构导航和关系候选，不是 Evidence。
 - 'code_reference' Evidence 来自工作区实际文件和指定行号。需要把源码关系作为 Claim 依据时，应先读取源码，再用 'record_code_evidence' 保存关键片段；不要只引用 Graphify 路径或模型记忆。可以用 Graphify 找相关文件和路径，然后回到源码并结合确定性 Evidence Catalog 建立结论。source_file Evidence 只证明当时分析的是哪个文件版本和来源，不代表文件本身的业务含义已经得到证明。
 - 如果关键业务定义没有被 Evidence 或用户确认，提出一个聚焦的澄清问题，不要自行补全。
+- **Goal / Scope / Systems 是正式报告的必填内容。** 如果其中任何一项为空，先从用户原始问题、已上传文件、Discovery、代码仓库、SQL、配置和已存在 Evidence 中挖掘候选，不要直接填“未设置”。
+- **范围定义要说人话。** Scope 是这次调查到底看哪些业务对象、系统或数据域；Systems 是实际涉及的应用、仓库、数据库、数据平台或下游系统。不要把每张表、每个文件都塞进 Scope。
+- 如果材料足够明确，直接形成 intake；如果存在多个合理解释或材料不足，先调用 ask_user，把已经找到的候选列出来，让用户选择或修正。没有用户确认时，不要把猜测写成已确认范围。
+- 每次回答都尽量带上 intake；只提交本轮实际形成、来源清楚的 goal / scope / systems。source 使用 user / materials / mixed，材料来源必须带真实 evidenceIds，userConfirmed 只能在用户明确确认后设为 true。
 - **所有用户可见的回答默认使用浅显、自然、直接的中文。**除非用户明确要求其他语言，不要使用英文套话。
 - **answer 是“秘书向用户汇报刚刚查到的结果”，不是调查报告摘要，也不是内部执行日志。**
 - answer 只写用户真正需要知道的内容：先说结论，再用少量事实解释；只有确实需要用户决定、补充资料或处理权限时，才明确写出用户要做什么。
@@ -63,6 +67,7 @@ export function buildQuestionPrompt(args: {
 }): string {
   return [
     '调查执行规则：如果当前问题需要先理解陌生代码仓库，且尚未有 Discovery snapshot，优先使用 project_discover；没有 Evidence 不阻止继续调查，Evidence 用于约束最终可确认 Claim。',
+    '范围确认规则：正式结果必须有 Goal、Scope、Systems。先从现有材料挖掘，再在有歧义时 ask_user；不要输出（unset）或把模型猜测当成已确认。',
     `调查名称：${args.investigationName}`,
     `目标：${args.goal || '（未设置）'}`,
     `范围：${args.scope.join('、') || '（未设置）'}`,
@@ -98,7 +103,7 @@ export function buildQuestionPrompt(args: {
     `验证结果：modernization.validation.checks 只更新本轮真正检查过的项目；要写 passed，必须同时给出 result 和 evidenceIds，并且必须给出 reconciliation 的实际新旧对比结果。`,
     `这些内容会先保存到 reports/modernization-plan.json，再由确定性 Script Gate 判断是否允许 Workflow 前进。workflow.success 只是完成申请，不是通行证。`,
     `请严格返回 JSON：`,
-    `{"answer":"...","checkpoint":{"title":"阶段名称","summary":"这一阶段形成的简短结论","confirmed":["已经确认的关键事实"],"evidenceIds":["对应 Evidence id"],"unknowns":["仍未查清的关键问题"],"nextStep":"下一步实际要做什么"},"claims":[{"claim":"...","status":"supported|inferred|unknown|contradicted","evidenceIds":["..."]}],"unknowns":["..."],"followUpQuestions":[],"routeOptions":[],"modernization":{"targetArchitecture":{"title":"目标架构","status":"in_review","principles":["..."],"components":[{"id":"component:1","type":"domain_data","name":"...","description":"...","dependsOn":[],"sourceAssets":["..."]}],"openQuestions":[],"evidenceIds":["..."]},"mappings":[{"sourceAsset":"...","targetAsset":"...","transformation":"...","businessRule":"...","validationRule":"...","status":"proposed","evidenceIds":["..."]}],"mappingCoverage":{"sourceAssets":["..."],"unmappedAssets":[]},"validation":{"checks":[{"id":"validation:reconciliation","type":"reconciliation","name":"改造前后数据对比","description":"实际新旧数据对比","status":"passed","blocking":true,"evidenceIds":["..."],"result":"实际对比结果"}],"cutoverCriteria":["..."],"rollbackCriteria":["..."]}},"workflow":{"nodeId":"当前节点 ID","outcome":"合法 outcome（只有当前阶段确实完成时才提交）"}}`,
+    `{"answer":"...","intake":{"goal":"...","scope":["..."],"systems":["..."],"source":"mixed","userConfirmed":true,"evidenceIds":["..."]},"checkpoint":{"title":"阶段名称","summary":"这一阶段形成的简短结论","confirmed":["已经确认的关键事实"],"evidenceIds":["对应 Evidence id"],"unknowns":["仍未查清的关键问题"],"nextStep":"下一步实际要做什么"},"claims":[{"claim":"...","status":"supported|inferred|unknown|contradicted","evidenceIds":["..."]}],"unknowns":["..."],"followUpQuestions":[],"routeOptions":[],"modernization":{"targetArchitecture":{"title":"目标架构","status":"in_review","principles":["..."],"components":[{"id":"component:1","type":"domain_data","name":"...","description":"...","dependsOn":[],"sourceAssets":["..."]}],"openQuestions":[],"evidenceIds":["..."]},"mappings":[{"sourceAsset":"...","targetAsset":"...","transformation":"...","businessRule":"...","validationRule":"...","status":"proposed","evidenceIds":["..."]}],"mappingCoverage":{"sourceAssets":["..."],"unmappedAssets":[]},"validation":{"checks":[{"id":"validation:reconciliation","type":"reconciliation","name":"改造前后数据对比","description":"实际新旧数据对比","status":"passed","blocking":true,"evidenceIds":["..."],"result":"实际对比结果"}],"cutoverCriteria":["..."],"rollbackCriteria":["..."]}},"workflow":{"nodeId":"当前节点 ID","outcome":"合法 outcome（只有当前阶段确实完成时才提交）"}}`,
     `允许引用的 evidenceIds：${args.evidenceIds.join('、') || '（无）'}`,
   ].join('\n');
 }
