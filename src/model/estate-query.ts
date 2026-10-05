@@ -142,6 +142,8 @@ export function columnLineageRelations(estate: DataEstate): ColumnLineageRelatio
       const targetDataset = targetDot > 0 ? target.name.slice(0, targetDot) : target.name;
       const targetColumn = targetDot > 0 ? target.name.slice(targetDot + 1) : target.name;
       const attributes = source.attributes as { expression?: unknown };
+      const expression = edge.expression
+        ?? (typeof attributes.expression === 'string' ? attributes.expression : undefined);
 
       return {
         edge,
@@ -151,7 +153,7 @@ export function columnLineageRelations(estate: DataEstate): ColumnLineageRelatio
         sourceColumn,
         targetDataset,
         targetColumn,
-        ...(typeof attributes.expression === 'string' ? { expression: attributes.expression } : {}),
+        ...(expression ? { expression } : {}),
       };
     });
 }
