@@ -23,6 +23,7 @@ const SESSION_NOT_FOUND = /session not found|no such session|unknown session|doe
 const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
 const AGENT_EXECUTION_TIMEOUT = /^Timeout after \d+ms waiting for agent execution$/;
 const USER_INPUT_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for user input$/;
+const PERMISSION_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for permission$/;
 const WORKFLOW_SKILL_NAMES = ['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'];
 
 // Keep the host tool surface intentionally small; the CLI-like runtime provides
@@ -355,13 +356,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const selectedModel = input.model ?? config.model;
 
   /**
-   * sendAndWait 的 SDK timeout 只负责最终兜底；真正的“执行 6 分钟上限”
-   * 和“等待用户回答 1 小时上限”由宿主自己分开计时。
+   * sendAndWait 的 SDK timeout 只负责最终兜底；真正的“执行 6 分钟上限”、
+   * “等待用户回答上限”和“等待权限确认上限”由宿主自己分开计时。
    *
-   * 这样 Agent 一旦调用 ask_user，6 分钟执行计时器会暂停，改用独立的
-   * USER_INPUT_WAIT_TIMEOUT_MS。用户回答后再重新开始一次执行计时。
+   * Agent 一旦停在 ask_user / permission，计算计时器都会暂停，改用对应的等待上限。
+   * 用户完成确认后，再重新开始一次 Agent 执行计时。
    */
-  let waitMode: 'execution' | 'user_input' = 'execution';
+  let waitMode: 'execution' | 'permission' | 'user_input' = 'execution';
   let waitTimeoutId: ReturnType<typeof setTimeout> | undefined;
   let rejectWaitTimeout: ((error: Error) => void) | undefined;
   let pendingUserInputWaits = 0;
@@ -370,16 +371,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
     waitMode = mode;
     if (waitTimeoutId !== undefined) clearTimeout(waitTimeoutId);
 
-    const timeoutMs = mode === 'user_input'
-      ? config.userInputWaitTimeoutMs
-      : config.turnTimeoutMs;
+    const timeoutMs = mode === 'permission'
+      ? config.permissionWaitTimeoutMs
+      : mode === 'user_input'
+        ? config.userInputWaitTimeoutMs
+        : config.turnTimeoutMs;
 
     waitTimeoutId = setTimeout(() => {
       rejectWaitTimeout?.(
         new Error(
-          mode === 'user_input'
-            ? `Timeout after ${timeoutMs}ms waiting for user input`
-            : `Timeout after ${timeoutMs}ms waiting for agent execution`,
+          mode === 'permission'
+            ? `Timeout after ${timeoutMs}ms waiting for permission`
+            : mode === 'user_input'
+              ? `Timeout after ${timeoutMs}ms waiting for user input`
+              : `Timeout after ${timeoutMs}ms waiting for agent execution`,
         ),
       );
     }, timeoutMs);
@@ -418,7 +423,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     onUserInputRequest: async (request) => {
       const requestId = randomUUID();
       pendingUserInputWaits += 1;
-      armWaitTimeout('user_input');
+      syncWaitTimeout();
 
       input.onStatus?.('Agent 正在等待你的回答。');
       input.onTrajectory?.({
@@ -449,15 +454,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }).then(
         (response) => {
           pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
+          syncWaitTimeout();
           if (pendingUserInputWaits === 0) {
-            armWaitTimeout('execution');
             input.onStatus?.('已收到你的回答，助手继续处理，请稍候…');
           }
           return response;
         },
         (error) => {
           pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
-          if (pendingUserInputWaits === 0) armWaitTimeout('execution');
+          syncWaitTimeout();
           throw error;
         },
       );
@@ -537,6 +542,17 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
   const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
   const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
+
+  /** 根据当前真正卡住的资源选择等待计时器。权限/用户输入存在时，不计入 Agent 执行超时。 */
+  const syncWaitTimeout = (): void => {
+    const nextMode: 'execution' | 'permission' | 'user_input' = pendingPermissions.size > 0
+      ? 'permission'
+      : pendingUserInputWaits > 0
+        ? 'user_input'
+        : 'execution';
+    if (waitTimeoutId === undefined || waitMode !== nextMode) armWaitTimeout(nextMode);
+  };
+
   let lastActivityAt = new Date(turnStartedAt).toISOString();
   let lastActivityType = 'turn_start';
   let lastActivity = 'Agent 本轮开始';
@@ -725,6 +741,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const autoApproved = input.permissionMode === 'allow_all' && !managedApprovalRequired;
     if (!autoApproved) {
       pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
+      syncWaitTimeout();
     }
     // Allow All 仍然要尊重 Copilot/平台要求的 managedApproval；这种请求必须回到人工确认 UI。
     if (!autoApproved) {
@@ -787,16 +804,27 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
     const result = e.data.result as unknown as Record<string, unknown> | undefined;
     pendingPermissions.delete(e.data.requestId);
-    markActivity('permission_completed', '确认已处理');
+    syncWaitTimeout();
+    const resultKind = typeof result?.kind === 'string' ? result.kind : undefined;
+    const completionLabel = resultKind === 'cancelled'
+      ? '权限请求已取消'
+      : resultKind === 'reject'
+        ? '已拒绝操作'
+        : resultKind === 'approve-for-session'
+          ? '已允许当前会话'
+          : resultKind === 'approve-once'
+            ? '已允许操作'
+            : '确认已处理';
+    markActivity('permission_completed', completionLabel);
     input.onTrajectory?.({
       type: 'permission_completed',
-      name: '确认已处理',
-      status: 'completed',
+      name: completionLabel,
+      status: resultKind === 'cancelled' ? 'info' : 'completed',
       ...(durationMs !== undefined ? { durationMs } : {}),
       details: {
         requestId: e.data.requestId,
         ...(pending ? { kind: pending.kind, summary: redactTrajectoryValue(pending.summary) } : {}),
-        ...(typeof result?.kind === 'string' ? { resultKind: result.kind } : {}),
+        ...(resultKind ? { resultKind } : {}),
       },
     });
   });
@@ -1049,7 +1077,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         final = await Promise.race([
           session.sendAndWait(
             { prompt: continuationPrompt },
-            Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs),
+            Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs, config.permissionWaitTimeoutMs),
           ),
           waitTimeoutPromise,
         ]);
@@ -1057,6 +1085,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         if (error instanceof Error && (
           AGENT_EXECUTION_TIMEOUT.test(error.message)
           || USER_INPUT_WAIT_TIMEOUT.test(error.message)
+          || PERMISSION_WAIT_TIMEOUT.test(error.message)
         )) {
           timedOutError = error;
           try {
@@ -1162,10 +1191,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const sdkTimedOut = TURN_TIMEOUT.test(errorMessage);
     const executionTimedOut = AGENT_EXECUTION_TIMEOUT.test(errorMessage);
     const userInputTimedOut = USER_INPUT_WAIT_TIMEOUT.test(errorMessage);
-    const timedOut = sdkTimedOut || executionTimedOut || userInputTimedOut;
-    const timeoutLabel = userInputTimedOut
-      ? '等待用户回答超时'
-      : executionTimedOut
+    const permissionTimedOut = PERMISSION_WAIT_TIMEOUT.test(errorMessage);
+    const timedOut = sdkTimedOut || executionTimedOut || userInputTimedOut || permissionTimedOut;
+    const timeoutLabel = permissionTimedOut
+      ? '等待用户确认超时'
+      : userInputTimedOut
+        ? '等待用户回答超时'
+        : executionTimedOut
         ? 'Agent 执行超时'
         : sdkTimedOut
           ? '等待 Session 完成超时'
@@ -1180,10 +1212,23 @@ export async function askCopilot(input: AskInput): Promise<string> {
       details: {
         error: errorMessage,
         elapsedMs: Date.now() - turnStartedAt,
-        timeoutMs: executionTimedOut ? config.turnTimeoutMs : sdkTimedOut ? Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs) : undefined,
+        timeoutMs: permissionTimedOut
+          ? config.permissionWaitTimeoutMs
+          : executionTimedOut
+            ? config.turnTimeoutMs
+            : sdkTimedOut
+              ? Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs, config.permissionWaitTimeoutMs)
+              : undefined,
+        ...(permissionTimedOut ? { permissionWaitTimeoutMs: config.permissionWaitTimeoutMs } : {}),
         ...(userInputTimedOut ? { userInputWaitTimeoutMs: config.userInputWaitTimeoutMs } : {}),
         ...(timedOut ? {
-          timeoutKind: userInputTimedOut ? 'user_input' : sdkTimedOut ? 'session_idle' : 'execution',
+          timeoutKind: permissionTimedOut
+            ? 'permission'
+            : userInputTimedOut
+              ? 'user_input'
+              : sdkTimedOut
+                ? 'session_idle'
+                : 'execution',
         } : {}),
         lastActivityAt,
         lastActivityType,
