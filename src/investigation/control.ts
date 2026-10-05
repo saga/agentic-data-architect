@@ -208,6 +208,11 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
     },
   } as Omit<InvestigationControl, 'history'>;
 
+  // 旧版配置可能只有 avatarPaths，没有 avatarPath。默认头像应该直接使用第一张已上传图片。
+  if (!base.agent.avatarPath && base.agent.avatarPaths?.length) {
+    base.agent.avatarPath = base.agent.avatarPaths[0];
+  }
+
   return InvestigationControlSchema.parse({
     ...base,
     history: Array.isArray(raw.history)
