@@ -135,6 +135,7 @@ export function useInvestigationController() {
     deliverableIds: [],
   });
   const [missionSaving, setMissionSaving] = useState(false);
+  const [missionError, setMissionError] = useState<string>();
   const [pendingMissionMessage, setPendingMissionMessage] = useState<string>();
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
@@ -309,6 +310,7 @@ export function useInvestigationController() {
     setStreamingReasoning('');
     setReasoningByMessage({});
     setMissionOpen(false);
+    setMissionError(undefined);
     setPendingMissionMessage(undefined);
     setMissionDraft({ purpose: '', expectedResult: '', deliverableIds: [] });
     setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
@@ -655,6 +657,7 @@ export function useInvestigationController() {
 
   /** 打开 Mission 编辑/确认窗口；已确认 Mission 也可以从这里修改。 */
   const editMission = () => {
+    setMissionError(undefined);
     const mission = current?.context.mission;
     setMissionDraft(mission
       ? {
@@ -682,6 +685,7 @@ export function useInvestigationController() {
 
     setMissionSaving(true);
     setError(undefined);
+    setMissionError(undefined);
     try {
       const result = await getJson<{ context: SessionContext; mission: MissionContract }>(
         '/api/sessions/' + encodeURIComponent(active) + '/mission',
@@ -719,10 +723,10 @@ export function useInvestigationController() {
           clarity?: { reason?: string };
         };
         if (body.code === 'MISSION_CLARITY_REQUIRED') {
-          setError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
-        } else {
-          setError(body.error || raw);
+          setMissionError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
+          return;
         }
+        setError(body.error || raw);
       } catch {
         setError(raw);
       }
@@ -871,6 +875,7 @@ export function useInvestigationController() {
     missionOpen,
     missionDraft,
     missionSaving,
+    missionError,
     journey,
     attachmentsOpen,
     attachments,
