@@ -187,6 +187,17 @@ export function useInvestigationController() {
     setCurrent(result);
     setJourney(journeyResult.journey ?? undefined);
 
+    // Mission 是正式调查的前置条件。旧 Session 如果还没有 Mission，
+    // 首次打开就直接让用户确认，而不是先允许 Agent 自己猜目标。
+    if (!result.context.mission) {
+      setMissionDraft({
+        purpose: result.context.goal || result.context.userPrompt || '',
+        expectedResult: '',
+        deliverableIds: [],
+      });
+      setMissionOpen(true);
+    }
+
     const existing = result.context.inputs
       .filter((input) => input.kind === 'document')
       .map((input) => ({
@@ -700,7 +711,21 @@ export function useInvestigationController() {
         void send(nextMessage);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '无法保存任务目标');
+      const raw = e instanceof Error ? e.message : '无法保存任务目标';
+      try {
+        const body = JSON.parse(raw) as {
+          code?: string;
+          error?: string;
+          clarity?: { reason?: string };
+        };
+        if (body.code === 'MISSION_CLARITY_REQUIRED') {
+          setError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
+        } else {
+          setError(body.error || raw);
+        }
+      } catch {
+        setError(raw);
+      }
     } finally {
       setMissionSaving(false);
     }
@@ -767,7 +792,6 @@ export function useInvestigationController() {
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
-      navigatePage('config');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法创建调查');
     }
