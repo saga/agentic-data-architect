@@ -1311,14 +1311,30 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }
 
       if (execution < autoContinuationTurns) {
-        if (workflowTransition.applied && workflowTransition.execution?.status === 'completed') {
-          break;
+        const workflowCompleted =
+          workflowTransition.applied && workflowTransition.execution?.status === 'completed';
+
+        if (workflowCompleted) {
+          /**
+           * Workflow 的 completed 只是某个路线节点已经结束。
+           * Mission 是否真的完成仍由上层 Completion Gate 决定；否则一个固定 Workflow
+           * 很容易把“阶段做完”错误地当成“用户最终结果已经拿到”。
+           */
+          const shouldContinueAfterWorkflowCompletion = input.shouldContinueMission
+            ? await input.shouldContinueMission()
+            : false;
+          if (!shouldContinueAfterWorkflowCompletion) {
+            break;
+          }
+          // Workflow 已经没有下一节点，但 Mission 还有缺口：继续自主调查，不再注入完成态 Workflow 指令。
+          currentWorkflowInstruction = '';
         }
+
         if (workflowTransition.applied && workflowTransition.execution?.status === 'waiting') {
           break;
         }
 
-        if (workflowTransition.applied && input.workflowSkill) {
+        if (workflowTransition.applied && input.workflowSkill && !workflowCompleted) {
           try {
             currentWorkflowInstruction = await buildJourneyAgentInstruction(
               investigationName,
