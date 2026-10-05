@@ -4,6 +4,11 @@ import { Mermaid } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
 
 const { Text } = Typography;
+
+function formatTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
 export const markdownComponents = { mermaid: Mermaid as React.ComponentType<any> };
 
 export function displayAssistantContent(content: string): string {
