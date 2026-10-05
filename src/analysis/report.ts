@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
-import { assertInvestigationScopeGate } from '../workflow/scope-gate.js';
+import { assertInvestigationScopeGate, isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import { assertCurrentStateReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
 import {
@@ -207,7 +207,8 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     questions: finding.questions,
   }));
   const openQuestions = buildOpenQuestions(inv.unknowns, findingInput);
-  const modernizationGoal = /replatform|迁移|现代化|改造/i.test((inv.userPrompt + ' ' + inv.goal).trim());
+  const currentStateOnly = isCurrentStateOnlyScope(inv.goal, inv.scope);
+  const modernizationGoal = !currentStateOnly && /replatform|迁移|现代化|改造/i.test((inv.userPrompt + ' ' + inv.goal).trim());
   const implications = buildReplatformImplications(findingInput, modernization, modernizationGoal);
   const datasetFlows = estate ? summarizeDatasetFlows(estate) : [];
   const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
@@ -281,11 +282,15 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
           '',
         ])
       : ['当前还没有形成单独保存的关键结论。', '']),
-    '## 6. Replatform 影响',
+    '## 6. 后续影响',
     '',
-    ...implications.map((item) => '- ' + item),
+    ...(currentStateOnly
+      ? ['本次范围明确只做当前状态分析，因此这里不展开目标架构、迁移步骤或新旧映射。', '如后续需要这些内容，再基于已经确认的现状结果启动对应工作。']
+      : implications.map((item) => '- ' + item)),
     '',
-    '下一步：进入目标架构设计，重点处理目前尚未闭合的 ' + (openQuestions.length ? '问题和 ' + String(openQuestions.length) + ' 个待确认事项' : '范围') + '。',
+    currentStateOnly
+      ? '下一步：继续补齐当前状态中仍然缺失、且对现状判断有影响的事实。'
+      : '下一步：进入目标架构设计，重点处理目前尚未闭合的 ' + (openQuestions.length ? '问题和 ' + String(openQuestions.length) + ' 个待确认事项' : '范围') + '。',
     '',
     '## 7. 待确认问题',
     '',
@@ -304,7 +309,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     '',
   ];
 
-  if (modernization) {
+  if (modernization && !currentStateOnly) {
     lines.push(
       '## 9. Modernization 状态',
       '',
@@ -319,7 +324,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     );
   }
 
-  const markdown = lines.join('\\n');
+  const markdown = lines.join('\n');
   const dir = reportsDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, 'report.md');
