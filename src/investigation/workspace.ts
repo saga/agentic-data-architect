@@ -309,10 +309,18 @@ export async function addImportantInformation(name: string, information: string[
 }
 
 /** 把可恢复的 Copilot Session ID 和对应状态版本写回 Workspace。 */
-export async function setCopilotSessionId(name: string, sessionId: string): Promise<void> {
+/** 持久化可恢复的 Copilot Session，并绑定它所对应的 Investigation 配置版本。 */
+export async function setCopilotSessionId(
+  name: string,
+  sessionId: string,
+  configurationVersion?: number,
+): Promise<void> {
   await withWorkspaceContextLock(name, async () => {
     const context = await loadWorkspaceContext(name);
     context.copilotSessionId = sessionId;
+    if (typeof configurationVersion === 'number') {
+      context.copilotConfigurationVersion = configurationVersion;
+    }
     context.updatedAt = new Date().toISOString();
     await writeJsonAtomic(contextFile(name), context);
   });
