@@ -1206,6 +1206,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           ? {
               applied: false,
               error: stageGateDecision.error ?? 'Stage Gate 未通过，当前 Workflow 保持不变。',
+              execution: undefined,
             }
           : await applyAgentWorkflowTransition(
               investigationName,
