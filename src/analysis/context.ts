@@ -1,7 +1,8 @@
 /**
  * Evidence Retrieval：按问题组织有限上下文。
  *
- * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ * 本文件的职责是问题相关性排序和上下文编排；DataEstate 的图查询统一由
+ * ../model/estate-query.ts 提供，避免各分析模块重复遍历 nodes/edges。
  */
 import type { DataProfile } from '../adapters/database.js';
 import type { EvidenceRef, Finding } from '../evidence/types.js';
@@ -9,12 +10,17 @@ import type { LineageGraph } from './lineage.js';
 import type { CurrentStateIntelligence } from '../model/current-state.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import type { Inventory } from '../discovery/scanner.js';
+import type { DataEstate } from '../model/estate.js';
+import {
+  columnLineageRelations,
+  datasetLineageRelations,
+  nodesOfType,
+} from '../model/estate-query.js';
 
 /**
  * Evidence Retrieval（§十八）：按问题取相关节点/边/profile/finding，
  * 不再把整个 snapshot 截断塞给模型。
  */
-
 export interface QuestionContext {
   text: string;
   evidenceIds: string[];
@@ -38,9 +44,16 @@ function scoreDataset(questionTokens: string[], dataset: string): number {
   return score;
 }
 
-/** 从 lineage、profile、finding 和 evidence 中挑选与问题最相关的上下文，避免把整个 snapshot 塞给模型。 */
+/**
+ * 从 canonical DataEstate、profile、finding 和 evidence 中挑选与问题最相关的上下文，
+ * 避免把整个 snapshot 塞给模型。
+ *
+ * lineage 参数现在只表示“本次是否已有 SQL lineage 分析结果”；具体 dataset /
+ * edge / column lineage 查询统一从 DataEstate 获取。
+ */
 export function buildQuestionContext(args: {
   question: string;
+  estate: DataEstate;
   lineage: LineageGraph | null;
   profiles: DataProfile[];
   findings: Finding[];
@@ -50,7 +63,17 @@ export function buildQuestionContext(args: {
   inventory?: Inventory | null;
   maxDatasets?: number;
 }): QuestionContext {
-  const { question, lineage, profiles, findings, evidence, currentState, semanticAssets = [], inventory = null } = args;
+  const {
+    question,
+    estate,
+    lineage,
+    profiles,
+    findings,
+    evidence,
+    currentState,
+    semanticAssets = [],
+    inventory = null,
+  } = args;
   const qt = tokens(question);
   const byId = new Map(evidence.map((e) => [e.id, e]));
   const out: string[] = [];
@@ -120,15 +143,16 @@ export function buildQuestionContext(args: {
       evidenceIds: [...new Set([...sourceIds, ...codeEvidenceIds])],
     };
   }
-  const ranked = lineage.tables
-    .filter((t) => !t.startsWith('file:'))
-    .map((t) => ({ t, s: scoreDataset(qt, t) }))
+
+  const datasetNodes = nodesOfType(estate, 'dataset')
+    .filter((node) => !node.name.toLowerCase().startsWith('file:'));
+  const ranked = datasetNodes
+    .map((node) => ({ node, s: scoreDataset(qt, node.name) }))
     .sort((a, b) => b.s - a.s);
-  const top = (ranked.filter((r) => r.s > 0).length > 0 ? ranked.filter((r) => r.s > 0) : ranked).slice(
-    0,
-    args.maxDatasets ?? 6,
-  );
-  const topNames = new Set(top.map((r) => r.t.toLowerCase()));
+  const top = (ranked.filter((r) => r.s > 0).length > 0
+    ? ranked.filter((r) => r.s > 0)
+    : ranked).slice(0, args.maxDatasets ?? 6);
+  const topNames = new Set(top.map((r) => r.node.name.toLowerCase()));
 
   if (inventory?.files.length) {
     const rankedFiles = inventory.files
@@ -150,18 +174,22 @@ export function buildQuestionContext(args: {
     out.push('');
   }
 
-  out.push('Related datasets: ' + (top.map((r) => r.t).join(', ') || '(none scored)'));
+  out.push('Related datasets: ' + (top.map((r) => r.node.name).join(', ') || '(none scored)'));
   out.push('');
   out.push('Lineage:');
   let edgeCount = 0;
-  for (const e of lineage.edges) {
-    if (!topNames.has(e.source.toLowerCase()) && !topNames.has(e.target.toLowerCase())) continue;
+  for (const relation of datasetLineageRelations(estate)) {
+    if (!topNames.has(relation.source.name.toLowerCase()) && !topNames.has(relation.target.name.toLowerCase())) continue;
     if (edgeCount >= 20) {
-      out.push(`... and more (narrow the question to see them)`);
+      out.push('... and more (narrow the question to see them)');
       break;
     }
-    const ref = use(e.evidenceId);
-    out.push(`- ${e.source} → ${e.target}${ref ? ` ${ref}` : ''}`);
+    const refs = relation.edge.evidenceIds
+      .map(use)
+      .filter((id): id is string => Boolean(id));
+    out.push(
+      `- ${relation.source.name} → ${relation.target.name}${refs.length ? ' ' + refs.join(' ') : ''}`,
+    );
     edgeCount++;
   }
   if (edgeCount === 0) out.push('(no lineage edges for these datasets)');
@@ -169,11 +197,18 @@ export function buildQuestionContext(args: {
   out.push('');
   out.push('Columns:');
   let colCount = 0;
-  for (const c of lineage.columns) {
-    if (!topNames.has(c.targetDataset.toLowerCase()) && !topNames.has(c.sourceDataset.toLowerCase())) continue;
+  for (const relation of columnLineageRelations(estate)) {
+    if (
+      !topNames.has(relation.targetDataset.toLowerCase()) &&
+      !topNames.has(relation.sourceDataset.toLowerCase())
+    ) continue;
     if (colCount >= 30) break;
-    const ref = c.evidenceId ? use(c.evidenceId) : null;
-    out.push(`- ${c.targetDataset}.${c.targetColumn} ← ${c.sourceDataset}.${c.sourceColumn} (${c.expression?.slice(0, 120) ?? ''})${ref ? ` ${ref}` : ''}`);
+    const refs = relation.edge.evidenceIds
+      .map(use)
+      .filter((id): id is string => Boolean(id));
+    out.push(
+      `- ${relation.targetDataset}.${relation.targetColumn} ← ${relation.sourceDataset}.${relation.sourceColumn} (${relation.expression?.slice(0, 120) ?? ''})${refs.length ? ' ' + refs.join(' ') : ''}`,
+    );
     colCount++;
   }
   if (colCount === 0) out.push('(no column lineage)');
@@ -192,7 +227,7 @@ export function buildQuestionContext(args: {
     out.push('业务语义上下文：');
     for (const match of semanticMatches) {
       const asset = match.asset;
-      const refs = (asset.evidenceIds ?? []).map(use).filter(Boolean).join(' ');
+      const refs = (asset.evidenceIds ?? []).map(use).filter((id): id is string => Boolean(id)).join(' ');
       out.push(
         '- [' + asset.kind + '] ' + asset.provider + ':' + (asset.qualifiedName ?? asset.name) +
         (asset.description ? ' — ' + asset.description.slice(0, 400) : '') +
@@ -210,7 +245,7 @@ export function buildQuestionContext(args: {
       out.push('语义候选：');
       for (const candidate of semanticCandidates) {
         out.push('- ' + candidate.key + ' [' + candidate.kind + '] ' + candidate.names.slice(0, 5).join('、'));
-        const refs = candidate.evidenceIds.map(use).filter(Boolean);
+        const refs = candidate.evidenceIds.map(use).filter((id): id is string => Boolean(id));
         if (refs.length > 0) out.push('  Evidence: ' + refs.join(' '));
       }
     }
@@ -223,7 +258,7 @@ export function buildQuestionContext(args: {
       out.push('来源候选：');
       for (const candidate of sourceCandidates) {
         out.push('- ' + candidate.key + ': ' + candidate.candidateDatasets.join('、') + '；这里只是候选，还没有确认业务权威。');
-        const refs = candidate.evidenceIds.map(use).filter(Boolean);
+        const refs = candidate.evidenceIds.map(use).filter((id): id is string => Boolean(id));
         if (refs.length > 0) out.push('  Evidence: ' + refs.join(' '));
       }
     }
