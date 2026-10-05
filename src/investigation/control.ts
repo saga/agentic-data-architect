@@ -98,6 +98,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       permissionMode: 'permission',
       autoContinuationTurns: 4,
       displayName: '秘书',
+      personality: '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。',
       avatarWidth: 180,
       avatarHeight: 240,
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
@@ -128,6 +129,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       permissionMode: control.agent.permissionMode,
       autoContinuationTurns: control.agent.autoContinuationTurns,
       displayName: control.agent.displayName,
+      personality: control.agent.personality,
       ...(control.agent.avatarPath ? { avatarPath: control.agent.avatarPath } : {}),
       ...(control.agent.avatarPaths?.length ? { avatarPaths: [...control.agent.avatarPaths] } : {}),
       ...(control.agent.avatarMimeType ? { avatarMimeType: control.agent.avatarMimeType } : {}),
@@ -179,6 +181,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
         : '秘书',
+      personality: typeof agent.personality === 'string' ? agent.personality.slice(0, 4000) : defaults.agent.personality,
       ...(typeof agent.avatarPath === 'string' && agent.avatarPath.trim()
         ? { avatarPath: agent.avatarPath.trim() }
         : {}),
