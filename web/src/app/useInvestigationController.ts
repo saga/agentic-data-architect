@@ -726,6 +726,10 @@ export function useInvestigationController() {
           setMissionError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
           return;
         }
+        if (body.code === 'MISSION_CHANGE_BLOCKED') {
+          setMissionError(body.error || '当前调查正在执行，请先停止后再修改任务。');
+          return;
+        }
         setError(body.error || raw);
       } catch {
         setError(raw);
