@@ -146,7 +146,13 @@ export async function answerQuestion(
 
     const githubRepositories = [...new Set([
       ...control.research.githubRepositories,
-      ...extractGitHubRepositories([inv.goal, inv.userPrompt, effectiveQuestion].filter(Boolean).join('\n')),
+      ...extractGitHubRepositories([
+        inv.mission?.purpose,
+        inv.mission?.expectedResult,
+        inv.goal,
+        inv.userPrompt,
+        effectiveQuestion,
+      ].filter(Boolean).join('\n')),
     ])].slice(0, 5);
     if (githubRepositories.length) {
       onStatus?.('正在准备代码仓库并建立初始调查资料，请稍候…');
@@ -174,8 +180,13 @@ export async function answerQuestion(
     });
 
     const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
+    const contextQuestion = [
+      inv.mission?.purpose,
+      inv.mission?.expectedResult,
+      effectiveQuestion,
+    ].filter(Boolean).join('\n');
     const ctx = buildQuestionContext({
-      question: effectiveQuestion,
+      question: contextQuestion,
       estate: snapshot?.estate ?? { nodes: [], edges: [] },
       hasSqlLineage: snapshot?.lineage != null,
       profiles: snapshot?.profiles ?? [],
@@ -200,7 +211,12 @@ export async function answerQuestion(
         ].join('\n')
       : '';
     const questionContextText = [ctx.text, conversationText].filter(Boolean).join('\n\n');
-    const knowledge = await searchArchitectureKnowledge([inv.goal, effectiveQuestion].filter(Boolean).join('\n'), { workflow: inv.workflow, limit: 6 });
+    const knowledge = await searchArchitectureKnowledge([
+      inv.mission?.purpose,
+      inv.mission?.expectedResult,
+      inv.goal,
+      effectiveQuestion,
+    ].filter(Boolean).join('\n'), { workflow: inv.workflow, limit: 6 });
     const knowledgeText = renderArchitectureKnowledge(knowledge);
     const missionProgress = await buildMissionProgress(inv.name, inv.mission);
     const missionPrompt = buildMissionContractPrompt(inv.mission!, missionProgress ?? undefined);
