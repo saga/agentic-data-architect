@@ -722,12 +722,10 @@ body {
   min-width: 260px;
   justify-content: center;
   padding-inline: 13px;
-  border-color: #91caff !important;
+  border-color: transparent !important;
   color: #0958d9 !important;
   background: #e6f4ff !important;
-  box-shadow:
-    0 0 0 3px rgba(22, 119, 255, 0.08),
-    0 4px 14px rgba(22, 119, 255, 0.12);
+  box-shadow: none;
   font-weight: 600;
   animation: workspace-status-pulse 2s ease-in-out infinite;
 }
@@ -738,14 +736,10 @@ body {
 
 @keyframes workspace-status-pulse {
   0%, 100% {
-    box-shadow:
-      0 0 0 3px rgba(22, 119, 255, 0.07),
-      0 4px 14px rgba(22, 119, 255, 0.10);
+    box-shadow: none;
   }
   50% {
-    box-shadow:
-      0 0 0 5px rgba(22, 119, 255, 0.11),
-      0 6px 18px rgba(22, 119, 255, 0.14);
+    box-shadow: none;
   }
 }
 
