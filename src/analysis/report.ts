@@ -1,7 +1,8 @@
 /**
  * Current-State Report 生成器。
  *
- * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
+ * 这里负责把内部 Discovery / Evidence 结果整理成人可以直接阅读的报告。
+ * 它不改变事实，只改变事实的选择、组织和表达方式。
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -9,148 +10,319 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import { assertInvestigationScopeGate } from '../workflow/scope-gate.js';
 import { assertCurrentStateReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
+import {
+  datasetLineageRelations,
+  edgesFrom,
+  edgesTo,
+  findNode,
+  nodesOfType,
+} from '../model/estate-query.js';
+import type { DataEstate, EstateNode } from '../model/estate.js';
 import type { DiscoverySnapshot } from '../workflow/discover.js';
 
+function unique(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function preview(values: string[], limit: number): string {
+  if (values.length <= limit) return values.join('、');
+  return values.slice(0, limit).join('、') + '，另外还有 ' + String(values.length - limit) + ' 项';
+}
+
+function evidenceText(ids: string[]): string {
+  return ids.length ? '证据：' + unique(ids).slice(0, 3).join('、') : '证据未记录';
+}
+
+function impactForFinding(type: string): string {
+  switch (type) {
+    case 'missing_lineage':
+      return '迁移范围还没有完全闭合，受影响对象需要先把来源和下游用途查清楚。';
+    case 'multiple_sources_of_truth':
+      return '迁移前需要确认哪个来源代表真正业务口径，否则容易把不同系统的数据混在一起。';
+    case 'duplicate_transformation':
+      return '可能存在重复计算或重复转换，迁移时应先确认这些逻辑是否可以合并。';
+    case 'semantic_conflict':
+      return '同名字段或指标可能采用了不同业务口径，迁移前需要确认统一定义。';
+    case 'identifier_fragmentation':
+      return '同一业务对象可能使用多个标识，迁移时需要先确认它们之间的对应关系。';
+    case 'data_quality_issue':
+      return '数据质量问题会直接影响迁移后的结果校验，需要明确哪些问题可以接受、哪些必须修复。';
+    case 'temporal_risk':
+      return '时间口径存在风险，迁移时需要明确生效时间、历史数据和时间窗口。';
+    case 'possible_stale_documentation':
+      return '文档与实际实现可能不一致，迁移依据应优先采用已经验证的代码和数据证据。';
+    default:
+      return '这个问题需要在进入下一步设计前确认影响范围。';
+  }
+}
+
+function genericQuestionForFinding(type: string, affectedAssets: string[]): string | undefined {
+  const assetText = preview(affectedAssets, 3);
+  if (!assetText) return undefined;
+
+  switch (type) {
+    case 'missing_lineage':
+      return '确认 ' + assetText + ' 的来源、写入过程和下游用途。';
+    case 'multiple_sources_of_truth':
+      return '确认 ' + assetText + ' 哪一个来源是业务上真正采用的口径。';
+    case 'duplicate_transformation':
+      return '确认 ' + assetText + ' 涉及的重复转换是否业务等价。';
+    case 'semantic_conflict':
+      return '确认 ' + assetText + ' 应该采用哪一个业务定义。';
+    case 'identifier_fragmentation':
+      return '确认 ' + assetText + ' 的多个标识之间是否代表同一业务对象。';
+    case 'data_quality_issue':
+      return '确认 ' + assetText + ' 的质量问题哪些必须修复，哪些可以接受。';
+    case 'temporal_risk':
+      return '确认 ' + assetText + ' 的时间口径和历史数据规则。';
+    default:
+      return undefined;
+  }
+}
+
+function sourceFileForJob(job: EstateNode): string {
+  const sourceFile = job.attributes.sourceFile;
+  return typeof sourceFile === 'string' && sourceFile.trim()
+    ? sourceFile
+    : job.name.replace(/^SQL file:\s*/i, '');
+}
+
+function summarizeSqlTransforms(estate: DataEstate, limit = 8): string[] {
+  const rows = nodesOfType(estate, 'job').map((job) => {
+    const inputEdges = edgesTo(estate, job.id, 'reads_from');
+    const outputEdges = edgesFrom(estate, job.id, 'writes_to');
+    const sources = inputEdges
+      .map((edge) => findNode(estate, edge.from))
+      .filter((node): node is EstateNode => node?.type === 'dataset')
+      .map((node) => node.name);
+    const targets = outputEdges
+      .map((edge) => findNode(estate, edge.to))
+      .filter((node): node is EstateNode => node?.type === 'dataset')
+      .map((node) => node.name);
+    const evidenceIds = unique([
+      ...inputEdges.flatMap((edge) => edge.evidenceIds),
+      ...outputEdges.flatMap((edge) => edge.evidenceIds),
+    ]);
+    return {
+      score: sources.length + targets.length * 2,
+      file: sourceFileForJob(job),
+      sources: unique(sources),
+      targets: unique(targets),
+      evidenceIds,
+    };
+  })
+    .filter((row) => row.sources.length > 0 || row.targets.length > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  return rows.map((row) => {
+    const sourceText = row.sources.length ? '读取 ' + preview(row.sources, 4) : '没有找到明确输入';
+    const targetText = row.targets.length ? '，写入 ' + preview(row.targets, 3) : '，没有明确写入目标';
+    return 'SQL 文件 "' + row.file + '"：' + sourceText + targetText + '（' + evidenceText(row.evidenceIds) + '）';
+  });
+}
+
+function summarizeDatasetFlows(estate: DataEstate, limit = 8): string[] {
+  return datasetLineageRelations(estate)
+    .sort((a, b) => b.edge.evidenceIds.length - a.edge.evidenceIds.length)
+    .slice(0, limit)
+    .map((relation) =>
+      relation.source.name + ' 是 ' + relation.target.name + ' 的上游数据（' + evidenceText(relation.edge.evidenceIds) + '）',
+    );
+}
+
+function buildOpenQuestions(
+  unknowns: string[],
+  findings: Array<{ type: string; affectedAssets: string[]; questions?: string[] }>,
+): string[] {
+  const result = unique([
+    ...unknowns,
+    ...findings.flatMap((finding) => finding.questions ?? []),
+    ...findings
+      .map((finding) => genericQuestionForFinding(finding.type, finding.affectedAssets))
+      .filter((item): item is string => Boolean(item)),
+  ]);
+  return result.slice(0, 8);
+}
+
+function claimStatusText(status: string): string {
+  switch (status) {
+    case 'verified': return '已验证';
+    case 'supported': return '证据较充分';
+    case 'inferred': return '目前是推断';
+    case 'unknown': return '还不能确认';
+    case 'contradicted': return '证据存在冲突';
+    default: return status;
+  }
+}
+
+function buildReplatformImplications(
+  findings: Array<{ type: string }>,
+  modernization: Awaited<ReturnType<typeof loadModernizationPlan>>,
+  modernizationGoal: boolean,
+): string[] {
+  const implications = unique(findings.map((finding) => impactForFinding(finding.type)));
+  if (modernization?.targetArchitecture.components.length) {
+    implications.push('已经开始形成目标架构，可以在这些已确认的问题边界内继续细化目标组件。');
+  } else if (modernizationGoal) {
+    implications.push('当前还没有形成可供批准的目标架构，因此这份报告不能把 replatform 方案说成已经确定。');
+  }
+  return implications.slice(0, 5);
+}
+
 /**
- * Current-State Report（§二十）：8 节，带 Coverage / Gaps。
- * 写到 reports/report.md，同时 stdout 打印。
+ * Current-State Report（用户阅读版）。
+ *
+ * 正式报告只展示少量关键事实；完整 Evidence、原始 lineage 和内部指标继续保存在工作区。
  */
 export async function buildReport(name: string): Promise<{ markdown: string; path: string }> {
-  // 正式报告严格禁止 unset：先通过独立 Scope Gate。
   await assertInvestigationScopeGate(name);
   await assertCurrentStateReportGate(name);
+
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = await loadModernizationPlan(name);
-  const lineage = snapshot?.lineage ?? null;
   const estate = snapshot?.estate ?? null;
+  const current = snapshot?.currentState ?? null;
+  const coverage = current?.coverage;
+  const datasets = estate ? nodesOfType(estate, 'dataset').map((node) => node.name) : [];
+  const sqlFiles = snapshot?.inventory?.files.filter((file) => file.kind === 'sql') ?? [];
+  const parsedFiles = new Set((snapshot?.lineage?.statements ?? []).map((statement) => statement.file));
+  const sqlParseFailures = coverage?.sqlParseFailures ?? snapshot?.lineage?.parseFailures.length ?? 0;
+  const sqlCoverage = sqlFiles.length === 0
+    ? '没有发现 SQL 文件'
+    : String(parsedFiles.size) + '/' + String(sqlFiles.length) + ' 个 SQL 文件有解析结果';
+  const connectedDatasets = coverage
+    ? String(coverage.connectedDatasets) + '/' + String(coverage.datasets)
+    : '没有 Current-State coverage';
+  const columnEdges = coverage?.columnLineageEdges ?? snapshot?.lineage?.columns.length ?? 0;
+  const findingInput = inv.findings.map((finding) => ({
+    type: finding.type,
+    title: finding.title,
+    description: finding.description,
+    severity: finding.severity,
+    status: finding.status,
+    affectedAssets: finding.affectedAssets,
+    evidenceIds: finding.evidenceIds,
+    questions: finding.questions,
+  }));
+  const openQuestions = buildOpenQuestions(inv.unknowns, findingInput);
+  const modernizationGoal = /replatform|迁移|现代化|改造/i.test((inv.userPrompt + ' ' + inv.goal).trim());
+  const implications = buildReplatformImplications(findingInput, modernization, modernizationGoal);
+  const datasetFlows = estate ? summarizeDatasetFlows(estate) : [];
+  const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
 
-  const edges = lineage?.edges ?? [];
-  const tables = (lineage?.tables ?? []).filter((t) => !t.startsWith('file:'));
-  const connected = new Set<string>();
-  for (const e of edges) {
-    connected.add(e.source.toLowerCase());
-    connected.add(e.target.toLowerCase());
-  }
-  const evidenceByType = new Map<string, number>();
-  for (const e of inv.evidence) evidenceByType.set(e.type, (evidenceByType.get(e.type) ?? 0) + 1);
-
-  const sqlFiles = snapshot?.inventory?.files.filter((f) => f.kind === 'sql') ?? [];
-  const parsedFiles = new Set((lineage?.statements ?? []).map((s) => s.file));
-  const sqlCoverage = sqlFiles.length === 0 ? 'n/a (no sql files)' : `${parsedFiles.size}/${sqlFiles.length}`;
-  const lineageCoverage =
-    tables.length === 0 ? 'n/a' : `${connected.size}/${tables.length} datasets connected`;
-  const columnEdges = lineage?.columns.length ?? 0;
-
-  const L = [
-    `# Current-State Report: ${inv.name}`,
-    ``,
-    `> Evidence-first：每条结论回指 evidence id。状态只有 verified / supported / inferred / unknown / contradicted。`,
-    ``,
-    `## 1. Scope`,
-    ``,
-    `- Goal: ${inv.goal}`,
-    `- Scope: ${inv.scope.join(', ')}`,
-    `- Systems: ${inv.systems.join(', ')}`,
-    `- Scope validation: ${inv.scopeValidation?.source ?? 'validated'}; evidence=${inv.scopeValidation?.evidenceIds.join(', ') || '(user confirmed)'}`,
-    `- Discovery runs: ${inv.discoveryRuns.map((r) => `${r.id} (${r.root}, parser=${r.parserVersion})`).join('; ') || '(none)'}`,
-    ``,
-    `## 2. Data Estate`,
-    ``,
-    `- Nodes: ${estate?.nodes.length ?? 0}, Edges: ${estate?.edges.length ?? 0}`,
-    `- Datasets: ${tables.join(', ') || '(none)'}`,
-    ``,
-    `## 3. Dependency / Lineage`,
-    ``,
-    ...(edges.length ? edges.map((e) => `- ${e.source} → ${e.target} [${e.evidenceId}]`) : ['(no edges)']),
-    ...(columnEdges ? [``, `Column lineage edges: ${columnEdges}`] : []),
-    ``,
-    `## 4. Findings`,
-    ``,
+  const lines: string[] = [
+    '# Current-State Assessment: ' + inv.name,
+    '',
+    '**用户目标**：' + (inv.userPrompt || inv.goal || '未记录'),
+    '',
+    modernizationGoal
+      ? '这份报告先回答“旧系统现在怎么工作、哪里会影响后续 replatform”。它不是最终目标架构；目标架构尚未形成时，这里不会把草案写成已经确定的方案。'
+      : '这份报告先把当前系统、主要问题和证据整理清楚；它不会把尚未形成的后续方案写成已经确定的结论。',
+    '',
+    '## 1. 结论先说',
+    '',
+    coverage
+      ? '目前已经查到 ' + String(coverage.datasets) + ' 个数据集，' + String(sqlFiles.length) + ' 个 SQL 文件；其中 SQL 解析失败 ' + String(sqlParseFailures) + ' 个，数据集血缘连接为 ' + connectedDatasets + '。'
+      : '当前还没有形成完整的 Current-State coverage，不能可靠判断系统全貌。',
+    inv.findings.length
+      ? '现在最值得注意的是 ' + String(inv.findings.length) + ' 个问题：' + preview(inv.findings.slice(0, 4).map((finding) => finding.title), 4) + '。'
+      : '当前没有发现已经形成 Finding 的明显问题。',
+    '',
+    (modernizationGoal ? '对 replatform 的直接影响：' : '对下一步工作的直接影响：') + (implications[0] ?? '还没有形成可以支撑决策的结论。'),
+    '',
+    '## 2. 当前系统和数据',
+    '',
+    inv.systems.length
+      ? '涉及的系统包括 ' + preview(inv.systems, 6) + '。'
+      : '当前范围中没有记录具体系统。',
+    inv.scope.length
+      ? '这次重点看的是 ' + preview(inv.scope, 6) + '。'
+      : '当前范围没有记录具体业务对象。',
+    datasets.length
+      ? '已发现的数据集主要包括：' + preview(datasets, 12) + '。'
+      : '还没有发现可以展示的数据集。',
+    '',
+    '## 3. 关键数据流',
+    '',
+    ...(datasetFlows.length
+      ? datasetFlows.map((item) => '- ' + item)
+      : ['当前没有形成可直接阅读的数据集上下游关系。']),
+    '',
+    ...(sqlTransforms.length
+      ? ['### 关键 SQL 转换', '', ...sqlTransforms.map((item) => '- ' + item), '']
+      : []),
+    '## 4. 主要问题',
+    '',
     ...(inv.findings.length
-      ? inv.findings.map((f) => `- [${f.severity}/${f.status}] ${f.type}: ${f.title} — ${f.description.slice(0, 200)}`)
-      : ['(none — run discover to generate deterministic findings)']),
-    ``,
-    `## 5. Current-State Intelligence`,
-    ``,
-    ...(snapshot?.currentState
-      ? [
-        `- 已连上线的数据集: ${snapshot.currentState.coverage.connectedDatasets}/${snapshot.currentState.coverage.datasets}`,
-        `- SQL parse failures: ${snapshot.currentState.coverage.sqlParseFailures}`,
-        `- Semantic assets: ${snapshot.currentState.coverage.semanticAssets}`,
-        `- Source-of-truth candidates: ${snapshot.currentState.sourceOfTruthCandidates.length}`,
-        `- Semantic candidates: ${snapshot.currentState.semanticCandidates.length}`,
-      ]
-      : ['(no Current-State Intelligence yet)']),
-    ``,
-    `## 6. Data Quality`,
-    ``,
-    ...((snapshot?.profiles.length ?? 0)
-      ? (snapshot?.profiles ?? []).map((p) => `- ${p.dataset}: rows=${p.rowCount}`)
-      : ['(no DB profiling yet — discover with --database ... --profile)']),
-    ``,
-    `## 7. Open Questions`,
-    ``,
-    ...(inv.unknowns.length ? inv.unknowns.map((u) => `- ${u}`) : ['(none)']),
-    ``,
-    `## 8. Evidence-backed Claims`,
-    ``,
+      ? inv.findings.slice(0, 8).flatMap((finding) => [
+          '### ' + finding.title + '（' + finding.severity + '）',
+          '',
+          finding.description,
+          '',
+          '影响：' + impactForFinding(finding.type),
+          '',
+          finding.affectedAssets.length
+            ? '涉及对象：' + preview(finding.affectedAssets, 5)
+            : '',
+          evidenceText(finding.evidenceIds),
+          '',
+        ])
+      : ['当前没有记录需要单独处理的问题。', '']),
+    '## 5. 已形成的关键结论',
+    '',
     ...(inv.claims.length
-      ? inv.claims.map((c) => `### [${c.status}] ${c.claim.split('\n')[0]?.slice(0, 160)}` + `\n evidence: ${c.evidenceIds.join(', ') || '(none → treat as unknown)'}`)
-      : ['(none yet — run ask)']),
-    ``,
-    `## 9. Modernization Work Plan`,
-    ``,
-    ...(modernization
-      ? [
-        `- Status: ${modernization.status}, version: ${modernization.version}`,
-        `- Gaps: ${modernization.gaps.length}, mappings: ${modernization.mappings.length}`,
-        `- Validation checks: ${modernization.validationPlan.checks.length}`,
-        `- Migration stages: ${modernization.migrationStages.map((stage) => stage.name).join(' → ')}`,
-        `- Target components: ${modernization.targetArchitecture.components.map((component) => component.name).join(', ') || '(none)'}`,
-        ``,
-        `### 9.1 Target Architecture`,
-        ``,
-        ...(modernization.targetArchitecture.components.length
-          ? modernization.targetArchitecture.components.map((component) =>
-              `- ${component.name}: ${component.description} | sources=${component.sourceAssets.join(', ') || '(none)'}`,
-            )
-          : ['(target architecture has no persisted components)']),
-        ``,
-        `### 9.2 Source-to-Target Mapping`,
-        ``,
-        ...(modernization.mappings.length
-          ? modernization.mappings.map((mapping) =>
-              `- ${mapping.sourceAsset} → ${mapping.targetAsset} [${mapping.status}] | transformation=${mapping.transformation || '(none)'} | businessRule=${mapping.businessRule || '(none)'} | validation=${mapping.validationRule || '(none)'} | evidence=${mapping.evidenceIds.join(', ') || '(none)'}`,
-            )
-          : ['(no persisted mappings)']),
-        ``,
-        `### 9.3 Validation`,
-        ``,
-        ...modernization.validationPlan.checks.map((check) =>
-          `- [${check.status}] ${check.name}: ${check.result || '(not executed)'} | evidence=${check.evidenceIds.join(', ') || '(none)'}`,
-        ),
-        ...(modernization.mappingCoverage
-          ? [
-              ``,
-              `Mapping coverage: ${modernization.mappingCoverage.sourceAssets.length} source assets considered; ${modernization.mappingCoverage.unmappedAssets.length} unmapped.`,
-            ]
-          : []),
-      ]
-      : ['(no modernization plan yet — use the Modernization Workbench to generate one)']),
-    ``,
-    `## 10. Coverage / Gaps`,
-    ``,
-    `- SQL parse coverage: ${sqlCoverage}`,
-    `- 已发现血缘连接: ${lineageCoverage}`,
-    `- Column lineage edges: ${columnEdges}`,
-    `- Evidence: ${inv.evidence.length} total (${[...evidenceByType.entries()].map(([t, n]) => `${t}=${n}`).join(', ') || 'none'})`,
-    `- Findings: ${inv.findings.length}, Claims: ${inv.claims.length}, Unknowns: ${inv.unknowns.length}`,
+      ? inv.claims.slice(0, 8).flatMap((claim) => [
+          '### ' + claimStatusText(claim.status),
+          '',
+          claim.claim.split('\n')[0].trim(),
+          evidenceText(claim.evidenceIds),
+          '',
+        ])
+      : ['当前还没有形成单独保存的关键结论。', '']),
+    '## 6. Replatform 影响',
+    '',
+    ...implications.map((item) => '- ' + item),
+    '',
+    '下一步：进入目标架构设计，重点处理目前尚未闭合的 ' + (openQuestions.length ? '问题和 ' + String(openQuestions.length) + ' 个待确认事项' : '范围') + '。',
+    '',
+    '## 7. 待确认问题',
+    '',
+    ...(openQuestions.length
+      ? openQuestions.map((question) => '- ' + question)
+      : ['当前没有记录需要业务方直接回答的问题；这不代表所有信息都已经确认。']),
+    '',
+    '## 8. 证据与覆盖情况',
+    '',
+    'SQL：' + sqlCoverage,
+    '数据集血缘：' + connectedDatasets + ' 已建立结构连接；这不等于已经确认业务上的权威来源。',
+    '列级血缘：' + String(columnEdges) + ' 条',
+    '数据质量画像：' + String(snapshot?.profiles.length ?? 0) + ' 个数据集',
+    'Evidence：' + String(inv.evidence.length) + ' 条',
+    'Findings：' + String(inv.findings.length) + ' 个；Claims：' + String(inv.claims.length) + ' 个；Unknowns：' + String(inv.unknowns.length) + ' 个',
+    '',
   ];
-  const markdown = L.join('\n');
+
+  if (modernization) {
+    lines.push(
+      '## 9. Modernization 状态',
+      '',
+      modernization.targetArchitecture.components.length
+        ? '目标架构已经有 ' + String(modernization.targetArchitecture.components.length) + ' 个组件草案。'
+        : '目标架构还没有形成实际组件。',
+      modernization.mappings.length
+        ? '已经记录 ' + String(modernization.mappings.length) + ' 条新旧对应关系。'
+        : '还没有记录新旧数据对应关系。',
+      '验证检查：' + String(modernization.validationPlan.checks.length) + ' 项。',
+      '',
+    );
+  }
+
+  const markdown = lines.join('\\n');
   const dir = reportsDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, 'report.md');
-  await fs.writeFile(fp, markdown);
+  await fs.writeFile(fp, markdown + '\\n', 'utf8');
   return { markdown, path: fp };
 }

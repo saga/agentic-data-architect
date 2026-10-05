@@ -38,7 +38,7 @@ import {
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
 import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
-import { buildReport } from './analysis/report.js';
+import { runReport } from './workflow/report.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
@@ -920,7 +920,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
   app.get('/api/sessions/:name/report', async (req, res) => {
     const name = sessionKey(req.params.name);
     try {
-      const report = await buildReport(name);
+      const report = await runReport(name);
       res.type('text/markdown').send(report.markdown);
     } catch (error) {
       if (error instanceof ScopeGateError) {
