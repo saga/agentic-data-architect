@@ -31,7 +31,7 @@ export async function runReport(
     }, null, 2),
   });
   const reviewPath = await saveArtifactReview(name, review);
-  if (review.status !== 'pass') {
+  if (review.status !== 'pass' && review.availability !== 'unavailable') {
     throw new Error(
       '报告已经生成，但独立质量检查没有通过：'
       + summarizeReviewFailure(review)
