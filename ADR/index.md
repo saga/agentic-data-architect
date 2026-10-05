@@ -17,6 +17,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-007](./007-structural-analysis-boundary.md) | Graphify 用于 structural navigation，不直接作为业务事实来源 | Accepted |
 | [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量，不引入重量级 Workflow Engine | Accepted |
 | [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配，Investigation 状态和页面 UI 按职责拆分 | Accepted |
+| [ADR-010](./010-mandatory-agent-permission-approval.md) | Agent 权限必须人工逐次确认，不提供 Allow All 或 Session 持续授权 | Accepted |
 
 ## 如何使用 ADR
 
