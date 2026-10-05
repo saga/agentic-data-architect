@@ -173,9 +173,38 @@ test('loads the architecture assessment markdown workflow', async () => {
   const definition = await loadWorkflowJourney('data-architecture-assessment');
   assert.equal(definition.id, 'data-architecture-assessment');
   assert.equal(definition.start, 'intake');
-  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completeWhen, 'goal');
+  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completeWhen, 'scope-ready');
 });
 
+
+test('scope-ready gate requires validated intake', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> intake',
+    '',
+    '## @task intake',
+    'completeWhen: scope-ready',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\\n'));
+
+  assert.ok(result.definition);
+
+  const notReady = buildJourneyState(
+    result.definition!,
+    { ...baseFacts, scopeReady: false },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(notReady.execution.currentNodeId, 'intake');
+
+  const ready = buildJourneyState(
+    result.definition!,
+    { ...baseFacts, scopeReady: true },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(ready.execution.currentNodeId, 'done');
+});
 
 test('current-state gate requires an actual discovered dataset', () => {
   const result = parseJourneyMarkdown([
