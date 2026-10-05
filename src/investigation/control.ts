@@ -179,7 +179,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(agent.autoTier === 'efficiency' || agent.autoTier === 'balance' || agent.autoTier === 'intelligence' || agent.autoTier === 'fast'
         ? { autoTier: agent.autoTier }
         : {}),
-      permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
+      permissionMode: (agent.permissionMode ?? defaults.agent.permissionMode) === 'allow_all' ? 'allow_all' : 'permission',
       autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 4, 0, 6),
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
@@ -249,7 +249,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
                   ...snapshot,
                   agent: {
                     ...agentWithoutSkills,
-                    permissionMode: agentRecord.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
+                    permissionMode: (agentRecord.permissionMode ?? base.agent.permissionMode) === 'allow_all' ? 'allow_all' : 'permission',
                   },
                 },
               };
