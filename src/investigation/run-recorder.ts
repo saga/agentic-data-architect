@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { workspaceRoot } from './workspace.js';
+import { workspaceRoot, writeJsonAtomic } from './workspace.js';
 
 /**
  * 本地 Investigation 原始运行录制器。
@@ -11,10 +11,15 @@ import { workspaceRoot } from './workspace.js';
  * 不记录模型隐藏推理正文；assistant response、tool 参数/结果、permission、
  * user input 和每次 sendAndWait prompt 都会记录。
  */
+export interface RunCloseResult {
+  status: 'completed' | 'failed' | 'aborted';
+  error?: string;
+}
+
 export interface RunRecorder {
   runId: string;
   write(type: string, payload: unknown): Promise<void>;
-  close(): Promise<void>;
+  close(result?: RunCloseResult): Promise<void>;
 }
 
 const SECRET_KEY = /token|secret|password|authorization|api[_-]?key|cookie/i;
@@ -31,9 +36,11 @@ export function redactRunRecording(value: unknown): unknown {
 }
 
 export async function createRunRecorder(name: string, metadata: Record<string, unknown>): Promise<RunRecorder> {
-  const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+  const runId = new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID().slice(0, 8);
+  const startedAt = new Date().toISOString();
   const directory = path.join(workspaceRoot(name), 'runs', runId);
   const file = path.join(directory, 'events.jsonl');
+  const manifestFile = path.join(directory, 'manifest.json');
   await fs.mkdir(directory, { recursive: true });
 
   let closed = false;
@@ -57,17 +64,30 @@ export async function createRunRecorder(name: string, metadata: Record<string, u
     safeMetadata && typeof safeMetadata === 'object' && !Array.isArray(safeMetadata)
       ? safeMetadata as Record<string, unknown>
       : {};
-  await fs.writeFile(
-    path.join(directory, 'manifest.json'),
-    JSON.stringify({ runId, startedAt: new Date().toISOString(), ...manifestMetadata }, null, 2) + '\n',
-    'utf8',
-  );
+  await writeJsonAtomic(manifestFile, {
+    runId,
+    startedAt,
+    status: 'running',
+    ...manifestMetadata,
+  });
 
   return {
     runId,
     write,
-    async close() {
+    async close(result = { status: 'completed' as const }) {
       await chain;
+      if (closed) return;
+
+      const completedAt = new Date().toISOString();
+      await writeJsonAtomic(manifestFile, {
+        runId,
+        startedAt,
+        completedAt,
+        durationMs: Math.max(0, Date.parse(completedAt) - Date.parse(startedAt)),
+        ...manifestMetadata,
+        status: result.status,
+        ...(result.error ? { error: result.error } : {}),
+      });
       closed = true;
     },
   };
