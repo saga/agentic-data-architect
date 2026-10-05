@@ -343,8 +343,8 @@ function eventDetail(event: TrajectoryEvent) {
 
   if (event.type === 'stage_gate') {
     const passed = event.details.passed !== false;
-    const newEvidence = Number(event.details.newEvidenceIds?.length) || 0;
-    const newFindings = Number(event.details.newFindingIds?.length) || 0;
+    const newEvidence = Array.isArray(event.details.newEvidenceIds) ? event.details.newEvidenceIds.length : 0;
+    const newFindings = Array.isArray(event.details.newFindingIds) ? event.details.newFindingIds.length : 0;
     const claimCount = Number(event.details.evidenceBackedClaimCount) || 0;
     const checks = Array.isArray(event.details.checks) ? event.details.checks : [];
     return (
