@@ -3,6 +3,8 @@
  *
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { PARSER_VERSION } from '../analysis/sql-parser.js';
 import { buildLineage, type LineageGraph } from '../analysis/lineage.js';
 import { buildCurrentStateIntelligence } from '../analysis/current-state.js';
@@ -64,6 +66,29 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   }
 
   const inv = await loadInvestigation(name);
+  const startedAt = new Date().toISOString();
+  // 路径 Discovery 先做当前文件指纹，再判断是否真的需要产生新的 run。
+  // 同一目录、同一批文件 hash、同一 parser 版本不会再次制造数千条重复 Evidence。
+  let inventory: Inventory | null = null;
+  if (opts.path) {
+    inventory = await discoverDirectory(opts.path, 'pending');
+    const reusable = await findReusablePathDiscoveryRun(name, inv, opts.path, inventory);
+    if (reusable) {
+      return {
+        runId: reusable.id,
+        filesScanned: reusable.filesScanned,
+        datasetsFound: reusable.datasetsFound,
+        lineageEdgesFound: reusable.lineageEdgesFound,
+        columnsFound: reusable.datasetsFound,
+        findingsFound: inv.findings.length,
+        parseFailures: reusable.sqlParseFailures ?? 0,
+        semanticAssetsFound: reusable.semanticAssetsFound ?? 0,
+        unknowns: inv.unknowns,
+        snapshotPath: path.join(discoveryDir(name), reusable.id + '.json'),
+      };
+    }
+  }
+
   await appendContextInput(name, {
     kind: 'discovery',
     title: 'Discovery run',
@@ -71,12 +96,10 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     source: 'agentic-data-architect discover',
     important: true,
   });
-  const startedAt = new Date().toISOString();
   // runId 按 Investigation 顺序递增，用于把本轮 Evidence、snapshot 和审计范围关联起来。
-const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
+  const runId = 'run-' + String(inv.discoveryRuns.length + 1).padStart(3, '0');
 
   const estate = emptyEstate();
-  let inventory: Inventory | null = null;
   let lineage: LineageGraph | null = null;
   const profiles: DataProfile[] = [];
   const semanticAssets: SemanticAsset[] = [];
@@ -84,8 +107,7 @@ const runId = `run-${String(inv.discoveryRuns.length + 1).padStart(3, '0')}`;
 
   let graphify: GraphifyRunMetadata | undefined;
 
-  if (opts.path) {
-    inventory = await discoverDirectory(opts.path, runId);
+  if (opts.path && inventory) {
     // Source-file Evidence 建立 Graphify → source provenance 的桥：Graphify 只负责定位候选文件。
     const sourceEvidence: EvidenceRef[] = inventory.files.map((file) => ({
       id: nextId('ev'),
@@ -202,6 +224,38 @@ const snapshotPath = await saveDiscoverySnapshot(name, runId, snapshot);
     unknowns: inv.unknowns,
     snapshotPath,
   };
+}
+
+/** 判断一次本地路径 Discovery 是否与已有 run 完全一致；一致时直接复用旧 snapshot。 */
+async function findReusablePathDiscoveryRun(
+  name: string,
+  investigation: Awaited<ReturnType<typeof loadInvestigation>>,
+  root: string,
+  inventory: Inventory,
+): Promise<Awaited<ReturnType<typeof loadInvestigation>>['discoveryRuns'][number] | null> {
+  const normalizedRoot = path.resolve(root);
+  for (const run of [...investigation.discoveryRuns].reverse()) {
+    if (run.parserVersion !== PARSER_VERSION || path.resolve(run.root) !== normalizedRoot) continue;
+
+    const sourceEvidence = investigation.evidence.filter(
+      (item) => item.discoveryRunId === run.id && item.type === 'source_file' && item.file && item.sourceHash,
+    );
+    if (sourceEvidence.length !== inventory.files.length) continue;
+
+    const previousHashes = new Map(
+      sourceEvidence.map((item) => [item.file as string, item.sourceHash as string]),
+    );
+    const sameFiles = inventory.files.every((file) => previousHashes.get(file.path) === file.sha256);
+    if (!sameFiles) continue;
+
+    try {
+      await fs.access(path.join(discoveryDir(name), run.id + '.json'));
+      return run;
+    } catch {
+      // 没有可恢复 snapshot 的旧 run 不能复用。
+    }
+  }
+  return null;
 }
 
 /** 把不同 Discovery 来源得到的 Estate 节点/边合并到当前 Investigation 的统一图。 */
