@@ -6,6 +6,43 @@
 import * as z from 'zod';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
 
+/** 任务契约中的单个交付物；用于判断调查是否一直在朝用户最终结果推进。 */
+export const MissionDeliverableSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(500),
+  required: z.boolean().default(true),
+}).strict();
+export type MissionDeliverable = z.infer<typeof MissionDeliverableSchema>;
+
+/**
+ * Investigation 的 Mission Contract。
+ *
+ * purpose = 为什么做；
+ * expectedResult = 最后要拿到什么；
+ * deliverables = 把期望结果拆成几个可观察的交付物。
+ *
+ * 只有用户明确确认后，Mission 才能进入 confirmed 状态。模型不能替用户确认 Mission。
+ */
+export const MissionContractSchema = z.object({
+  version: z.literal(1),
+  purpose: z.string().trim().min(10).max(2000),
+  expectedResult: z.string().trim().min(10).max(4000),
+  deliverables: z.array(MissionDeliverableSchema).min(1).max(12),
+  status: z.literal('confirmed'),
+  confirmedAt: z.string().datetime(),
+  confirmedBy: z.literal('user'),
+}).strict();
+export type MissionContract = z.infer<typeof MissionContractSchema>;
+
+/** UI / API 展示的 Mission 草稿；草稿没有确认资格，也不能解除 Mission Gate。 */
+export const MissionDraftSchema = z.object({
+  purpose: z.string().trim().min(1).max(2000),
+  expectedResult: z.string().trim().min(1).max(4000),
+  deliverableIds: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
+}).strict();
+export type MissionDraft = z.infer<typeof MissionDraftSchema>;
+
 /** Investigation 可选的工作路线；null 表示由 Agent 自主调查，不采用固定路线。 */
 export const WorkflowIdSchema = z.enum([
   'legacy-modernization',
@@ -101,6 +138,8 @@ export const WorkspaceContextSchema = z.object({
   goal: z.string(),
   scope: z.array(z.string()),
   systems: z.array(z.string()),
+  /** 本次 Investigation 的最高优先级任务契约；没有 confirmed Mission 时不得开始 Agent 调查。 */
+  mission: MissionContractSchema.optional(),
   /** 只有这里记录的 validated 快照仍与当前 goal/scope/systems 一致时，正式产物才能生成。 */
   scopeValidation: ScopeValidationSchema.optional(),
   questions: z.array(z.string()),
