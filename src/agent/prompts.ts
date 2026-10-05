@@ -168,29 +168,9 @@ export function buildQuestionPrompt(args: {
   selectedGuidance?: string;
 }): string {
   return [
-    '## Mission Contract（本轮最高优先级）',
-    '任务目的（为什么做）：' + args.mission.purpose,
-    '期望结果（最后要拿到什么）：' + args.mission.expectedResult,
-    '这是本轮工作的唯一目标边界。当前问题、Workflow、Skill、unknowns、routeOptions 和工具结果都只是完成 Mission 的手段，不能替换 Mission。',
-    '本轮所有调查动作都必须能够回答“它具体帮助哪个期望结果”；如果说不清，就不要执行。',
-    '本轮行动必须优先帮助完成尚未覆盖的交付物；如果某个 unknown 与 Mission 无关，不要为了清空它而继续调查。'
-    ...(args.missionProgress
-      ? [
-          '',
-          '当前交付覆盖：',
-          '已覆盖 ' + String(args.missionProgress.covered) + '/' + String(args.missionProgress.total) + ' 项（' + String(args.missionProgress.percent) + '%）。',
-          ...args.missionProgress.deliverables
-            .filter((item) => item.required)
-            .map((item) => '- [' + item.status + '] ' + item.title + '：' + item.detail),
-        ]
-      : []),
+    buildMissionContractPrompt(args.mission, args.missionProgress),
     '',
-    '本次任务的主要交付物：',
-    args.mission.deliverables
-      .filter((item) => item.required)
-      .map((item) => '- ' + item.title + '：' + item.description)
-      .join('\n'),
-    '',
+    '本轮具体执行信息：',
     '调查执行规则：如果当前问题需要先理解陌生代码仓库，且尚未有 Discovery snapshot，优先使用 project_discover；没有 Evidence 不阻止继续调查，Evidence 用于约束最终可确认 Claim。对于“看懂当前系统的数据架构 / 数据模型 / Data Flow / Data Source”类请求，先覆盖 Source、Flow、Model，再补关键转换和业务含义，不要先寻找一个所谓“关键问题”。',
     '范围确认规则：正式结果必须有 Goal、Scope、Systems。先从现有材料挖掘，再在有歧义时 ask_user；不要输出（unset）或把模型猜测当成已确认。',
     `调查名称：${args.investigationName}`,
