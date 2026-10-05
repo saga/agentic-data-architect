@@ -96,6 +96,54 @@ export interface MissionAlignmentInput {
   workingDirectory?: string;
 }
 
+/** Mission 行动前检查结果；只回答“这个动作该不该现在做”。 */
+export interface MissionActionReview {
+  allowed: boolean;
+  aligned: boolean;
+  necessary: boolean;
+  alignment: number;
+  necessity: number;
+  targetDeliverableId: string | null;
+  reason: string;
+}
+
+export interface MissionActionInput {
+  mission: {
+    purpose: string;
+    expectedResult: string;
+    deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+  };
+  candidate: {
+    toolName: string;
+    toolArgs?: unknown;
+  };
+  context?: string | string[] | Record<string, unknown>;
+  model?: string;
+  workingDirectory?: string;
+}
+
+/** Unknown 不再只是文字；结构化判断明确它是否影响 Mission，以及谁能解决。 */
+export interface MissionUnknownReview {
+  unknown: string;
+  affectsMission: boolean;
+  worthInvestigating: boolean;
+  canAgentResolve: boolean;
+  action: 'ignore' | 'investigate' | 'ask_user';
+  reason: string;
+}
+
+export interface MissionUnknownInput {
+  mission: {
+    purpose: string;
+    expectedResult: string;
+    deliverables: Array<{ id: string; title: string; description: string; required: boolean }>;
+  };
+  unknowns: string[];
+  context?: string | string[] | Record<string, unknown>;
+  model?: string;
+  workingDirectory?: string;
+}
+
 export interface JevSmartFuncInput {
   /** 这次要做什么判断；不要把状态内容重复写进 prompt。 */
   prompt: string;
@@ -372,6 +420,262 @@ export function normalizeMissionAlignment(
     continuationValue,
     reason,
   };
+}
+
+
+/**
+ * 把工具参数压成适合 Smart Function 的有限上下文。
+ * 参数可能包含很长的查询或敏感值；这里只用于“这个动作是否值得做”的判断，不需要完整 payload。
+ */
+function summarizeToolArgs(value: unknown): string {
+  const sensitive = /password|secret|token|authorization|api[_-]?key|credential/i;
+  const replacer = (key: string, item: unknown): unknown => {
+    if (sensitive.test(key)) return '[REDACTED]';
+    return item;
+  };
+
+  try {
+    const rendered = JSON.stringify(value, replacer, 2);
+    if (!rendered) return '（无参数）';
+    return rendered.length > 3500 ? rendered.slice(0, 3500) + '\n…（参数已截断）' : rendered;
+  } catch {
+    return String(value).slice(0, 3500);
+  }
+}
+
+/**
+ * 构造“行动前”检查 Prompt。
+ *
+ * 这个判断发生在工具真正执行之前。它不要求模型预测完整执行计划，只判断当前这个动作
+ * 是否直接服务某个 Mission 交付物，以及现在做它是否有必要。
+ */
+export function buildMissionActionPrompt(input: MissionActionInput): string {
+  return [
+    '判断 Agent 准备执行的这一个工具动作，是否应该在当前 Investigation 中执行。',
+    '',
+    'Mission（最高优先级）：',
+    '任务目的：' + input.mission.purpose.trim(),
+    '期望结果：' + input.mission.expectedResult.trim(),
+    '交付物：',
+    ...input.mission.deliverables.map((item) =>
+      '- ' + item.id + '：' + item.title + '；' + item.description + (item.required ? '（必须）' : '（可选）')),
+    '',
+    '准备执行的动作：',
+    '工具：' + input.candidate.toolName,
+    '参数：' + summarizeToolArgs(input.candidate.toolArgs),
+    ...(input.context !== undefined ? ['', '当前状态：', renderContext(input.context)] : []),
+    '',
+    '判断标准：',
+    '1. aligned=true：这个动作能直接帮助完成 Mission 的目的、期望结果或某个明确交付物。',
+    '2. aligned=false：主要是在追逐局部发现、无关 unknown、旁支细节，或者只是“顺便看看”。',
+    '3. necessary=true：现在不做这个动作，当前剩余结果会受到实际影响，而且没有更直接的替代动作。',
+    '4. necessary=false：可以不做、可以稍后做，或者有更直接的方式完成结果。',
+    '5. target_deliverable 必须选择这个动作实际服务的交付物；如果没有直接服务对象，选择 none。',
+    '不要因为工具本身看起来有用就允许；只看它对 Mission 是否有直接、当前的价值。',
+  ].join('\n');
+}
+
+/** 把行动前 Smart Function 输出转成保守的确定性允许/拒绝结果。 */
+export function normalizeMissionAction(
+  raw: Record<string, { type: string; noul?: number; choice?: string }>,
+): MissionActionReview {
+  const alignment = raw.aligned?.noul ?? 0;
+  const necessity = raw.necessary?.noul ?? 0;
+  const targetDeliverableId = raw.target_deliverable?.choice && raw.target_deliverable.choice !== 'none'
+    ? raw.target_deliverable.choice
+    : null;
+  const aligned = alignment >= 0.72;
+  const necessary = necessity >= 0.68;
+  const allowed = aligned && necessary && Boolean(targetDeliverableId);
+
+  let reason = allowed
+    ? '这个动作直接服务当前 Mission，并且现在有必要执行。'
+    : '这个动作没有同时满足“直接服务 Mission”和“现在确有必要”两个条件。';
+  if (!targetDeliverableId) reason += ' 没有识别到明确的 Mission 交付物。';
+
+  return {
+    allowed,
+    aligned,
+    necessary,
+    alignment,
+    necessity,
+    targetDeliverableId,
+    reason,
+  };
+}
+
+/** 行动前只调用一次 Smart Function，避免每个工具调用都增加一轮模型成本。 */
+export async function reviewMissionAction(
+  input: MissionActionInput,
+): Promise<MissionActionReview | null> {
+  try {
+    const options = Object.fromEntries([
+      ...input.mission.deliverables.map((item) => [
+        item.id,
+        item.title + '：' + item.description,
+      ]),
+      ['none', '没有一个明确的 Mission 交付物被这个动作直接推进。'],
+    ]);
+
+    const raw = await jevSmartFunc({
+      prompt: buildMissionActionPrompt(input),
+      context: {
+        mission: input.mission,
+        candidate: {
+          toolName: input.candidate.toolName,
+          toolArgs: summarizeToolArgs(input.candidate.toolArgs),
+        },
+        ...(input.context !== undefined ? { state: input.context } : {}),
+      },
+      questions: {
+        aligned: {
+          type: 'noul',
+          instructions: '这个工具动作是否直接服务 Mission？',
+          criteria: {
+            true: '直接推进用户明确需要的结果或交付物。',
+            false: '主要是旁支、好奇性检索、无关 unknown 或不影响最终结果的细节。',
+          },
+        },
+        necessary: {
+          type: 'noul',
+          instructions: '现在执行这个动作是否有明确必要性？',
+          criteria: {
+            true: '不执行会实际阻碍当前 Mission，且没有更直接的替代动作。',
+            false: '可以不做、可以延后，或者存在更直接的完成方式。',
+          },
+        },
+        target_deliverable: {
+          type: 'choice',
+          instructions: '这个动作实际服务哪个 Mission 交付物？',
+          options,
+        },
+      },
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    });
+
+    return normalizeMissionAction(
+      raw as Record<string, { type: string; noul?: number; choice?: string }>,
+    );
+  } catch {
+    // Smart Function 不是权限边界；不可用时不伪装成“业务判断通过”，交给 Stage Gate 做最终兜底。
+    return null;
+  }
+}
+
+/**
+ * 构造 Unknown 影响判断。
+ *
+ * 所有 unknown 一次性判断，避免“每个 unknown 一个模型调用”。输出再由 Script 按 action 执行：
+ * ignore = 不追；investigate = Agent 自己查；ask_user = 需要用户补输入/做决定。
+ */
+export function buildMissionUnknownPrompt(input: MissionUnknownInput): string {
+  return [
+    '判断这些 Unknown 是否值得为了本次 Mission 继续调查。',
+    '',
+    'Mission：',
+    '任务目的：' + input.mission.purpose.trim(),
+    '期望结果：' + input.mission.expectedResult.trim(),
+    '必须交付：',
+    ...input.mission.deliverables.map((item) =>
+      '- ' + item.id + '：' + item.title + '；' + item.description + (item.required ? '（必须）' : '（可选）')),
+    '',
+    'Unknown：',
+    ...input.unknowns.map((unknown, index) => 'unknown_' + index + ': ' + unknown),
+    ...(input.context !== undefined ? ['', '补充状态：', renderContext(input.context)] : []),
+    '',
+    '对每个 Unknown 分别判断：',
+    '1. affects_mission=true：它如果长期未知，会影响用户最终要拿到的结果或重要决策。',
+    '2. worth_investigating=true：即使影响 Mission，也值得现在投入调查成本；不是理论上有关系就一直查。',
+    '3. can_agent_resolve=true：Agent 可以仅凭已有工具、代码、SQL、配置、文档或已授权资料解决，不需要用户提供信息或做业务选择。',
+    '4. 三项判断合并成 action：',
+    '   - affects_mission=false 或 worth_investigating=false -> ignore',
+    '   - affects_mission=true 且 worth_investigating=true 且 can_agent_resolve=true -> investigate',
+    '   - affects_mission=true 且 worth_investigating=true 且 can_agent_resolve=false -> ask_user',
+    'Unknown 是状态，不是待办清单；ignore 不代表删除事实，只代表不能让它驱动下一步行动。',
+  ].join('\n');
+}
+
+/** 把一个 Unknown 的三个 Smart Function 结果归一成确定动作。 */
+export function normalizeUnknownImpact(
+  unknown: string,
+  raw: Record<string, { type: string; noul?: number }>,
+): MissionUnknownReview {
+  const affectsMission = (raw.affects_mission?.noul ?? 0) >= 0.72;
+  const worthInvestigating = (raw.worth_investigating?.noul ?? 0) >= 0.72;
+  const canAgentResolve = (raw.can_agent_resolve?.noul ?? 0) >= 0.68;
+
+  const action: MissionUnknownReview['action'] =
+    !affectsMission || !worthInvestigating
+      ? 'ignore'
+      : canAgentResolve
+        ? 'investigate'
+        : 'ask_user';
+
+  const reason =
+    action === 'ignore'
+      ? '这个 Unknown 不足以影响当前 Mission 的继续执行。'
+      : action === 'investigate'
+        ? '它影响 Mission，而且 Agent 可以自己通过现有资料继续查清。'
+        : '它影响 Mission，但现有资料不足，需要用户补输入或做决定。';
+
+  return {
+    unknown: unknown.trim(),
+    affectsMission,
+    worthInvestigating,
+    canAgentResolve,
+    action,
+    reason,
+  };
+}
+
+/** 一次性判断当前最多 6 个 Unknown，避免把 Unknown 变成连续模型调用队列。 */
+export async function reviewUnknownImpact(
+  input: MissionUnknownInput,
+): Promise<MissionUnknownReview[] | null> {
+  const unknowns = input.unknowns.map((item) => item.trim()).filter(Boolean).slice(0, 6);
+  if (!unknowns.length) return [];
+
+  try {
+    const questions: Record<string, JevQuestion> = {};
+    unknowns.forEach((_unknown, index) => {
+      questions['unknown_' + index + '_affects'] = {
+        type: 'noul',
+        instructions: 'unknown_' + index + ' 是否会影响 Mission 的最终结果或重要决策？',
+      };
+      questions['unknown_' + index + '_worth'] = {
+        type: 'noul',
+        instructions: 'unknown_' + index + ' 是否值得现在投入调查成本？',
+      };
+      questions['unknown_' + index + '_resolve'] = {
+        type: 'noul',
+        instructions: 'unknown_' + index + ' 是否可以仅凭 Agent 当前已有工具、代码、SQL、配置、文档和授权资料自行解决？',
+      };
+    });
+
+    const raw = await jevSmartFunc({
+      prompt: buildMissionUnknownPrompt(input),
+      context: {
+        mission: input.mission,
+        unknowns,
+        ...(input.context !== undefined ? { state: input.context } : {}),
+      },
+      questions,
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    });
+
+    return unknowns.map((unknown, index) =>
+      normalizeUnknownImpact(unknown, {
+        affects_mission: raw['unknown_' + index + '_affects'] as { type: string; noul?: number },
+        worth_investigating: raw['unknown_' + index + '_worth'] as { type: string; noul?: number },
+        can_agent_resolve: raw['unknown_' + index + '_resolve'] as { type: string; noul?: number },
+      }),
+    );
+  } catch {
+    // Smart Function 不可用时保留原 Unknown；本轮不擅自把它升级成 ask_user。
+    return null;
+  }
 }
 
 /**
