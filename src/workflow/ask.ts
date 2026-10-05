@@ -15,7 +15,7 @@ import {
   reviewUnknownImpact,
   type MissionUnknownReview,
 } from '../agent/jev-smart-func.js';
-import { reviewMissionCompletion, type MissionCompletionReview } from './mission-completion.js';
+import { reviewMissionCompletion } from './mission-completion.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
@@ -285,12 +285,9 @@ export async function answerQuestion(
     };
 
     // Smart Alignment 只在本阶段确实产生状态变化时调用，避免每个空回答都多做一次模型判断。
-    // 当 Smart Function 暂不可用时，Stage Script Gate 仍然可以依靠 Evidence / 交付物等确定性状态继续工作。
-    let stageContinuationRecommendation = true;
 
     // 当前 turn 最近一阶段的 Unknown 结构化判断；Unknown 仍是状态，不是独立任务队列。
     let unknownReviewsForTurn: MissionUnknownReview[] = [];
-    let lastMissionCompletionReview: MissionCompletionReview | null = null;
 
     /** 把 Unknown 判断翻译成下一阶段真正可执行的指令。 */
     const buildUnknownContinuationGuidance = (): string => {
@@ -520,7 +517,6 @@ export async function answerQuestion(
             model: control.agent.model,
             workingDirectory: workspaceRoot(inv.name),
           });
-          lastMissionCompletionReview = completion;
           recordTrajectory({
             type: 'status',
             name: completion.completed ? 'Mission Completion 检查通过' : 'Mission Completion 检查未通过',
@@ -550,7 +546,6 @@ export async function answerQuestion(
 
         // 只有 Script Gate 通过，才能生成 checkpoint。Agent 返回的 checkpoint 字段不参与决定。
         if (gate.passed) {
-          stageContinuationRecommendation = gate.shouldContinue;
           const checkpoint = buildStageCheckpoint(stageGateInput, gate);
           const createdAt = new Date().toISOString();
           recordTrajectory({
@@ -637,7 +632,6 @@ export async function answerQuestion(
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
         });
-        lastMissionCompletionReview = completion;
         recordTrajectory({
           type: 'status',
           name: completion.completed ? 'Mission Completion 检查通过' : 'Mission Completion 检查未通过',
