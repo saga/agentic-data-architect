@@ -23,6 +23,8 @@ import {
 } from '../investigation/workspace.js';
 import { loadLatestSnapshot } from '../investigation/store.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
+import { parseAgentAnswer } from '../agent/result.js';
+import { loadInvestigation } from '../investigation/store.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
@@ -826,19 +828,22 @@ export async function applyAgentWorkflowTransition(
    */
   let persistedModernization = false;
   if (workflowId === 'legacy-modernization') {
-    const latestInvestigation = await (async () => {
-      const module = await import('../investigation/store.js');
-      return module.loadInvestigation(name);
-    })();
-    const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
-    const { parseAgentAnswer } = await import('../agent/result.js');
-    const parsed = parseAgentAnswer(rawAnswer, evidenceMap);
-    const persisted = await persistModernizationAgentResult(name, parsed.modernization);
-    persistedModernization = persisted.saved;
+    try {
+      const latestInvestigation = await loadInvestigation(name);
+      const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
+      const parsed = parseAgentAnswer(rawAnswer, evidenceMap);
+      const persisted = await persistModernizationAgentResult(name, parsed.modernization);
+      persistedModernization = persisted.saved;
+    } catch (error) {
+      return {
+        applied: false,
+        error: '保存 Modernization 工作成果失败：' + (error instanceof Error ? error.message : String(error)),
+      };
+    }
   }
 
   const transition = extractWorkflowTransition(rawAnswer);
-  if (!transition) return { applied: persistedModernization };
+  if (!transition) return { applied: false };
 
   let eventRunId = workflowId + '-rejected';
   let eventWorkflowVersion = 0;
