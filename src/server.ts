@@ -698,7 +698,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     await fs.writeFile(
       sharedMetaPath,
       JSON.stringify({
-        sourcePath: 'default.' + extension,
+        sourcePath: 'assistant/default.' + extension,
         width: control.agent.avatarWidth,
         height: control.agent.avatarHeight,
       }, null, 2) + '\n',
