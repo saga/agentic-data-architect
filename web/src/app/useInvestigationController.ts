@@ -401,9 +401,7 @@ export function useInvestigationController() {
       setTurnStatus(
         !allowed
           ? '已拒绝这次操作，助手会继续处理…'
-          : scope === 'session'
-            ? '已允许本次及当前会话后续操作，助手继续处理…'
-            : '已允许这次操作，助手继续处理…',
+          '已允许这次操作，助手继续处理…',
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法处理权限请求');
