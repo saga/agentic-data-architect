@@ -16,6 +16,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-006](./006-provider-neutral-semantic-context.md) | Semantic Context 采用 provider-neutral 核心模型 | Accepted |
 | [ADR-007](./007-structural-analysis-boundary.md) | Graphify 用于 structural navigation，不直接作为业务事实来源 | Accepted |
 | [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量，不引入重量级 Workflow Engine | Accepted |
+| [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配，Investigation 状态和页面 UI 按职责拆分 | Accepted |
 
 ## 如何使用 ADR
 
