@@ -168,6 +168,7 @@ async function createSession(
       sourcePath?: string;
       width?: number;
       height?: number;
+      mimeType?: string;
     };
     if (meta.sourcePath) {
       const sourcePath = path.resolve(config.sharedDir, meta.sourcePath);
@@ -176,7 +177,18 @@ async function createSession(
         throw new Error('默认头像路径无效。');
       }
       const avatarId = randomUUID();
-      const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.png');
+      const extension = path.extname(sourcePath).slice(1).toLowerCase() || 'png';
+      const mimeByExtension: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+        gif: 'image/gif',
+        mp4: 'video/mp4',
+        webm: 'video/webm',
+        mov: 'video/quicktime',
+      };
+      const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.' + extension);
       const targetPath = path.join(workspaceRoot(key), relativePath);
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
       await fs.copyFile(sourcePath, targetPath);
@@ -188,7 +200,7 @@ async function createSession(
             ...control.agent,
             avatarPath: relativePath,
             avatarPaths: [relativePath],
-            avatarMimeType: req.file.mimetype,
+            avatarMimeType: meta.mimeType ?? mimeByExtension[extension] ?? control.agent.avatarMimeType,
             avatarWidth: Number.isFinite(meta.width) ? Math.max(40, Math.min(800, Math.round(meta.width!))) : control.agent.avatarWidth,
             avatarHeight: Number.isFinite(meta.height) ? Math.max(40, Math.min(1200, Math.round(meta.height!))) : control.agent.avatarHeight,
           },
@@ -687,7 +699,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
           // avatarPaths 是完整头像池；avatarPath 保留原来的默认头像，不能随着每次上传被替换。
           avatarPath: current.agent.avatarPath ?? relativePath,
           avatarPaths,
-          avatarMimeType: 'image/png',
+          avatarMimeType: req.file.mimetype || 'application/octet-stream',
           avatarWidth,
           avatarHeight,
         },
@@ -699,6 +711,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       sharedMetaPath,
       JSON.stringify({
         sourcePath: 'assistant/default.' + extension,
+        mimeType: req.file.mimetype || 'application/octet-stream',
         width: control.agent.avatarWidth,
         height: control.agent.avatarHeight,
       }, null, 2) + '\n',
