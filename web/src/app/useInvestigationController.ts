@@ -58,8 +58,16 @@ export function useInvestigationController() {
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
     const sessionName = current?.context.name;
-    const avatarPaths = current?.control.agent.avatarSources?.map((item) => item.src) ?? current?.control.agent.avatarPaths ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
-    if (!sessionName || !avatarPaths.length) return;
+    // avatarSources 为空数组时不能屏蔽旧版 avatarPaths；只有真正有来源时才优先使用 avatarSources。
+    const configuredSources = current?.control.agent.avatarSources?.map((item) => item.src).filter(Boolean) ?? [];
+    const avatarPaths = configuredSources.length > 0
+      ? configuredSources
+      : current?.control.agent.avatarPaths?.filter(Boolean)
+        ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
+    if (!sessionName || !avatarPaths.length) {
+      setAssistantAvatarByMessage({});
+      return;
+    }
 
     const storageKey = `ada.avatarAssignments.${sessionName}`;
     let stored: Record<string, string> = {};
@@ -67,14 +75,21 @@ export function useInvestigationController() {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as unknown;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) stored = parsed as Record<string, string>;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          stored = parsed as Record<string, string>;
+        }
       }
     } catch {
       // 本地存储不可用时仍然允许当前页面正常显示头像。
     }
 
+    // 删除已经从配置中移除的头像引用，否则旧消息会继续请求失效 URL。
+    const allowed = new Set(avatarPaths);
+    const next: Record<string, string> = Object.fromEntries(
+      Object.entries(stored).filter(([, source]) => allowed.has(source)),
+    );
+
     const assistantMessages = (current?.messages ?? []).filter((message) => message.role === 'assistant');
-    const next = { ...stored };
     for (const message of assistantMessages) {
       if (!next[message.id]) {
         next[message.id] = avatarPaths[Math.floor(Math.random() * avatarPaths.length)];
