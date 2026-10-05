@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   createUserScopeValidation,
   evaluateInvestigationScopeGate,
+  formatScopeGateFailure,
   isCurrentStateOnlyScope,
 } from '../src/workflow/scope-gate.js';
 
@@ -103,4 +104,18 @@ test('explicit current-state-only scope is recognized', () => {
     ),
     false,
   );
+});
+
+
+test('formats incomplete scope confirmation as a human-readable message', () => {
+  const result = evaluateInvestigationScopeGate(
+    investigation() as never,
+    new Set(),
+  );
+
+  const message = formatScopeGateFailure(result);
+
+  assert.match(message, /已经整理出来，但还没有完成确认/);
+  assert.doesNotMatch(message, /没有可比较的确认记录/);
+  assert.doesNotMatch(message, /；/);
 });
