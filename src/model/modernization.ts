@@ -154,8 +154,68 @@ export const ValidationCheckSchema = z.object({
   status: z.enum(['planned', 'ready', 'passed', 'failed', 'blocked']),
   blocking: z.boolean(),
   evidenceIds: z.array(z.string()),
-}).strict();
+  /** passed / failed 不能只有状态；必须留下本次实际检查的可读结果。 */
+  result: z.string().trim().optional(),
+}).strict().superRefine((value, ctx) => {
+  if ((value.status === 'passed' || value.status === 'failed') && !value.result?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['result'],
+      message: '已执行的 Validation Check 必须留下实际结果。',
+    });
+  }
+});
 export type ValidationCheck = z.infer<typeof ValidationCheckSchema>;
+
+/**
+ * Agent 在 target / mapping / validation 阶段提交的最小工作成果。
+ *
+ * id / version / 时间戳等元数据由服务端生成；Agent 不能靠 approved 直接取得人工审批状态。
+ */
+export const AgentModernizationResultSchema = z.object({
+  targetArchitecture: z.object({
+    title: z.string().trim().min(1).optional(),
+    status: z.enum(['draft', 'in_review', 'approved']).optional(),
+    principles: z.array(z.string().trim().min(1)).optional(),
+    components: z.array(TargetComponentSchema).optional(),
+    openQuestions: z.array(z.string().trim().min(1)).optional(),
+    evidenceIds: z.array(z.string()).optional(),
+  }).strict().optional(),
+  mappings: z.array(z.object({
+    id: z.string().trim().min(1).optional(),
+    sourceAsset: z.string().trim().min(1),
+    targetAsset: z.string().trim().min(1),
+    transformation: z.string().trim().optional(),
+    businessRule: z.string().trim().optional(),
+    validationRule: z.string().trim().optional(),
+    status: z.enum(['proposed', 'reviewed', 'approved', 'rejected']).optional(),
+    evidenceIds: z.array(z.string()).optional(),
+  }).strict()).optional(),
+  /**
+   * 明确本轮 Mapping 覆盖范围。Gate 不会把“模型说都对应了”当成覆盖证明，
+   * 但没有这份记录则连“覆盖范围已经明确”都无法验证。
+   */
+  mappingCoverage: z.object({
+    sourceAssets: z.array(z.string().trim().min(1)),
+    unmappedAssets: z.array(z.string().trim().min(1)),
+  }).strict().optional(),
+  validation: z.object({
+    checks: z.array(z.object({
+      id: z.string().trim().min(1),
+      type: z.enum(['coverage', 'lineage', 'semantic', 'mapping', 'reconciliation', 'quality', 'cutover']),
+      name: z.string().trim().min(1),
+      description: z.string().trim().min(1),
+      status: z.enum(['planned', 'ready', 'passed', 'failed', 'blocked']),
+      blocking: z.boolean(),
+      evidenceIds: z.array(z.string()).optional(),
+      result: z.string().trim().optional(),
+    }).strict()),
+    cutoverCriteria: z.array(z.string().trim().min(1)).optional(),
+    rollbackCriteria: z.array(z.string().trim().min(1)).optional(),
+  }).strict().optional(),
+}).strict();
+export type AgentModernizationResult = z.infer<typeof AgentModernizationResultSchema>;
+
 
 /** Modernization 的独立 Validation Plan，供 Analyst / Architect 在迁移前审核。 */
 export const ValidationPlanSchema = WorkProductBaseSchema.extend({
@@ -211,6 +271,11 @@ export const ModernizationPlanSchema = z.object({
   validationPlan: ValidationPlanSchema,
   /** 根据 Markdown Workflow 计算出的当前关卡；旧版本计划可暂时没有这一项。 */
   journey: JourneyStateSchema.optional(),
+  /** Mapping Gate 使用的覆盖范围记录。 */
+  mappingCoverage: z.object({
+    sourceAssets: z.array(z.string()),
+    unmappedAssets: z.array(z.string()),
+  }).strict().optional(),
   evidenceIds: z.array(z.string()),
 }).strict();
 export type ModernizationPlan = z.infer<typeof ModernizationPlanSchema>;
