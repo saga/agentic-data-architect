@@ -380,7 +380,7 @@ export function useInvestigationController() {
   const respondToPermission = async (
     permission: PendingPermission,
     allowed: boolean,
-    scope: 'once' | 'session' = 'once',
+    scope: 'once' = 'once',
   ) => {
     if (permission.sessionName !== active) return;
     try {
