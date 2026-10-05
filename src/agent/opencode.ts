@@ -17,6 +17,7 @@
 import { config } from '../config.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
+import * as z from 'zod';
 
 export interface OpenCodeModelOption {
   id: string;
@@ -90,6 +91,7 @@ export interface OpenCodeAskInput {
   refreshMissionPrompt?: () => string | Promise<string>;
   shouldContinueMission?: () => boolean | Promise<boolean>;
   onStageResult?: (result: { content: string; execution: number }) => void | Promise<void | { passed?: boolean; error?: string }>;
+  responseSchema?: z.ZodTypeAny;
   onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
   workflowSkill?: WorkflowId;
   investigationName?: string;
@@ -349,6 +351,19 @@ function extractTextParts(value: unknown): { answer: string; reasoning: string; 
   const infoRecord = info && typeof info === 'object'
     ? info as Record<string, unknown>
     : undefined;
+  const structuredOutput = infoRecord?.structured_output;
+  if (structuredOutput !== undefined) {
+    return {
+      answer: JSON.stringify(structuredOutput),
+      reasoning: '',
+      ...(infoRecord?.tokens && typeof infoRecord.tokens === 'object'
+        ? { usage: {
+            ...(infoRecord.tokens as Record<string, unknown>),
+            ...(typeof infoRecord.cost === 'number' ? { cost: infoRecord.cost } : {}),
+          } }
+        : {}),
+    };
+  }
   const tokens = infoRecord?.tokens && typeof infoRecord.tokens === 'object'
     ? infoRecord.tokens as Record<string, unknown>
     : undefined;
@@ -463,6 +478,13 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
               input.systemPrompt,
               currentWorkflowInstruction,
             ].filter(Boolean).join('\n\n'),
+            ...(input.responseSchema ? {
+              format: {
+                type: 'json_schema' as const,
+                schema: z.toJSONSchema(input.responseSchema),
+                retryCount: 2,
+              },
+            } : {}),
             parts: [{ type: 'text', text: currentPrompt }],
           }),
         },
