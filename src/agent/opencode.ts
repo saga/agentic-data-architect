@@ -401,7 +401,6 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
-  const directory = encodeURIComponent(input.workingDirectory);
   const transportController = new AbortController();
   let sessionId = '';
 
@@ -415,7 +414,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const sessionResponse = await openCodeFetch(
-    '/session?directory=' + directory,
+    '/session',
     {
       method: 'POST',
       body: JSON.stringify({
