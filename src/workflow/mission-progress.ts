@@ -84,7 +84,7 @@ function evaluateDeliverable(
     case 'current-state-architecture': {
       const sourceReady = datasets > 0;
       const flowReady = connectedDatasets > 0;
-      const modelReady = signals.estateColumnCount > 0 || current?.coverage.semanticAssets ? current.coverage.semanticAssets > 0 : false;
+      const modelReady = signals.estateColumnCount > 0 || (current?.coverage.semanticAssets ?? 0) > 0;
       const coveredCount = Number(sourceReady) + Number(flowReady) + Number(modelReady) + Number(parsedSql > 0);
       return covered(
         item,
