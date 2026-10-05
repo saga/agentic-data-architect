@@ -26,6 +26,7 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
+import { runInvestigationScopeGate } from './scope-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
@@ -859,6 +860,20 @@ export async function applyAgentWorkflowTransition(
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
+
+    if (transition.outcome === 'success' && currentNode?.id === active.definition.start) {
+      const scopeGate = await runInvestigationScopeGate(name);
+      if (!scopeGate.passed) {
+        const failed = scopeGate.checks
+          .filter((item) => !item.passed)
+          .map((item) => item.name + '：' + item.detail)
+          .join('；');
+        throw new Error(
+          'Workflow Intake Gate 未通过，当前阶段不能完成。'
+          + (failed ? ' ' + failed : ''),
+        );
+      }
     }
 
     const gateStage = workflowId === 'legacy-modernization' && currentNode
