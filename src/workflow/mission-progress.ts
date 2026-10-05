@@ -51,6 +51,8 @@ interface ProgressSignals {
   estateNodeCount: number;
   estateColumnCount: number;
   findingsCount: number;
+  sourceOfTruthCount: number;
+  lineageEdgeCount: number;
   modernization?: {
     targetComponentCount: number;
     mappingCount: number;
@@ -106,34 +108,45 @@ function evaluateDeliverable(
       );
     }
 
-    case 'data-source':
+    case 'data-source': {
+      const hasAssets = datasets > 0;
+      const sourceCandidate = signals.sourceOfTruthCount > 0;
       return covered(
         item,
-        datasets > 0 ? 'covered' : 'not_started',
-        datasets > 0 ? '已经发现 ' + String(datasets) + ' 个数据集。' : '还没有发现可用于当前任务的数据集。',
+        sourceCandidate ? 'covered' : hasAssets ? 'in_progress' : 'not_started',
+        sourceCandidate
+          ? '已经形成数据来源候选，可以继续核对可信来源。'
+          : hasAssets
+            ? '已经发现数据集，但还没有形成明确的数据来源候选。'
+            : '还没有发现可用于当前任务的数据来源。',
       );
+    }
 
-    case 'data-flow':
+    case 'data-flow': {
+      const flowReady = signals.lineageEdgeCount > 0 || connectedDatasets >= 2;
       return covered(
         item,
-        connectedDatasets > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
-        connectedDatasets > 0
-          ? '已经建立数据集之间的连接。'
+        flowReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        flowReady
+          ? '已经形成可追踪的数据流关系。'
           : datasets > 0
-            ? '已经有数据集，但数据流连接还没有形成。'
+            ? '已经发现数据集，但数据流关系还没有形成。'
             : '还没有足够的资产来判断数据流。',
       );
+    }
 
-    case 'data-model':
+    case 'data-model': {
+      const modelReady = datasets > 0 && signals.estateColumnCount > 0;
       return covered(
         item,
-        signals.estateColumnCount > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
-        signals.estateColumnCount > 0
-          ? '已经发现列级结构，可以继续整理实体和关系。'
+        modelReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        modelReady
+          ? '已经发现数据集和列级结构，可以整理核心实体与关系。'
           : datasets > 0
-            ? '已经发现数据集，列级模型还需要继续整理。'
+            ? '已经发现数据集，但列级模型还需要继续整理。'
             : '还没有发现数据模型资产。',
       );
+    }
 
     case 'transformation':
       return covered(
@@ -207,8 +220,8 @@ function evaluateDeliverable(
     case 'custom-result':
       return covered(
         item,
-        signals.findingsCount > 0 || (current?.coverage.datasets ?? 0) > 0 ? 'in_progress' : 'not_tracked',
-        '其他结果不适合用平台通用指标判断完成程度；继续以用户明确的期望结果为准。',
+        'not_tracked',
+        '这个结果没有通用的确定性覆盖指标；不会为了追一个数字而自动延长调查。',
       );
 
     default:
@@ -232,6 +245,8 @@ export async function buildMissionProgress(
     estateNodeCount: estate?.nodes.length ?? 0,
     estateColumnCount: estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
     findingsCount: investigation.findings.length,
+    sourceOfTruthCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
+    lineageEdgeCount: snapshot?.lineage?.edges.length ?? estate?.edges.length ?? 0,
   };
 
   if (investigation.workflow === 'legacy-modernization') {
