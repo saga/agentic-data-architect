@@ -9,6 +9,7 @@ export function MissionContractPanel(props: {
   draft: MissionDraft;
   open: boolean;
   saving: boolean;
+  loading?: boolean;
   onOpen: () => void;
   onClose: () => void;
   onChange: (draft: MissionDraft) => void;
@@ -42,7 +43,7 @@ export function MissionContractPanel(props: {
               </Text>
             )}
           </div>
-          <Button size="small" onClick={props.onOpen}>
+          <Button size="small" disabled={props.loading} onClick={props.onOpen}>
             {confirmed ? '修改' : '确认任务'}
           </Button>
         </Flex>
