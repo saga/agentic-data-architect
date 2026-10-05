@@ -192,12 +192,12 @@ function parseSseBlock(block: string): OpenCodeEvent | undefined {
       ? envelope.payload as Record<string, unknown>
       : envelope;
 
-    return {
-      type: typeof payload.type === 'string' ? payload.type : undefined,
-      properties: payload.properties && typeof payload.properties === 'object'
-        ? payload.properties as Record<string, unknown>
-        : undefined,
-    };
+    const event: OpenCodeEvent = {};
+    if (typeof payload.type === 'string') event.type = payload.type;
+    if (payload.properties && typeof payload.properties === 'object') {
+      event.properties = payload.properties as Record<string, unknown>;
+    }
+    return event;
   } catch {
     return undefined;
   }
