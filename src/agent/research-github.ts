@@ -59,6 +59,17 @@ async function gitHead(repoDir: string): Promise<string> {
   return result.stdout.trim();
 }
 
+/** 更新工作区托管的 GitHub 副本到远端当前分支；该目录是 Agent 管理的研究副本，不保留人工修改。 */
+async function refreshRepositoryClone(repoDir: string): Promise<void> {
+  const branch = (await execFile('git', ['-C', repoDir, 'branch', '--show-current'], { maxBuffer: 1024 * 1024 })).stdout.trim();
+  if (branch) {
+    await execFile('git', ['-C', repoDir, 'fetch', '--depth', '1', 'origin', branch], { maxBuffer: 4 * 1024 * 1024 });
+  } else {
+    await execFile('git', ['-C', repoDir, 'fetch', '--depth', '1', 'origin', 'HEAD'], { maxBuffer: 4 * 1024 * 1024 });
+  }
+  await execFile('git', ['-C', repoDir, 'reset', '--hard', 'FETCH_HEAD'], { maxBuffer: 4 * 1024 * 1024 });
+}
+
 async function cloneRepository(repository: GitHubRepository, targetDir: string): Promise<void> {
   await fs.mkdir(path.dirname(targetDir), { recursive: true });
   const env = { ...process.env };
@@ -119,7 +130,12 @@ export async function researchGitHubRepository(
     // 第一次研究。
   }
 
-  if (!exists) await cloneRepository(repository, root);
+  if (!exists) {
+    await cloneRepository(repository, root);
+  } else {
+    // 已有研究副本也必须先刷新，否则后续 Discovery 可能一直分析旧 commit。
+    await refreshRepositoryClone(root);
+  }
 
   const commit = await gitHead(root);
   const currentBeforeRun = await loadInvestigation(investigationName);
