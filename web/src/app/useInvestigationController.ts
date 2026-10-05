@@ -151,6 +151,12 @@ export function useInvestigationController() {
   const loadRequestRef = useRef(0);
   /** 新建调查时临时保存用户已经写好的 Mission 草稿，等 Session 加载完成后交给 Mission 确认窗口。 */
   const pendingInitialMissionDraftRef = useRef<MissionDraft | undefined>(undefined);
+  /** 新建调查已经自动确认 Mission 后，等 Session 页面加载完成再启动第一轮 Agent。 */
+  const pendingInitialAutoStartRef = useRef<{ sessionName: string; message: string } | undefined>(undefined);
+  /** Mission Gate 暂时拦住的用户消息，对应的 turnId 要在确认 Mission 后原样重试。 */
+  const [pendingMissionTurnId, setPendingMissionTurnId] = useState<string>();
+  /** 新建调查 Mission 清晰度校验失败时，等 Session 加载完成再展示具体原因。 */
+  const pendingInitialMissionErrorRef = useRef<string | undefined>(undefined);
   const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController } | undefined>(undefined);
 
   useEffect(() => {
@@ -205,7 +211,19 @@ export function useInvestigationController() {
           deliverableIds: [],
         });
       }
+      const initialMissionError = pendingInitialMissionErrorRef.current;
+      if (initialMissionError) {
+        setMissionError(initialMissionError);
+        pendingInitialMissionErrorRef.current = undefined;
+      }
       setMissionOpen(true);
+    }
+
+    const initialAutoStart = pendingInitialAutoStartRef.current;
+    if (result.context.mission && initialAutoStart?.sessionName === key) {
+      pendingInitialAutoStartRef.current = undefined;
+      // 等本次 render 完成后再调用 send，确保 send 使用的是刚切换到的 active Session。
+      window.setTimeout(() => { void send(initialAutoStart.message); }, 0);
     }
 
     const existing = result.context.inputs
@@ -493,7 +511,7 @@ export function useInvestigationController() {
     }
   };
 
-  const send = async (text?: string, routeId?: string, guided = false) => {
+  const send = async (text?: string, routeId?: string, guided = false, turnIdOverride?: string) => {
     const selectedRoute = routeId
       ? current?.context.journeyPlan?.routes.find((route) => route.id === routeId)
       : undefined;
@@ -510,7 +528,7 @@ export function useInvestigationController() {
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
-    const turnId = crypto.randomUUID();
+    const turnId = turnIdOverride ?? crypto.randomUUID();
     const controller = new AbortController();
     let missionBlocked = false;
 
@@ -557,8 +575,12 @@ export function useInvestigationController() {
             deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
           });
           setPendingMissionMessage(message);
+          setPendingMissionTurnId(turnId);
           setMissionOpen(true);
           missionBlocked = true;
+          // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
+          // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
+          await loadSession(key);
           setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
           return;
         }
@@ -714,14 +736,16 @@ export function useInvestigationController() {
       });
 
       const nextMessage = pendingMissionMessage;
+      const nextTurnId = pendingMissionTurnId;
       setPendingMissionMessage(undefined);
+      setPendingMissionTurnId(undefined);
       setTurnStatus('任务已确认，开始执行。');
 
       await loadSession(active);
       await reloadSessions(false);
 
       if (nextMessage) {
-        void send(nextMessage);
+        void send(nextMessage, undefined, false, nextTurnId);
       }
     } catch (e) {
       const raw = e instanceof Error ? e.message : '无法保存任务目标';
@@ -811,6 +835,42 @@ export function useInvestigationController() {
           workflow: newSessionWorkflow,
         }),
       });
+
+      // 新建调查时如果两个核心输入都已经填写，它们本身就是用户确认的 Mission。
+      // 直接保存 Mission，并在 Session 页面加载后自动启动第一轮，不再要求用户输入“开始”。
+      if (purpose && expectedResult) {
+        try {
+          await getJson<{ context: SessionContext }>(
+            '/api/sessions/' + encodeURIComponent(created.context.name) + '/mission',
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ purpose, expectedResult }),
+            },
+          );
+          pendingInitialMissionDraftRef.current = undefined;
+          pendingInitialMissionErrorRef.current = undefined;
+          pendingInitialAutoStartRef.current = {
+            sessionName: created.context.name,
+            message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
+          };
+        } catch (e) {
+          const raw = e instanceof Error ? e.message : '无法确认任务';
+          let clarityHandled = false;
+          try {
+            const body = JSON.parse(raw) as { code?: string; error?: string };
+            if (body.code === 'MISSION_CLARITY_REQUIRED') {
+              pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
+              pendingInitialMissionErrorRef.current = body.error || '任务目的和期望结果还不够具体。';
+              clarityHandled = true;
+            }
+          } catch {
+            // 非 JSON 错误继续抛出，让用户看到真正的创建失败原因。
+          }
+          if (!clarityHandled) throw e;
+        }
+      }
+
       setNewSessionOpen(false);
       setNewSessionName('');
       setNewSessionGoal('');
