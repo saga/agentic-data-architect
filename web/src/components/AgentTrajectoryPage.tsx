@@ -40,7 +40,7 @@ interface TrajectoryEvent {
   id: string;
   turnId: string;
   timestamp: string;
-  type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'status';
+  type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'checkpoint' | 'stage_gate' | 'status';
   name: string;
   status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
   durationMs?: number;
@@ -189,6 +189,8 @@ function eventLabel(event: TrajectoryEvent) {
     case 'context_changed': return '运行上下文变化';
     case 'turn_end': return '本轮完成';
     case 'error': return '执行失败';
+    case 'checkpoint': return '阶段小结';
+    case 'stage_gate': return event.details.passed === false ? '阶段成果检查未通过' : '阶段成果检查通过';
     case 'status': return event.name;
     default: return event.name;
   }
@@ -205,7 +207,8 @@ function eventColor(event: TrajectoryEvent) {
   }
   if (event.type === 'model_call') return 'blue';
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') return 'blue';
-  if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'user_input_completed') return 'green';
+  if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'user_input_completed' || event.type === 'checkpoint') return 'green';
+  if (event.type === 'stage_gate') return event.details.passed === false ? 'orange' : 'green';
   return undefined;
 }
 
@@ -213,6 +216,7 @@ function eventMarker(event: TrajectoryEvent): 'error' | 'warning' | undefined {
   if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'error';
   if (event.type === 'permission_completed' && event.details.resultKind === 'reject') return 'error';
   if (event.status === 'waiting' && (event.type === 'permission' || event.type === 'user_input_requested')) return 'warning';
+  if (event.type === 'stage_gate' && event.details.passed === false) return 'warning';
   return undefined;
 }
 function eventDetail(event: TrajectoryEvent) {
@@ -332,6 +336,32 @@ function eventDetail(event: TrajectoryEvent) {
         {typeof event.details.question === 'string' ? <Text>{event.details.question}</Text> : null}
         {Array.isArray(event.details.choices) && event.details.choices.length ? (
           <Text type="secondary">选项：{event.details.choices.map(String).join(' / ')}</Text>
+        ) : null}
+      </Flex>
+    );
+  }
+
+  if (event.type === 'stage_gate') {
+    const passed = event.details.passed !== false;
+    const newEvidence = Number(event.details.newEvidenceIds?.length) || 0;
+    const newFindings = Number(event.details.newFindingIds?.length) || 0;
+    const claimCount = Number(event.details.evidenceBackedClaimCount) || 0;
+    const checks = Array.isArray(event.details.checks) ? event.details.checks : [];
+    return (
+      <Flex vertical gap={4}>
+        <Flex wrap gap={6}>
+          <Tag color={passed ? 'green' : 'orange'}>{passed ? '通过' : '未通过'}</Tag>
+          <Tag>新增 Evidence {newEvidence}</Tag>
+          <Tag>新增 Finding {newFindings}</Tag>
+          <Tag>有证据的 Claim {claimCount}</Tag>
+        </Flex>
+        {checks.length ? (
+          <Text type="secondary">
+            {checks.map((item) => {
+              const check = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+              return (check.passed ? '✓ ' : '✗ ') + String(check.name ?? '');
+            }).join(' · ')}
+          </Text>
         ) : null}
       </Flex>
     );
@@ -475,7 +505,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
                 event.type === 'model_call' ? <RobotOutlined /> :
                 event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> :
                 event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> :
-                event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> :
+                event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'checkpoint' || event.type === 'stage_gate' ? <CheckCircleOutlined /> :
                 undefined,
               children: (
                 <div className={`trajectory-event-row${marker ? ` trajectory-event-row--${marker}` : ''}`}>
@@ -512,7 +542,7 @@ function TurnCard({ turn, events }: { turn: TrajectoryTurnSummary; events: Traje
                   return {
                     label: formatTime(event.timestamp),
                     color: eventColor(event),
-                    dot: event.type === 'model_call' ? <RobotOutlined /> : event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> : event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> : event.type === 'session_idle' || event.type === 'turn_end' ? <CheckCircleOutlined /> : undefined,
+                    dot: event.type === 'model_call' ? <RobotOutlined /> : event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress' ? <ToolOutlined /> : event.type === 'permission' || event.type === 'permission_completed' || event.type === 'user_input_requested' ? <WarningOutlined /> : event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'checkpoint' || event.type === 'stage_gate' ? <CheckCircleOutlined /> : undefined,
                     children: (
                       <div className={`trajectory-event-row${marker ? ` trajectory-event-row--${marker}` : ''}`}>
                         <Flex justify="space-between" align="center" gap={12} wrap>
