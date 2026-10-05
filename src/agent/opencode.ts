@@ -52,6 +52,20 @@ interface OpenCodePart {
   };
 }
 
+const activeOpenCodeTurns = new Map<string, () => Promise<void>>();
+
+/** 返回并停止当前 OpenCode turn；HTTP Stop API 会复用这个运行态。 */
+export async function abortOpenCodeTurn(turnId: string): Promise<boolean> {
+  const abort = activeOpenCodeTurns.get(turnId);
+  if (!abort) return false;
+  try {
+    await abort();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface OpenCodeAskInput {
   model: string;
   prompt: string;
@@ -341,9 +355,14 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
   const directory = encodeURIComponent(input.workingDirectory);
+  const transportController = new AbortController();
+  let sessionId = '';
 
-  const eventResponsePromise = openCodeFetch('/event', {}, input.workingDirectory);
-  const eventResponse = await eventResponsePromise;
+  const eventResponse = await openCodeFetch(
+    '/global/event',
+    { signal: transportController.signal },
+    input.workingDirectory,
+  );
   if (!eventResponse.ok) {
     throw new Error('无法连接 OpenCode 事件流：HTTP ' + eventResponse.status);
   }
@@ -363,8 +382,13 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const session = await sessionResponse.json() as { id?: string };
-  const sessionId = session.id;
+  sessionId = session.id ?? '';
   if (!sessionId) throw new Error('OpenCode 返回的 Session 没有 id。');
+  const abort = async () => {
+    transportController.abort();
+    await abortOpenCodeSession(sessionId);
+  };
+  if (input.turnId) activeOpenCodeTurns.set(input.turnId, abort);
 
   input.onTrajectory?.({
     type: 'turn_start',
@@ -411,11 +435,6 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
     // message endpoint 已经等待本轮完成。事件流只负责把过程实时推送到 UI。
     // 某些 OpenCode 版本可能继续保留 SSE 连接，因此在最终答案确定后不再等待它。
     void eventReaderTask.catch(() => undefined);
-
-    if (extracted.reasoning) {
-      // message.part.updated 如果没有实时事件，至少在结束时仍然保留可展示的 reasoning。
-      input.onReasoningDelta?.(extracted.reasoning);
-    }
 
     input.onTrajectory?.({
       type: 'assistant_turn_end',
