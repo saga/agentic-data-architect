@@ -90,7 +90,7 @@ export const ScopeValidationSchema = z.object({
   evidenceIds: z.array(z.string().trim().min(1)),
   validatedAt: z.string().min(1),
 }).strict();
-export type ScopeValidation = z.infer<typeof ScopeValidation>;
+export type ScopeValidation = z.infer<typeof ScopeValidationSchema>;
 
 /** Investigation 的核心 context.json Schema；它是持久化状态的运行时边界。 */
 export const WorkspaceContextSchema = z.object({
