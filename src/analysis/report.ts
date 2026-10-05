@@ -50,6 +50,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     `- Goal: ${inv.goal}`,
     `- Scope: ${inv.scope.join(', ')}`,
     `- Systems: ${inv.systems.join(', ')}`,
+    `- Scope validation: ${inv.scopeValidation?.source ?? 'validated'}; evidence=${inv.scopeValidation?.evidenceIds.join(', ') || '(user confirmed)'}`,
     `- Discovery runs: ${inv.discoveryRuns.map((r) => `${r.id} (${r.root}, parser=${r.parserVersion})`).join('; ') || '(none)'}`,
     ``,
     `## 2. Data Estate`,
