@@ -15,6 +15,7 @@ import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
+import { askOpenCode, isOpenCodeModel } from './opencode.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -389,15 +390,50 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 
 /** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/本地数据工具和执行白名单。 */
 export async function askCopilot(input: AskInput): Promise<string> {
+  // OpenCode 是显式选择的第二运行时。模型 ID 使用 opencode:<provider>/<model>，
+  // 因此不需要再增加一套并行的 runtime 配置字段；同一个 Investigation 仍然只记录一个 model。
+  const workingDirectory = input.workingDirectory ?? process.cwd();
+  const journeyMapPurpose = input.purpose === 'journey-map';
+  const reviewerPurpose = input.purpose === 'review';
+  const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
+  const investigationName = path.basename(workingDirectory);
+
+  if (isOpenCodeModel(selectedModel)) {
+    return askOpenCode({
+      model: selectedModel,
+      prompt: input.prompt,
+      systemPrompt: input.systemPrompt,
+      missionPrompt: input.missionPrompt,
+      workingDirectory,
+      turnId: input.turnId,
+      onDelta: input.onDelta,
+      onReasoningDelta: input.onReasoningDelta,
+      onStatus: input.onStatus,
+      onTrajectory: input.onTrajectory
+        ? (event) => input.onTrajectory?.({
+            type: event.type,
+            name: event.name,
+            status: event.status,
+            model: event.model,
+            details: event.details,
+          })
+        : undefined,
+      shouldAbort: input.shouldAbort,
+      autoContinuationTurns: input.autoContinuationTurns,
+      refreshMissionPrompt: input.refreshMissionPrompt,
+      shouldContinueMission: input.shouldContinueMission,
+      onStageResult: input.onStageResult,
+      onBeforeWorkflowTransition: input.onBeforeWorkflowTransition,
+      workflowSkill: input.workflowSkill,
+      investigationName,
+    });
+  }
+
   const c = await getClient();
 
   // This application intentionally uses Copilot's default agent. The project
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
-  const workingDirectory = input.workingDirectory ?? process.cwd();
-  const journeyMapPurpose = input.purpose === 'journey-map';
-  const reviewerPurpose = input.purpose === 'review';
-  const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
   const graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
