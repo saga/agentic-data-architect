@@ -102,6 +102,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       personality: '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。',
       avatarWidth: 180,
       avatarHeight: 240,
+      avatarSources: [],
       platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
       systemPrompt: {
         version: 1,
@@ -133,6 +134,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       personality: control.agent.personality,
       ...(control.agent.avatarPath ? { avatarPath: control.agent.avatarPath } : {}),
       ...(control.agent.avatarPaths?.length ? { avatarPaths: [...control.agent.avatarPaths] } : {}),
+      ...(control.agent.avatarSources?.length ? { avatarSources: control.agent.avatarSources.map((item) => ({ ...item })) } : {}),
       ...(control.agent.avatarMimeType ? { avatarMimeType: control.agent.avatarMimeType } : {}),
       avatarWidth: control.agent.avatarWidth,
       avatarHeight: control.agent.avatarHeight,
@@ -189,9 +191,19 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(Array.isArray(agent.avatarPaths)
         ? { avatarPaths: [...new Set(agent.avatarPaths.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))] }
         : agent.avatarPath ? { avatarPaths: [agent.avatarPath] } : {}),
-      ...(agent.avatarMimeType === 'image/png' || agent.avatarMimeType === 'image/jpeg' || agent.avatarMimeType === 'image/webp'
-        ? { avatarMimeType: agent.avatarMimeType }
+      ...(Array.isArray(agent.avatarSources)
+        ? {
+            avatarSources: agent.avatarSources
+              .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+              .map((item) => ({
+                src: String(item.src ?? '').trim(),
+                kind: item.kind === 'image' || item.kind === 'video' || item.kind === 'remote' ? item.kind : 'remote',
+                ...(typeof item.mimeType === 'string' && item.mimeType.trim() ? { mimeType: item.mimeType.trim() } : {}),
+              }))
+              .filter((item) => item.src),
+          }
         : {}),
+      ...(agent.avatarMimeType ? { avatarMimeType: String(agent.avatarMimeType).trim() } : {}),
       avatarWidth: normalizeAvatarDimension(agent.avatarWidth, 180, 40, 800),
       avatarHeight: normalizeAvatarDimension(agent.avatarHeight, 240, 40, 1200),
       platformCapabilities: config.graphifyEnabled
@@ -351,6 +363,8 @@ async function updateInvestigationControlImpl(
       displayName: next.agent.displayName.trim().slice(0, 40),
       personality: next.agent.personality.slice(0, 4000),
       ...(next.agent.avatarPath ? { avatarPath: next.agent.avatarPath } : {}),
+      ...(next.agent.avatarPaths?.length ? { avatarPaths: [...next.agent.avatarPaths] } : {}),
+      ...(next.agent.avatarSources?.length ? { avatarSources: next.agent.avatarSources.map((item) => ({ ...item })) } : {}),
       ...(next.agent.avatarMimeType ? { avatarMimeType: next.agent.avatarMimeType } : {}),
       avatarWidth: normalizeAvatarDimension(next.agent.avatarWidth, current.agent.avatarWidth, 40, 800),
       avatarHeight: normalizeAvatarDimension(next.agent.avatarHeight, current.agent.avatarHeight, 40, 1200),
