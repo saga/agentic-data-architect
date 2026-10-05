@@ -22,6 +22,14 @@
 
 
 
+### Mission 是整个 Investigation 的最高优先级任务边界
+
+- 每个 Investigation 都先明确“为什么做”和“最后希望拿到什么”。
+- 没有经过用户确认的 Mission，不得开始 Agent 正式调查。
+- Agent 每一轮都必须重新对照 Mission；Workflow、Skill、unknown、route 和局部发现只能服务 Mission，不能改变 Mission。
+- unknown 只是当前未知，不是任务队列；是否继续调查看它是否影响用户期望结果。
+- 常见的当前系统数据架构 / Data Source / Data Flow / Data Model 分析属于 capability，不新增固定 Workflow。
+
 ### 4）说人话、去掉 AI 味
 
 这个项目是给 Data Analyst / Data Architect 用的，不是给模型展示术语的。
