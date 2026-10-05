@@ -57,6 +57,7 @@ export function buildQuestionPrompt(args: {
   investigationName: string;
   goal: string;
   scope: string[];
+  systems: string[];
   question: string;
   contextText: string;
   selectedRoute?: { id: string; title: string; reason: string; steps: string[] };
@@ -71,6 +72,7 @@ export function buildQuestionPrompt(args: {
     `调查名称：${args.investigationName}`,
     `目标：${args.goal || '（未设置）'}`,
     `范围：${args.scope.join('、') || '（未设置）'}`,
+    `涉及系统：${args.systems.join('、') || '（未设置）'}`,
     ``,
     `已检索 Evidence（确定性结果，优先相信 Evidence，不要凭猜测补全）：`,
     args.contextText || '（当前还没有相关 Evidence；这不阻止继续调查。先使用可用工具获取原始材料，再把需要确认的结果沉淀为 Evidence。）',
