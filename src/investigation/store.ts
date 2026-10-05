@@ -166,6 +166,9 @@ export async function confirmInvestigationMission(
   mission: Investigation['mission'],
 ): Promise<Investigation> {
   if (!mission) throw new Error('Mission 不能为空。');
+  if (mission.status !== 'confirmed' || mission.confirmedBy !== 'user') {
+    throw new Error('只有用户明确确认的 Mission Contract 才能保存为正式任务。');
+  }
 
   return withWorkspaceContextLock(name, async () => {
     const current = await loadWorkspaceContext(name);
