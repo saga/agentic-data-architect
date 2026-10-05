@@ -82,6 +82,7 @@ KISS 不只是架构原则，UI 一样要遵守。**界面只保留用户现在�
 - **Data Architect 的固定工作路线由 Markdown Workflow 定义。** Data Analyst / Data Architect 的高层工作阶段、人工确认和典型回退不要散落在 prompt 或 React 代码里；分别放在 `skills/legacy-modernization/SKILL.md`、`skills/financial-ai-native-architecture/SKILL.md`、`skills/data-architecture-assessment/SKILL.md` 中。TypeScript runtime 只负责解析、结构校验、执行位置和确定性推进。
 - **Workflow DSL 刻意保持很小。** 当前只允许 `@flow`、`@task`、`@review`、`@end` 四种 block。节点只描述 `title`、`objective`、`actor`、`completeWhen`；连线只描述 `outcome -> target`。不再增加 `@gate`、`@stop`、`completion`、`visible`、`tools`、`requires/produces` 或 route condition。
 - **Skill 统一用 SKILL.md 打包，但必须声明执行类型。** frontmatter 使用 metadata.kind: capability 或 metadata.kind: workflow。capability 只提供可被 Agent 自由组合的能力，不定义 @flow；workflow 才能定义固定的高层工作路线。Workflow 不替 Agent 决定每一个调查动作。
+- **Goal / Scope / Systems 是正式结果的必填范围。** 先从用户问题、代码仓库、文档、SQL、Discovery 和 Evidence 提取；材料明确就记录，存在歧义再让用户确认。没有 `ScopeValidation` 就不能生成阶段成果或最终报告，报告不得用 `(unset)` 代替必填范围。
 - **Workflow 和 Skill 分工不能混。** Workflow 说明“现在做什么、什么时候能过、失败回哪里”；Skill 说明“这一关具体怎么查”。SQL、profiling、lineage、GitHub、Confluence、Web Search 都是执行能力，不是 Workflow 节点本身。通用 Data Architect 经验放在 `knowledge/`，只作为方法参考，不能代替当前 Investigation 的 Evidence。
 - **路线图必须允许返工。** 发现新的 lineage、业务定义或数据质量问题时，Agent 应回到相应调查关卡，而不是继续往后假装完成。生成 draft 方案、draft mapping 不等于关卡完成。
 - **回答之后必须主动把用户带到下一步。** Agent 回答不能停在“目前不知道 / 需要先检索 / 请提供更多信息”。先把已经知道的和不知道的说清楚，再明确下一步；如果下一步需要用户补充信息，就只问一个最关键的问题，并提供一个直接可输入的入口。优先让 Agent 自己完成能完成的检索，只有确实缺少代码库、数据目录、文件、业务定义等外部输入或权限时才让用户补充。
