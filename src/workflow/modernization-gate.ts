@@ -11,6 +11,7 @@ import { loadInvestigation, reportsDir } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
 import { runInvestigationScopeGate } from './scope-gate.js';
 import type { ModernizationPlan } from '../model/modernization.js';
+import { reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 
 export type ModernizationGateStage = 'target' | 'mapping' | 'validation';
 
@@ -196,10 +197,75 @@ export async function runModernizationGate(
     exists = false;
   }
 
-  return evaluateModernizationGate(
+  const result = evaluateModernizationGate(
     plan,
     new Set(inv.evidence.map((item) => item.id)),
     stage,
     exists ? artifactPath : '',
   );
+
+  // 先通过确定性检查，再让独立 Reviewer 检查内容是否真的可读、可用。
+  if (!result.passed || !plan) return result;
+
+  const artifact = stage === 'target'
+    ? JSON.stringify(plan.targetArchitecture, null, 2)
+    : stage === 'mapping'
+      ? JSON.stringify({
+          mappingCoverage: plan.mappingCoverage,
+          mappings: plan.mappings,
+        }, null, 2)
+      : JSON.stringify({ validationPlan: plan.validationPlan }, null, 2);
+
+  const facts = JSON.stringify({
+    currentState: plan.currentState,
+    findings: inv.findings.slice(0, 20).map((finding) => ({
+      title: finding.title,
+      severity: finding.severity,
+      affectedAssets: finding.affectedAssets,
+    })),
+  }, null, 2);
+
+  try {
+    const review = await reviewArtifact({
+      investigationName: name,
+      goal: inv.userPrompt || inv.goal || plan.goal,
+      artifactType: stage === 'target'
+        ? 'target_architecture'
+        : stage === 'mapping'
+          ? 'mapping'
+          : 'validation',
+      artifact,
+      facts,
+    });
+    await saveArtifactReview(name, review);
+
+    const reviewPassed = review.status === 'pass';
+    return {
+      ...result,
+      passed: result.passed && reviewPassed,
+      checks: [
+        ...result.checks,
+        {
+          name: '独立质量审核',
+          passed: reviewPassed,
+          detail: reviewPassed
+            ? '内容已经通过独立 Reviewer 检查，score=' + String(review.score) + '。'
+            : summarizeReviewFailure(review),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      ...result,
+      passed: false,
+      checks: [
+        ...result.checks,
+        {
+          name: '独立质量审核',
+          passed: false,
+          detail: 'Reviewer 无法完成这次检查：' + (error instanceof Error ? error.message : String(error)),
+        },
+      ],
+    };
+  }
 }
