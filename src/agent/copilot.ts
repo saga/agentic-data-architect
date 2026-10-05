@@ -764,7 +764,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
       ('需要确认 ' + kind);
     void runRecorder?.write('permission_request', { requestId, permissionRequest: request });
     const managedApprovalRequired = request.managedApprovalRequired === true;
-    const autoApproved = (input.permissionMode ?? 'allow_all') === 'allow_all' && !managedApprovalRequired;
+    // 当前安全模型要求每一个 permission request 都经过人工确认。
+    const autoApproved = false;
     if (!autoApproved) {
       pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
       startPermissionWaitTimeout();
