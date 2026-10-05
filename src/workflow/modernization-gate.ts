@@ -168,6 +168,22 @@ export async function runModernizationGate(
   name: string,
   stage: ModernizationGateStage,
 ): Promise<ModernizationGateResult> {
+  const scopeGate = await runInvestigationScopeGate(name);
+  if (!scopeGate.passed) {
+    return {
+      stage,
+      passed: false,
+      checks: [{
+        name: 'Investigation Scope',
+        passed: false,
+        detail: scopeGate.checks
+          .filter((item) => !item.passed)
+          .map((item) => item.name + '：' + item.detail)
+          .join('；'),
+      }],
+      artifactPath: path.join(reportsDir(name), 'modernization-plan.json'),
+    };
+  }
   const plan = await loadModernizationPlan(name);
   const inv = await loadInvestigation(name);
   const artifactPath = path.join(reportsDir(name), 'modernization-plan.json');
