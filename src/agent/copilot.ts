@@ -397,6 +397,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const reviewerPurpose = input.purpose === 'review';
   const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
   const investigationName = path.basename(workingDirectory);
+  const selectedModel = input.model ?? config.model;
+  const workflowInstruction = isolatedPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
 
   if (isOpenCodeModel(selectedModel)) {
     return askOpenCode({
@@ -443,16 +445,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
     assertGraphifyRuntimeAvailable();
   }
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
-  const investigationName = path.basename(workingDirectory);
-  const workflowInstruction = isolatedPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
   const mcpServers = {
     ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
     ...(input.mcpServers ?? {}),
   };
-  const selectedModel = input.model ?? config.model;
-
   // SDK 自己的 wait timeout 只做极长的 transport-level 兜底；业务 timeout 由下面独立 watchdog 管理。
   const SDK_WAIT_GUARD_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
