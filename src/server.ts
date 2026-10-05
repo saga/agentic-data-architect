@@ -188,7 +188,7 @@ async function createSession(
             ...control.agent,
             avatarPath: relativePath,
             avatarPaths: [relativePath],
-            avatarMimeType: 'image/png',
+            avatarMimeType: req.file.mimetype,
             avatarWidth: Number.isFinite(meta.width) ? Math.max(40, Math.min(800, Math.round(meta.width!))) : control.agent.avatarWidth,
             avatarHeight: Number.isFinite(meta.height) ? Math.max(40, Math.min(1200, Math.round(meta.height!))) : control.agent.avatarHeight,
           },
@@ -633,8 +633,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.status(400).json({ error: '没有收到头像文件，请重新选择。' });
       return;
     }
-    if (req.file.mimetype !== 'image/png') {
-      res.status(400).json({ error: '头像上传接口只接受 PNG 图片。' });
+    const allowedAvatarTypes = new Set([
+      'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+      'video/mp4', 'video/webm', 'video/quicktime',
+    ]);
+    if (!allowedAvatarTypes.has(req.file.mimetype)) {
+      res.status(400).json({ error: '头像只支持 PNG、JPEG、WebP、GIF、MP4、WebM 或 MOV。' });
       return;
     }
     if (req.file.size > 10 * 1024 * 1024) {
@@ -646,7 +650,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const avatarDir = path.join(root, 'assistant', 'avatars');
     await fs.mkdir(avatarDir, { recursive: true });
     const avatarId = randomUUID();
-    const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.png');
+    const extensionByMime: Record<string, string> = {
+      'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
+      'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
+    };
+    const extension = extensionByMime[req.file.mimetype] ?? 'bin';
+    const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.' + extension);
     const avatarPath = path.join(root, relativePath);
     await fs.writeFile(avatarPath, req.file.buffer);
 
@@ -706,6 +715,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         avatarCount: avatarPaths.length,
         avatarWidth: control.agent.avatarWidth,
         avatarHeight: control.agent.avatarHeight,
+        mimeType: req.file.mimetype,
         sizeBytes: req.file.size,
       },
     });
@@ -731,7 +741,11 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
     try {
       const buffer = await fs.readFile(path.join(workspaceRoot(name), relativePath));
-      res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
+      const mimeByExtension: Record<string, string> = {
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+      };
+      res.setHeader('Content-Type', mimeByExtension[path.extname(relativePath).toLowerCase()] ?? control.agent.avatarMimeType ?? 'application/octet-stream');
       res.setHeader('Content-Length', buffer.byteLength);
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.end(buffer);
