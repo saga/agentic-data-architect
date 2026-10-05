@@ -31,7 +31,7 @@ export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责�
 - 工作方式不是普通对话偏好。除非用户明确表达“把这次调查/设计改成某种工作方式”，否则不要建议或暗示修改当前工作方式；“换个思路”“先做别的”“路线不合适”等模糊表达只应触发重新规划路线，不应改变持久化工作方式。
 - 使用已加载的 Skill 处理领域方法和业务问题；Skill 本身不是 Evidence。
 - **最终目标不是整理一堆 Claims，而是完成架构工作。** 在现状证据足够后，开始形成 Target Architecture；说明数据源、核心数据模型、数据流、关键组件、主要取舍和实施路线。不要等所有小问题都解决才开始设计。
-- **如果当前有正式 Workflow，Workflow 是阶段导航的唯一主线。** 当前节点的主要工作完成后，返回该节点已有的合法 outcome；不要再用 routeOptions / followUpQuestions 代替 Workflow 推进。
+- **如果当前有正式 Workflow，Workflow 是阶段导航的唯一主线。** 当前节点的主要工作完成后，可以提交该节点已有的合法 outcome 作为“完成申请”；但这不是完成证明。服务端会先保存本轮真实工作成果，再运行确定性 Gate，Gate 不通过就不会推进 Workflow，也不能用 routeOptions / followUpQuestions 代替 Workflow 推进。
 - 如果 Skill 提供确定性脚本，直接运行脚本，不要凭记忆重新实现其逻辑。
 - Graphify structural-analysis 的结果只用于结构导航和关系候选，不是 Evidence。
 - 'code_reference' Evidence 来自工作区实际文件和指定行号。需要把源码关系作为 Claim 依据时，应先读取源码，再用 'record_code_evidence' 保存关键片段；不要只引用 Graphify 路径或模型记忆。可以用 Graphify 找相关文件和路径，然后回到源码并结合确定性 Evidence Catalog 建立结论。source_file Evidence 只证明当时分析的是哪个文件版本和来源，不代表文件本身的业务含义已经得到证明。
@@ -92,8 +92,13 @@ export function buildQuestionPrompt(args: {
     ``,
     '当前执行请求：' + args.question,
     ``,
+    `如果当前工作方式是 legacy-modernization，并且当前节点是“设计新方案 / 新旧对应 / 验证结果”，必须同时提交 modernization 工作成果；只填写这一轮实际形成的内容，不要填占位符。`,
+    `设计新方案：modernization.targetArchitecture 至少有实际 components、principles、openQuestions、evidenceIds；status 使用 in_review，不要假装已经人工 approved。`,
+    `新旧对应：modernization.mappings 至少包含 sourceAsset、targetAsset、transformation、businessRule、validationRule、evidenceIds；同时填写 mappingCoverage.sourceAssets 和 unmappedAssets。没有完成覆盖时，不要把 unmappedAssets 写成空数组来假装完成。`,
+    `验证结果：modernization.validation.checks 只更新本轮真正检查过的项目；要写 passed，必须同时给出 result 和 evidenceIds，并且必须给出 reconciliation 的实际新旧对比结果。`,
+    `这些内容会先保存到 reports/modernization-plan.json，再由确定性 Script Gate 判断是否允许 Workflow 前进。workflow.success 只是完成申请，不是通行证。`,
     `请严格返回 JSON：`,
-    `{"answer": "...", "checkpoint": {"title": "阶段名称", "summary": "这一阶段形成的简短结论", "confirmed": ["已经确认的关键事实"], "evidenceIds": ["对应 Evidence id"], "unknowns": ["仍未查清的关键问题"], "nextStep": "下一步实际要做什么"}, "claims": [{"claim": "...", "status": "supported|inferred|unknown|contradicted", "evidenceIds": ["..."]}], "unknowns": ["..."], "followUpQuestions": [], "routeOptions": [], "workflow": {"nodeId": "当前节点 ID", "outcome": "合法 outcome（只有当前阶段确实完成时才返回）"}}`,
+    `{"answer":"...","checkpoint":{"title":"阶段名称","summary":"这一阶段形成的简短结论","confirmed":["已经确认的关键事实"],"evidenceIds":["对应 Evidence id"],"unknowns":["仍未查清的关键问题"],"nextStep":"下一步实际要做什么"},"claims":[{"claim":"...","status":"supported|inferred|unknown|contradicted","evidenceIds":["..."]}],"unknowns":["..."],"followUpQuestions":[],"routeOptions":[],"modernization":{"targetArchitecture":{"title":"目标架构","status":"in_review","principles":["..."],"components":[{"id":"component:1","type":"domain_data","name":"...","description":"...","dependsOn":[],"sourceAssets":["..."]}],"openQuestions":[],"evidenceIds":["..."]},"mappings":[{"sourceAsset":"...","targetAsset":"...","transformation":"...","businessRule":"...","validationRule":"...","status":"proposed","evidenceIds":["..."]}],"mappingCoverage":{"sourceAssets":["..."],"unmappedAssets":[]},"validation":{"checks":[{"id":"validation:reconciliation","type":"reconciliation","name":"改造前后数据对比","description":"实际新旧数据对比","status":"passed","blocking":true,"evidenceIds":["..."],"result":"实际对比结果"}],"cutoverCriteria":["..."],"rollbackCriteria":["..."]}},"workflow":{"nodeId":"当前节点 ID","outcome":"合法 outcome（只有当前阶段确实完成时才提交）"}}`,
     `允许引用的 evidenceIds：${args.evidenceIds.join('、') || '（无）'}`,
   ].join('\n');
 }
