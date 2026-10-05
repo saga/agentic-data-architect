@@ -414,7 +414,11 @@ export function InvestigationChatPanel(props: {
                   optionFilterProp="label"
                   options={props.modelOptions.map((model) => ({
                     value: model.id,
-                    label: model.id === 'auto' ? 'Auto（自动选择模型）' : model.name || model.id,
+                    label: model.id === 'auto'
+                      ? 'Auto（自动选择模型）'
+                      : model.runtime === 'opencode' || model.id.startsWith('opencode:')
+                        ? (model.name || model.id) + '（本机）'
+                        : model.name || model.id,
                   }))}
                   onChange={(model) =>
                     void props.updateModelSettings(
