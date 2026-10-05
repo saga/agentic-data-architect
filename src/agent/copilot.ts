@@ -600,7 +600,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(input.autoTier ? { autoTier: input.autoTier } : {}),
         workingDirectory,
         workflowSkill: input.workflowSkill ?? null,
-        permissionMode: input.permissionMode ?? 'permission',
+        permissionMode: input.permissionMode ?? 'allow_all',
         mcpServers: Object.keys(mcpServers),
       })
     : null;
@@ -764,7 +764,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       ('需要确认 ' + kind);
     void runRecorder?.write('permission_request', { requestId, permissionRequest: request });
     const managedApprovalRequired = request.managedApprovalRequired === true;
-    const autoApproved = input.permissionMode === 'allow_all' && !managedApprovalRequired;
+    const autoApproved = (input.permissionMode ?? 'allow_all') === 'allow_all' && !managedApprovalRequired;
     if (!autoApproved) {
       pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
       startPermissionWaitTimeout();
