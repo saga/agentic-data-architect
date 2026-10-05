@@ -38,6 +38,7 @@ export function InvestigationChatPanel(props: {
   modelOptions: CopilotModelOption[];
   modelSaving: boolean;
   executionStatus: ExecutionStatus;
+  error?: string;
   setValue: (value: string) => void;
   setAttachmentsOpen: (open: boolean) => void;
   setUserInputDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -228,9 +229,11 @@ export function InvestigationChatPanel(props: {
         </div>
       )}
 
-      {props.current.context.unknowns.length || props.pendingPermissions.length || props.pendingUserInputs.length
-        ? null
-        : null}
+      {props.error ? (
+        <Card size="small" className="error-card">
+          <Text type="danger">{props.error}</Text>
+        </Card>
+      ) : null}
 
       {props.pendingPermissions.length ? (
         <div className="pending-permission-list">
