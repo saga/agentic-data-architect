@@ -355,41 +355,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   };
   const selectedModel = input.model ?? config.model;
 
-  /**
-   * sendAndWait 的 SDK timeout 只负责最终兜底；真正的“执行 6 分钟上限”、
-   * “等待用户回答上限”和“等待权限确认上限”由宿主自己分开计时。
-   *
-   * Agent 一旦停在 ask_user / permission，计算计时器都会暂停，改用对应的等待上限。
-   * 用户完成确认后，再重新开始一次 Agent 执行计时。
-   */
-  let waitMode: 'execution' | 'permission' | 'user_input' = 'execution';
-  let waitTimeoutId: ReturnType<typeof setTimeout> | undefined;
-  let rejectWaitTimeout: ((error: Error) => void) | undefined;
-  let pendingUserInputWaits = 0;
-
-  const armWaitTimeout = (mode: 'execution' | 'user_input'): void => {
-    waitMode = mode;
-    if (waitTimeoutId !== undefined) clearTimeout(waitTimeoutId);
-
-    const timeoutMs = mode === 'permission'
-      ? config.permissionWaitTimeoutMs
-      : mode === 'user_input'
-        ? config.userInputWaitTimeoutMs
-        : config.turnTimeoutMs;
-
-    waitTimeoutId = setTimeout(() => {
-      rejectWaitTimeout?.(
-        new Error(
-          mode === 'permission'
-            ? `Timeout after ${timeoutMs}ms waiting for permission`
-            : mode === 'user_input'
-              ? `Timeout after ${timeoutMs}ms waiting for user input`
-              : `Timeout after ${timeoutMs}ms waiting for agent execution`,
-        ),
-      );
-    }, timeoutMs);
-    waitTimeoutId.unref?.();
-  };
+  // SDK 自己的 wait timeout 只做极长的 transport-level 兜底；业务 timeout 由下面独立 watchdog 管理。
+  const SDK_WAIT_GUARD_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
@@ -423,7 +390,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     onUserInputRequest: async (request) => {
       const requestId = randomUUID();
       pendingUserInputWaits += 1;
-      syncWaitTimeout();
+      startUserInputWaitTimeout();
 
       input.onStatus?.('Agent 正在等待你的回答。');
       input.onTrajectory?.({
@@ -454,7 +421,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       }).then(
         (response) => {
           pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
-          syncWaitTimeout();
+          clearUserInputWaitTimeout();
           if (pendingUserInputWaits === 0) {
             input.onStatus?.('已收到你的回答，助手继续处理，请稍候…');
           }
@@ -462,7 +429,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         },
         (error) => {
           pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
-          syncWaitTimeout();
+          clearUserInputWaitTimeout();
           throw error;
         },
       );
@@ -513,6 +480,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     });
   }, 15_000);
 
+  executionWatchdogId = setInterval(executionWatchdog, 250);
+  executionWatchdogId.unref?.();
+
   try {
     if (input.shouldAbort?.()) {
       await session.abort();
@@ -542,15 +512,72 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
   const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
   const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
+  let pendingUserInputWaits = 0;
 
-  /** 根据当前真正卡住的资源选择等待计时器。权限/用户输入存在时，不计入 Agent 执行超时。 */
-  const syncWaitTimeout = (): void => {
-    const nextMode: 'execution' | 'permission' | 'user_input' = pendingPermissions.size > 0
-      ? 'permission'
-      : pendingUserInputWaits > 0
-        ? 'user_input'
-        : 'execution';
-    if (waitTimeoutId === undefined || waitMode !== nextMode) armWaitTimeout(nextMode);
+  /**
+   * 三类 timeout 完全独立，不共享 waitMode 或 timer ID：
+   * - Agent 执行 watchdog：只累计真正执行中的时间；
+   * - Permission watchdog：独立 1 小时，负责等待人工确认；
+   * - User-input watchdog：独立 1 小时，负责 ask_user。
+   *
+   * watchdog 本身不会暂停；它一直运行，只是不把人工等待计入 Agent 执行预算。
+   */
+  let rejectExecutionTimeout: ((error: Error) => void) | undefined;
+  let rejectPermissionTimeout: ((error: Error) => void) | undefined;
+  let rejectUserInputTimeout: ((error: Error) => void) | undefined;
+  let permissionWaitTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let userInputWaitTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let executionWatchdogId: ReturnType<typeof setInterval> | undefined;
+  let executionActiveMs = 0;
+  let executionSampleAt = turnStartedAt;
+
+  const executionWaiting = (): boolean => pendingPermissions.size > 0 || pendingUserInputWaits > 0;
+
+  const executionWatchdog = (): void => {
+    const now = Date.now();
+    if (!executionWaiting()) {
+      executionActiveMs += Math.max(0, now - executionSampleAt);
+    }
+    executionSampleAt = now;
+
+    if (executionActiveMs >= config.turnTimeoutMs && rejectExecutionTimeout) {
+      const reject = rejectExecutionTimeout;
+      rejectExecutionTimeout = undefined;
+      if (executionWatchdogId !== undefined) clearInterval(executionWatchdogId);
+      reject(new Error(`Timeout after ${config.turnTimeoutMs}ms waiting for agent execution`));
+    }
+  };
+
+  const startPermissionWaitTimeout = (): void => {
+    if (permissionWaitTimeoutId !== undefined) return;
+    permissionWaitTimeoutId = setTimeout(() => {
+      rejectPermissionTimeout?.(
+        new Error(`Timeout after ${config.permissionWaitTimeoutMs}ms waiting for permission`),
+      );
+    }, config.permissionWaitTimeoutMs);
+    permissionWaitTimeoutId.unref?.();
+  };
+
+  const clearPermissionWaitTimeout = (): void => {
+    if (pendingPermissions.size > 0) return;
+    if (permissionWaitTimeoutId !== undefined) clearTimeout(permissionWaitTimeoutId);
+    permissionWaitTimeoutId = undefined;
+  };
+
+  const startUserInputWaitTimeout = (): void => {
+    if (userInputWaitTimeoutId !== undefined) return;
+    userInputWaitTimeoutId = setTimeout(() => {
+      rejectUserInputTimeout?.(
+        new Error(`Timeout after ${config.userInputWaitTimeoutMs}ms waiting for user input`),
+      );
+    }, config.userInputWaitTimeoutMs);
+    userInputWaitTimeoutId.unref?.();
+  };
+
+  const clearUserInputWaitTimeout = (): void => {
+    if (pendingUserInputWaits > 0) return;
+    if (userInputWaitTimeoutId !== undefined) clearTimeout(userInputWaitTimeoutId);
+    userInputWaitTimeoutId = undefined;
   };
 
   let lastActivityAt = new Date(turnStartedAt).toISOString();
@@ -741,7 +768,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const autoApproved = input.permissionMode === 'allow_all' && !managedApprovalRequired;
     if (!autoApproved) {
       pendingPermissions.set(requestId, { requestedAt: Date.now(), kind, summary });
-      syncWaitTimeout();
+      startPermissionWaitTimeout();
     }
     // Allow All 仍然要尊重 Copilot/平台要求的 managedApproval；这种请求必须回到人工确认 UI。
     if (!autoApproved) {
@@ -804,22 +831,25 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const durationMs = pending ? Date.now() - pending.requestedAt : undefined;
     const result = e.data.result as unknown as Record<string, unknown> | undefined;
     pendingPermissions.delete(e.data.requestId);
-    syncWaitTimeout();
+    clearPermissionWaitTimeout();
     const resultKind = typeof result?.kind === 'string' ? result.kind : undefined;
-    const completionLabel = resultKind === 'cancelled'
-      ? '权限请求已取消'
-      : resultKind === 'reject'
-        ? '已拒绝操作'
-        : resultKind === 'approve-for-session'
-          ? '已允许当前会话'
-          : resultKind === 'approve-once'
-            ? '已允许操作'
-            : '确认已处理';
+
+    // SDK 在 session.abort() 时会给尚未完成的 permission 补发 cancelled。
+    // cancelled 不是用户确认，不在轨迹里伪装成“确认已处理”，也不制造一串绿色完成事件。
+    if (resultKind === 'cancelled') return;
+
+    const completionLabel = resultKind === 'reject'
+      ? '已拒绝操作'
+      : resultKind === 'approve-for-session'
+        ? '已允许当前会话'
+        : resultKind === 'approve-once'
+          ? '已允许操作'
+          : '确认已处理';
     markActivity('permission_completed', completionLabel);
     input.onTrajectory?.({
       type: 'permission_completed',
       name: completionLabel,
-      status: resultKind === 'cancelled' ? 'info' : 'completed',
+      status: 'completed',
       ...(durationMs !== undefined ? { durationMs } : {}),
       details: {
         requestId: e.data.requestId,
@@ -1066,10 +1096,17 @@ export async function askCopilot(input: AskInput): Promise<string> {
         });
       }
 
-      let timedOutError: Error | undefined;
-      const waitTimeoutPromise = new Promise<never>((_, reject) => {
-        rejectWaitTimeout = reject;
-        armWaitTimeout(waitMode);
+      executionSampleAt = Date.now();
+      executionActiveMs = 0;
+
+      const executionTimeoutPromise = new Promise<never>((_, reject) => {
+        rejectExecutionTimeout = reject;
+      });
+      const permissionTimeoutPromise = new Promise<never>((_, reject) => {
+        rejectPermissionTimeout = reject;
+      });
+      const userInputTimeoutPromise = new Promise<never>((_, reject) => {
+        rejectUserInputTimeout = reject;
       });
 
       let final;
@@ -1077,9 +1114,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
         final = await Promise.race([
           session.sendAndWait(
             { prompt: continuationPrompt },
-            Math.max(config.turnTimeoutMs, config.userInputWaitTimeoutMs, config.permissionWaitTimeoutMs),
+            SDK_WAIT_GUARD_TIMEOUT_MS,
           ),
-          waitTimeoutPromise,
+          executionTimeoutPromise,
+          permissionTimeoutPromise,
+          userInputTimeoutPromise,
         ]);
       } catch (error) {
         if (error instanceof Error && (
@@ -1087,7 +1126,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
           || USER_INPUT_WAIT_TIMEOUT.test(error.message)
           || PERMISSION_WAIT_TIMEOUT.test(error.message)
         )) {
-          timedOutError = error;
           try {
             await session.abort();
           } catch {
@@ -1096,13 +1134,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
         }
         throw error;
       } finally {
-        if (waitTimeoutId !== undefined) {
-          clearTimeout(waitTimeoutId);
-          waitTimeoutId = undefined;
-        }
-        rejectWaitTimeout = undefined;
+        rejectExecutionTimeout = undefined;
+        rejectPermissionTimeout = undefined;
+        rejectUserInputTimeout = undefined;
       }
-      if (timedOutError) throw timedOutError;
       finalContent = final?.data.content || content;
       input.onStageResult?.({ content: finalContent, execution });
       if (input.onBeforeWorkflowTransition) {
@@ -1261,9 +1296,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
     await runRecorder?.write('run_finished', { elapsedMs: Date.now() - turnStartedAt });
     await runRecorder?.close();
     clearInterval(heartbeat);
-    if (waitTimeoutId !== undefined) clearTimeout(waitTimeoutId);
-    waitTimeoutId = undefined;
-    rejectWaitTimeout = undefined;
+    if (executionWatchdogId !== undefined) clearInterval(executionWatchdogId);
+    executionWatchdogId = undefined;
+    if (permissionWaitTimeoutId !== undefined) clearTimeout(permissionWaitTimeoutId);
+    permissionWaitTimeoutId = undefined;
+    if (userInputWaitTimeoutId !== undefined) clearTimeout(userInputWaitTimeoutId);
+    userInputWaitTimeoutId = undefined;
+    rejectExecutionTimeout = undefined;
+    rejectPermissionTimeout = undefined;
+    rejectUserInputTimeout = undefined;
     for (const [requestId, pending] of pendingCopilotPermissions) {
       if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
     }
