@@ -6,6 +6,7 @@ import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
+import { assertInvestigationScopeGate } from './scope-gate.js';
 
 /**
  * 架构评估结果是一个轻量的“可继续讨论的草案”，不是自动审批结论。
@@ -80,6 +81,8 @@ function dedupe(values: string[]): string[] { return [...new Set(values.filter(B
 
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
+  // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
+  await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
