@@ -25,17 +25,17 @@
 - Mapping
 - Validation
 
-这些交付物用于检查调查有没有跑偏，不是硬性的流程步骤。
+这些交付物用于检查调查有没有跑偏，不是硬性的流程步骤。系统会根据已经落盘的 Discovery、Lineage、Finding、Modernization Plan 等状态，持续计算“已覆盖 / 进行中 / 未开始”，把它作为下一步调查的主要导航信号。
 
 ## 每一轮
 
-Mission 会重新放进 Agent 的动态 system message 最前面，并在自动续跑时再次出现。
+Mission 会作为独立的最高优先级 system block 注入 Copilot Session；每个自动续跑阶段都会重新计算交付物覆盖后再注入一次。长期 Session 即使发生 compaction，也不能让局部问题取代 Mission。
 
 Agent 每次选择工具或下一步动作时，都应该先回答：
 
 > 这个动作是不是直接帮助完成期望结果？
 
-如果答案是否定的，就不要因为 unknown、某个工具结果或者当前 Workflow 节点而继续追。
+如果答案是否定的，就不要因为 unknown、某个工具结果或者当前 Workflow 节点而继续追。应先检查还有哪个 Mission 交付物没有覆盖，优先做离目标最近的工作。
 
 ## Unknown 和 Mission 的关系
 
@@ -102,7 +102,9 @@ Evidence / Tool / Skill
 - `src/workflow/mission-gate.ts`：确定性 Mission Gate 和交付物拆分
 - `src/workflow/ask.ts`：每轮注入 Mission
 - `src/agent/prompts.ts`：最高优先级 Prompt
-- `src/workflow/stage-gate.ts`：阶段成果必须绑定已确认 Mission
+- `src/workflow/stage-gate.ts`：阶段成果必须绑定已确认 Mission，并至少推动一个已定义交付物
+- `src/workflow/mission-progress.ts`：根据已经落盘的调查状态计算交付覆盖
+- `src/workflow/mission-evaluation.ts`：用 Smart Function 做 Mission 清晰度辅助判断
 - `web/src/components/MissionContractPanel.tsx`：用户确认和修改 Mission
 - `scripts/investigation-mission-gate.ts`：本地 Script Gate
 
