@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ImgCrop from 'antd-img-crop';
-import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Typography, Upload } from 'antd';
-import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
+import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
+import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -22,6 +22,10 @@ const workflowOptions:{value:ConfigWorkflow;label:string}[]=[
 
 function clone<T>(value:T):T{return JSON.parse(JSON.stringify(value)) as T;}
 function formatTime(value:string){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString();}
+
+async function copyText(value:string):Promise<void>{
+  await navigator.clipboard.writeText(value);
+}
 
 export function InvestigationConfigPage(props:{
   sessionName:string;
@@ -127,12 +131,11 @@ export function InvestigationConfigPage(props:{
   return <div className='config-page-shell'>
     <header className='subpage-header'>
       <Flex align='center' gap={10}>
-        <Button type='text' icon={<ArrowLeftOutlined/>} onClick={props.onBack}>返回调查</Button>
-        <Divider orientation='vertical'/>
         <SettingOutlined/> <Title level={4} style={{margin:0}}>调查配置</Title>
         <Tag>v{props.control.version}</Tag>
       </Flex>
       <Space>
+        <Button onClick={props.onBack} disabled={saving}>退出</Button>
         <Button icon={<SaveOutlined/>} type='primary' loading={saving} onClick={()=>void save()}>保存配置</Button>
       </Space>
     </header>
@@ -143,7 +146,41 @@ export function InvestigationConfigPage(props:{
       <main className='config-page-content'>
         {tab==='research'&&<div className='settings-page'>
           <Title level={4}>研究范围</Title><Paragraph type='secondary'>决定 Agent 优先查什么资料。这里是调查输入，不改变工作方式。</Paragraph>
-          <Card title='GitHub 仓库' className='settings-card'><Select mode='tags' value={draft.research.githubRepositories} style={{width:'100%'}} tokenSeparators={[',']} placeholder='https://github.com/org/repo' onChange={value=>update(next=>{next.research.githubRepositories=value;})}/>
+          <Card title='GitHub 仓库' className='settings-card'>
+            <Select
+              mode='tags'
+              value={draft.research.githubRepositories}
+              style={{width:'100%'}}
+              tokenSeparators={[',']}
+              placeholder='https://github.com/org/repo'
+              tagRender={(tagProps) => (
+                <Tag
+                  closable={tagProps.closable}
+                  onClose={tagProps.onClose}
+                  style={{display:'inline-flex',alignItems:'center',gap:4,maxWidth:'100%',marginInlineEnd:4}}
+                >
+                  <span style={{maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={String(tagProps.label)}>
+                    {tagProps.label}
+                  </span>
+                  <Tooltip title='复制仓库地址'>
+                    <Button
+                      type='text'
+                      size='small'
+                      icon={<CopyOutlined />}
+                      style={{padding:0,width:20,height:20}}
+                      onMouseDown={(event)=>event.preventDefault()}
+                      onClick={(event)=>{
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void copyText(String(tagProps.value));
+                      }}
+                    />
+                  </Tooltip>
+                </Tag>
+              )}
+              onChange={value=>update(next=>{next.research.githubRepositories=value;})}
+            />
+
             <div className='field-label'>搜索范围</div><Radio.Group value={draft.research.githubSearchMode} optionType='button' buttonStyle='solid' options={[{value:'only_selected',label:'仅搜索已选仓库'},{value:'selected_and_broad',label:'先搜索已选仓库，再扩大范围'}]} onChange={e=>update(next=>{next.research.githubSearchMode=e.target.value;})}/>
           </Card>
           <Card title='研究关键词' className='settings-card'><Paragraph type='secondary'>希望 Agent 主动关注的重要业务或技术术语。</Paragraph><Select mode='tags' style={{width:'100%'}} tokenSeparators={[',']} value={draft.research.keywords} onChange={value=>update(next=>{next.research.keywords=value;})} placeholder='例如：持仓、证券主数据、代理投票...'/></Card>
