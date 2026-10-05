@@ -18,6 +18,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量，不引入重量级 Workflow Engine | Accepted |
 | [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配，Investigation 状态和页面 UI 按职责拆分 | Accepted |
 | [ADR-010](./010-independent-artifact-review.md) | AI 工作成果增加独立语义质量审核；不替代 Evidence Gate 或人工批准 | Accepted |
+| [ADR-011](./011-mission-contract-as-investigation-boundary.md) | Mission Contract 作为 Investigation 的最高优先级任务边界；正式调查必须经过用户确认 | Accepted |
 
 ## 如何使用 ADR
 
