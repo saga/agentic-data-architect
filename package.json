@@ -22,7 +22,8 @@
     "gate:report": "tsx scripts/current-state-report-gate.ts",
     "python:sync": "uv sync",
     "python:lock": "uv lock",
-    "python:check": "uv run python scripts/check-python-deps.py"
+    "python:check": "uv run python scripts/check-python-deps.py",
+    "gate:stage": "tsx scripts/investigation-stage-gate.ts"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
