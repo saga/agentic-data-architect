@@ -35,3 +35,22 @@
 本 ADR 约束前端结构，不要求所有组件都立即拆分。优先拆分职责明显、代码量大、状态边界清楚的部分。
 
 本 ADR 的形成讨论见 Appendix A；附录仅供参考。
+## Appendix A：形成决定时的分析记录（仅供参考）
+
+这次重构的直接原因是 web/src/App.tsx 已经同时包含路由、会话加载、执行状态轮询、Agent turn、权限和用户输入响应、文件上传、Workflow 修改、消息渲染以及完整三栏布局。
+
+检查后发现，真正可以独立出来的边界很清楚：
+
+- controller：状态、API 调用和 Agent turn 行为；
+- page router：chat/config/results/trajectory/journey 页面选择；
+- sidebar：调查列表和左栏宽度；
+- topbar：工作区状态和导航入口；
+- chat panel：消息、权限请求、用户输入和 composer；
+- context panel：Journey 和当前事实；
+- dialogs：新建调查和待查内容。
+
+因此没有引入全局状态管理框架，也没有把每个函数机械地拆成大量小文件，而是按已经存在的职责边界拆分。App.tsx 最终只负责 Provider 和 controller/page/workspace 的装配。
+
+这次分析还发现原 App 与已有组件存在两个潜在的前端类型/解析问题：WorkflowId 没有从统一类型文件导入，以及 ChatContent 使用了未在自身定义的 formatTime。重构时一并恢复到统一类型/本地工具函数，但没有改变业务行为。
+
+本附录只记录重构形成过程，不构成正文之外的额外架构规则。
