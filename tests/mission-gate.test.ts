@@ -16,6 +16,48 @@ test('mission gate requires explicit user confirmation', () => {
   assert.match(formatMissionGateFailure(result), /为什么要做.*最后希望拿到什么/);
 });
 
+test('mission gate rejects vague confirmed text instead of trusting confirmation alone', () => {
+  const result = evaluateMissionGate({
+    version: 1,
+    purpose: '分析一下',
+    expectedResult: '给我一些建议',
+    deliverables: [{
+      id: 'custom-result',
+      title: '其他结果',
+      description: '按照用户明确说明的期望结果形成最终交付物。',
+      required: true,
+    }],
+    status: 'confirmed',
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user',
+  });
+
+  assert.equal(result.passed, false);
+  assert.match(formatMissionGateFailure(result), /任务目的/);
+});
+
+test('mission gate rejects a persisted contract whose deliverables no longer match its text', () => {
+  const purpose = '理解 IBM 老系统当前的数据架构，为 replatform 提供依据。';
+  const expectedResult = '拿到当前 Data Source、Data Flow、Data Model。';
+  const result = evaluateMissionGate({
+    version: 1,
+    purpose,
+    expectedResult,
+    deliverables: [{
+      id: 'target-architecture',
+      title: '目标架构',
+      description: '形成新的数据/应用架构方案及关键设计。',
+      required: true,
+    }],
+    status: 'confirmed',
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user',
+  });
+
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '交付物与任务契约一致' && !item.passed));
+});
+
 test('mission gate accepts a confirmed mission with observable deliverables', () => {
   const mission = {
     version: 1 as const,
