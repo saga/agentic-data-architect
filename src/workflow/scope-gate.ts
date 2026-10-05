@@ -167,7 +167,7 @@ export function formatScopeGateFailure(result: ScopeGateResult): string {
 
   return '这次调查还不能生成正式结果。'
     + reason
-    + ' 请回到调查，让助手先整理已有材料；材料足够明确时会直接确认，存在歧义时再请你确认。';
+    + ' 请回到调查，让助手先整理已有材料。材料足够明确时会直接确认，存在歧义时再请你确认。';
 }
 
 /**
