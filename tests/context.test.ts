@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildQuestionContext } from '../src/analysis/context.js';
+import { emptyEstate, nodeId } from '../src/model/estate.js';
 import type { EvidenceRef } from '../src/evidence/types.js';
 
 test('question context exposes evidence ids for column lineage and profiles', () => {
@@ -33,24 +34,52 @@ test('question context exposes evidence ids for column lineage and profiles', ()
       collectedAt: new Date().toISOString(),
     },
   ];
+
+  const estate = emptyEstate();
+  const legacyPositionId = nodeId('dataset', 'legacy_position');
+  const positionId = nodeId('dataset', 'position');
+  const sourceColumnId = nodeId('column', 'legacy_position.pos_qty');
+  const targetColumnId = nodeId('column', 'position.quantity');
+  estate.nodes.push(
+    { id: legacyPositionId, type: 'dataset', name: 'legacy_position', attributes: {} },
+    { id: positionId, type: 'dataset', name: 'position', attributes: {} },
+    {
+      id: sourceColumnId,
+      type: 'column',
+      name: 'legacy_position.pos_qty',
+      attributes: { expression: 'pos_qty' },
+    },
+    { id: targetColumnId, type: 'column', name: 'position.quantity', attributes: {} },
+  );
+  estate.edges.push(
+    {
+      id: 'e-dataset',
+      from: legacyPositionId,
+      to: positionId,
+      type: 'derived_from',
+      evidenceIds: ['ev-sql'],
+    },
+    {
+      id: 'e-column',
+      from: sourceColumnId,
+      to: targetColumnId,
+      type: 'derived_from',
+      evidenceIds: ['ev-sql'],
+    },
+  );
+
   const result = buildQuestionContext({
     question: 'position quantity',
+    estate,
+    // The lineage object only signals that SQL lineage has been run. Dataset and
+    // column graph data intentionally come from DataEstate above.
     lineage: {
       edges: [],
-      tables: ['position'],
+      tables: [],
       statements: [],
       evidence,
-      columns: [
-        {
-          sourceDataset: 'legacy_position',
-          sourceColumn: 'pos_qty',
-          targetDataset: 'position',
-          targetColumn: 'quantity',
-          expression: 'pos_qty',
-          statementId: 's1',
-          evidenceId: 'ev-sql',
-        },
-      ],
+      columns: [],
+      parseFailures: [],
     },
     profiles: [
       {
@@ -74,6 +103,9 @@ test('question context exposes evidence ids for column lineage and profiles', ()
     findings: [],
     evidence,
   });
+
+  assert.ok(result.text.includes('legacy_position → position'));
+  assert.ok(result.text.includes('position.quantity ← legacy_position.pos_qty'));
   assert.ok(result.text.includes('[ev-sql]'));
   assert.ok(result.text.includes('[ev-profile]'));
   assert.ok(result.text.includes('[ev-profile-col]'));
