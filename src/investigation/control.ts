@@ -96,7 +96,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     agent: {
       model: config.model,
       // 本地单用户工作台默认不逐次弹权限确认；需要严格审批时可显式切回 permission。
-      permissionMode: 'permission',
+      permissionMode: 'allow_all',
       autoContinuationTurns: 4,
       displayName: '秘书',
       personality: '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。',
@@ -179,7 +179,7 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(agent.autoTier === 'efficiency' || agent.autoTier === 'balance' || agent.autoTier === 'intelligence' || agent.autoTier === 'fast'
         ? { autoTier: agent.autoTier }
         : {}),
-      permissionMode: 'permission',
+      permissionMode: agent.permissionMode === 'allow_all' ? 'allow_all' : 'permission',
       autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 4, 0, 6),
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
