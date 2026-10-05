@@ -20,7 +20,7 @@ import {
 } from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
 import { appendTrajectoryEvent } from '../investigation/trajectory.js';
-import { workspaceRoot } from '../investigation/workspace.js';
+import { appendContextInput, appendTranscript, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
@@ -117,6 +117,15 @@ export async function answerQuestion(
       role: 'user',
       content: effectiveQuestion,
     });
+    // SQLite 用于全文检索；Workspace 同步保留用户输入和 transcript，导出后仍能还原调查过程。
+    await appendContextInput(investigationName, {
+      kind: 'user_message',
+      title: '用户问题',
+      content: effectiveQuestion,
+      source: 'conversation',
+      important: false,
+    });
+    await appendTranscript(investigationName, 'user', effectiveQuestion);
     let inv = await loadInvestigation(investigationName);
     const control = await loadInvestigationControl(investigationName);
 
@@ -347,6 +356,7 @@ export async function answerQuestion(
     });
 
     saveConversationMessage({ sessionName: investigationName, role: 'assistant', content: answer });
+    await appendTranscript(investigationName, 'assistant', answer);
     const result: AnswerSummary = {
       answer,
       claimIds: claims.map((c) => `${c.id}[${c.status}]`),
