@@ -47,7 +47,7 @@ export const config = {
   githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
   model: envConfig.COPILOT_MODEL,
   openCodeEnabled: envConfig.OPENCODE_ENABLED === 'true',
-  openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\\/+$/, ''),
+  openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\/+$/, ''),
   openCodeUsername: envConfig.OPENCODE_USERNAME?.trim() || undefined,
   openCodePassword: envConfig.OPENCODE_PASSWORD || undefined,
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
