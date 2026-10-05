@@ -36,7 +36,7 @@ start -> intake
 
 title: 明确评估目标
 objective: 先说清楚为什么做这次评估、评什么、谁使用结果、最终要交付什么。
-completeWhen: goal
+completeWhen: scope-ready
 - success -> current-state
 
 ## @task current-state
