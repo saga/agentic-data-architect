@@ -119,7 +119,7 @@ export interface AskInput {
   skillDirectories?: string[];
   /** Platform capabilities are fixed by the Control snapshot for this turn. */
   platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
-  /** 当前 Investigation 的 Agent 权限模式；默认 permission 保持原有逐次确认行为。 */
+  /** 当前 Investigation 的 Agent 权限模式；未显式指定时默认 Allow All。 */
   permissionMode?: 'permission' | 'allow_all';
   mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
   onDelta?: (delta: string) => void;
@@ -361,9 +361,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
-    // Allow All Access 使用 SDK 官方 approveAll；默认 permission 模式不注册 handler，
-    // 这样 permission.requested 会停在 pending，等待本工作台前端明确批准或拒绝。
-    ...(input.permissionMode === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
+    // 默认直接 Allow All，避免本地单用户工作台对每个 read/grep/bash 都重复确认。
+    // 只有上层显式传 permission 时，才启用逐次人工审批。
+    ...((input.permissionMode ?? 'allow_all') === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
     /**
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
@@ -528,6 +528,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     userInputWaitTimeoutId = undefined;
   };
 
+  executionWatchdogId = setInterval(executionWatchdog, 250);
+  executionWatchdogId.unref?.();
+
   const heartbeat = setInterval(() => {
     input.onTrajectory?.({
       type: 'status',
@@ -547,9 +550,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
       },
     });
   }, 15_000);
-
-  executionWatchdogId = setInterval(executionWatchdog, 250);
-  executionWatchdogId.unref?.();
 
   try {
     if (input.shouldAbort?.()) {
