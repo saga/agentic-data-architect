@@ -45,6 +45,7 @@ import {
   loadArchitectureAssessmentPlan,
 } from './workflow/assessment.js';
 import { config } from './config.js';
+import { ScopeGateError } from './workflow/scope-gate.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
   appendContextInput,
@@ -813,8 +814,19 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   app.get('/api/sessions/:name/report', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const report = await buildReport(name);
-    res.type('text/markdown').send(report.markdown);
+    try {
+      const report = await buildReport(name);
+      res.type('text/markdown').send(report.markdown);
+    } catch (error) {
+      if (error instanceof ScopeGateError) {
+        res.status(409).json({
+          error: error.message,
+          checks: error.result.checks,
+        });
+        return;
+      }
+      throw error;
+    }
   });
 
   app.get('/api/shared', async (_req, res) => {
