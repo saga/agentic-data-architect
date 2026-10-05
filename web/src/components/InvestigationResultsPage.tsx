@@ -115,7 +115,7 @@ export function InvestigationResultsPage(props: {
       }
       if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
       if (!sessionResponse.ok) throw new Error((await sessionResponse.text()) || sessionResponse.statusText);
-      if (!modernizationResponse.ok) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
+      if (!modernizationResponse.ok && modernizationResponse.status !== 409) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
 
       const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
         reportResponse.ok
@@ -123,7 +123,9 @@ export function InvestigationResultsPage(props: {
           : reportResponse.json() as Promise<{error?: string}>,
         trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
         sessionResponse.json() as Promise<SessionSnapshot>,
-        modernizationResponse.json() as Promise<{plan?: ModernizationPlan | null}>,
+        modernizationResponse.ok
+          ? modernizationResponse.json() as Promise<{plan?: ModernizationPlan | null}>
+          : Promise.resolve({ plan: null }),
       ]);
 
       const unique = new Map<string, Checkpoint>();
