@@ -152,6 +152,7 @@ export async function answerQuestion(
     const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(investigationName);
     const ctx = buildQuestionContext({
       question: effectiveQuestion,
+      estate: snapshot?.estate ?? { nodes: [], edges: [] },
       lineage: snapshot?.lineage ?? null,
       profiles: snapshot?.profiles ?? [],
       findings: inv.findings,
