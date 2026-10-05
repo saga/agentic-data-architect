@@ -28,11 +28,7 @@ import { loadModernizationPlan, persistModernizationAgentResult } from './modern
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import { runInvestigationScopeGate } from './scope-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
-import {
-  buildJourneyState,
-  isJourneyCompletionConditionSatisfied,
-  type JourneyFacts,
-} from './journey.js';
+import { isJourneyCompletionConditionSatisfied } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
   applyJourneyTransition,
