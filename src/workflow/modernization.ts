@@ -220,6 +220,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
   const journeyDefinition = await loadModernizationJourney();
   const journey = buildJourneyState(journeyDefinition, {
     goal: inv.goal || inv.userPrompt,
+    scopeReady: inv.scopeValidation?.status === 'validated',
     currentState: current ? {
       datasets: current.coverage.datasets,
       semanticAssets: current.coverage.semanticAssets,
