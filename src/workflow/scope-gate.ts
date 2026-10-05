@@ -7,8 +7,8 @@
  * 2. 没有使用占位符；
  * 3. 已保存的 ScopeValidation 仍然与当前字段一致，并且来源可以追溯到用户或真实 Evidence。
  */
-import { loadInvestigation } from '../investigation/store.js';
-import type { Investigation } from '../investigation/store.js';
+import { loadInvestigation, saveInvestigation, type Investigation } from '../investigation/store.js';
+import type { AgentIntake } from '../investigation/schemas.js';
 
 export interface ScopeGateCheck {
   name: string;
@@ -135,7 +135,7 @@ export function formatScopeGateFailure(result: ScopeGateResult): string {
  */
 export async function persistAgentIntake(
   name: string,
-  intake: Investigation extends never ? never : import('../investigation/schemas.js').AgentIntake,
+  intake: AgentIntake,
 ): Promise<boolean> {
   const inv = await loadInvestigation(name);
   const goal = (intake.goal ?? inv.goal ?? inv.userPrompt).trim();
@@ -166,7 +166,7 @@ export async function persistAgentIntake(
     evidenceIds,
     validatedAt: new Date().toISOString(),
   };
-  await (await import('../investigation/store.js')).saveInvestigation(inv);
+  await saveInvestigation(inv);
   return true;
 }
 
