@@ -1,0 +1,180 @@
+/**
+ * 独立工作成果 Reviewer。
+ *
+ * Reviewer 不参与调查、不修改结果，也不共享主 Agent 的 Session。
+ * 它只判断已经生成的用户可见报告或 Modernization 工作成果：
+ * 是否回答了原始目标、是否容易读懂、是否自洽、是否有实际结论。
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import * as z from 'zod';
+import { askCopilot } from '../agent/copilot.js';
+import { config } from '../config.js';
+import { reportsDir } from '../investigation/store.js';
+import { workspaceRoot } from '../investigation/workspace.js';
+
+export const ReviewArtifactTypeSchema = z.enum([
+  'report',
+  'target_architecture',
+  'mapping',
+  'validation',
+]);
+export type ReviewArtifactType = z.infer<typeof ReviewArtifactTypeSchema>;
+
+export const ReviewIssueSchema = z.object({
+  category: z.enum([
+    'goal_alignment',
+    'readability',
+    'conclusion',
+    'signal_noise',
+    'consistency',
+    'decision_usefulness',
+  ]),
+  severity: z.enum(['high', 'medium', 'low']),
+  description: z.string().trim().min(1),
+  suggestion: z.string().trim().min(1),
+}).strict();
+
+export const ArtifactReviewSchema = z.object({
+  artifactType: ReviewArtifactTypeSchema,
+  status: z.enum(['pass', 'fail']),
+  score: z.number().int().min(0).max(100),
+  summary: z.string().trim().min(1),
+  issues: z.array(ReviewIssueSchema),
+  reviewedAt: z.string().datetime(),
+}).strict();
+export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
+
+const REVIEWER_SYSTEM_PROMPT = [
+  '你是一个独立的 Data Architect 工作成果 Reviewer。',
+  '你的职责只有一个：判断别人刚生成的工作成果是否已经达到可以交给架构师/分析师阅读和继续决策的质量。',
+  '你不是原来的调查 Agent，不要继续调查，不要调用工具，不要补充新的事实，不要替作者重写成果。',
+  '必须以原始用户目标作为第一判断标准。',
+  '只评价输入中已经提供的内容；不要因为你自己知道某个系统而添加外部事实。',
+  '重点检查：是否真的回答了目标、是否说人话、是否把内部实现结构泄漏给用户、是否有明确结论、是否存在前后矛盾、是否把指标堆砌成结论。',
+  '对于架构工作成果，还要检查内容是否足够支持下一步决策，但不能把“应该采用某技术”当成事实要求。',
+  'Evidence 的真假和 Evidence ID 的有效性由确定性 Gate 检查；你只检查报告有没有正确使用这些信息和是否出现明显越界。',
+  '只有没有 high severity 问题，并且整体已经达到可直接阅读和使用的水平时才能 pass。',
+  '输出必须是严格 JSON，不要输出 Markdown 或代码围栏。',
+].join('\n');
+
+function extractJson(raw: string): unknown {
+  const fenced = raw.match(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/);
+  const text = fenced?.[1]?.trim() ?? raw.trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new Error('Reviewer 没有返回可识别的审核结果。');
+    return JSON.parse(text.slice(start, end + 1));
+  }
+}
+
+function artifactLabel(type: ReviewArtifactType): string {
+  switch (type) {
+    case 'report': return 'Current-State Report';
+    case 'target_architecture': return 'Target Architecture';
+    case 'mapping': return 'Source-to-Target Mapping';
+    case 'validation': return 'Validation Plan / Validation Result';
+  }
+}
+
+function trimArtifact(value: string, maxChars = 36000): string {
+  return value.length <= maxChars
+    ? value
+    : value.slice(0, maxChars) + '\n\n[内容过长，后半部分未提供给 Reviewer]';
+}
+
+function buildReviewPrompt(input: {
+  goal: string;
+  artifactType: ReviewArtifactType;
+  artifact: string;
+  facts?: string;
+}): string {
+  return [
+    '原始用户目标：',
+    input.goal.trim() || '（未设置）',
+    '',
+    '待审核成果类型：',
+    artifactLabel(input.artifactType),
+    '',
+    ...(input.facts?.trim()
+      ? ['确定性事实摘要（只用于检查成果是否自洽，不要求 Reviewer 重新计算）：', trimArtifact(input.facts, 12000), '']
+      : []),
+    '待审核成果：',
+    trimArtifact(input.artifact),
+    '',
+    '请只返回以下 JSON：',
+    JSON.stringify({
+      artifactType: input.artifactType,
+      status: 'pass',
+      score: 85,
+      summary: '一句话说明整体质量。',
+      issues: [{
+        category: 'readability',
+        severity: 'low',
+        description: '具体问题。',
+        suggestion: '具体怎么改。',
+      }],
+      reviewedAt: new Date().toISOString(),
+    }),
+    '',
+    '判定要求：',
+    '- status=fail：存在至少一个 high 问题，或者成果整体明显不能支持用户理解/决策。',
+    '- status=pass：没有 high 问题，medium 问题不会实质影响理解和决策。',
+    '- score 只是整体质量分，不替代上述 pass/fail 规则。',
+    '- 问题必须具体到这份成果，不要写“可以更好”“建议进一步完善”之类空话。',
+  ].join('\n');
+}
+
+export async function reviewArtifact(input: {
+  investigationName: string;
+  goal: string;
+  artifactType: ReviewArtifactType;
+  artifact: string;
+  facts?: string;
+}): Promise<ArtifactReview> {
+  const raw = await askCopilot({
+    prompt: buildReviewPrompt(input),
+    systemPrompt: REVIEWER_SYSTEM_PROMPT,
+    purpose: 'review',
+    model: config.model,
+    workingDirectory: workspaceRoot(input.investigationName),
+  });
+
+  const parsed = ArtifactReviewSchema.parse(extractJson(raw));
+  if (parsed.artifactType !== input.artifactType) {
+    throw new Error('Reviewer 返回的成果类型与当前审核对象不一致。');
+  }
+
+  const hasHigh = parsed.issues.some((issue) => issue.severity === 'high');
+  const normalizedStatus = !hasHigh && parsed.status === 'pass' ? 'pass' : 'fail';
+  return {
+    ...parsed,
+    status: normalizedStatus,
+    reviewedAt: new Date().toISOString(),
+  };
+}
+
+export async function saveArtifactReview(
+  investigationName: string,
+  review: ArtifactReview,
+): Promise<string> {
+  const fileName = review.artifactType === 'report'
+    ? 'report-review.json'
+    : `${review.artifactType.replaceAll('_', '-')}-review.json`;
+  const filePath = path.join(reportsDir(investigationName), fileName);
+  await fs.mkdir(reportsDir(investigationName), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(review, null, 2) + '\n', 'utf8');
+  return filePath;
+}
+
+export function summarizeReviewFailure(review: ArtifactReview, maxIssues = 4): string {
+  const issues = review.issues
+    .filter((issue) => issue.severity !== 'low')
+    .slice(0, maxIssues)
+    .map((issue) => issue.description)
+    .join('；');
+  return issues || review.summary;
+}
