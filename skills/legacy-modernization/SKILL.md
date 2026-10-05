@@ -165,7 +165,7 @@ objective: 把旧数据对应到新数据，并把 transformation、business rul
 - evidence
 - 当前状态
 
-遇到不能自动确定的映射，回到 investigate，而不是猜。
+遇到不能自动确定的映射，先保留为未解决项；只有它会影响本次 Mission 的交付时，才回到当前架构调查继续查清，而不是猜。
 
 - success -> validation
 
@@ -186,7 +186,7 @@ objective: 证明目标系统和旧系统在关键业务结果上可以对得上
 - performance / SLA
 - cutover / rollback readiness
 
-发现差异后回到 investigate，先找原因再继续。
+发现差异后，只有它会影响本次 Mission 的交付时才继续查原因；优先回到当前架构调查补证据，不要把“发现差异”自动变成新的固定阶段。
 
 - success -> cutover
 
