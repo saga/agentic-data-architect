@@ -22,6 +22,15 @@ import { JourneyPlanSchema, WorkspaceContextSchema, type JourneyPlan } from './s
 /** Investigation 是 WorkspaceContext 在业务层的别名，代表持久化的当前分析状态。 */
 export type Investigation = WorkspaceContext;
 
+/** 判断两个 Mission 是否代表同一份用户任务；用于防止旧 turn 写回已失效的范围确认。 */
+function sameMission(
+  left: Investigation['mission'],
+  right: Investigation['mission'],
+): boolean {
+  return left?.purpose === right?.purpose
+    && left?.expectedResult === right?.expectedResult;
+}
+
 /** 创建一个空的 Investigation 初始状态；不负责写盘。 */
 export function newInvestigation(name: string, userPrompt = '', workflow: Investigation['workflow'] = null): Investigation {
   return {
@@ -89,7 +98,10 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       // Mission 只能通过 confirmInvestigationMission 修改。这里必须保留锁内读到的最新 Mission，
       // 防止旧 Agent turn 在用户修改 Mission 后把旧任务契约写回去。
       ...(current.mission ? { mission: current.mission } : {}),
-      ...(inv.scopeValidation ? { scopeValidation: inv.scopeValidation } : {}),
+      // Mission 改变后，旧 turn 带来的 Scope Confirmation 也不能恢复，否则正式结果会引用旧 Mission。
+      ...(sameMission(current.mission, inv.mission)
+        ? (inv.scopeValidation ? { scopeValidation: inv.scopeValidation } : {})
+        : (current.scopeValidation ? { scopeValidation: current.scopeValidation } : {})),
       questions: inv.questions,
       discoveryRuns: inv.discoveryRuns,
       evidence: inv.evidence,
