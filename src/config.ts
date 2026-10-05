@@ -19,10 +19,9 @@ const EnvSchema = z.object({
   OPENCODE_ENABLED: z.enum(['true', 'false']).default('true'),
   /** OpenCode Server 地址；默认使用 opencode serve 的本机地址。 */
   OPENCODE_BASE_URL: z.string().url().default('http://127.0.0.1:4096'),
-  /** OpenCode Server 使用 --password 时的 Basic Auth 用户名。 */
-  OPENCODE_USERNAME: z.string().optional(),
-  /** OpenCode Server 使用 --password 时的 Basic Auth 密码。 */
-  OPENCODE_PASSWORD: z.string().optional(),
+  /** OpenCode Server 开启 Basic Auth 时，沿用 OpenCode 官方环境变量。通常本机开发无需填写。 */
+  OPENCODE_SERVER_USERNAME: z.string().optional(),
+  OPENCODE_SERVER_PASSWORD: z.string().optional(),
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(360_000),
   // Agent 真正执行的默认上限仍为 6 分钟；进入 ask_user 后改用单独的等待上限。
   USER_INPUT_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
@@ -48,8 +47,8 @@ export const config = {
   model: envConfig.COPILOT_MODEL,
   openCodeEnabled: envConfig.OPENCODE_ENABLED === 'true',
   openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\/+$/, ''),
-  openCodeUsername: envConfig.OPENCODE_USERNAME?.trim() || undefined,
-  openCodePassword: envConfig.OPENCODE_PASSWORD || undefined,
+  openCodeUsername: envConfig.OPENCODE_SERVER_USERNAME?.trim() || undefined,
+  openCodePassword: envConfig.OPENCODE_SERVER_PASSWORD || undefined,
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   userInputWaitTimeoutMs: envConfig.USER_INPUT_WAIT_TIMEOUT_MS,
   permissionWaitTimeoutMs: envConfig.PERMISSION_WAIT_TIMEOUT_MS,
