@@ -99,3 +99,16 @@ test('Mission boundary allows a target stage when the user explicitly requested 
     true,
   );
 });
+
+
+test('specific current-state deliverables do not create a redundant umbrella deliverable', () => {
+  const deliverables = inferMissionDeliverables(
+    '理解当前系统的数据架构。',
+    '只需要当前 Data Source、Data Flow 和 Data Model。',
+  );
+
+  assert.deepEqual(
+    deliverables.map((item) => item.id),
+    ['data-source', 'data-flow', 'data-model'],
+  );
+});
