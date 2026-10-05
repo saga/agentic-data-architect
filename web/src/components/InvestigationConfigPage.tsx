@@ -294,8 +294,7 @@ export function InvestigationConfigPage(props:{
                 optionType='button'
                 buttonStyle='solid'
               options={[
-                { value:'permission', label:'按需确认' },
-                { value:'allow_all', label:'Allow All Access from Agent' },
+                { value:'permission', label:'每次确认' },
               ]}
                 onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
               />
