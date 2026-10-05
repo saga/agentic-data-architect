@@ -194,12 +194,15 @@ function normalizeControl(raw: Partial<InvestigationControl>): InvestigationCont
       ...(Array.isArray(agent.avatarSources)
         ? {
             avatarSources: agent.avatarSources
-              .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-              .map((item) => ({
-                src: String(item.src ?? '').trim(),
-                kind: item.kind === 'image' || item.kind === 'video' || item.kind === 'remote' ? item.kind : 'remote',
-                ...(typeof item.mimeType === 'string' && item.mimeType.trim() ? { mimeType: item.mimeType.trim() } : {}),
-              }))
+              .filter((item) => Boolean(item) && typeof item === 'object')
+              .map((item) => {
+                const source = item as unknown as Record<string, unknown>;
+                return {
+                  src: String(source.src ?? '').trim(),
+                  kind: source.kind === 'image' || source.kind === 'video' || source.kind === 'remote' ? source.kind : 'remote',
+                  ...(typeof source.mimeType === 'string' && source.mimeType.trim() ? { mimeType: source.mimeType.trim() } : {}),
+                };
+              })
               .filter((item) => item.src),
           }
         : {}),
