@@ -42,8 +42,17 @@ export function InvestigationConfigPage(props:{
   const [confirmText,setConfirmText]=useState('');
   const [avatarUploading,setAvatarUploading]=useState(false);
   const [avatarError,setAvatarError]=useState<string>();
+  const [openCodeStatus,setOpenCodeStatus]=useState<{enabled:boolean;reachable:boolean;baseUrl:string;modelCount:number;error?:string}>();
 
   useEffect(()=>setDraft(clone(props.control)),[props.control]);
+  useEffect(()=>{
+    let cancelled=false;
+    void fetch('/api/opencode/status')
+      .then(async response=>response.ok ? await response.json() as typeof openCodeStatus : undefined)
+      .then(result=>{if(!cancelled&&result)setOpenCodeStatus(result);})
+      .catch(()=>{if(!cancelled)setOpenCodeStatus(undefined);});
+    return ()=>{cancelled=true;};
+  },[]);
   const update=(mutator:(next:ConfigPageControl)=>void)=>setDraft(prev=>{const next=clone(prev);mutator(next);return next;});
 
   const save=async()=>{
@@ -287,7 +296,36 @@ export function InvestigationConfigPage(props:{
                 onChange={e=>update(next=>{next.agent.personality=e.target.value;})}
               />
             </Card>
-            <Card title='自动继续' className='settings-card'>
+            <Card title='本机 OpenCode' className='settings-card'>
+             <Paragraph type='secondary'>
+               模型下拉框会自动读取本机 OpenCode 已连接的 provider / model。选择后，当前 Investigation 的模型值会保存为 <code>opencode:&lt;provider&gt;/&lt;model&gt;</code>，下一轮直接由 OpenCode 执行。
+             </Paragraph>
+             <Flex align='center' gap={10} wrap>
+               <Tag color={openCodeStatus?.reachable ? 'green' : openCodeStatus?.enabled ? 'orange' : 'default'}>
+                 {openCodeStatus?.reachable ? '已连接' : openCodeStatus?.enabled ? '未连接' : '已关闭'}
+               </Tag>
+               <Text type='secondary'>{openCodeStatus?.baseUrl ?? '读取中…'}</Text>
+               {openCodeStatus?.reachable ? <Tag>{openCodeStatus.modelCount} 个模型</Tag> : null}
+             </Flex>
+             {!openCodeStatus?.reachable ? (
+               <Alert
+                 type='info'
+                 showIcon
+                 style={{marginTop:10}}
+                 title='启动本机 OpenCode'
+                 description={
+                   <span>
+                     执行 <code>opencode serve</code>。默认地址是 <code>http://127.0.0.1:4096</code>；也可以在 .env 中配置 <code>OPENCODE_BASE_URL</code>、<code>OPENCODE_ENABLED</code>。
+                   </span>
+                 }
+               />
+             ) : (
+               <Text type='secondary' style={{display:'block',marginTop:10}}>
+                 provider 和模型由 OpenCode 自己管理。这里不保存 OpenCode 的 API Key；认证仍放在 OpenCode 配置或运行环境里。
+               </Text>
+             )}
+           </Card>
+           <Card title='自动继续' className='settings-card'>
             <Paragraph type='secondary'>Agent 完成一个阶段后，可以继续自动调查。这里控制一轮最多自动再推进几个阶段；设置为 0 表示每个阶段完成后都等你下一次输入。</Paragraph>
             <Flex align='center' gap={12} wrap>
               <Select
