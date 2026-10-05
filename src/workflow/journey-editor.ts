@@ -27,6 +27,8 @@ import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate.js';
+import { isMissionWorkflowTargetAllowed } from './mission-gate.js';
+import { buildMissionProgress } from './mission-progress.js';
 import { assertMissionGate } from './mission-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { isJourneyCompletionConditionSatisfied } from './journey.js';
@@ -878,6 +880,37 @@ export async function applyAgentWorkflowTransition(
         && ['target', 'mapping', 'validation', 'cutover'].includes(route?.target ?? '')
       ) {
         throw new Error('本次调查范围明确只包含当前状态分析，不能进入目标架构、迁移映射或切换阶段；如需继续，请先由用户明确调整范围。');
+      }
+
+      // Mission 是比 Workflow 更高一层的任务边界：Workflow 可以导航，但不能要求
+      // Agent 去完成用户没有要求的结果。例如用户只要当前 Data Source / Data Flow /
+      // Data Model，就不能因为 legacy-modernization 默认路线存在 target 节点而进入方案设计。
+      if (transition.outcome === 'success' && route) {
+        const missionBoundary = isMissionWorkflowTargetAllowed(
+          context.mission!,
+          route.target,
+          active.definition.nodes.find((node) => node.id === route.target)?.title,
+        );
+        if (!missionBoundary.allowed) {
+          throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
+        }
+
+        // end 节点是整个 Workflow 的完成点；已经明确列出的、可自动追踪的交付物
+        // 必须先覆盖，否则 Agent 不能靠一句 workflow.success 提前结束。
+        const targetNode = active.definition.nodes.find((node) => node.id === route.target);
+        if (targetNode?.type === 'end') {
+          const progress = await buildMissionProgress(name, context.mission);
+          const uncovered = progress?.deliverables.filter(
+            (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+          ) ?? [];
+          if (uncovered.length) {
+            throw new Error(
+              '本次任务还有未完成的结果：'
+              + uncovered.map((item) => item.title).join('、')
+              + '。请先完成这些结果，再结束 Workflow。',
+            );
+          }
+        }
       }
     }
 
