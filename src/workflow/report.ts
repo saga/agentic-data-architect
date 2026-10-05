@@ -6,6 +6,7 @@
 import { buildReport } from '../analysis/report.js';
 import { reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 import { loadInvestigation } from '../investigation/store.js';
+import { assertMissionGate } from './mission-gate.js';
 
 /** report 的 workflow 入口（纯透传，保持 cli → workflow → analysis 分层）。 */
 export async function runReport(
@@ -13,6 +14,7 @@ export async function runReport(
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
   const report = await buildReport(name);
   const investigation = await loadInvestigation(name);
+  assertMissionGate(investigation.mission);
   const review = await reviewArtifact({
     investigationName: name,
     goal: investigation.userPrompt || investigation.goal,
