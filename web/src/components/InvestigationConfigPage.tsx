@@ -300,19 +300,9 @@ export function InvestigationConfigPage(props:{
               />
               <Tag color='blue'>当前：每次确认</Tag>
             </div>
-            {draft.agent.permissionMode==='allow_all' ? (
-              <Alert
-                style={{marginTop:12}}
-                type='warning'
-                showIcon
-                title='Agent 将自动批准权限请求'
-                description='本次调查后续执行不再逐项弹出确认。修改配置并保存后，新一轮 Agent 执行才会使用这个设置。'
-              />
-            ) : (
-              <Text type='secondary' style={{display:'block',marginTop:10}}>
-                Agent 需要执行 shell、写文件等受控操作时，会在主对话区显示具体操作；还可以选择“后续都允许”，让当前 Copilot Session 不再反复询问。
-              </Text>
-            )}
+            <Text type='secondary' style={{display:'block',marginTop:10}}>
+              Agent 需要执行 shell、读写文件或调用受控工具时，必须在主对话区逐项确认。允许只对当前这一次操作生效，不会扩大为当前 Session 的持续授权。
+            </Text>
           </Card>
           <Paragraph type='secondary'>技能会由 Copilot 根据当前任务自动发现，不需要你逐项选择。这里只写这次调查额外需要记住的背景、关注点或输出要求。</Paragraph>
           <Card title='本次调查说明' className='settings-card'>
