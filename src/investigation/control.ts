@@ -151,7 +151,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
 }
 
 /** 读取旧 control.json 后补默认值、清理历史格式，并通过 Zod 得到可信 Control。 */
-function normalizeControl(raw: Partial<InvestigationControl>): InvestigationControl {
+export function normalizeControl(raw: Partial<InvestigationControl>): InvestigationControl {
   const defaults = defaultControl();
   const research = raw.research ?? defaults.research;
   const agent = raw.agent ?? defaults.agent;
