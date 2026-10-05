@@ -19,6 +19,7 @@ import {
   UserInputResponseBodySchema,
   UpdateConfigBodySchema,
   UpdateAgentModelBodySchema,
+  UpdateMissionBodySchema,
   UpdateWorkflowBodySchema,
   JourneyAiRequestSchema,
   JourneyTransitionBodySchema,
@@ -46,6 +47,12 @@ import {
 } from './workflow/assessment.js';
 import { config } from './config.js';
 import { ScopeGateError } from './workflow/scope-gate.js';
+import {
+  buildMissionDraft,
+  evaluateMissionGate,
+  formatMissionGateFailure,
+  inferMissionDeliverables,
+} from './workflow/mission-gate.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
   appendContextInput,
@@ -53,7 +60,14 @@ import {
   loadWorkspaceContext,
   workspaceRoot,
 } from './investigation/workspace.js';
-import { investigationExists, newInvestigation, saveInvestigation, loadLatestSnapshot, updateInvestigationWorkflow } from './investigation/store.js';
+import {
+  investigationExists,
+  newInvestigation,
+  saveInvestigation,
+  loadLatestSnapshot,
+  updateInvestigationWorkflow,
+  confirmInvestigationMission,
+} from './investigation/store.js';
 import {
   closeConversationStore,
   recoverRunningConversationTurns,
@@ -131,7 +145,9 @@ async function listSessions(): Promise<SessionSummary[]> {
       const conversation = getConversationSummary(entry.name);
       result.push({
         key: entry.name,
-        label: context.userPrompt?.trim().slice(0, 60) || entry.name,
+        label: context.mission?.purpose?.trim().slice(0, 60)
+          || context.userPrompt?.trim().slice(0, 60)
+          || entry.name,
         userPrompt: context.userPrompt ?? '',
         updatedAt: conversation.lastMessageAt ?? context.updatedAt,
       });
@@ -268,6 +284,49 @@ app.post('/api/sessions', async (req, res) => {
     });
   });
 
+
+  /** 返回当前 Mission；没有确认 Mission 时同时提供可编辑候选。 */
+  app.get('/api/sessions/:name/mission', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    const gate = evaluateMissionGate(context.mission);
+    res.json({
+      mission: context.mission ?? null,
+      gate,
+      ...(context.mission ? {} : {
+        draft: buildMissionDraft(context.goal || context.userPrompt),
+      }),
+    });
+  });
+
+  /** 用户确认 Mission；这是解除 Mission Gate 的唯一接口。 */
+  app.patch('/api/sessions/:name/mission', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const body = parseRequest(UpdateMissionBodySchema, req.body);
+    const mission = {
+      version: 1 as const,
+      purpose: body.purpose,
+      expectedResult: body.expectedResult,
+      deliverables: inferMissionDeliverables(body.purpose, body.expectedResult),
+      status: 'confirmed' as const,
+      confirmedAt: new Date().toISOString(),
+      confirmedBy: 'user' as const,
+    };
+
+    const context = await confirmInvestigationMission(name, mission);
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'investigation.mission.confirmed',
+      summary: 'Confirmed the Investigation Mission Contract.',
+      details: {
+        purpose: mission.purpose,
+        expectedResult: mission.expectedResult,
+        deliverableIds: mission.deliverables.map((item) => item.id),
+      },
+    });
+
+    res.json({ context, mission, gate: evaluateMissionGate(mission) });
+  });
 
   /**
    * 当前 Investigation 的 live execution state。
@@ -959,6 +1018,15 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const body = parseRequest(MessageBodySchema, req.body);
     await ensureWorkspace(name);
     const context = await loadWorkspaceContext(name);
+    const missionGate = evaluateMissionGate(context.mission);
+    if (!missionGate.passed) {
+      res.status(409).json({
+        code: 'MISSION_REQUIRED',
+        error: formatMissionGateFailure(missionGate),
+        draft: buildMissionDraft(context.goal || context.userPrompt),
+      });
+      return;
+    }
     let selectedRoute;
     const message = body.message
       ?? (() => {
