@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
-import { toCopilotMcpServers, type InvestigationControl } from '../src/investigation/control.js';
+import { normalizeControl, toCopilotMcpServers, type InvestigationControl } from '../src/investigation/control.js';
 
 function control(): InvestigationControl {
   return {
@@ -73,4 +73,34 @@ test('Investigation control schema rejects invalid MCP settings', async () => {
     },
   });
   assert.equal(result.success, false);
+});
+
+
+test('legacy control without permissionMode normalizes to allow_all', () => {
+  const result = normalizeControl({
+    schemaVersion: 1,
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    research: {
+      githubRepositories: [],
+      githubSearchMode: 'only_selected',
+      keywords: [],
+      importantDocuments: [],
+    },
+    agent: {
+      model: 'auto',
+      displayName: '秘书',
+      personality: '',
+      avatarPath: undefined,
+      avatarPaths: [],
+      avatarSources: [],
+      autoContinuationTurns: 2,
+      avatarWidth: 180,
+      avatarHeight: 240,
+      systemPrompt: { version: 1, content: '' },
+      mcpServers: [],
+      platformCapabilities: [],
+    } as InvestigationControl['agent'],
+  });
+  assert.equal(result.agent.permissionMode, 'allow_all');
 });
