@@ -25,9 +25,13 @@
 ### Mission 是整个 Investigation 的最高优先级任务边界
 
 - 每个 Investigation 都先明确“为什么做”和“最后希望拿到什么”。
-- 没有经过用户确认的 Mission，不得开始 Agent 正式调查。
-- Agent 每一轮都必须重新对照 Mission；Workflow、Skill、unknown、route 和局部发现只能服务 Mission，不能改变 Mission。
-- unknown 只是当前未知，不是任务队列；是否继续调查看它是否影响用户期望结果。
+- 这两项必须由用户确认；目的或期望结果不清楚时，不开始 Agent 正式调查，先让用户确认。
+- Mission 的 purpose / expectedResult 是每轮 Prompt 的第一优先级动态上下文。长期 Copilot Session、context compaction、Workflow、Skill、当前问题和工具结果都不能覆盖它。
+- Agent 每一轮都必须重新对照 Mission：先看为什么做、最后要交付什么，再决定调用什么工具、继续什么方向或停止。
+- 当前用户消息只是本轮触发，不能偷偷变成新的项目目标；用户要改变任务时，必须显式修改 Mission。
+- Workflow 只能导航，Skill 只能提供能力，unknown 只是状态，route 只是可选动作；这些都只能服务 Mission，不能反过来定义任务。
+- unknown 不是任务队列。是否继续调查，只看它是否影响用户期望结果或下一阶段真正需要的决定；不要为了清空 unknowns 而继续查。
+- 阶段成果和自动续跑必须以真实工作成果及 Mission 交付物覆盖为依据，不能因为 Agent 自己说“完成了”就推进。
 - 常见的当前系统数据架构 / Data Source / Data Flow / Data Model 分析属于 capability，不新增固定 Workflow。
 
 ### 4）说人话、去掉 AI 味
