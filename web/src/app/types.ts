@@ -39,7 +39,7 @@ export interface InvestigationControl {
   agent: {
     model: string;
     autoTier?: AutoTier;
-    permissionMode: 'permission';
+    permissionMode: 'permission' | 'allow_all';
     displayName: string;
     personality: string;
     avatarPath?: string;
