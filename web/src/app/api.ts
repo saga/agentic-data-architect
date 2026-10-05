@@ -5,7 +5,7 @@ export interface StreamEvent {
   data: unknown;
 }
 
-async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
     const body = await response.text();
@@ -14,7 +14,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function consumeSse(
+export async function consumeSse(
   response: Response,
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
