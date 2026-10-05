@@ -54,7 +54,7 @@ const KEYWORD_RULES: Array<{ id: MissionDeliverableId; keywords: string[] }> = [
   { id: 'data-flow', keywords: ['data flow', '数据流', '数据流向', '数据链路', '血缘', 'lineage'] },
   { id: 'data-model', keywords: ['data model', '数据模型', '实体', '表结构', '模型', '关系模型'] },
   { id: 'transformation', keywords: ['transformation', '转换', 'etl', 'sql', '计算逻辑', '加工'] },
-  { id: 'target-architecture', keywords: ['target architecture', '目标架构', '新架构', 'replatform', '现代化', '迁移方案', '方案'] },
+  { id: 'target-architecture', keywords: ['target architecture', '目标架构', '新架构', 'replatform', '现代化', '迁移方案'] },
   { id: 'mapping', keywords: ['mapping', '映射', '新旧对应', '迁移映射'] },
   { id: 'validation', keywords: ['validation', '验证', '对账', 'reconciliation', '一致性检查'] },
   { id: 'findings', keywords: ['问题', '风险', '缺口', 'findings', 'issue'] },
@@ -113,13 +113,17 @@ export function evaluateMissionGate(mission: MissionContract | undefined): Missi
 
   add(
     '任务目的明确',
-    Boolean(mission?.purpose.trim()),
-    mission?.purpose.trim() ? '已经记录任务目的。' : '还没有记录任务目的。',
+    Boolean(mission?.purpose.trim()) && mission!.purpose.trim().length >= 10,
+    mission?.purpose.trim().length && mission.purpose.trim().length >= 10
+      ? '已经记录任务目的。'
+      : '任务目的为空或过于简短。',
   );
   add(
     '期望结果明确',
-    Boolean(mission?.expectedResult.trim()),
-    mission?.expectedResult.trim() ? '已经记录期望结果。' : '还没有记录期望结果。',
+    Boolean(mission?.expectedResult.trim()) && mission!.expectedResult.trim().length >= 10,
+    mission?.expectedResult.trim().length && mission.expectedResult.trim().length >= 10
+      ? '已经记录期望结果。'
+      : '期望结果为空或过于简短。',
   );
   add(
     '交付物已拆分',
