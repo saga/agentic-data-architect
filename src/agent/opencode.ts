@@ -15,6 +15,8 @@
  * Stage Gate 等业务状态仍然由本项目自己管理。
  */
 import { config } from '../config.js';
+import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
+import type { WorkflowId } from '../investigation/schemas.js';
 
 export interface OpenCodeModelOption {
   id: string;
@@ -83,6 +85,14 @@ export interface OpenCodeAskInput {
     details?: Record<string, unknown>;
   }) => void;
   shouldAbort?: () => boolean;
+  autoContinuationTurns?: number;
+  missionPrompt?: string;
+  refreshMissionPrompt?: () => string | Promise<string>;
+  shouldContinueMission?: () => boolean | Promise<boolean>;
+  onStageResult?: (result: { content: string; execution: number }) => void | Promise<void | { passed?: boolean; error?: string }>;
+  onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
+  workflowSkill?: WorkflowId;
+  investigationName?: string;
 }
 
 export function isOpenCodeModel(model: string): boolean {
@@ -322,7 +332,7 @@ async function abortOpenCodeSession(sessionId: string): Promise<void> {
   }
 }
 
-function extractTextParts(value: unknown): { answer: string; reasoning: string } {
+function extractTextParts(value: unknown): { answer: string; reasoning: string; usage?: Record<string, unknown> } {
   if (!value || typeof value !== 'object') return { answer: '', reasoning: '' };
   const object = value as { parts?: unknown };
   if (!Array.isArray(object.parts)) return { answer: '', reasoning: '' };
@@ -335,9 +345,21 @@ function extractTextParts(value: unknown): { answer: string; reasoning: string }
     if (part.type === 'text' && typeof part.text === 'string') answerParts.push(part.text);
     if (part.type === 'reasoning' && typeof part.text === 'string') reasoningParts.push(part.text);
   }
+  const info = (value as { info?: unknown }).info;
+  const usage = info && typeof info === 'object'
+    ? (info as { tokens?: unknown; cost?: unknown }).tokens
+      ? {
+          ...((info as { tokens?: unknown }).tokens && typeof (info as { tokens?: unknown }).tokens === 'object'
+            ? (info as { tokens: Record<string, unknown> }).tokens
+            : {}),
+          ...('cost' in (info as Record<string, unknown>) ? { cost: (info as Record<string, unknown>).cost } : {}),
+        }
+      : undefined
+    : undefined;
   return {
     answer: answerParts.join('\\n').trim(),
     reasoning: reasoningParts.join('\\n').trim(),
+    ...(usage ? { usage } : {}),
   };
 }
 
@@ -407,33 +429,135 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   try {
     eventReaderTask = consumeOpenCodeEvents(eventResponse, input, sessionId);
 
-    const response = await openCodeFetch(
-      '/session/' + encodeURIComponent(sessionId) + '/message',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          model: { providerID: providerId, modelID: modelId },
-          system: input.systemPrompt,
-          parts: [{ type: 'text', text: input.prompt }],
-        }),
-      },
-      input.workingDirectory,
+    const maxAutomaticContinuations = Math.min(
+      6,
+      Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
     );
+    let currentPrompt = input.prompt;
+    let currentWorkflowInstruction = input.workflowSkill && input.investigationName
+      ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
+      : '';
+    let finalAnswer = '';
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error('OpenCode 执行失败：HTTP ' + response.status + (detail ? ' · ' + detail.slice(0, 500) : ''));
+    for (let execution = 0; execution <= maxAutomaticContinuations; execution += 1) {
+      if (input.shouldAbort?.()) {
+        await abortOpenCodeSession(sessionId);
+        throw new Error('Turn aborted.');
+      }
+
+      if (execution > 0) {
+        input.onStatus?.(`OpenCode 已完成前一阶段，正在继续调查（第 ${execution + 1} 阶段）…`);
+      }
+
+      const response = await openCodeFetch(
+        '/session/' + encodeURIComponent(sessionId) + '/message',
+        {
+          method: 'POST',
+          signal: transportController.signal,
+          body: JSON.stringify({
+            model: { providerID: providerId, modelID: modelId },
+            system: [
+              input.missionPrompt,
+              input.systemPrompt,
+              currentWorkflowInstruction,
+            ].filter(Boolean).join('\\n\\n'),
+            parts: [{ type: 'text', text: currentPrompt }],
+          }),
+        },
+        input.workingDirectory,
+      );
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error('OpenCode 执行失败：HTTP ' + response.status + (detail ? ' · ' + detail.slice(0, 500) : ''));
+      }
+
+      const result = await response.json() as unknown;
+      const extracted = extractTextParts(result);
+      if (!extracted.answer) {
+        const detail = JSON.stringify(result).slice(0, 1200);
+        throw new Error('OpenCode 没有返回文本答案。' + (detail ? ' 返回内容：' + detail : ''));
+      }
+
+      finalAnswer = extracted.answer;
+      if (extracted.usage) {
+        const inputTokens = typeof extracted.usage.input === 'number' ? extracted.usage.input : undefined;
+        const outputTokens = typeof extracted.usage.output === 'number' ? extracted.usage.output : undefined;
+        const reasoningTokens = typeof extracted.usage.reasoning === 'number' ? extracted.usage.reasoning : undefined;
+        const cost = typeof extracted.usage.cost === 'number' ? extracted.usage.cost : undefined;
+        input.onTrajectory?.({
+          type: 'status',
+          name: 'OpenCode 模型调用完成',
+          status: 'info',
+          model: input.model,
+          details: {
+            execution,
+            ...(inputTokens !== undefined ? { inputTokens } : {}),
+            ...(outputTokens !== undefined ? { outputTokens } : {}),
+            ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+            ...(cost !== undefined ? { cost } : {}),
+          },
+        });
+      }
+
+      if (input.onBeforeWorkflowTransition) {
+        await input.onBeforeWorkflowTransition({ content: finalAnswer, execution });
+      }
+
+      const stageGate = await input.onStageResult?.({ content: finalAnswer, execution });
+      const workflowTransition =
+        stageGate && 'passed' in stageGate && stageGate.passed === false
+          ? {
+              applied: false,
+              error: stageGate.error ?? 'Stage Gate 未通过，当前 Workflow 保持不变。',
+              execution: undefined,
+            }
+          : input.workflowSkill && input.investigationName
+            ? await applyAgentWorkflowTransition(
+                input.investigationName,
+                input.workflowSkill,
+                finalAnswer,
+                { persistModernizationResult: false },
+              )
+            : { applied: false, error: undefined, execution: undefined };
+
+      if (workflowTransition.error) {
+        input.onStatus?.('OpenCode 本阶段没有通过 Workflow Gate，继续补齐结果。');
+      }
+
+      if (execution >= maxAutomaticContinuations) break;
+      if (workflowTransition.applied && workflowTransition.execution?.status === 'waiting') break;
+
+      const shouldContinue = input.shouldContinueMission
+        ? await input.shouldContinueMission()
+        : Boolean(stageGate && 'passed' in stageGate ? stageGate.passed !== false : true);
+      if (!shouldContinue) break;
+
+      if (input.refreshMissionPrompt) {
+        const refreshed = await input.refreshMissionPrompt();
+        currentPrompt = [
+          '重新检查本次 Mission 的任务目的和期望结果，再决定下一阶段做什么。',
+          refreshed,
+          '只做直接服务于 Mission 剩余交付物的工作；能通过现有工具、代码、SQL、配置、文档或 Skill 完成的就直接执行，不要只给建议。',
+          ...(workflowTransition.error ? ['', '上一阶段 Gate 没通过：', workflowTransition.error] : []),
+        ].filter(Boolean).join('\\n');
+      } else {
+        currentPrompt = [
+          '继续自主推进当前 Investigation。',
+          input.missionPrompt ?? '',
+          ...(workflowTransition.error ? ['', '上一阶段 Gate 没通过：', workflowTransition.error] : []),
+        ].filter(Boolean).join('\\n');
+      }
+
+      if (input.workflowSkill && input.investigationName) {
+        currentWorkflowInstruction = await buildJourneyAgentInstruction(
+          input.investigationName,
+          input.workflowSkill,
+        ).catch(() => currentWorkflowInstruction);
+      }
     }
 
-    const result = await response.json() as unknown;
-    const extracted = extractTextParts(result);
-    if (!extracted.answer) {
-      const detail = JSON.stringify(result).slice(0, 1200);
-      throw new Error('OpenCode 没有返回文本答案。' + (detail ? ' 返回内容：' + detail : ''));
-    }
-
-    // message endpoint 已经等待本轮完成。事件流只负责把过程实时推送到 UI。
-    // 某些 OpenCode 版本可能继续保留 SSE 连接，因此在最终答案确定后不再等待它。
+    // message endpoint 已经等待本轮完成；事件流只负责把过程实时推送到 UI。
     void eventReaderTask.catch(() => undefined);
 
     input.onTrajectory?.({
@@ -445,9 +569,10 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
         sessionId,
         providerId,
         modelId,
+        automaticContinuations: maxAutomaticContinuations,
       },
     });
-    return extracted.answer;
+    return finalAnswer;
   } catch (error) {
     void eventReaderTask?.catch(() => undefined);
     const message = error instanceof Error ? error.message : String(error);
