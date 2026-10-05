@@ -884,6 +884,10 @@ export function useInvestigationController() {
       await reloadSessions(false);
       navigateToSession(created.context.name);
     } catch (e) {
+      // 创建失败时不得把临时 Mission/自动启动状态带入下一次新建调查。
+      pendingInitialMissionDraftRef.current = undefined;
+      pendingInitialAutoStartRef.current = undefined;
+      pendingInitialMissionErrorRef.current = undefined;
       setError(e instanceof Error ? e.message : '无法创建调查');
     }
   };
