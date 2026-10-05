@@ -45,7 +45,7 @@ export function InvestigationDialogs(props: {
           <Input.TextArea
             value={props.newSessionGoal}
             onChange={(event) => props.setNewSessionGoal(event.target.value)}
-            placeholder="先说清楚你想解决什么，例如：为什么两个系统的 Position 不一致？（可选）"
+            placeholder="任务目的：为什么要做这次调查，例如：弄清老系统的数据架构，为 replatform 提供依据。（可选）"
             autoSize={{ minRows: 3, maxRows: 6 }}
           />
           <Select
@@ -58,7 +58,7 @@ export function InvestigationDialogs(props: {
             className="modal-tip"
             type="info"
             showIcon
-            title="默认自主调查。路线是可选的工作方法；开始后不会在首页随手切换，确需改变时到“调查配置 → 工作方式”执行明确调整。"
+            title="创建后，第一次真正开始调查前会先确认任务目的和期望结果。工作路线只是实现任务的方式，不会替代任务本身。"
           />
         </Space>
       </Modal>
@@ -66,7 +66,7 @@ export function InvestigationDialogs(props: {
       <Modal
         title={
           <Flex align="center" gap={8}>
-            <span>待查内容</span>
+            <span>尚未查清的事项</span>
             <Tag variant="filled" color="orange">{props.current?.context.unknowns.length ?? 0} 项</Tag>
           </Flex>
         }
@@ -83,7 +83,7 @@ export function InvestigationDialogs(props: {
                 <div className="unknown-item-index">待查 {index + 1}</div>
                 <Text strong className="unknown-item-title">{unknown}</Text>
                 <Text type="secondary" className="unknown-item-guidance">
-                  导引：让 Agent 直接围绕这条未知项继续检索、核对 Evidence，并在完成后重新判断它是否已经查清。
+                  这只是当前的未知，不代表一定要继续查。让助手先判断它是否会影响本次任务的最终结果。
                 </Text>
               </div>
               <Button
