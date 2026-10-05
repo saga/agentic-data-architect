@@ -101,7 +101,35 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
         `- Gaps: ${modernization.gaps.length}, mappings: ${modernization.mappings.length}`,
         `- Validation checks: ${modernization.validationPlan.checks.length}`,
         `- Migration stages: ${modernization.migrationStages.map((stage) => stage.name).join(' → ')}`,
-        `- Target components: ${modernization.targetArchitecture.components.map((component) => component.name).join(', ')}`,
+        `- Target components: ${modernization.targetArchitecture.components.map((component) => component.name).join(', ') || '(none)'}`,
+        ``,
+        `### 9.1 Target Architecture`,
+        ``,
+        ...(modernization.targetArchitecture.components.length
+          ? modernization.targetArchitecture.components.map((component) =>
+              `- ${component.name}: ${component.description} | sources=${component.sourceAssets.join(', ') || '(none)'}`,
+            )
+          : ['(target architecture has no persisted components)']),
+        ``,
+        `### 9.2 Source-to-Target Mapping`,
+        ``,
+        ...(modernization.mappings.length
+          ? modernization.mappings.map((mapping) =>
+              `- ${mapping.sourceAsset} → ${mapping.targetAsset} [${mapping.status}] | transformation=${mapping.transformation || '(none)'} | businessRule=${mapping.businessRule || '(none)'} | validation=${mapping.validationRule || '(none)'} | evidence=${mapping.evidenceIds.join(', ') || '(none)'}`,
+            )
+          : ['(no persisted mappings)']),
+        ``,
+        `### 9.3 Validation`,
+        ``,
+        ...modernization.validationPlan.checks.map((check) =>
+          `- [${check.status}] ${check.name}: ${check.result || '(not executed)'} | evidence=${check.evidenceIds.join(', ') || '(none)'}`,
+        ),
+        ...(modernization.mappingCoverage
+          ? [
+              ``,
+              `Mapping coverage: ${modernization.mappingCoverage.sourceAssets.length} source assets considered; ${modernization.mappingCoverage.unmappedAssets.length} unmapped.`,
+            ]
+          : []),
       ]
       : ['(no modernization plan yet — use the Modernization Workbench to generate one)']),
     ``,
