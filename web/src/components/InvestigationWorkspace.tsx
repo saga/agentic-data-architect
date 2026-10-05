@@ -46,6 +46,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     missionOpen,
     missionDraft,
     missionSaving,
+    missionError,
     setValue,
     setAttachmentsOpen,
     setUserInputDrafts,
@@ -172,6 +173,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             missionOpen={missionOpen}
             missionDraft={missionDraft}
             missionSaving={missionSaving}
+            missionError={missionError}
             onOpenMission={editMission}
             onCloseMission={() => setMissionOpen(false)}
             onChangeMission={setMissionDraft}
