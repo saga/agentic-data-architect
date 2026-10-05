@@ -60,7 +60,7 @@ const WORKFLOW_TARGET_DELIVERABLES: Record<string, MissionDeliverableId[]> = {
   '看清旧系统': ['current-state-architecture', 'data-source', 'data-flow', 'data-model'],
   'data-truth': ['current-state-architecture', 'data-source', 'data-model', 'transformation'],
   '找到数据真相': ['current-state-architecture', 'data-source', 'data-model', 'transformation'],
-  'current-state': ['current-state-architecture', 'data-source', 'data-flow', 'data-model', 'transformation', 'findings'],
+  'current-state': ['data-source', 'data-flow', 'data-model', 'transformation'],
   '梳理当前架构': ['current-state-architecture', 'data-source', 'data-flow', 'data-model', 'transformation'],
   'target': ['target-architecture'],
   '设计新方案': ['target-architecture'],
@@ -137,7 +137,22 @@ export function inferMissionDeliverables(
     .filter((rule) => rule.keywords.some((keyword) => corpus.includes(keyword.toLowerCase())))
     .map((rule) => rule.id);
 
-  const ids = matched.length ? [...new Set(matched)] : ['custom-result' as MissionDeliverableId];
+  let ids = matched.length ? [...new Set(matched)] : ['custom-result' as MissionDeliverableId];
+
+  // 用户明确写出 Source / Flow / Model 等具体结果时，不再额外生成一个“当前架构”
+  // 父项，否则父项会被 Mission Progress 当成第四个必须完成的结果，反而降低判断准确性。
+  const concreteCurrentState = new Set([
+    'data-source',
+    'data-flow',
+    'data-model',
+    'transformation',
+  ]);
+  if (
+    ids.some((id) => concreteCurrentState.has(id))
+    && ids.filter((id) => concreteCurrentState.has(id)).length >= 2
+  ) {
+    ids = ids.filter((id) => id !== 'current-state-architecture');
+  }
 
   return ids.slice(0, 12).map((id) => {
     const [title, description] = MISSION_DELIVERABLE_CATALOG[id];
