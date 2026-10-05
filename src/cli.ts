@@ -11,6 +11,7 @@ import { answerQuestion } from './workflow/ask.js';
 import { runReport } from './workflow/report.js';
 import { buildModernizationPlan } from './workflow/modernization.js';
 import type { WorkflowId } from './investigation/schemas.js';
+import { createUserScopeValidation } from './workflow/scope-gate.js';
 
 /** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
@@ -33,6 +34,8 @@ async function cmdInit(args: string[]): Promise<void> {
       inv.workflow = value;
     }
   }
+  const scopeValidation = createUserScopeValidation(inv.goal, inv.scope, inv.systems);
+  if (scopeValidation) inv.scopeValidation = scopeValidation;
   console.log('session created: ' + await saveInvestigation(inv));
 }
 
