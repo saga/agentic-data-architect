@@ -1049,8 +1049,6 @@ export async function applyHumanWorkflowTransition(
   nodeId: string,
   outcome: string,
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
-  const missionContext = await loadInvestigation(name);
-  assertMissionGate(missionContext.mission);
   let eventRunId = workflowId + '-rejected';
   let eventWorkflowVersion = 0;
 
