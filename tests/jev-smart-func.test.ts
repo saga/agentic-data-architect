@@ -3,8 +3,12 @@ import test from 'node:test';
 
 import {
   buildJevSmartFuncResponseSchema,
+  buildMissionActionPrompt,
   buildMissionAlignmentPrompt,
+  buildMissionUnknownPrompt,
+  normalizeMissionAction,
   normalizeMissionAlignment,
+  normalizeUnknownImpact,
   type JevQuestion,
 } from '../src/agent/jev-smart-func.js';
 
@@ -139,4 +143,92 @@ test('Mission Alignment stops once the Mission is sufficiently supported', () =>
   assert.equal(result.aligned, true);
   assert.equal(result.worthContinuing, false);
   assert.match(result.reason, /没有必要/);
+});
+
+
+test('Mission Action requires both direct Mission alignment and current necessity', () => {
+  const mission = {
+    purpose: '理解 IBM 老系统，为 replatform 决策提供依据。',
+    expectedResult: '形成当前 Data Source、Data Flow、Data Model。',
+    deliverables: [
+      { id: 'data-source', title: 'Data Source', description: '关键数据来源。', required: true },
+      { id: 'data-flow', title: 'Data Flow', description: '关键数据流向。', required: true },
+      { id: 'data-model', title: 'Data Model', description: '核心数据模型。', required: true },
+    ],
+  };
+
+  const prompt = buildMissionActionPrompt({
+    mission,
+    candidate: {
+      toolName: 'grep',
+      toolArgs: { pattern: 'Position', path: 'src' },
+    },
+    context: { progress: '1/3' },
+  });
+  assert.match(prompt, /现在做它是否有必要/);
+  assert.match(prompt, /Data Source/);
+
+  const allowed = normalizeMissionAction({
+    aligned: { type: 'noul', noul: 0.95 },
+    necessary: { type: 'noul', noul: 0.9 },
+    target_deliverable: {
+      type: 'choice',
+      choice: 'data-source',
+      probabilities: [{ key: 'data-source', probability: 1 }],
+      confidence: 0.9,
+    },
+  });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.targetDeliverableId, 'data-source');
+
+  const denied = normalizeMissionAction({
+    aligned: { type: 'noul', noul: 0.95 },
+    necessary: { type: 'noul', noul: 0.2 },
+    target_deliverable: {
+      type: 'choice',
+      choice: 'data-source',
+      probabilities: [{ key: 'data-source', probability: 1 }],
+      confidence: 0.9,
+    },
+  });
+  assert.equal(denied.allowed, false);
+});
+
+test('Unknown impact deterministically routes to ignore, investigate, or ask_user', () => {
+  const ignore = normalizeUnknownImpact('历史接口命名风格还不统一。', {
+    affects_mission: { type: 'noul', noul: 0.2 },
+    worth_investigating: { type: 'noul', noul: 0.95 },
+    can_agent_resolve: { type: 'noul', noul: 0.9 },
+  });
+  assert.equal(ignore.action, 'ignore');
+
+  const investigate = normalizeUnknownImpact('Position 的历史回补 SQL 还没找到。', {
+    affects_mission: { type: 'noul', noul: 0.95 },
+    worth_investigating: { type: 'noul', noul: 0.9 },
+    can_agent_resolve: { type: 'noul', noul: 0.95 },
+  });
+  assert.equal(investigate.action, 'investigate');
+
+  const askUser = normalizeUnknownImpact('业务方是否允许历史仓位回补需要确认。', {
+    affects_mission: { type: 'noul', noul: 0.95 },
+    worth_investigating: { type: 'noul', noul: 0.9 },
+    can_agent_resolve: { type: 'noul', noul: 0.1 },
+  });
+  assert.equal(askUser.action, 'ask_user');
+
+  const prompt = buildMissionUnknownPrompt({
+    mission: {
+      purpose: '理解旧系统，为迁移决策提供依据。',
+      expectedResult: '形成可靠的当前状态说明。',
+      deliverables: [{
+        id: 'current-state',
+        title: '当前状态',
+        description: '关键系统、数据流和模型。',
+        required: true,
+      }],
+    },
+    unknowns: ['某个事实还没有确认。'],
+  });
+  assert.match(prompt, /affects_mission=true/);
+  assert.match(prompt, /can_agent_resolve=true/);
 });
