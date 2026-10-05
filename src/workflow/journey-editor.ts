@@ -1177,15 +1177,16 @@ export async function buildJourneyAgentInstruction(
     '当前 Investigation 有一条真正会影响执行位置的 Workflow，不是仅供参考的路线图。',
     'Workflow 节点和出口由服务端校验；Agent 不能自行发明 nodeId 或 outcome。',
     '',
-    '整个 Investigation 要完成的任务：' + (overallGoal || '（未设置）'),
     ...(context.mission
       ? [
-          '最高优先级任务目的：' + context.mission.purpose,
-          '最高优先级期望结果：' + context.mission.expectedResult,
+          '最高优先级：本次任务。',
+          '任务目的（为什么做）：' + context.mission.purpose,
+          '期望结果（最后要拿到什么）：' + context.mission.expectedResult,
           '当前 Workflow 只是实现 Mission 的路线，不能改变任务目的或期望结果。',
+          '只有仍然存在与 Mission 直接相关、而且值得完成的工作时才继续；不要为了填满 Workflow、解决无关 unknown 或寻找“关键问题”而推进。',
         ]
-      : []),
-    '不要把当前节点当成一个独立问题；它只是整个架构任务中的当前阶段。只要整体任务还有重要工作没有完成，就继续推进。',
+      : ['整个 Investigation 要完成的任务：' + (overallGoal || '（未设置）')]),
+    '不要把当前节点当成一个独立问题；它只是完成 Mission 的当前导航位置。',
     '当前节点：' + current.nodeId + '（' + current.title + '）',
     '节点类型：' + current.type,
     '执行者：' + current.actor,
