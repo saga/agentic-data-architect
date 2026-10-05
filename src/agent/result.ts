@@ -280,7 +280,7 @@ export function buildAgentCheckpoint(parsed: ParsedAnswer, execution: number): A
 
   const modernizationFacts: string[] = [];
   if (parsed.modernization) {
-    const componentCount = parsed.modernization.targetArchitecture?.components.length ?? 0;
+    const componentCount = parsed.modernization.targetArchitecture?.components?.length ?? 0;
     const mappingCount = parsed.modernization.mappings?.length ?? 0;
     const validationCount = parsed.modernization.validation?.checks.length ?? 0;
     if (componentCount > 0) modernizationFacts.push('已形成 ' + String(componentCount) + ' 个目标架构组件。');
