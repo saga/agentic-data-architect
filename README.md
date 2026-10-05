@@ -106,14 +106,16 @@ OPENCODE_ENABLED=true
 OPENCODE_BASE_URL=http://127.0.0.1:4096
 ~~~
 
-如果 OpenCode Server 开启了 Basic Auth，再配置：
+OpenCode 默认本机服务不需要工作台保存任何模型厂商 Secret。OpenCode 自己负责 provider、模型、工具、MCP 和认证配置；例如 Ollama 等本地模型应在 OpenCode 中配置完成，工作台不会复制一套 provider 配置。
+
+如果你自己给 `opencode serve` 开了 Basic Auth，工作台可复用 OpenCode 官方的本地服务环境变量：
 
 ~~~bash
-OPENCODE_USERNAME=opencode
-OPENCODE_PASSWORD=...
+OPENCODE_SERVER_USERNAME=opencode
+OPENCODE_SERVER_PASSWORD=...
 ~~~
 
-OpenCode 自己负责 provider、模型、工具、MCP 和认证配置；例如 Ollama 等本地模型应在 OpenCode 中配置完成，工作台不会复制一套 provider 配置。
+这只是工作台连接本机 OpenCode Server 的认证，不是 Anthropic/OpenAI/Ollama 等模型厂商的 API Secret。
 
 主对话区选择本机模型后，模型值形如：
 
@@ -122,7 +124,7 @@ opencode:ollama/<model>
 opencode:openai/<model>
 ~~~
 
-这里的模型选择按 Investigation 保存，下一轮执行即可切换。OpenCode 当前 provider/model 列表来自 `GET /provider`，执行使用 `POST /session` 和 `POST /session/:id/message`，过程通过 SSE 事件回传。
+这里的模型选择按 Investigation 保存，下一轮执行即可切换。OpenCode 当前 provider/model 列表来自本机 Server；执行使用 Session API，过程通过 SSE 事件回传。OpenCode 官方 JS/TS SDK 本质上也是这个本机 HTTP Server 的类型安全客户端；当前项目先直接调用同一组 HTTP API，减少额外依赖，不改变 Runtime 边界。
 
 注意：OpenCode 是独立 Runtime，它的工具、MCP 和权限由 OpenCode 本身管理；本项目仍负责 Mission、Evidence、Stage Gate 和 Investigation 结果持久化。
 
