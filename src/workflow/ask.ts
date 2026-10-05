@@ -9,7 +9,13 @@ import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { persistModernizationAgentResult } from './modernization.js';
-import { reviewMissionAlignment } from '../agent/jev-smart-func.js';
+import {
+  reviewMissionAction,
+  reviewMissionAlignment,
+  reviewUnknownImpact,
+  type MissionUnknownReview,
+} from '../agent/jev-smart-func.js';
+import { reviewMissionCompletion, type MissionCompletionReview } from './mission-completion.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
 import { nextId } from '../evidence/types.js';
@@ -282,6 +288,40 @@ export async function answerQuestion(
     // 当 Smart Function 暂不可用时，Stage Script Gate 仍然可以依靠 Evidence / 交付物等确定性状态继续工作。
     let stageContinuationRecommendation = true;
 
+    // 当前 turn 最近一阶段的 Unknown 结构化判断；Unknown 仍是状态，不是独立任务队列。
+    let unknownReviewsForTurn: MissionUnknownReview[] = [];
+    let lastMissionCompletionReview: MissionCompletionReview | null = null;
+
+    /** 把 Unknown 判断翻译成下一阶段真正可执行的指令。 */
+    const buildUnknownContinuationGuidance = (): string => {
+      if (!unknownReviewsForTurn.length) return '';
+      const investigate = unknownReviewsForTurn
+        .filter((item) => item.action === 'investigate')
+        .map((item) => '- 自己继续查：' + item.unknown);
+      const askUser = unknownReviewsForTurn
+        .filter((item) => item.action === 'ask_user')
+        .map((item) => '- 必须向用户确认：' + item.unknown);
+      const ignored = unknownReviewsForTurn
+        .filter((item) => item.action === 'ignore')
+        .map((item) => '- 不要为了这个 Unknown 继续调查：' + item.unknown);
+
+      return [
+        '### Unknown 行动约束（服务器已做结构化判断）',
+        ...investigate,
+        ...askUser,
+        ...ignored,
+        askUser.length
+          ? '存在需要用户输入的 Mission 相关 Unknown：下一阶段先用 ask_user 问清楚，不要继续猜测或绕开这个缺口。'
+          : '',
+        investigate.length
+          ? '以上“自己继续查”的 Unknown 仍需 Agent 自行处理；不要把它写成 followUpQuestions 交给用户。'
+          : '',
+        ignored.length
+          ? '以上“不需要继续调查”的 Unknown 只是状态记录，不能驱动下一步工具动作。'
+          : '',
+      ].filter(Boolean).join('\n');
+    };
+
     const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
     await appendAuditEvent(investigationName, {
       actor: 'system',
@@ -339,6 +379,44 @@ export async function answerQuestion(
       permissionMode: control.agent.permissionMode,
       autoContinuationTurns: control.agent.autoContinuationTurns,
       mcpServers: toCopilotMcpServers(control) as NonNullable<Parameters<typeof askCopilot>[0]['mcpServers']>,
+      missionActionGate: async ({ execution, toolName, toolArgs }) => {
+        const latest = await loadInvestigation(investigationName);
+        assertMissionGate(latest.mission);
+        const progress = await buildMissionProgress(investigationName, latest.mission);
+
+        const review = await reviewMissionAction({
+          mission: latest.mission,
+          candidate: { toolName, toolArgs },
+          context: {
+            execution,
+            currentQuestion: effectiveQuestion,
+            progress,
+            unknownReviews: unknownReviewsForTurn,
+            ignoredUnknowns: unknownReviewsForTurn
+              .filter((item) => item.action === 'ignore')
+              .map((item) => item.unknown),
+          },
+          model: control.agent.model,
+          workingDirectory: workspaceRoot(inv.name),
+        });
+
+        // Smart Function 不可用时不把它伪装成权限边界；仍允许首次动作执行，
+        // 但 Stage Gate 会在阶段结束时检查真实成果是否确实推进 Mission。
+        if (!review) {
+          recordTrajectory({
+            type: 'status',
+            name: 'Mission 行动语义检查暂不可用',
+            status: 'info',
+            details: { execution, toolName },
+          });
+          return {
+            allowed: true,
+            reason: 'Mission Action Review 暂不可用，本次由阶段成果 Gate 兜底。',
+          };
+        }
+
+        return review;
+      },
       ...(onDelta ? { onDelta } : {}),
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
@@ -357,6 +435,34 @@ export async function answerQuestion(
           || stageAfter.discoveryRunCount > stageGateBaseline.discoveryRunCount
           || stageAfter.scopeValidatedAt !== stageGateBaseline.scopeValidatedAt
           || missionProgressAfterStage.percent !== stageMissionProgressBaseline.percent;
+
+        const missionUnknownReviews = stageParsed.unknowns.length
+          ? await reviewUnknownImpact({
+              mission: inv.mission!,
+              unknowns: stageParsed.unknowns,
+              context: {
+                execution,
+                progressBefore: stageMissionProgressBaseline,
+                progressAfter: missionProgressAfterStage,
+                newEvidenceIds: stageAfter.evidenceIds.filter((id) => !stageGateBaseline.evidenceIds.includes(id)),
+                newFindingIds: stageAfter.findingIds.filter((id) => !stageGateBaseline.findingIds.includes(id)),
+              },
+              model: control.agent.model,
+              workingDirectory: workspaceRoot(inv.name),
+            })
+          : [];
+
+        unknownReviewsForTurn = missionUnknownReviews ?? [];
+        recordTrajectory({
+          type: 'status',
+          name: 'Unknown 影响检查',
+          status: missionUnknownReviews ? 'completed' : 'info',
+          details: {
+            execution,
+            reviews: missionUnknownReviews ?? [],
+            fallback: missionUnknownReviews === null,
+          },
+        });
 
         const missionAlignment = hasRealStateChange
           ? await reviewMissionAlignment({
@@ -396,6 +502,39 @@ export async function answerQuestion(
           missionAlignment,
         };
         const gate = evaluateInvestigationStageGate(stageGateInput);
+
+        // Agent 提交 workflow.completed 只是“完成申请”；真正完成 Mission 必须再经过 Completion Gate。
+        if (stageParsed.workflow?.outcome === 'completed') {
+          const completion = await reviewMissionCompletion({
+            mission: inv.mission!,
+            progress: missionProgressAfterStage,
+            resultSummary: {
+              evidenceCount: latestStage.evidence.length,
+              findingCount: latestStage.findings.length,
+              claimCount: latestStage.claims.length,
+              unknowns: missionUnknownReviews
+                ? missionUnknownReviews.filter((item) => item.action !== 'ignore').map((item) => item.unknown)
+                : stageParsed.unknowns,
+            },
+            unknownReviews: missionUnknownReviews ?? undefined,
+            model: control.agent.model,
+            workingDirectory: workspaceRoot(inv.name),
+          });
+          lastMissionCompletionReview = completion;
+          recordTrajectory({
+            type: 'status',
+            name: completion.completed ? 'Mission Completion 检查通过' : 'Mission Completion 检查未通过',
+            status: completion.completed ? 'completed' : 'info',
+            details: { execution, completion },
+          });
+
+          if (!completion.completed) {
+            return {
+              passed: false,
+              error: 'Mission Completion Gate 未通过：' + completion.reason,
+            };
+          }
+        }
 
         // Gate 失败也要留下记录，方便轨迹明确告诉用户“为什么没有形成阶段成果”。
         recordTrajectory({
@@ -463,15 +602,50 @@ export async function answerQuestion(
         const latest = await loadInvestigation(investigationName);
         assertMissionGate(latest.mission);
         const progress = await buildMissionProgress(investigationName, latest.mission);
-        return buildMissionContractPrompt(latest.mission, progress ?? undefined);
+        return [
+          buildMissionContractPrompt(latest.mission, progress ?? undefined),
+          buildUnknownContinuationGuidance(),
+        ].filter(Boolean).join('\n\n');
       },
       shouldContinueMission: async () => {
         const latest = await loadInvestigation(investigationName);
         assertMissionGate(latest.mission);
         const progress = await buildMissionProgress(investigationName, latest.mission);
         if (!progress) return true;
-        // 有未覆盖的必需交付物时，确定性地继续；否则采用本阶段 Smart Function 的“是否值得继续”建议。
-        return missionHasOpenDeliverables(progress) || stageContinuationRecommendation;
+
+        // 先执行确定性的结构判断；有明确未完成交付物，不能提前停止。
+        if (missionHasOpenDeliverables(progress)) return true;
+
+        // Unknown 只有在结构化判断明确要求“自己查 / 问用户”时才驱动继续。
+        if (unknownReviewsForTurn.some((item) => item.action === 'investigate' || item.action === 'ask_user')) {
+          return true;
+        }
+
+        // 必需交付物都没有可量化缺口后，最终是否停止交给 Completion Gate。
+        const completion = await reviewMissionCompletion({
+          mission: latest.mission,
+          progress,
+          resultSummary: {
+            evidenceCount: latest.evidence.length,
+            findingCount: latest.findings.length,
+            claimCount: latest.claims.length,
+            unknowns: unknownReviewsForTurn.length
+              ? unknownReviewsForTurn.filter((item) => item.action !== 'ignore').map((item) => item.unknown)
+              : latest.unknowns,
+          },
+          unknownReviews: unknownReviewsForTurn,
+          model: control.agent.model,
+          workingDirectory: workspaceRoot(inv.name),
+        });
+        lastMissionCompletionReview = completion;
+        recordTrajectory({
+          type: 'status',
+          name: completion.completed ? 'Mission Completion 检查通过' : 'Mission Completion 检查未通过',
+          status: completion.completed ? 'completed' : 'info',
+          details: { completion },
+        });
+
+        return !completion.completed;
       },
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
@@ -512,7 +686,10 @@ export async function answerQuestion(
     inv.claims.push(...claims);
     if (!inv.questions.includes(effectiveQuestion)) inv.questions.push(effectiveQuestion);
     const currentUnknowns = [...new Set(parsed.unknowns.map((item) => item.trim()).filter(Boolean).filter((item) => item.length <= 500))].slice(0, 12);
-    inv.unknowns = currentUnknowns;
+    // 只保留仍会影响 Mission 的 Unknown；无关 Unknown 不再作为后续调查入口。
+    inv.unknowns = unknownReviewsForTurn.length
+      ? [...new Set(unknownReviewsForTurn.filter((item) => item.affectsMission).map((item) => item.unknown))].slice(0, 12)
+      : currentUnknowns;
 
     const answer = parsed.answer || raw.slice(0, 2000);
     await saveInvestigation(inv);
