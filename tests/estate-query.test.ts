@@ -65,7 +65,7 @@ describe('Data Estate graph queries', () => {
         id: sourceId,
         type: 'column',
         name: 'raw_position.pos_qty',
-        attributes: { expression: 'pos_qty * 100' },
+        attributes: {},
       },
       { id: targetId, type: 'column', name: 'position.quantity', attributes: {} },
     );
@@ -75,6 +75,7 @@ describe('Data Estate graph queries', () => {
       to: targetId,
       type: 'derived_from',
       evidenceIds: ['ev-column'],
+      expression: 'pos_qty * 100',
     });
 
     const relations = columnLineageRelations(estate);
