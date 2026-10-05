@@ -29,7 +29,7 @@ export const AgentAnswerSchema = z.object({
   answer: z.string().max(8000).catch(''),
   /** Agent 从用户问题、仓库、文档和 Discovery 中整理出的调查范围候选。 */
   intake: AgentIntakeSchema.optional().catch(undefined),
-  /** 有实质调查成果时输出；这是中间 checkpoint，不是最终报告。 */
+  /** 兼容旧版本 Agent 输出；服务器不会使用它判断阶段是否完成。 */
   checkpoint: AgentCheckpointSchema.optional().catch(undefined),
   claims: z.array(AgentClaimDraftSchema.nullable().catch(null))
     .catch([])
