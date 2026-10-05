@@ -26,7 +26,7 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
 import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
-import { runInvestigationScopeGate } from './scope-gate.js';
+import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { isJourneyCompletionConditionSatisfied } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -862,6 +862,20 @@ export async function applyAgentWorkflowTransition(
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+    }
+
+    // 用户明确要求只分析现状时，即使 Agent 返回合法的 Workflow outcome，也不能越过范围进入设计阶段。
+    if (currentNode) {
+      const context = await loadInvestigation(name);
+      const currentStateOnly = isCurrentStateOnlyScope(context.goal, context.scope);
+      const route = currentNode.routes.find((item) => item.outcome === transition.outcome);
+      if (
+        transition.outcome === 'success'
+        && currentStateOnly
+        && ['target', 'mapping', 'validation', 'cutover'].includes(route?.target ?? '')
+      ) {
+        throw new Error('本次调查范围明确只包含当前状态分析，不能进入目标架构、迁移映射或切换阶段；如需继续，请先由用户明确调整范围。');
+      }
     }
 
     if (transition.outcome === 'success' && currentNode) {
