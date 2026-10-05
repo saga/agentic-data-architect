@@ -247,7 +247,7 @@ function sanitizeModernizationEvidence(
   return sanitized;
 }
 
-/** 从完整 Agent JSON 中只提取阶段性 checkpoint；解析失败时直接忽略，不影响最终答案。 */
+/** 从完整 Agent JSON 中只提取模型明确返回的阶段性 checkpoint。 */
 export function extractAgentCheckpoint(raw: string): AgentCheckpoint | undefined {
   try {
     const data = JSON.parse(extractJson(raw)) as unknown;
@@ -257,6 +257,58 @@ export function extractAgentCheckpoint(raw: string): AgentCheckpoint | undefined
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 模型漏填 checkpoint 时，从已经通过 Schema 和 Evidence 校验的阶段结果生成一个兜底小结。
+ *
+ * checkpoint 是调查成果的展示记录，不能要求模型自己维护“日志格式”才能工作。
+ * 这里只使用已经解析后的 answer / claims / unknowns / routeOptions，不凭空补事实。
+ */
+export function buildAgentCheckpoint(parsed: ParsedAnswer, execution: number): AgentCheckpoint | undefined {
+  const answer = parsed.answer.trim();
+  const supportedClaims = parsed.claims
+    .filter((claim) => claim.status === 'supported' || claim.status === 'verified')
+    .slice(0, 6);
+
+  const confirmed = supportedClaims.map((claim) => claim.claim.trim()).filter(Boolean);
+  const evidenceIds = [...new Set(parsed.claims.flatMap((claim) => claim.evidenceIds))].slice(0, 12);
+  const unknowns = parsed.unknowns
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const modernizationFacts: string[] = [];
+  if (parsed.modernization) {
+    const componentCount = parsed.modernization.targetArchitecture?.components.length ?? 0;
+    const mappingCount = parsed.modernization.mappings?.length ?? 0;
+    const validationCount = parsed.modernization.validation?.checks.length ?? 0;
+    if (componentCount > 0) modernizationFacts.push('已形成 ' + String(componentCount) + ' 个目标架构组件。');
+    if (mappingCount > 0) modernizationFacts.push('已形成 ' + String(mappingCount) + ' 条新旧对应关系。');
+    if (validationCount > 0) modernizationFacts.push('已完成 ' + String(validationCount) + ' 项验证检查记录。');
+  }
+
+  const summary = answer
+    .split(/\n\s*\n/)
+    .map((item) => item.replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' '))
+    .find((item) => item.length > 0)
+    ?.slice(0, 500);
+
+  // 没有实际内容时不要为了“每轮都有记录”而制造空的阶段成果。
+  if (!summary && !confirmed.length && !evidenceIds.length && !modernizationFacts.length) return undefined;
+
+  return AgentCheckpointSchema.parse({
+    title: '第 ' + String(execution + 1) + ' 阶段',
+    summary: summary ?? modernizationFacts[0] ?? confirmed[0] ?? '这一阶段已经形成可保存的调查结果。',
+    confirmed: [...confirmed, ...modernizationFacts].slice(0, 6),
+    evidenceIds,
+    unknowns,
+    ...(parsed.followUpQuestions[0]
+      ? { nextStep: parsed.followUpQuestions[0].trim().slice(0, 500) }
+      : parsed.routeOptions[0]?.steps[0]
+        ? { nextStep: parsed.routeOptions[0].steps[0].trim().slice(0, 500) }
+        : {}),
+  });
 }
 
 /** 把模型层 ParsedAnswer 转成可持久化的业务 Claim，并由调用方生成唯一 ID。 */
