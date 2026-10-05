@@ -23,7 +23,8 @@
     "python:sync": "uv sync",
     "python:lock": "uv lock",
     "python:check": "uv run python scripts/check-python-deps.py",
-    "gate:stage": "tsx scripts/investigation-stage-gate.ts"
+    "gate:stage": "tsx scripts/investigation-stage-gate.ts",
+    "gate:mission": "tsx scripts/investigation-mission-gate.ts"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
