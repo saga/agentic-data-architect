@@ -18,6 +18,8 @@ const EnvSchema = z.object({
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(360_000),
   // Agent 真正执行的默认上限仍为 6 分钟；进入 ask_user 后改用单独的等待上限。
   USER_INPUT_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
+  // 权限确认和 Agent 实际计算是两种等待。用户没有及时点“允许/拒绝”时，不能被 6 分钟执行超时误杀。
+  PERMISSION_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
   GRAPHIFY_ENABLED: z.enum(['true', 'false']).default('true'),
   GRAPHIFY_MCP_COMMAND: z.string().min(1).default('graphify-mcp'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
@@ -38,6 +40,7 @@ export const config = {
   model: envConfig.COPILOT_MODEL,
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   userInputWaitTimeoutMs: envConfig.USER_INPUT_WAIT_TIMEOUT_MS,
+  permissionWaitTimeoutMs: envConfig.PERMISSION_WAIT_TIMEOUT_MS,
   graphifyEnabled: envConfig.GRAPHIFY_ENABLED === 'true',
   graphifyMcpCommand: envConfig.GRAPHIFY_MCP_COMMAND,
   graphifyPlatformCapabilityVersion: 1,
