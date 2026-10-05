@@ -9,6 +9,7 @@ import {
 const review = {
   artifactType: 'report' as const,
   status: 'fail' as const,
+  availability: 'completed' as const,
   score: 62,
   summary: '报告没有形成清晰的结论。',
   issues: [
@@ -37,4 +38,24 @@ test('review failure summary keeps concrete issues and avoids empty advice', () 
     summarizeReviewFailure(review),
     '用户要求 replatform 方案，但报告只描述现状。；报告暴露了内部对象名称。',
   );
+});
+
+
+test('unavailable review can be persisted as a valid review record', () => {
+  const unavailable = {
+    artifactType: 'report' as const,
+    status: 'fail' as const,
+    availability: 'unavailable' as const,
+    score: 0,
+    summary: '独立 Reviewer 暂时没有返回可验证的审核结果。',
+    issues: [{
+      category: 'consistency' as const,
+      severity: 'high' as const,
+      description: 'Reviewer 没有返回可验证的结构化审核结果。',
+      suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
+    }],
+    reviewedAt: new Date().toISOString(),
+  };
+
+  assert.equal(ArtifactReviewSchema.parse(unavailable).availability, 'unavailable');
 });
