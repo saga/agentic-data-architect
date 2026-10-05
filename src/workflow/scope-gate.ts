@@ -45,6 +45,15 @@ function hasPlaceholder(value: string): boolean {
   return /^(?:\(unset\)|（unset）|\(not set\)|（未设置）|未设置|未知)$/i.test(value.trim());
 }
 
+/**
+ * 判断本次 Investigation 是否明确限制在 Current-State，暂不进入目标架构/迁移设计。
+ * 这是对用户显式范围的保护，不根据任务名称自行推断。
+ */
+export function isCurrentStateOnlyScope(goal: string, scope: string[]): boolean {
+  const text = [goal, ...scope].filter(Boolean).join(' ');
+  return /只分析(?:当前)?状态|只做现状|不设计目标架构|不制定迁移计划|不做迁移计划|不设计迁移步骤|不做新旧映射|不做映射/i.test(text);
+}
+
 function allKnownEvidence(ids: string[], known: Set<string>): boolean {
   return ids.length > 0 && ids.every((id) => known.has(id));
 }
