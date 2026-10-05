@@ -11,7 +11,7 @@ import { buildCurrentStateIntelligence } from '../analysis/current-state.js';
 import { runAllFindings } from '../analysis/findings.js';
 import { discoverDirectory, type Inventory } from '../discovery/scanner.js';
 import { discoverDatabase } from '../discovery/database.js';
-import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
+import { discoveryDir, loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
 import { appendContextInput, redactSensitiveUri } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
 import { nextId, type DiscoveryRun, type EvidenceRef, type GraphifyRunMetadata } from '../evidence/types.js';
