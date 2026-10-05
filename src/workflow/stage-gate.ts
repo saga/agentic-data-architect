@@ -6,7 +6,7 @@
  *
  * Gate 的核心原则：
  * 1. 仅凭一段自然语言 answer 永远不能通过；
- * 2. 至少要有 Evidence-backed Claim，或者 Investigation 在本阶段出现真实持久化变化；
+ * 2. Investigation 必须在本阶段出现真实持久化变化；
  * 3. Claim 引用的 Evidence 必须真实存在；
  * 4. Gate 结果本身可以序列化到 trajectory，脚本可以重新检查，避免运行时和事后判断不一致。
  */
@@ -70,7 +70,7 @@ export function snapshotInvestigationForStageGate(
  * 确定性判断本阶段是否形成值得留下的阶段成果。
  *
  * 注意：parsed.answer 的文字质量不会决定 Gate 是否通过。
- * answer 写得再漂亮，但没有 Evidence-backed Claim，也没有真实调查状态变化，仍然失败。
+ * answer 写得再漂亮，但没有真实调查状态变化，仍然失败。
  */
 export function evaluateInvestigationStageGate(input: StageGateInput): StageGateResult {
   const checks: StageGateCheck[] = [];
