@@ -38,9 +38,11 @@ export interface MissionProgress {
 
 /** 只根据 Mission 交付物状态判断是否还有必要自动继续，不看 Agent 自己的“完成”声明。 */
 export function missionHasOpenDeliverables(progress: MissionProgress): boolean {
-  // not_tracked 不是完成，而是“系统无法自动量化”；为了避免误停，仍视为有待处理工作。
+  // not_tracked 表示平台无法自动量化这个结果，不能拿它作为继续跑 Agent 的理由。
+  // 自动续跑只追踪明确的未开始 / 进行中交付物；自定义结果在一次 Agent 执行里自行判断，
+  // 避免因为一个无法量化的结果把 Investigation 无意义地延长到最大轮次。
   return progress.deliverables.some(
-    (item) => item.required && item.status !== 'covered',
+    (item) => item.required && (item.status === 'not_started' || item.status === 'in_progress'),
   );
 }
 
