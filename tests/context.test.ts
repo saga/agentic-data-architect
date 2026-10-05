@@ -71,16 +71,8 @@ test('question context exposes evidence ids for column lineage and profiles', ()
   const result = buildQuestionContext({
     question: 'position quantity',
     estate,
-    // The lineage object only signals that SQL lineage has been run. Dataset and
-    // column graph data intentionally come from DataEstate above.
-    lineage: {
-      edges: [],
-      tables: [],
-      statements: [],
-      evidence,
-      columns: [],
-      parseFailures: [],
-    },
+    // SQL lineage availability is separate from the canonical graph queried above.
+    hasSqlLineage: true,
     profiles: [
       {
         dataset: 'position',
