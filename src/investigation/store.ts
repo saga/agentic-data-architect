@@ -155,6 +155,10 @@ export async function confirmInvestigationMission(
 
   return withWorkspaceContextLock(name, async () => {
     const current = await loadWorkspaceContext(name);
+    const missionChanged =
+      current.mission?.purpose !== mission.purpose
+      || current.mission?.expectedResult !== mission.expectedResult;
+
     const next = WorkspaceContextSchema.parse({
       ...current,
       mission,
@@ -162,11 +166,16 @@ export async function confirmInvestigationMission(
       goal: mission.purpose,
       updatedAt: new Date().toISOString(),
     });
+
     const nextState = { ...next };
-    delete nextState.scopeValidation;
-    delete nextState.copilotSessionId;
-    delete nextState.copilotConfigurationVersion;
-    delete nextState.journeyPlan;
+    if (missionChanged) {
+      // Mission 真正改变后，旧范围确认、Copilot Session 和动态路线都可能已经过时。
+      delete nextState.scopeValidation;
+      delete nextState.copilotSessionId;
+      delete nextState.copilotConfigurationVersion;
+      delete nextState.journeyPlan;
+    }
+
     await writeJsonAtomic(contextFile(name), nextState);
     return nextState;
   });
