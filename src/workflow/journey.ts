@@ -57,6 +57,8 @@ export interface ParsedJourney {
 export interface JourneyFacts {
   /** 用户明确给出的本次调查目标；为空时通常不能自动完成 intake。 */
   goal: string;
+  /** Scope Gate 是否已经确认 Goal / Scope / Systems。 */
+  scopeReady?: boolean;
   /** Architecture Assessment 使用的确定性计数；Legacy 路线不需要填。 */
   findingCount?: number;
   recommendationCount?: number;
@@ -305,6 +307,7 @@ export async function loadModernizationJourney(): Promise<JourneyDefinition> {
 /** 当前版本已支持的 deterministic completion 条件。 */
 export const KNOWN_COMPLETION_CONDITIONS = [
   'goal',
+  'scope-ready',
   'current-state',
   'data-truth',
   'investigation',
@@ -323,6 +326,8 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
   switch (condition) {
     case 'goal':
       return Boolean(facts.goal.trim());
+    case 'scope-ready':
+      return facts.scopeReady === true;
     case 'current-state':
       return Boolean(facts.currentState && facts.currentState.datasets > 0);
     case 'data-truth':
