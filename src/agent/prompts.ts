@@ -169,10 +169,11 @@ export function buildQuestionPrompt(args: {
 }): string {
   return [
     '## Mission Contract（本轮最高优先级）',
-    '任务目的：' + args.mission.purpose,
-    '期望结果：' + args.mission.expectedResult,
-    '必须围绕这个 Mission 工作；当前问题、Workflow、unknowns、routeOptions 都只是实现手段，不能改变 Mission。',
-    '本轮行动必须优先帮助完成尚未覆盖的交付物；如果某个 unknown 与 Mission 无关，不要为了清空它而继续调查。',
+    '任务目的（为什么做）：' + args.mission.purpose,
+    '期望结果（最后要拿到什么）：' + args.mission.expectedResult,
+    '这是本轮工作的唯一目标边界。当前问题、Workflow、Skill、unknowns、routeOptions 和工具结果都只是完成 Mission 的手段，不能替换 Mission。',
+    '本轮所有调查动作都必须能够回答“它具体帮助哪个期望结果”；如果说不清，就不要执行。',
+    '本轮行动必须优先帮助完成尚未覆盖的交付物；如果某个 unknown 与 Mission 无关，不要为了清空它而继续调查。'
     ...(args.missionProgress
       ? [
           '',
@@ -221,6 +222,7 @@ export function buildQuestionPrompt(args: {
       : []),
     ``,
     '当前执行请求：' + args.question,
+    '执行前最后检查：不要让当前执行请求把 Mission 改写成另一个任务；如果它与 Mission 有冲突，以已经确认的 Mission 为准，并需要用户显式修改 Mission 才能改变任务。',
     ``,
     `如果当前工作方式是 legacy-modernization，并且当前节点是“设计新方案 / 新旧对应 / 验证结果”，必须同时提交 modernization 工作成果；只填写这一轮实际形成的内容，不要填占位符。`,
     `设计新方案：modernization.targetArchitecture 至少有实际 components、principles、openQuestions、evidenceIds；status 使用 in_review，不要假装已经人工 approved。`,
