@@ -6,7 +6,6 @@
  */
 import type { DataProfile } from '../adapters/database.js';
 import type { EvidenceRef, Finding } from '../evidence/types.js';
-import type { LineageGraph } from './lineage.js';
 import type { CurrentStateIntelligence } from '../model/current-state.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import type { Inventory } from '../discovery/scanner.js';
@@ -54,7 +53,7 @@ function scoreDataset(questionTokens: string[], dataset: string): number {
 export function buildQuestionContext(args: {
   question: string;
   estate: DataEstate;
-  lineage: LineageGraph | null;
+  hasSqlLineage: boolean;
   profiles: DataProfile[];
   findings: Finding[];
   evidence: EvidenceRef[];
@@ -66,7 +65,7 @@ export function buildQuestionContext(args: {
   const {
     question,
     estate,
-    lineage,
+    hasSqlLineage,
     profiles,
     findings,
     evidence,
@@ -116,7 +115,7 @@ export function buildQuestionContext(args: {
     return lines;
   };
 
-  if (!lineage) {
+  if (!hasSqlLineage) {
     const sourceLines: string[] = [];
     const sourceIds: string[] = [];
     for (const file of (inventory?.files ?? []).slice(0, 20)) {
