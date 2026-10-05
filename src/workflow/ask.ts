@@ -388,6 +388,21 @@ export async function answerQuestion(
       },
       ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
       missionPrompt,
+      refreshMissionPrompt: async () => {
+        const latest = await loadInvestigation(investigationName);
+        assertMissionGate(latest.mission);
+        const progress = await buildMissionProgress(investigationName, latest.mission);
+        return buildMissionContractPrompt(latest.mission, progress ?? undefined);
+      },
+      shouldContinueMission: async () => {
+        const latest = await loadInvestigation(investigationName);
+        assertMissionGate(latest.mission);
+        const progress = await buildMissionProgress(investigationName, latest.mission);
+        if (!progress) return true;
+        return progress.deliverables.some(
+          (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+        );
+      },
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
