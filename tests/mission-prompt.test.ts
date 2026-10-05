@@ -20,6 +20,9 @@ test('Mission Contract is rendered as the highest-priority prompt block', () => 
   assert.match(prompt, /Data Source/);
   assert.match(prompt, /Data Flow/);
   assert.match(prompt, /Data Model/);
+  assert.match(prompt, /这是整个 Investigation 唯一的任务契约/);
+  assert.match(prompt, /只有明确服务于这两项内容的动作才值得执行/);
+  assert.match(prompt, /unknown 只是未知状态/);
 });
 
 test('question prompt repeats Mission before question-specific context', () => {
@@ -38,6 +41,7 @@ test('question prompt repeats Mission before question-specific context', () => {
   assert.equal(prompt.startsWith('## Mission Contract（本轮最高优先级）'), true);
   assert.ok(prompt.indexOf('期望结果：') < prompt.indexOf('当前未知项'));
   assert.ok(prompt.indexOf('当前未知项') < prompt.indexOf('当前执行请求：'));
+  assert.match(prompt, /不能让当前执行请求把 Mission 改写成另一个任务/);
 });
 
 
