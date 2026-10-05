@@ -145,12 +145,29 @@ export function evaluateInvestigationScopeGate(
   return { passed: checks.every((item) => item.passed), checks };
 }
 
-/** 将 Gate 失败转换成人可以直接处理的错误消息。 */
+/** 将 Gate 失败转换成人可以直接处理的错误消息；不要把内部检查项和机器字段原样堆给用户。 */
 export function formatScopeGateFailure(result: ScopeGateResult): string {
-  const failed = result.checks.filter((item) => !item.passed).map((item) => item.name + '：' + item.detail);
-  return '这次调查的目标、范围和系统还没有确认完整，暂时不能生成正式结果。'
-    + (failed.length ? ' ' + failed.join('；') : '')
-    + ' 请回到调查，让助手先从已有材料整理候选，材料说不清时会请你确认。';
+  const checks = new Map(result.checks.map((item) => [item.name, item]));
+  const failed = (name: string) => checks.get(name)?.passed === false;
+
+  let reason = '范围确认还缺少必要信息。';
+  if (failed('Goal / Scope / Systems 都已填写')) {
+    reason = '目标、范围或涉及系统还没有补齐。';
+  } else if (failed('没有占位内容')) {
+    reason = '目标、范围或涉及系统里还有未明确的占位内容。';
+  } else if (failed('范围已经明确记录为已确认')) {
+    reason = '目标、范围和涉及系统已经整理出来，但还没有完成确认。';
+  } else if (failed('已确认内容与当前范围一致')) {
+    reason = '已经确认的范围和现在的范围不一致，需要重新确认。';
+  } else if (failed('确认时间有效')) {
+    reason = '范围确认记录不完整，需要重新确认。';
+  } else if (failed('确认来源可以追溯')) {
+    reason = '范围虽然标记为已确认，但确认来源不足，暂时不能作为正式结果依据。';
+  }
+
+  return '这次调查还不能生成正式结果。'
+    + reason
+    + ' 请回到调查，让助手先整理已有材料；材料足够明确时会直接确认，存在歧义时再请你确认。';
 }
 
 /**
