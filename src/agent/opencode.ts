@@ -122,12 +122,14 @@ function authHeaders(): Record<string, string> {
   };
 }
 
-function directoryHeaders(workingDirectory?: string): Record<string, string> {
-  return workingDirectory ? { 'x-opencode-directory': workingDirectory } : {};
-}
-
 function baseUrl(): string {
   return config.openCodeBaseUrl.replace(/\/+$/, '');
+}
+
+function withDirectory(pathname: string, workingDirectory?: string): string {
+  if (!workingDirectory) return pathname;
+  const separator = pathname.includes('?') ? '&' : '?';
+  return pathname + separator + 'directory=' + encodeURIComponent(workingDirectory);
 }
 
 async function openCodeFetch(
@@ -137,10 +139,9 @@ async function openCodeFetch(
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   for (const [key, value] of Object.entries(authHeaders())) headers.set(key, value);
-  for (const [key, value] of Object.entries(directoryHeaders(workingDirectory))) headers.set(key, value);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
 
-  return fetch(baseUrl() + pathname, {
+  return fetch(baseUrl() + withDirectory(pathname, workingDirectory), {
     ...init,
     headers,
   });
@@ -155,10 +156,14 @@ export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
     throw new Error('OpenCode 服务不可用：HTTP ' + response.status);
   }
 
-  const payload = await response.json() as { all?: OpenCodeProvider[] };
+  const payload = await response.json() as { all?: OpenCodeProvider[]; connected?: string[] };
+  const connected = new Set(payload.connected ?? []);
   const result: OpenCodeModelOption[] = [];
 
   for (const provider of payload.all ?? []) {
+    // 只展示 OpenCode 当前已经连接的 provider，避免把未登录/未配置的模型
+    // 塞进工作台后才在真正执行时失败。
+    if (connected.size > 0 && !connected.has(provider.id)) continue;
     for (const [modelKey, model] of Object.entries(provider.models ?? {})) {
       const modelId = model.id?.trim() || modelKey;
       if (!modelId) continue;
