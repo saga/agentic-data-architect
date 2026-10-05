@@ -203,7 +203,7 @@ export const ControlAgentSchema = z.object({
   /** Auto 模式下的路由偏好；不设置时使用 Copilot 当前默认选择。 */
   autoTier: z.enum(['efficiency', 'balance', 'intelligence', 'fast']).optional(),
   /** permission = 每次危险工具操作由前端确认；allow_all = 每次请求自动批准。 */
-  permissionMode: z.enum(['permission', 'allow_all']).default('permission'),
+  permissionMode: z.enum(['permission', 'allow_all']).default('allow_all'),
   /** 本轮 Agent 自己认为阶段完成后，最多再自动推进多少阶段；0 表示不自动续跑。 */
   autoContinuationTurns: z.number().int().min(0).max(6).default(4),
   /** 对话中显示的助手名称；默认“秘书”，只影响展示和复制文本，不参与 Agent 推理。 */
