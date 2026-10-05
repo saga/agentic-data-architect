@@ -195,7 +195,7 @@ title: 切换确认
 objective: 验证已经完成后，由负责人确认切换条件、回退方案和运行准备，再进入实际切换；工作台不会把“生成了一份计划”当成已经切换完成。
 
 - approved -> done
-- rollback -> investigate
+- rollback -> current-state
 
 ## @end done
 
