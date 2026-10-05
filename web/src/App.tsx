@@ -104,6 +104,7 @@ interface InvestigationControl {
     autoTier?: AutoTier;
     permissionMode: 'permission' | 'allow_all';
     displayName: string;
+    personality: string;
     avatarPath?: string;
     avatarPaths?: string[];
     avatarMimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
@@ -488,7 +489,7 @@ function AppInner() {
   const routeInfo = () => {
     const match = window.location.pathname.match(/^\/investigations\/([^/]+)(?:\/(config|trajectory|journey|results))?\/?$/);
     return match
-      ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' | 'journey' }
+      ? { session: decodeURIComponent(match[1]), page: (match[2] ?? 'chat') as 'chat' | 'config' | 'trajectory' | 'journey' | 'results' }
       : undefined;
   };
 
@@ -628,7 +629,6 @@ function AppInner() {
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
-    setCheckpoints(result.checkpoints ?? []);
     setJourney(journeyResult.journey ?? undefined);
 
     const existing = result.context.inputs
@@ -1117,10 +1117,6 @@ function AppInner() {
         if (event === 'checkpoint') {
           const checkpoint = data as InvestigationCheckpoint;
           if (checkpoint && typeof checkpoint.id === 'string' && typeof checkpoint.title === 'string') {
-            setCheckpoints((items) => [
-              ...items.filter((item) => item.id !== checkpoint.id),
-              checkpoint,
-            ].slice(-20));
             setTurnStatus('已形成阶段小结：' + checkpoint.title);
           }
           return;
