@@ -169,21 +169,23 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     ].join('，'),
   );
 
+  const allRequiredUntracked = input.missionProgressAfter.deliverables.every(
+    (item) => !item.required || item.status === 'not_tracked',
+  );
+
   add(
     '本阶段推进了 Mission 交付物',
-    advancedDeliverables.length > 0,
+    advancedDeliverables.length > 0 || allRequiredUntracked,
     advancedDeliverables.length
       ? advancedDeliverables.map((item) => item.title + '：' + item.from + ' → ' + item.to).join('，')
-      : '本阶段虽然产生了调查变化，但没有推动任何已定义的 Mission 交付物。',
+      : allRequiredUntracked
+        ? '本次 Mission 没有可自动量化的交付物，本阶段有真实调查成果即可留下阶段小结。'
+        : '本阶段虽然产生了调查变化，但没有推动任何已定义的 Mission 交付物。',
   );
 
   return {
     execution: input.execution,
-    passed: checks.every((item) => item.passed)
-      && (
-        advancedDeliverables.length > 0
-        || input.missionProgressAfter.deliverables.every((item) => !item.required || item.status === 'not_tracked')
-      ),
+    passed: checks.every((item) => item.passed),
     checks,
     newEvidenceIds,
     newFindingIds,
