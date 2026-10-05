@@ -7,19 +7,41 @@ describe('Current-State Intelligence', () => {
   it('builds source and semantic candidates without treating them as business truth', () => {
     const estate = emptyEstate();
 
+    const stgPositionId = nodeId('dataset', 'stg_position');
+    const rawPositionId = nodeId('dataset', 'raw_position');
+    const portfolioPositionId = nodeId('dataset', 'prod.portfolio_position');
+    const reportId = nodeId('dataset', 'prod.report');
+
     estate.nodes.push(
-      { id: nodeId('dataset', 'stg_position'), type: 'dataset', name: 'stg_position', attributes: { adapter: 'snowflake' } },
-      { id: nodeId('dataset', 'raw_position'), type: 'dataset', name: 'raw_position', attributes: { adapter: 'snowflake' } },
+      { id: stgPositionId, type: 'dataset', name: 'stg_position', attributes: { adapter: 'snowflake' } },
+      { id: rawPositionId, type: 'dataset', name: 'raw_position', attributes: { adapter: 'snowflake' } },
+      { id: portfolioPositionId, type: 'dataset', name: 'prod.portfolio_position', attributes: {} },
+      { id: reportId, type: 'dataset', name: 'prod.report', attributes: {} },
       { id: nodeId('column', 'stg_position.security_id'), type: 'column', name: 'stg_position.security_id', attributes: {} },
       { id: nodeId('column', 'stg_position.position_qty'), type: 'column', name: 'stg_position.position_qty', attributes: {} },
       { id: nodeId('column', 'stg_position.as_of_date'), type: 'column', name: 'stg_position.as_of_date', attributes: {} },
     );
+    estate.edges.push(
+      {
+        id: 'e-1',
+        from: stgPositionId,
+        to: portfolioPositionId,
+        type: 'derived_from',
+        evidenceIds: ['ev-1'],
+      },
+      {
+        id: 'e-2',
+        from: rawPositionId,
+        to: reportId,
+        type: 'derived_from',
+        evidenceIds: ['ev-2'],
+      },
+    );
 
     const lineage = {
-      edges: [
-        { source: 'stg_position', target: 'prod.portfolio_position', viaFile: 'a.sql', evidenceId: 'ev-1' },
-        { source: 'raw_position', target: 'prod.report', viaFile: 'b.sql', evidenceId: 'ev-2' },
-      ],
+      // Graph traversal is deliberately empty here: Current-State must use the
+      // canonical DataEstate rather than re-querying LineageGraph.edges.
+      edges: [],
       tables: ['stg_position', 'prod.portfolio_position', 'raw_position', 'prod.report'],
       columns: [],
       statements: [],
