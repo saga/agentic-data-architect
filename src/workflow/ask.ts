@@ -25,6 +25,11 @@ import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
 import { persistAgentIntake } from './scope-gate.js';
+import {
+  buildStageCheckpoint,
+  evaluateInvestigationStageGate,
+  snapshotInvestigationForStageGate,
+} from './stage-gate.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
@@ -217,6 +222,10 @@ export async function answerQuestion(
       });
     }
 
+    // Stage Gate 的基线必须建立在本次 Agent turn 真正开始前；这样每个自动续跑阶段
+    // 都只能因为本阶段新增的 Evidence / Finding / Discovery 等真实结果而形成小结。
+    let stageGateBaseline = snapshotInvestigationForStageGate(inv);
+
     const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
     await appendAuditEvent(investigationName, {
       actor: 'system',
@@ -278,31 +287,65 @@ export async function answerQuestion(
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
-        // 优先使用模型明确返回的 checkpoint；模型漏填时，用这一阶段已经解析并通过
-        // Evidence 校验的结果生成兜底小结，避免“已经做完几阶段，但结果页显示 0 个阶段”。
         const latestStage = await loadInvestigation(investigationName);
         const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
-        const checkpoint = stageParsed.checkpoint ?? buildAgentCheckpoint(stageParsed, execution);
-        if (!checkpoint) return;
+        const stageAfter = snapshotInvestigationForStageGate(latestStage);
+        const stageGateInput = {
+          execution,
+          before: stageGateBaseline,
+          after: stageAfter,
+          parsed: {
+            answer: stageParsed.answer,
+            claims: stageParsed.claims,
+            unknowns: stageParsed.unknowns,
+            followUpQuestions: stageParsed.followUpQuestions,
+            routeOptions: stageParsed.routeOptions,
+          },
+        };
+        const gate = evaluateInvestigationStageGate(stageGateInput);
 
-        const createdAt = new Date().toISOString();
+        // Gate 失败也要留下记录，方便轨迹明确告诉用户“为什么没有形成阶段成果”。
         recordTrajectory({
-          type: 'checkpoint',
-          name: '阶段小结：' + checkpoint.title,
-          status: 'completed',
+          type: 'stage_gate',
+          name: gate.passed ? '阶段成果检查通过' : '阶段成果检查未通过',
+          status: gate.passed ? 'completed' : 'info',
           details: {
             execution,
-            ...checkpoint,
+            ...gate,
+            input: stageGateInput,
           },
         });
-        options?.onCheckpoint?.({
-          ...checkpoint,
-          turnId,
+        void runRecorder?.write('stage_gate', {
           execution,
-          createdAt,
+          ...gate,
+          input: stageGateInput,
         });
-        onStatus?.('阶段小结：' + checkpoint.title);
+
+        // 只有 Script Gate 通过，才能生成 checkpoint。Agent 返回的 checkpoint 字段不参与决定。
+        if (gate.passed) {
+          const checkpoint = buildStageCheckpoint(stageGateInput, gate);
+          const createdAt = new Date().toISOString();
+          recordTrajectory({
+            type: 'checkpoint',
+            name: '阶段小结：' + checkpoint.title,
+            status: 'completed',
+            details: {
+              execution,
+              gatePassed: true,
+              ...checkpoint,
+            },
+          });
+          options?.onCheckpoint?.({
+            ...checkpoint,
+            turnId,
+            execution,
+            createdAt,
+          });
+          onStatus?.('阶段小结：' + checkpoint.title);
+        }
+
+        stageGateBaseline = stageAfter;
       },
       onBeforeWorkflowTransition: async ({ content }) => {
         // 每个阶段在 Gate 前先把本轮已经形成的、且通过 Evidence 校验的 intake 写入 context。
