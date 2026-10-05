@@ -309,6 +309,16 @@ app.post('/api/sessions', async (req, res) => {
   /** 用户确认 Mission；这是解除 Mission Gate 的唯一接口。 */
   app.patch('/api/sessions/:name/mission', async (req, res) => {
     const name = sessionKey(req.params.name);
+    const activeTurn = getActiveInvestigationTurn(name);
+    if (activeTurn) {
+      res.status(409).json({
+        code: 'MISSION_CHANGE_BLOCKED',
+        error: '本次调查正在执行，任务目标不能在执行中途修改。请先停止当前执行，再修改任务目的或期望结果。',
+        execution: activeTurn,
+      });
+      return;
+    }
+
     const body = parseRequest(UpdateMissionBodySchema, req.body);
     const clarity = await reviewMissionClarity(
       body.purpose,
