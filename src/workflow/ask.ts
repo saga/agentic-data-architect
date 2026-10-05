@@ -302,6 +302,7 @@ export async function answerQuestion(
         const stageAfter = snapshotInvestigationForStageGate(latestStage);
         const stageGateInput = {
           execution,
+          mission: inv.mission!,
           before: stageGateBaseline,
           after: stageAfter,
           parsed: {
