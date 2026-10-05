@@ -358,6 +358,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // SDK 自己的 wait timeout 只做极长的 transport-level 兜底；业务 timeout 由下面独立 watchdog 管理。
   const SDK_WAIT_GUARD_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
+  // 必须在 watchdog 闭包初始化前记录 turn 起始时间，避免块级变量先用后声明。
+  const turnStartedAt = Date.now();
+
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
@@ -528,9 +531,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
     userInputWaitTimeoutId = undefined;
   };
 
-  executionWatchdogId = setInterval(executionWatchdog, 250);
-  executionWatchdogId.unref?.();
-
   const heartbeat = setInterval(() => {
     input.onTrajectory?.({
       type: 'status',
@@ -576,7 +576,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   let content = '';
   // 运行态诊断只记录“当前在哪一步”，不记录模型隐藏推理正文。
-  const turnStartedAt = Date.now();
   const trajectoryToolStarts = new Map<string, { startedAt: number; name: string }>();
   const pendingPermissions = new Map<string, { requestedAt: number; kind: string; summary: string }>();
   const pendingUserInputs = new Map<string, { requestedAt: number; question: string }>();
