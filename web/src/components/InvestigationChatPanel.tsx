@@ -206,6 +206,7 @@ export function InvestigationChatPanel(props: {
         draft={props.missionDraft}
         open={props.missionOpen}
         saving={props.missionSaving}
+        loading={props.loading}
         onOpen={props.onOpenMission}
         onClose={props.onCloseMission}
         onChange={props.onChangeMission}
