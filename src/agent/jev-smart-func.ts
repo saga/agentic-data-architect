@@ -318,8 +318,8 @@ export async function jevSmartFunc(
     if (question.type === 'choice' && Object.keys(question.options).length < 2) {
       throw new Error('choice 至少需要两个候选项：' + key);
     }
-    if (question.type === 'score' && question.levels.length < 2) {
-      throw new Error('score 至少需要两个等级：' + key);
+    if (question.type === 'score' && (question.levels.length < 2 || question.levels.length > 10)) {
+      throw new Error('score 需要 2～10 个从低到高排列的等级：' + key);
     }
   }
 
