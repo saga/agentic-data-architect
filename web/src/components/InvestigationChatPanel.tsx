@@ -230,7 +230,9 @@ export function InvestigationChatPanel(props: {
           <div className="empty-chat-inner">
             <Text className="empty-chat-title">开始调查</Text>
             <Text className="empty-chat-description">
-              直接写下你想查清楚的问题。需要时再上传资料或补充信息。
+              {props.current.context.mission
+                ? '直接写下你想查清楚的问题。后续调查都会围绕本次任务目标展开。'
+                : '先确认“为什么做”和“最后希望拿到什么”，确认后再开始调查。'}
             </Text>
             <div className="starter-prompts">
               {[
@@ -474,7 +476,7 @@ export function InvestigationChatPanel(props: {
           suffix={(_, { components }) => (
             <components.SendButton
               type="primary"
-              disabled={!props.value.trim() || props.loading}
+              disabled={!props.value.trim() || props.loading || !props.current.context.mission}
             />
           )}
         />
