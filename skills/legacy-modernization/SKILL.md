@@ -51,7 +51,7 @@ start -> intake
 
 title: 接到任务
 objective: 明确这次为什么改、改什么、范围在哪里，以及当前已经有哪些资料。
-completeWhen: goal
+completeWhen: scope-ready
 
 先判断：
 
@@ -60,6 +60,8 @@ completeWhen: goal
 - 已知系统入口
 - 当前资料
 - 当前未知数
+
+Goal / Scope / Systems 是正式结果的必填内容。先从已有材料挖掘候选；材料足够时直接记录，存在歧义时让用户确认。没有确认完整前，不得生成正式报告或进入下一阶段。
 
 如果输入不足，不要停在“信息不足”。主动问一个最关键的问题，并把问题放进回答后的输入入口。
 
