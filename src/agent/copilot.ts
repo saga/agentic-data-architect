@@ -5,6 +5,7 @@
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
 import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
+import type { ZodType } from 'zod';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -129,6 +130,11 @@ export interface AskInput {
   shouldAbort?: () => boolean;
   /** 本轮 Agent 结束后最多自动再推进多少阶段；0 表示不自动续跑。 */
   autoContinuationTurns?: number;
+  /**
+   * 当前 sendAndWait 的结构化输出 Schema。Schema 仅对本次发送生效，
+   * 不改变普通调查 Agent 的输出协议。
+   */
+  responseSchema?: ZodType;
 }
 
 // turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
@@ -1139,7 +1145,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
       try {
         final = await Promise.race([
           session.sendAndWait(
-            { prompt: continuationPrompt },
+            {
+              prompt: continuationPrompt,
+              ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
+            },
             SDK_WAIT_GUARD_TIMEOUT_MS,
           ),
           executionTimeoutPromise,
