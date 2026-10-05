@@ -6,6 +6,7 @@ import {
   evaluateMissionGate,
   formatMissionGateFailure,
   inferMissionDeliverables,
+  isMissionWorkflowTargetAllowed,
 } from '../src/workflow/mission-gate.js';
 
 test('mission gate requires explicit user confirmation', () => {
@@ -46,4 +47,55 @@ test('mission draft does not imply confirmation', () => {
   const draft = buildMissionDraft('分析当前系统的数据架构');
   assert.equal(draft.expectedResult, '');
   assert.deepEqual(draft.deliverableIds, []);
+});
+
+
+test('Mission boundary blocks Workflow stages that are not part of the requested result', () => {
+  const mission = {
+    version: 1 as const,
+    purpose: '理解 IBM 老系统当前的数据架构，为后续判断提供依据。',
+    expectedResult: '只需要当前 Data Source、Data Flow 和 Data Model。',
+    deliverables: inferMissionDeliverables(
+      '理解 IBM 老系统当前的数据架构，为后续判断提供依据。',
+      '只需要当前 Data Source、Data Flow 和 Data Model。',
+    ),
+    status: 'confirmed' as const,
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user' as const,
+  };
+
+  const currentState = isMissionWorkflowTargetAllowed(
+    mission,
+    'current-state',
+    '梳理当前架构',
+  );
+  assert.equal(currentState.allowed, true);
+
+  const target = isMissionWorkflowTargetAllowed(
+    mission,
+    'target',
+    '设计新方案',
+  );
+  assert.equal(target.allowed, false);
+  assert.match(target.reason ?? '', /目标架构/);
+});
+
+test('Mission boundary allows a target stage when the user explicitly requested target architecture', () => {
+  const mission = {
+    version: 1 as const,
+    purpose: '分析旧系统并设计 replatform 方案。',
+    expectedResult: '形成当前架构、目标架构、新旧映射和验证方案。',
+    deliverables: inferMissionDeliverables(
+      '分析旧系统并设计 replatform 方案。',
+      '形成当前架构、目标架构、新旧映射和验证方案。',
+    ),
+    status: 'confirmed' as const,
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user' as const,
+  };
+
+  assert.equal(
+    isMissionWorkflowTargetAllowed(mission, 'target', '设计新方案').allowed,
+    true,
+  );
 });
