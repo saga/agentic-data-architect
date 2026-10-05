@@ -74,7 +74,7 @@ export function InvestigationDialogs(props: {
             className="modal-tip"
             type="info"
             showIcon
-            title="创建工作空间不会直接开始调查。第一次执行前还会让你确认这两个内容；没有确认之前，Agent 不会开始查资料或调用工具。"
+            title="填写“任务目的”和“期望结果”后，创建调查会直接开始。无需再输入“开始”；如果内容还不够清楚，系统才会要求你补充确认。"
           />
         </Space>
       </Modal>
