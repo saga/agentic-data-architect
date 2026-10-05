@@ -1,11 +1,12 @@
 import React from 'react';
-import { Button, Card, Flex, Input, Modal, Tag, Typography } from 'antd';
-import type { MissionContract, MissionDraft } from '../app/types';
+import { Button, Card, Flex, Input, Modal, Progress, Tag, Typography } from 'antd';
+import type { MissionContract, MissionDraft, MissionProgress } from '../app/types';
 
 const { Text, Paragraph } = Typography;
 
 export function MissionContractPanel(props: {
   mission?: MissionContract;
+  progress?: MissionProgress | null;
   draft: MissionDraft;
   open: boolean;
   saving: boolean;
@@ -42,6 +43,23 @@ export function MissionContractPanel(props: {
                 还需要确认“为什么做”和“最后希望拿到什么”。
               </Text>
             )}
+            {confirmed && props.progress ? (
+              <div style={{ marginTop: 8, maxWidth: 640 }}>
+                <Flex align="center" justify="space-between" gap={12}>
+                  <Text type="secondary">
+                    已覆盖 {props.progress.covered}/{props.progress.total} 项交付物
+                  </Text>
+                  <Text type="secondary">{props.progress.percent}%</Text>
+                </Flex>
+                <Progress
+                  percent={props.progress.percent}
+                  size="small"
+                  showInfo={false}
+                  status={props.progress.percent >= 100 ? 'success' : 'active'}
+                  style={{ margin: '2px 0 0' }}
+                />
+              </div>
+            ) : null}
           </div>
           <Button size="small" disabled={props.loading} onClick={props.onOpen}>
             {confirmed ? '修改' : '确认任务'}
@@ -99,10 +117,26 @@ export function MissionContractPanel(props: {
             <div>
               <Text strong>系统会围绕这些结果工作</Text>
               <Flex wrap gap={6} style={{ marginTop: 8 }}>
-                {confirmed.deliverables.map((item) => (
-                  <Tag key={item.id}>{item.title}</Tag>
-                ))}
+                {confirmed.deliverables.map((item) => {
+                  const current = props.progress?.deliverables.find((progressItem) => progressItem.id === item.id);
+                  const statusLabel =
+                    current?.status === 'covered' ? '已覆盖'
+                      : current?.status === 'in_progress' ? '进行中'
+                        : current?.status === 'not_started' ? '未开始'
+                          : '未自动追踪';
+                  return (
+                    <Tag
+                      key={item.id}
+                      color={current?.status === 'covered' ? 'green' : current?.status === 'in_progress' ? 'blue' : undefined}
+                    >
+                      {item.title} · {statusLabel}
+                    </Tag>
+                  );
+                })}
               </Flex>
+              <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                这些只是任务结果的覆盖情况。未知项不会因为没有解决就自动变成下一项任务。
+              </Text>
             </div>
           ) : (
             <Text type="secondary">
