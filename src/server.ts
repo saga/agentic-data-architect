@@ -59,6 +59,7 @@ import { buildMissionProgress } from './workflow/mission-progress.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
   appendContextInput,
+  appendTranscript,
   ensureWorkspace,
   loadWorkspaceContext,
   workspaceRoot,
@@ -78,6 +79,7 @@ import {
   getConversationTurn,
   listConversationMessages,
   listConversationTurns,
+  saveConversationMessage,
   searchConversation,
 } from './investigation/conversation.js';
 import {
@@ -242,6 +244,36 @@ async function createSession(
     details: { hasInitialPrompt: Boolean(userPrompt?.trim()) },
   });
   return loadWorkspaceContext(key);
+}
+
+/**
+ * Mission 尚未确认时也要先保留用户已经发送的消息。
+ *
+ * Mission Gate 负责阻止 Agent 执行，而不是删除用户对话。使用 turnId:user
+ * 作为稳定消息 ID，使确认 Mission 后重试同一个 turn 时不会产生重复用户消息。
+ */
+async function preserveBlockedUserMessage(
+  sessionName: string,
+  turnId: string,
+  message: string,
+): Promise<void> {
+  const content = message.trim();
+  if (!content) return;
+
+  saveConversationMessage({
+    id: turnId + ':user',
+    sessionName,
+    role: 'user',
+    content,
+  });
+  await appendContextInput(sessionName, {
+    kind: 'user_message',
+    title: '用户问题',
+    content,
+    source: 'conversation',
+    important: false,
+  });
+  await appendTranscript(sessionName, 'user', content);
 }
 
 /** 创建 Express 应用和全部 Web API/SSE 路由；主进程负责 listen，这里只负责组装。 */
@@ -1055,15 +1087,6 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const body = parseRequest(MessageBodySchema, req.body);
     await ensureWorkspace(name);
     const context = await loadWorkspaceContext(name);
-    const missionGate = evaluateMissionGate(context.mission);
-    if (!missionGate.passed) {
-      res.status(409).json({
-        code: 'MISSION_REQUIRED',
-        error: formatMissionGateFailure(missionGate),
-        draft: buildMissionDraft(context.goal || context.userPrompt),
-      });
-      return;
-    }
     let selectedRoute;
     const message = body.message
       ?? (() => {
@@ -1073,6 +1096,19 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
     if (body.routeId && !selectedRoute) {
       res.status(409).json({ error: '这个下一步已经过期，请根据最新情况重新选择。' });
+      return;
+    }
+
+    const missionGate = evaluateMissionGate(context.mission);
+    if (!missionGate.passed) {
+      const blockedTurnId = body.turnId ?? randomUUID();
+      await preserveBlockedUserMessage(name, blockedTurnId, message);
+      res.status(409).json({
+        code: 'MISSION_REQUIRED',
+        error: formatMissionGateFailure(missionGate),
+        draft: buildMissionDraft(context.goal || context.userPrompt),
+        turnId: blockedTurnId,
+      });
       return;
     }
 
@@ -1093,16 +1129,6 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     const body = parseRequest(MessageBodySchema, req.body);
     await ensureWorkspace(name);
     const context = await loadWorkspaceContext(name);
-    const missionGate = evaluateMissionGate(context.mission);
-    if (!missionGate.passed) {
-      res.status(409).json({
-        code: 'MISSION_REQUIRED',
-        error: formatMissionGateFailure(missionGate),
-        draft: buildMissionDraft(context.goal || context.userPrompt),
-      });
-      return;
-    }
-
     let selectedRoute = body.routeId
       ? context.journeyPlan?.routes.find((route) => route.id === body.routeId)
       : undefined;
@@ -1112,6 +1138,20 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     }
     const message = body.message
       ?? (selectedRoute ? '选择下一步：' + selectedRoute.title : '');
+
+    const missionGate = evaluateMissionGate(context.mission);
+    if (!missionGate.passed) {
+      const blockedTurnId = body.turnId ?? randomUUID();
+      await preserveBlockedUserMessage(name, blockedTurnId, message);
+      res.status(409).json({
+        code: 'MISSION_REQUIRED',
+        error: formatMissionGateFailure(missionGate),
+        draft: buildMissionDraft(context.goal || context.userPrompt),
+        turnId: blockedTurnId,
+      });
+      return;
+    }
+
     const turnId = body.turnId ?? randomUUID();
 
     res.status(200);
