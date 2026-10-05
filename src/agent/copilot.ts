@@ -15,7 +15,7 @@ import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
-import { askOpenCode, isOpenCodeModel } from './opencode.js';
+import { askOpenCode, isOpenCodeModel, type OpenCodeAskInput } from './opencode.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -405,29 +405,32 @@ export async function askCopilot(input: AskInput): Promise<string> {
       model: selectedModel,
       prompt: input.prompt,
       systemPrompt: input.systemPrompt,
-      missionPrompt: input.missionPrompt,
       workingDirectory,
-      turnId: input.turnId,
-      onDelta: input.onDelta,
-      onReasoningDelta: input.onReasoningDelta,
-      onStatus: input.onStatus,
-      onTrajectory: input.onTrajectory
-        ? (event) => input.onTrajectory?.({
-            type: event.type,
-            name: event.name,
-            status: event.status,
-            model: event.model,
-            details: event.details,
-          })
-        : undefined,
-      shouldAbort: input.shouldAbort,
-      autoContinuationTurns: input.autoContinuationTurns,
-      refreshMissionPrompt: input.refreshMissionPrompt,
-      shouldContinueMission: input.shouldContinueMission,
-      onStageResult: input.onStageResult,
-      onBeforeWorkflowTransition: input.onBeforeWorkflowTransition,
-      responseSchema: input.responseSchema,
-      workflowSkill: input.workflowSkill,
+      ...(input.missionPrompt !== undefined ? { missionPrompt: input.missionPrompt } : {}),
+      ...(input.turnId !== undefined ? { turnId: input.turnId } : {}),
+      ...(input.onDelta ? { onDelta: input.onDelta } : {}),
+      ...(input.onReasoningDelta ? { onReasoningDelta: input.onReasoningDelta } : {}),
+      ...(input.onStatus ? { onStatus: input.onStatus } : {}),
+      ...(input.onTrajectory
+        ? {
+            onTrajectory: (event: Parameters<NonNullable<OpenCodeAskInput['onTrajectory']>>[0]) =>
+              input.onTrajectory?.({
+                type: event.type,
+                name: event.name,
+                ...(event.status !== undefined ? { status: event.status } : {}),
+                ...(event.model !== undefined ? { model: event.model } : {}),
+                ...(event.details !== undefined ? { details: event.details } : {}),
+              }),
+          }
+        : {}),
+      ...(input.shouldAbort ? { shouldAbort: input.shouldAbort } : {}),
+      ...(input.autoContinuationTurns !== undefined ? { autoContinuationTurns: input.autoContinuationTurns } : {}),
+      ...(input.refreshMissionPrompt ? { refreshMissionPrompt: input.refreshMissionPrompt } : {}),
+      ...(input.shouldContinueMission ? { shouldContinueMission: input.shouldContinueMission } : {}),
+      ...(input.onStageResult ? { onStageResult: input.onStageResult } : {}),
+      ...(input.onBeforeWorkflowTransition ? { onBeforeWorkflowTransition: input.onBeforeWorkflowTransition } : {}),
+      ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
+      ...(input.workflowSkill !== undefined ? { workflowSkill: input.workflowSkill } : {}),
       investigationName,
     });
   }
