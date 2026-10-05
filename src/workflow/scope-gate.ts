@@ -21,6 +21,14 @@ export interface ScopeGateResult {
   checks: ScopeGateCheck[];
 }
 
+/** 报告/阶段产物因 Scope 未通过而拒绝生成时使用的明确错误类型。 */
+export class ScopeGateError extends Error {
+  constructor(public readonly result: ScopeGateResult) {
+    super(formatScopeGateFailure(result));
+    this.name = 'ScopeGateError';
+  }
+}
+
 function nonEmpty(value: string | undefined): boolean {
   return Boolean(value?.trim());
 }
@@ -182,6 +190,6 @@ export async function runInvestigationScopeGate(name: string): Promise<ScopeGate
 /** Gate 失败时抛出统一错误，供 CLI、Workflow 和报告复用。 */
 export async function assertInvestigationScopeGate(name: string): Promise<ScopeGateResult> {
   const result = await runInvestigationScopeGate(name);
-  if (!result.passed) throw new Error(formatScopeGateFailure(result));
+  if (!result.passed) throw new ScopeGateError(result);
   return result;
 }
