@@ -234,6 +234,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
     goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
     scope: raw.scope ?? [],
     systems: raw.systems ?? [],
+    ...(raw.mission ? { mission: raw.mission } : {}),
     questions: raw.questions ?? [],
     discoveryRuns: raw.discoveryRuns ?? [],
     evidence: raw.evidence ?? [],
