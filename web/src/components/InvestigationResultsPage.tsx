@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import { XMarkdown } from '@ant-design/x-markdown';
 
@@ -96,24 +96,31 @@ export function InvestigationResultsPage(props: {
   const [modernization, setModernization] = useState<ModernizationPlan>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [reportGateError, setReportGateError] = useState<string>();
 
   const load = async () => {
     setLoading(true);
     setError(undefined);
+    setReportGateError(undefined);
     try {
+      const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
       const [reportResponse, trajectoryResponse, sessionResponse, modernizationResponse] = await Promise.all([
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/report`),
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/trajectory?limit=5000`),
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}`),
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/modernization`),
+        fetch(sessionPath + '/report'),
+        fetch(sessionPath + '/trajectory?limit=5000'),
+        fetch(sessionPath),
+        fetch(sessionPath + '/modernization'),
       ]);
-      if (!reportResponse.ok) throw new Error((await reportResponse.text()) || reportResponse.statusText);
+      if (!reportResponse.ok && reportResponse.status !== 409) {
+        throw new Error((await reportResponse.text()) || reportResponse.statusText);
+      }
       if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
       if (!sessionResponse.ok) throw new Error((await sessionResponse.text()) || sessionResponse.statusText);
       if (!modernizationResponse.ok) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
 
-      const [reportText, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        reportResponse.text(),
+      const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
+        reportResponse.ok
+          ? reportResponse.text()
+          : reportResponse.json() as Promise<{error?: string}>,
         trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
         sessionResponse.json() as Promise<SessionSnapshot>,
         modernizationResponse.json() as Promise<{plan?: ModernizationPlan | null}>,
@@ -124,7 +131,16 @@ export function InvestigationResultsPage(props: {
         const checkpoint = asCheckpoint(event);
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
       }
-      setReport(reportText);
+      if (reportResponse.ok) {
+        setReport(reportPayload as string);
+      } else {
+        setReport('');
+        setReportGateError(
+          typeof reportPayload === 'object' && reportPayload && typeof reportPayload.error === 'string'
+            ? reportPayload.error
+            : '范围还没有确认完整，正式报告暂时不能生成。',
+        );
+      }
       setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
       setSession(sessionData);
       setModernization(modernizationData.plan ?? undefined);
@@ -134,7 +150,6 @@ export function InvestigationResultsPage(props: {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     void load();
   }, [props.sessionName]);
@@ -315,9 +330,21 @@ export function InvestigationResultsPage(props: {
               <Tag>{session?.control.agent.displayName ?? '秘书'}</Tag>
             </Flex>
           </Flex>
+          {reportGateError ? (
+            <Alert
+              type='warning'
+              showIcon
+              message='结果报告暂时不能生成'
+              description={reportGateError}
+              action={<Button type='link' onClick={props.onBack}>回调查确认范围</Button>}
+              style={{ marginBottom: 12 }}
+            />
+          ) : null}
           <Card className='results-report-card'>
             {loading ? <Text type='secondary'>正在读取结果…</Text> : report ? (
               <XMarkdown content={report} className='result-report-markdown x-markdown-light' />
+            ) : reportGateError ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='完成范围确认后再生成正式报告。' />
             ) : (
               <Empty description='还没有可展示的结果报告。' />
             )}
