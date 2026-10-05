@@ -298,7 +298,7 @@ export function InvestigationConfigPage(props:{
               ]}
                 onChange={e=>update(next=>{next.agent.permissionMode=e.target.value;})}
               />
-              <Tag color='blue'>当前：{draft.agent.permissionMode==='allow_all'?'Allow All Access from Agent':'按需确认'}</Tag>
+              <Tag color='blue'>当前：每次确认</Tag>
             </div>
             {draft.agent.permissionMode==='allow_all' ? (
               <Alert
