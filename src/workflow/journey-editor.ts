@@ -1138,6 +1138,7 @@ export async function buildJourneyAgentInstruction(
     '整个 Investigation 要完成的任务：' + (overallGoal || '（未设置）'),
     ...(context.mission
       ? [
+          '最高优先级任务目的：' + context.mission.purpose,
           '最高优先级期望结果：' + context.mission.expectedResult,
           '当前 Workflow 只是实现 Mission 的路线，不能改变任务目的或期望结果。',
         ]
