@@ -291,7 +291,15 @@ function mergeEstateFromLineage(estate: DataEstate, lineage: LineageGraph, inven
     const to = nodeId('column', `${c.targetDataset}.${c.targetColumn}`);
     ensure(from, 'column', `${c.sourceDataset}.${c.sourceColumn}`, { ...(c.expression ? { expression: c.expression } : {}) });
     ensure(to, 'column', `${c.targetDataset}.${c.targetColumn}`);
-    estate.edges.push({ id: nextEstateId(), from, to, type: 'derived_from', evidenceIds: c.evidenceId ? [c.evidenceId] : [] });
+    estate.edges.push({
+      id: nextEstateId(),
+      from,
+      to,
+      type: 'derived_from',
+      evidenceIds: c.evidenceId ? [c.evidenceId] : [],
+      relationMode: 'static',
+      ...(c.expression ? { expression: c.expression } : {}),
+    });
     estate.edges.push({
       id: nextEstateId(),
       from: nodeId('dataset', c.targetDataset),
