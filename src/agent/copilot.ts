@@ -91,6 +91,28 @@ export async function stopClient(): Promise<void> {
 
 type CreateSessionConfig = Parameters<CopilotClient['createSession']>[0];
 
+/**
+ * sessionConfig 用条件 spread 组装，字面量拿不到回调的上下文类型。
+ * SDK（1.0.16）没有从包根导出这三个请求类型，用 Parameters 从
+ * CreateSessionConfig 派生只会得到 any，所以这里按实际使用的字段声明最小结构。
+ * SDK 升级后如果字段对不上，运行时访问到 undefined 会直接暴露，不要静默加字段。
+ */
+interface McpAuthRequestParam {
+  requestId: string;
+  serverName: string;
+  serverUrl: string;
+  reason: string;
+}
+interface PreToolUseParam {
+  toolName: string;
+  toolArgs: unknown;
+}
+interface UserInputRequestParam {
+  question: string;
+  choices?: string[] | undefined;
+  allowFreeform?: boolean | undefined;
+}
+
 /** 一次 Agent 执行所需的全部输入，以及流式输出、状态、Session 持久化和取消回调。 */
 export interface AskInput {
   prompt: string;
@@ -415,7 +437,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
      */
-    onMcpAuthRequest: async (request) => {
+    onMcpAuthRequest: async (request: McpAuthRequestParam) => {
       input.onStatus?.(`MCP ${request.serverName} 需要登录授权，当前工作台暂不支持 OAuth。`);
       input.onTrajectory?.({
         type: 'status',
@@ -438,7 +460,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
          * 同一阶段后续的 grep / view / bash 等操作不重复调用模型；
          * 阶段结束后再由 Stage Gate 检查实际产物，避免额外成本变成另一种循环。
          */
-        onPreToolUse: async (toolInput) => {
+        onPreToolUse: async (toolInput: PreToolUseParam) => {
           if (!shouldCheckMissionAction(toolInput.toolName)) return null;
           if (missionActionReviewedExecution === currentExecution) return null;
 
@@ -491,7 +513,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * ask_user 必须由宿主提供异步 handler。
      * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
      */
-    onUserInputRequest: async (request) => {
+    onUserInputRequest: async (request: UserInputRequestParam) => {
       const requestId = randomUUID();
       pendingUserInputWaits += 1;
       startUserInputWaitTimeout();
