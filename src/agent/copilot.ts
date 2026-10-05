@@ -109,6 +109,8 @@ export interface AskInput {
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
   onStageResult?: (result: { content: string; execution: number }) => void;
+  /** 在 Workflow transition / Gate 前同步保存本阶段形成的 Intake，避免 Gate 读取到旧的 Scope。 */
+  onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
   /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
   workflowSkill?: WorkflowId;
   /** 工作地图 AI 使用独立的最小 Agent 能力，不带数据分析工具。 */
@@ -1074,6 +1076,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
       if (timedOutError) throw timedOutError;
       finalContent = final?.data.content || content;
       input.onStageResult?.({ content: finalContent, execution });
+      if (input.onBeforeWorkflowTransition) {
+        await input.onBeforeWorkflowTransition({ content: finalContent, execution });
+      }
       await runRecorder?.write('model_response', {
         execution,
         response: finalContent,
