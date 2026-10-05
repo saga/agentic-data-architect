@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Card, Flex, Input, Modal, Progress, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Flex, Input, Modal, Progress, Tag, Typography } from 'antd';
 import type { MissionContract, MissionDraft, MissionProgress } from '../app/types';
 
 const { Text, Paragraph } = Typography;
@@ -11,6 +11,7 @@ export function MissionContractPanel(props: {
   open: boolean;
   saving: boolean;
   loading?: boolean;
+  error?: string;
   onOpen: () => void;
   onClose: () => void;
   onChange: (draft: MissionDraft) => void;
@@ -79,6 +80,13 @@ export function MissionContractPanel(props: {
         destroyOnHidden
       >
         <Flex vertical gap={16}>
+          {props.error ? (
+            <Alert
+              type="warning"
+              showIcon
+              message={props.error}
+            />
+          ) : null}
           <div>
             <Text strong>任务目的</Text>
             <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
