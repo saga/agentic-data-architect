@@ -159,11 +159,12 @@ function claimStatusText(status: string): string {
 function buildReplatformImplications(
   findings: Array<{ type: string }>,
   modernization: Awaited<ReturnType<typeof loadModernizationPlan>>,
+  modernizationGoal: boolean,
 ): string[] {
   const implications = unique(findings.map((finding) => impactForFinding(finding.type)));
   if (modernization?.targetArchitecture.components.length) {
     implications.push('已经开始形成目标架构，可以在这些已确认的问题边界内继续细化目标组件。');
-  } else {
+  } else if (modernizationGoal) {
     implications.push('当前还没有形成可供批准的目标架构，因此这份报告不能把 replatform 方案说成已经确定。');
   }
   return implications.slice(0, 5);
@@ -206,7 +207,8 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     questions: finding.questions,
   }));
   const openQuestions = buildOpenQuestions(inv.unknowns, findingInput);
-  const implications = buildReplatformImplications(findingInput, modernization);
+  const modernizationGoal = /replatform|迁移|现代化|改造/i.test((inv.userPrompt + ' ' + inv.goal).trim());
+  const implications = buildReplatformImplications(findingInput, modernization, modernizationGoal);
   const datasetFlows = estate ? summarizeDatasetFlows(estate) : [];
   const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
 
@@ -215,7 +217,9 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     '',
     '**用户目标**：' + (inv.userPrompt || inv.goal || '未记录'),
     '',
-    '这份报告回答的是“旧系统现在怎么工作、哪里会影响后续 replatform”。它不是最终目标架构；目标架构尚未形成时，这里不会把草案写成已经确定的方案。',
+    modernizationGoal
+      ? '这份报告先回答“旧系统现在怎么工作、哪里会影响后续 replatform”。它不是最终目标架构；目标架构尚未形成时，这里不会把草案写成已经确定的方案。'
+      : '这份报告先把当前系统、主要问题和证据整理清楚；它不会把尚未形成的后续方案写成已经确定的结论。',
     '',
     '## 1. 结论先说',
     '',
@@ -226,7 +230,7 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
       ? '现在最值得注意的是 ' + String(inv.findings.length) + ' 个问题：' + preview(inv.findings.slice(0, 4).map((finding) => finding.title), 4) + '。'
       : '当前没有发现已经形成 Finding 的明显问题。',
     '',
-    '对 replatform 的直接影响：' + (implications[0] ?? '还没有形成可以支撑决策的结论。'),
+    (modernizationGoal ? '对 replatform 的直接影响：' : '对下一步工作的直接影响：') + (implications[0] ?? '还没有形成可以支撑决策的结论。'),
     '',
     '## 2. 当前系统和数据',
     '',
