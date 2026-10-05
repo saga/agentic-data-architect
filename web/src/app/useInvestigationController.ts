@@ -721,6 +721,7 @@ export function useInvestigationController() {
     active,
     current,
     availableModels,
+    modelOptions,
     modelSaving,
     streamingReasoning,
     reasoningByMessage,
