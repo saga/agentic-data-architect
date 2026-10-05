@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { assertInvestigationScopeGate } from '../workflow/scope-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
 import type { DiscoverySnapshot } from '../workflow/discover.js';
 
@@ -14,6 +15,8 @@ import type { DiscoverySnapshot } from '../workflow/discover.js';
  * 写到 reports/report.md，同时 stdout 打印。
  */
 export async function buildReport(name: string): Promise<{ markdown: string; path: string }> {
+  // 正式报告严格禁止 unset：先通过独立 Scope Gate。
+  await assertInvestigationScopeGate(name);
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = await loadModernizationPlan(name);
@@ -44,9 +47,9 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
     ``,
     `## 1. Scope`,
     ``,
-    `- Goal: ${inv.goal || '(unset)'}`,
-    `- Scope: ${inv.scope.join(', ') || '(unset)'}`,
-    `- Systems: ${inv.systems.join(', ') || '(unset)'}`,
+    `- Goal: ${inv.goal}`,
+    `- Scope: ${inv.scope.join(', ')}`,
+    `- Systems: ${inv.systems.join(', ')}`,
     `- Discovery runs: ${inv.discoveryRuns.map((r) => `${r.id} (${r.root}, parser=${r.parserVersion})`).join('; ') || '(none)'}`,
     ``,
     `## 2. Data Estate`,
