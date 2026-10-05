@@ -662,7 +662,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     // 同步更新工作台默认头像。之后新建的 Investigation 会继承这张头像。
     const sharedAvatarDir = path.join(config.sharedDir, 'assistant');
     await fs.mkdir(sharedAvatarDir, { recursive: true });
-    const sharedAvatarPath = path.join(sharedAvatarDir, 'default.png');
+    const sharedAvatarPath = path.join(sharedAvatarDir, 'default.' + extension);
     const sharedMetaPath = path.join(sharedAvatarDir, 'default.json');
     await fs.copyFile(avatarPath, sharedAvatarPath);
 
@@ -698,7 +698,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     await fs.writeFile(
       sharedMetaPath,
       JSON.stringify({
-        sourcePath: 'default.png',
+        sourcePath: 'default.' + extension,
         width: control.agent.avatarWidth,
         height: control.agent.avatarHeight,
       }, null, 2) + '\n',
