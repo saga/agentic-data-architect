@@ -1,0 +1,260 @@
+/**
+ * Mission Deliverable Coverage。
+ *
+ * 这里回答一个很实际的问题：
+ *
+ *   “用户想要的结果，现在已经覆盖到什么程度？”
+ *
+ * 它是导航信号，不是审批 Gate。覆盖率/状态只能帮助 Agent 和人选择下一步，
+ * 不能代替 Evidence、权限或 Workflow 的确定性校验。
+ */
+import type { MissionContract, MissionDeliverable } from '../investigation/schemas.js';
+import type { DiscoverySnapshot } from './discover.js';
+import { loadArchitectureAssessmentPlan } from './assessment.js';
+import { loadInvestigation } from '../investigation/store.js';
+import { loadModernizationPlan } from './modernization.js';
+
+export type MissionDeliverableStatus =
+  | 'covered'
+  | 'in_progress'
+  | 'not_started'
+  | 'not_tracked';
+
+export interface MissionDeliverableProgress {
+  id: string;
+  title: string;
+  description: string;
+  required: boolean;
+  status: MissionDeliverableStatus;
+  detail: string;
+}
+
+export interface MissionProgress {
+  covered: number;
+  total: number;
+  percent: number;
+  deliverables: MissionDeliverableProgress[];
+}
+
+interface ProgressSignals {
+  currentState: DiscoverySnapshot['currentState'] | null;
+  estateNodeCount: number;
+  estateColumnCount: number;
+  findingsCount: number;
+  modernization?: {
+    targetComponentCount: number;
+    mappingCount: number;
+    validationCount: number;
+    blockingValidationReady: number;
+    blockingValidationTotal: number;
+  } | null;
+  assessment?: {
+    findingsCount: number;
+    recommendationCount: number;
+    roadmapCount: number;
+  } | null;
+}
+
+function covered(
+  item: MissionDeliverable,
+  status: MissionDeliverableStatus,
+  detail: string,
+): MissionDeliverableProgress {
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    required: item.required,
+    status,
+    detail,
+  };
+}
+
+/** 根据已经落盘的结构化状态推算交付物覆盖；不阅读 Agent 自己的“完成声明”。 */
+function evaluateDeliverable(
+  item: MissionDeliverable,
+  signals: ProgressSignals,
+): MissionDeliverableProgress {
+  const current = signals.currentState;
+  const datasets = current?.coverage.datasets ?? 0;
+  const connectedDatasets = current?.coverage.connectedDatasets ?? 0;
+  const parsedSql = current?.coverage.sqlParsedStatements ?? 0;
+
+  switch (item.id) {
+    case 'current-state-architecture': {
+      const sourceReady = datasets > 0;
+      const flowReady = connectedDatasets > 0;
+      const modelReady = signals.estateColumnCount > 0 || current?.coverage.semanticAssets ? current.coverage.semanticAssets > 0 : false;
+      const coveredCount = Number(sourceReady) + Number(flowReady) + Number(modelReady) + Number(parsedSql > 0);
+      return covered(
+        item,
+        coveredCount >= 3 ? 'covered' : coveredCount > 0 ? 'in_progress' : 'not_started',
+        '当前架构覆盖 Source=' + (sourceReady ? '是' : '否')
+          + '、Flow=' + (flowReady ? '是' : '否')
+          + '、Model=' + (modelReady ? '是' : '否')
+          + '、Transformation=' + (parsedSql > 0 ? '是' : '否') + '。',
+      );
+    }
+
+    case 'data-source':
+      return covered(
+        item,
+        datasets > 0 ? 'covered' : 'not_started',
+        datasets > 0 ? '已经发现 ' + String(datasets) + ' 个数据集。' : '还没有发现可用于当前任务的数据集。',
+      );
+
+    case 'data-flow':
+      return covered(
+        item,
+        connectedDatasets > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        connectedDatasets > 0
+          ? '已经建立数据集之间的连接。'
+          : datasets > 0
+            ? '已经有数据集，但数据流连接还没有形成。'
+            : '还没有足够的资产来判断数据流。',
+      );
+
+    case 'data-model':
+      return covered(
+        item,
+        signals.estateColumnCount > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        signals.estateColumnCount > 0
+          ? '已经发现列级结构，可以继续整理实体和关系。'
+          : datasets > 0
+            ? '已经发现数据集，列级模型还需要继续整理。'
+            : '还没有发现数据模型资产。',
+      );
+
+    case 'transformation':
+      return covered(
+        item,
+        parsedSql > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        parsedSql > 0
+          ? '已经解析到 ' + String(parsedSql) + ' 条 SQL statement。'
+          : '还没有解析到可用于判断转换逻辑的 SQL。',
+      );
+
+    case 'findings':
+      return covered(
+        item,
+        signals.findingsCount > 0 ? 'covered' : 'not_started',
+        signals.findingsCount > 0
+          ? '已经形成 ' + String(signals.findingsCount) + ' 个 Finding。'
+          : '还没有形成结构化 Finding。',
+      );
+
+    case 'target-architecture': {
+      const count = signals.modernization?.targetComponentCount ?? 0;
+      return covered(
+        item,
+        count > 0 ? 'covered' : signals.currentState ? 'in_progress' : 'not_started',
+        count > 0 ? '已经形成 ' + String(count) + ' 个目标架构组件。' : '目标架构还没有形成实际组件。',
+      );
+    }
+
+    case 'mapping': {
+      const count = signals.modernization?.mappingCount ?? 0;
+      return covered(
+        item,
+        count > 0 ? 'covered' : 'not_started',
+        count > 0 ? '已经形成 ' + String(count) + ' 条新旧对应关系。' : '还没有形成新旧对应关系。',
+      );
+    }
+
+    case 'validation': {
+      const total = signals.modernization?.blockingValidationTotal ?? 0;
+      const ready = signals.modernization?.blockingValidationReady ?? 0;
+      const count = signals.modernization?.validationCount ?? 0;
+      return covered(
+        item,
+        total > 0 && ready >= total ? 'covered' : count > 0 || total > 0 ? 'in_progress' : 'not_started',
+        total > 0
+          ? '已有 ' + String(ready) + '/' + String(total) + ' 个阻断性检查通过。'
+          : count > 0
+            ? '已经形成验证检查，但还没有足够的通过结果。'
+            : '还没有形成验证检查。',
+      );
+    }
+
+    case 'recommendations': {
+      const count = signals.assessment?.recommendationCount ?? 0;
+      return covered(
+        item,
+        count > 0 ? 'covered' : 'not_started',
+        count > 0 ? '已经形成 ' + String(count) + ' 条建议。' : '还没有形成结构化改进建议。',
+      );
+    }
+
+    case 'roadmap': {
+      const count = signals.assessment?.roadmapCount ?? 0;
+      return covered(
+        item,
+        count > 0 ? 'covered' : 'not_started',
+        count > 0 ? '已经形成 ' + String(count) + ' 个实施阶段。' : '还没有形成实施顺序。',
+      );
+    }
+
+    case 'custom-result':
+      return covered(
+        item,
+        signals.findingsCount > 0 || (current?.coverage.datasets ?? 0) > 0 ? 'in_progress' : 'not_tracked',
+        '其他结果不适合用平台通用指标判断完成程度；继续以用户明确的期望结果为准。',
+      );
+
+    default:
+      return covered(item, 'not_tracked', '这个交付物没有配置自动覆盖指标。');
+  }
+}
+
+/** 生成某个 Investigation 当前的 Mission 覆盖情况。 */
+export async function buildMissionProgress(
+  name: string,
+  mission: MissionContract | undefined,
+): Promise<MissionProgress | null> {
+  if (!mission) return null;
+
+  const investigation = await loadInvestigation(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const estate = snapshot?.estate;
+
+  const signals: ProgressSignals = {
+    currentState: snapshot?.currentState ?? null,
+    estateNodeCount: estate?.nodes.length ?? 0,
+    estateColumnCount: estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
+    findingsCount: investigation.findings.length,
+  };
+
+  if (investigation.workflow === 'legacy-modernization') {
+    const plan = await loadModernizationPlan(name);
+    if (plan) {
+      signals.modernization = {
+        targetComponentCount: plan.targetArchitecture.components.length,
+        mappingCount: plan.mappings.length,
+        validationCount: plan.validationPlan.checks.length,
+        blockingValidationReady: plan.validationPlan.checks.filter((item) => item.blocking && item.status === 'passed').length,
+        blockingValidationTotal: plan.validationPlan.checks.filter((item) => item.blocking).length,
+      };
+    }
+  }
+
+  if (investigation.workflow === 'data-architecture-assessment') {
+    const plan = await loadArchitectureAssessmentPlan(name);
+    if (plan) {
+      signals.assessment = {
+        findingsCount: plan.findings.length,
+        recommendationCount: plan.recommendations.length,
+        roadmapCount: plan.roadmap.length,
+      };
+    }
+  }
+
+  const deliverables = mission.deliverables.map((item) => evaluateDeliverable(item, signals));
+  const coveredCount = deliverables.filter((item) => item.status === 'covered').length;
+
+  return {
+    covered: coveredCount,
+    total: deliverables.length,
+    percent: deliverables.length ? Math.round(coveredCount / deliverables.length * 100) : 0,
+    deliverables,
+  };
+}
