@@ -383,9 +383,9 @@ function extractTextParts(value: unknown): { answer: string; reasoning: string; 
 /**
  * 执行一轮 OpenCode。
  *
- * 每一轮独立创建一个 OpenCode session；对话上下文由本项目 prompt 已经整理好，
- * 因此不强依赖 OpenCode 自己的长期 session。这样不会出现 Copilot Session 和 OpenCode Session
- * 两套持久化状态互相打架的问题。
+ * 每个用户 turn 创建一个 OpenCode session；turn 内的自动续跑复用同一个 Session。
+ * 对话上下文由本项目 prompt 和 Mission Contract 管理，不依赖 OpenCode 的长期工作台状态，
+ * 避免 Copilot Session 与 OpenCode Session 两套持久化状态互相打架。
  */
 export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   if (!config.openCodeEnabled) {
