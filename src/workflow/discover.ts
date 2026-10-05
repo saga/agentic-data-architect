@@ -70,7 +70,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   // 路径 Discovery 先做当前文件指纹，再判断是否真的需要产生新的 run。
   // 同一目录、同一批文件 hash、同一 parser 版本不会再次制造数千条重复 Evidence。
   let inventory: Inventory | null = null;
-  if (opts.path) {
+  if (opts.path && !opts.database) {
     inventory = await discoverDirectory(opts.path, 'pending');
     const reusable = await findReusablePathDiscoveryRun(name, inv, opts.path, inventory);
     if (reusable) {
@@ -107,6 +107,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   });
   // runId 按 Investigation 顺序递增，用于把本轮 Evidence、snapshot 和审计范围关联起来。
   const runId = 'run-' + String(inv.discoveryRuns.length + 1).padStart(3, '0');
+  if (inventory) inventory.discoveryRunId = runId;
 
   const estate = emptyEstate();
   let lineage: LineageGraph | null = null;
