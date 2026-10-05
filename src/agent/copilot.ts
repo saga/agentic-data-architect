@@ -114,6 +114,11 @@ export interface AskInput {
    * Mission 本身仍由 Workspace 持久化状态提供，刷新失败时继续使用上一份。
    */
   refreshMissionPrompt?: () => string | Promise<string>;
+  /**
+   * 判断 Mission 是否还有未覆盖的必需交付物。
+   * 这是停止自动续跑的确定性导航条件，不替代 Workflow Gate。
+   */
+  shouldContinueMission?: () => boolean | Promise<boolean>;
   /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
@@ -1234,6 +1239,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
           } catch {
             // 下一阶段的工作提示是辅助上下文；如果读取失败，仍可依靠原有 Session 上下文继续。
           }
+        }
+
+        const shouldContinueMission = input.shouldContinueMission
+          ? await input.shouldContinueMission()
+          : true;
+        if (!shouldContinueMission) {
+          input.onStatus?.('Mission 需要的交付物已经覆盖，停止自动续跑。');
+          input.onTrajectory?.({
+            type: 'status',
+            name: 'Mission 交付物已覆盖，停止自动续跑',
+            status: 'completed',
+            details: { execution },
+          });
+          break;
         }
 
         const refreshedMissionPrompt = input.refreshMissionPrompt
