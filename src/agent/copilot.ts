@@ -1044,6 +1044,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
       },
     });
   });
+
+  // 6 分钟执行 watchdog 从整个 Agent turn 开始持续运行；它只累计非人工等待时间。
+  executionWatchdogId = setInterval(executionWatchdog, 250);
+  executionWatchdogId.unref?.();
+
   try {
     if (input.shouldAbort?.()) {
       await session.abort();
