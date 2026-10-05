@@ -272,14 +272,6 @@ export function InvestigationChatPanel(props: {
                       >
                         允许这次
                       </Button>
-                      {!permission.managedApprovalRequired ? (
-                        <Button
-                          size="small"
-                          onClick={() => void props.respondToPermission(permission, true, 'session')}
-                        >
-                          后续都允许
-                        </Button>
-                      ) : null}
                       <Button
                         size="small"
                         danger
