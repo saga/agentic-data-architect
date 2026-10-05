@@ -201,14 +201,14 @@ export function InvestigationConfigPage(props:{
            </Card>
            <Card title='头像' className='settings-card'>
              <Flex align='flex-start' gap={18} wrap>
-               <Avatar shape='square'
-                 src={(() => {
-                   const source = draft.agent.avatarSources?.[0]?.src ?? draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0];
-                   return /^https?:\\/\\//i.test(source ?? '') ? source : undefined;
-                 })()}
-                 icon={<PictureOutlined />}
-                 style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover'}}
-               />
+               {(() => {
+                 const source = draft.agent.avatarSources?.[0];
+                 if (source?.kind === 'video') {
+                   return <video src={source.src} autoPlay loop muted playsInline style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover',borderRadius:8}} />;
+                 }
+                 const imageSource = source?.src ?? draft.agent.avatarPath ?? draft.agent.avatarPaths?.[0];
+                 return <Avatar shape='square' src={/^https?:\\/\\//i.test(imageSource ?? '') ? imageSource : undefined} icon={<PictureOutlined />} style={{width:72,height:Math.round(72*draft.agent.avatarHeight/draft.agent.avatarWidth),objectFit:'cover'}} />;
+               })()}
                <div style={{minWidth:260,flex:'1 1 320px'}}>
                  <Paragraph type='secondary'>支持本地图片、GIF 动图，以及远程图片 / GIF / 视频 URL。每条回复会随机选择一个头像来源。</Paragraph>
                  <Input.Search
