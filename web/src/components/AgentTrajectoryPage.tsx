@@ -177,7 +177,10 @@ function eventLabel(event: TrajectoryEvent) {
     case 'tool_result': return '工具返回';
     case 'tool_progress': return '工具进度';
     case 'permission': return '等待确认';
-    case 'permission_completed': return '确认已处理';
+    case 'permission_completed': {
+      const resultKind = typeof event.details.resultKind === 'string' ? event.details.resultKind : undefined;
+      return resultKind === 'cancelled' ? '权限请求已取消' : event.name || '确认已处理';
+    }
     case 'user_input_requested': return '等待用户输入';
     case 'user_input_completed': return '用户输入已提供';
     case 'compaction': return '整理上下文';
@@ -194,14 +197,21 @@ function eventLabel(event: TrajectoryEvent) {
 function eventColor(event: TrajectoryEvent) {
   if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'red';
   if (event.status === 'waiting' && (event.type === 'permission' || event.type === 'user_input_requested')) return 'orange';
+  if (event.type === 'permission_completed') {
+    const resultKind = typeof event.details.resultKind === 'string' ? event.details.resultKind : undefined;
+    if (resultKind === 'cancelled') return undefined;
+    if (resultKind === 'reject') return 'red';
+    return 'green';
+  }
   if (event.type === 'model_call') return 'blue';
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') return 'blue';
-  if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'permission_completed' || event.type === 'user_input_completed') return 'green';
+  if (event.type === 'session_idle' || event.type === 'turn_end' || event.type === 'user_input_completed') return 'green';
   return undefined;
 }
 
 function eventMarker(event: TrajectoryEvent): 'error' | 'warning' | undefined {
   if (event.status === 'failed' || event.type === 'error' || event.type === 'session_error') return 'error';
+  if (event.type === 'permission_completed' && event.details.resultKind === 'reject') return 'error';
   if (event.status === 'waiting' && (event.type === 'permission' || event.type === 'user_input_requested')) return 'warning';
   return undefined;
 }
