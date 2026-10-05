@@ -591,6 +591,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let latestContextTokens: number | undefined;
   let latestContextLimit: number | undefined;
   let latestContextMessages: number | undefined;
+  let runOutcome: { status: 'completed' | 'failed' | 'aborted'; error?: string } = { status: 'completed' };
   const runRecorder: RunRecorder | null = input.turnId
     ? await createRunRecorder(investigationName, {
         turnId: input.turnId,
@@ -1243,6 +1244,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
         : sdkTimedOut
           ? '等待 Session 完成超时'
           : '';
+    runOutcome = {
+      status: timedOut || /abort/i.test(errorMessage) ? 'aborted' : 'failed',
+      error: errorMessage,
+    };
     markActivity(timedOut ? 'timeout' : 'error', timedOut ? timeoutLabel : 'Agent 执行失败');
     input.onTrajectory?.({
       type: 'error',
@@ -1299,8 +1304,16 @@ export async function askCopilot(input: AskInput): Promise<string> {
     }
     throw e;
   } finally {
-    await runRecorder?.write('run_finished', { elapsedMs: Date.now() - turnStartedAt });
-    await runRecorder?.close();
+    try {
+      await runRecorder?.write('run_finished', {
+        elapsedMs: Date.now() - turnStartedAt,
+        status: runOutcome.status,
+        ...(runOutcome.error ? { error: runOutcome.error } : {}),
+      });
+      await runRecorder?.close(runOutcome);
+    } catch {
+      // 运行记录失败不能覆盖 Agent 已经完成的业务结果。
+    }
     clearInterval(heartbeat);
     if (executionWatchdogId !== undefined) clearInterval(executionWatchdogId);
     executionWatchdogId = undefined;
