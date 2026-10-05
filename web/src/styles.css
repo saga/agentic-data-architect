@@ -1978,6 +1978,128 @@ body {
   background: #f7f9fc;
 }
 
+
+/* Investigation results ---------------------------------------------------- */
+.investigation-results-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f7f9fc;
+}
+
+.results-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px 10px;
+  border-bottom: 1px solid #e9edf3;
+  background: rgba(255, 255, 255, 0.97);
+  flex: 0 0 auto;
+}
+
+.investigation-results-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.6fr);
+  gap: 18px;
+  width: min(1600px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.results-checkpoints,
+.results-report {
+  min-width: 0;
+}
+
+.results-section-heading {
+  min-height: 48px;
+  margin-bottom: 12px;
+}
+
+.results-checkpoint-list {
+  display: grid;
+  gap: 10px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.results-checkpoint-card {
+  border-radius: 10px;
+  border-color: #e5eaf0;
+}
+
+.results-checkpoint-title {
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+}
+
+.results-checkpoint-summary {
+  margin: 12px 0 10px;
+  font-size: var(--font-size-md);
+  line-height: 1.65;
+}
+
+.results-checkpoint-items {
+  display: grid;
+  gap: 5px;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.results-checkpoint-next {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #f0f2f5;
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+}
+
+.results-report-card {
+  min-height: calc(100vh - 120px);
+  border-radius: 10px;
+}
+
+.result-report-markdown {
+  max-width: none;
+  font-size: var(--font-size-md);
+  line-height: 1.7;
+}
+
+.result-report-markdown h1,
+.result-report-markdown h2,
+.result-report-markdown h3,
+.result-report-markdown h4,
+.result-report-markdown h5,
+.result-report-markdown h6 {
+  font-size: var(--font-size-lg);
+}
+
+.results-error {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 900px) {
+  .investigation-results-body {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .results-checkpoint-list,
+  .results-report-card {
+    max-height: none;
+  }
+
+  .results-report-card {
+    min-height: auto;
+  }
+}
+
 /* 工作地图用画布自己平移缩放，不要页面滚动条。
    这两条必须留在 .subpage-app 之后：同优先级，后写的赢。
    height 要写死，否则 .journey-map-page 的 height:100% 没有可解析的父高度。 */
