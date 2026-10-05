@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { assertInvestigationScopeGate } from '../workflow/scope-gate.js';
+import { assertCurrentStateReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
 import type { DiscoverySnapshot } from '../workflow/discover.js';
 
@@ -17,6 +18,7 @@ import type { DiscoverySnapshot } from '../workflow/discover.js';
 export async function buildReport(name: string): Promise<{ markdown: string; path: string }> {
   // 正式报告严格禁止 unset：先通过独立 Scope Gate。
   await assertInvestigationScopeGate(name);
+  await assertCurrentStateReportGate(name);
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = await loadModernizationPlan(name);
