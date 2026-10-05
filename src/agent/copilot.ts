@@ -1128,6 +1128,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       await runRecorder?.write('agent_request', {
         execution,
         prompt: continuationPrompt,
+        missionPrompt: input.missionPrompt,
         workflowInstruction: currentWorkflowInstruction,
       });
       if (execution > 0) {
