@@ -23,6 +23,8 @@ import {
 } from '../investigation/workspace.js';
 import { loadLatestSnapshot } from '../investigation/store.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
+import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
+import { runModernizationGate, type ModernizationGateStage } from './modernization-gate.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
@@ -333,6 +335,10 @@ async function loadCustomActive(
 async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const context = await loadWorkspaceContext(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  // Workflow 地图只能读取已经落盘的 Modernization 工作成果，不能自己猜“这一关做完了”。
+  const modernization = context.workflow === 'legacy-modernization'
+    ? await loadModernizationPlan(name)
+    : null;
 
   return {
     goal: context.goal || context.userPrompt,
@@ -349,10 +355,17 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
       estate: snapshot?.estate ?? null,
       findings: context.findings,
     }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    targetComponentCount: 0,
-    mappingCount: 0,
-    blockingValidationReady: 0,
-    blockingValidationTotal: 0,
+    targetComponentCount: modernization?.targetArchitecture.status !== 'draft'
+      ? modernization?.targetArchitecture.components.length ?? 0
+      : 0,
+    mappingCount: modernization?.mappings.filter((mapping) => mapping.status !== 'rejected').length ?? 0,
+    // “ready”只是准备好了，不能算验证已经通过；地图上的 validation 事实只统计 passed。
+    blockingValidationReady: modernization?.validationPlan.checks.filter(
+      (check) => check.blocking && check.status === 'passed',
+    ).length ?? 0,
+    blockingValidationTotal: modernization?.validationPlan.checks.filter(
+      (check) => check.blocking,
+    ).length ?? 0,
   };
 }
 
@@ -730,6 +743,21 @@ async function appendDeterministicAdvanceEvents(
 }
 
 /**
+ * Legacy Modernization 的关键工作阶段对应确定性 Gate。
+ *
+ * 自定义 Workflow 允许改变节点标题和图结构，因此同时兼容内置 node id 和默认中文标题。
+ * 其它 Workflow 不走这套业务 Gate，避免把 modernization 规则泄漏到通用 Workflow。
+ */
+function modernizationGateStage(
+  node: JourneyDefinition['nodes'][number],
+): ModernizationGateStage | null {
+  if (node.id === 'target' || node.title === '设计新方案') return 'target';
+  if (node.id === 'mapping' || node.title === '新旧对应') return 'mapping';
+  if (node.id === 'validation' || node.title === '验证结果') return 'validation';
+  return null;
+}
+
+/**
  * transition 成功后记录最小运行事件；详细 trace 仍交给 Agent runtime / OTel。
  */
 async function appendJourneyTransitionEvents(
@@ -790,8 +818,27 @@ export async function applyAgentWorkflowTransition(
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
   if (!workflowId) return { applied: false };
 
+  /**
+   * 先解析并持久化工作成果，再处理 Workflow outcome。
+   *
+   * 这里必须位于 ask.ts 的最终 Investigation commit 之前：Workflow 是严格的状态边界，
+   * 所以不能允许“先跳图、后发现结果没保存”这种错误顺序。
+   */
+  let persistedModernization = false;
+  if (workflowId === 'legacy-modernization') {
+    const latestInvestigation = await (async () => {
+      const module = await import('../investigation/store.js');
+      return module.loadInvestigation(name);
+    })();
+    const evidenceMap = new Map(latestInvestigation.evidence.map((evidence) => [evidence.id, evidence]));
+    const { parseAgentAnswer } = await import('../agent/result.js');
+    const parsed = parseAgentAnswer(rawAnswer, evidenceMap);
+    const persisted = await persistModernizationAgentResult(name, parsed.modernization);
+    persistedModernization = persisted.saved;
+  }
+
   const transition = extractWorkflowTransition(rawAnswer);
-  if (!transition) return { applied: false };
+  if (!transition) return { applied: persistedModernization };
 
   let eventRunId = workflowId + '-rejected';
   let eventWorkflowVersion = 0;
@@ -809,6 +856,24 @@ export async function applyAgentWorkflowTransition(
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
       throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
     }
+
+    const gateStage = workflowId === 'legacy-modernization' && currentNode
+      ? modernizationGateStage(currentNode)
+      : null;
+    if (transition.outcome === 'success' && gateStage) {
+      const gate = await runModernizationGate(name, gateStage);
+      if (!gate.passed) {
+        const failed = gate.checks
+          .filter((item) => !item.passed)
+          .map((item) => item.name + '：' + item.detail)
+          .join('；');
+        throw new Error(
+          'Workflow Gate 未通过，当前阶段不能完成。'
+          + (failed ? ' ' + failed : ''),
+        );
+      }
+    }
+
     const next = applyJourneyTransition(
       active.definition,
       execution,
