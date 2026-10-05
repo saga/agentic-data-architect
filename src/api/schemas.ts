@@ -50,14 +50,22 @@ export const AbortBodySchema = z.object({
   turnId: z.string().trim().min(1),
 }).strict();
 
-/** 前端处理 Agent 权限请求；每次只能处理当前这一项权限。 */
+/** 前端处理 Agent 权限请求；scope=session 表示批准当前 Copilot Session 后续继续使用这项权限。 */
 export const PermissionResponseBodySchema = z.object({
   turnId: z.string().trim().min(1),
   requestId: z.string().trim().min(1),
   allowed: z.boolean(),
-  /** 只能允许当前这一次；不支持 session 级持续授权。 */
-  scope: z.literal('once').default('once'),
-}).strict();
+  /** once = 只允许这一次；session = 使用 Copilot SDK 的会话级批准。 */
+  scope: z.enum(['once', 'session']).default('once'),
+}).strict().superRefine((value, ctx) => {
+  if (!value.allowed && value.scope === 'session') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['scope'],
+      message: '拒绝操作时不能使用会话级批准。',
+    });
+  }
+});
 
 /** 回答 Agent 的 ask_user 请求；requestId 是工作台生成的运行态请求 ID。 */
 export const UserInputResponseBodySchema = z.object({
