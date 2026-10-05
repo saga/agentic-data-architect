@@ -1184,15 +1184,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
         rejectUserInputTimeout = undefined;
       }
       finalContent = final?.data.content || content;
-      await input.onStageResult?.({ content: finalContent, execution });
+
+      // 先保存本阶段应该落盘的业务成果，再执行 Workflow transition / Gate。
+      // Stage Script Gate 随后读取的是已经持久化的真实状态，而不是模型口中的“我做完了”。
       if (input.onBeforeWorkflowTransition) {
         await input.onBeforeWorkflowTransition({ content: finalContent, execution });
       }
-      await runRecorder?.write('model_response', {
-        execution,
-        response: finalContent,
-        sessionTurnId: final?.data.turnId,
-      });
 
       // 每个阶段结束后立即应用 Workflow outcome。这样自动续跑进入下一阶段时，
       // 模型拿到的是最新的工作位置，而不是上一阶段的旧节点。
@@ -1201,6 +1198,16 @@ export async function askCopilot(input: AskInput): Promise<string> {
         input.workflowSkill ?? null,
         finalContent,
       );
+
+      // Stage Gate 必须读取 transition 已经保存的工作成果。
+      await input.onStageResult?.({ content: finalContent, execution });
+
+      await runRecorder?.write('model_response', {
+        execution,
+        response: finalContent,
+        sessionTurnId: final?.data.turnId,
+      });
+
       if (workflowTransition.error) {
         input.onTrajectory?.({
           type: 'status',
