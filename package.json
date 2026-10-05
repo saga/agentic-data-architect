@@ -17,6 +17,7 @@
     "build": "vite build && tsc",
     "test:python": "npm run python:check",
     "flow:lint": "tsx src/workflow/lint.ts",
+    "gate:modernization": "tsx scripts/legacy-modernization-gate.ts",
     "python:sync": "uv sync",
     "python:lock": "uv lock",
     "python:check": "uv run python scripts/check-python-deps.py"
