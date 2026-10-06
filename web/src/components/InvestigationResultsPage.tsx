@@ -2,89 +2,210 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import { XMarkdown } from '@ant-design/x-markdown';
+import type { ResultAssessment, ResultModernization, ResultSection, ResultViewModel } from '../../../src/api/results.js';
 
 const { Title, Text, Paragraph } = Typography;
 
-interface Checkpoint {
-  id: string;
-  turnId: string;
-  timestamp: string;
-  execution: number;
-  title: string;
-  summary: string;
-  confirmed: string[];
-  evidenceIds: string[];
-  unknowns: string[];
-  nextStep?: string;
+function workflowLabel(workflow: ResultViewModel['session']['workflow']): string {
+  switch (workflow) {
+    case 'legacy-modernization': return '改造已有系统';
+    case 'financial-ai-native-architecture': return '金融 AI / 数据架构设计';
+    case 'data-architecture-assessment': return '数据架构评估';
+    default: return '自主调查';
+  }
 }
 
-interface TrajectoryEvent {
-  id: string;
-  type: string;
-  timestamp: string;
-  details?: unknown;
+function sectionMessage<T>(section: ResultSection<T>, fallback: string): string {
+  if ('message' in section && section.message) return section.message;
+  return fallback;
 }
 
-interface SessionSnapshot {
-  context: { workflow: string | null };
-  control: { version: number; agent: { model: string; displayName: string } };
+function ResultSectionState(props: {
+  section: ResultSection<unknown>;
+  emptyMessage: string;
+  onBack?: () => void;
+}) {
+  if (props.section.status === 'blocked') {
+    return (
+      <Alert
+        type='warning'
+        showIcon
+        message='当前结果还不能生成'
+        description={sectionMessage(props.section, props.emptyMessage)}
+        action={props.onBack ? <Button type='link' onClick={props.onBack}>回调查确认范围</Button> : undefined}
+      />
+    );
+  }
+  if (props.section.status === 'error') {
+    return <Alert type='error' showIcon message='读取结果失败' description={sectionMessage(props.section, props.emptyMessage)} />;
+  }
+  if (props.section.status === 'empty') {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sectionMessage(props.section, props.emptyMessage)} />;
+  }
+  if (props.section.status === 'not_applicable') return null;
+  return null;
 }
 
-interface ModernizationPlan {
-  version: number;
-  status: string;
-  targetArchitecture: {
-    title: string;
-    status: string;
-    principles: string[];
-    components: Array<{ id: string; name: string; description: string; sourceAssets: string[] }>;
-    openQuestions: string[];
-    evidenceIds: string[];
-  };
-  mappings: Array<{
-    id: string;
-    title: string;
-    status: string;
-    sourceAsset: string;
-    targetAsset: string;
-    transformation?: string;
-    businessRule?: string;
-    validationRule?: string;
-    evidenceIds: string[];
-  }>;
-  mappingCoverage?: { sourceAssets: string[]; unmappedAssets: string[] };
-  validationPlan: {
-    checks: Array<{
-      id: string;
-      name: string;
-      status: string;
-      blocking: boolean;
-      evidenceIds: string[];
-      result?: string;
-    }>;
-    cutoverCriteria: string[];
-    rollbackCriteria: string[];
-  };
+function renderModernization(
+  section: ResultViewModel['modernization'],
+  onBack: () => void,
+) {
+  if (section.status !== 'available') {
+    return <ResultSectionState section={section} emptyMessage='还没有形成改造工作成果。' onBack={onBack} />;
+  }
+  const modernization: ResultModernization = section.data;
+  return (
+    <>
+      <Card className='results-modernization-card' title='目标架构'>
+        {modernization.targetArchitecture.components.length ? (
+          <>
+            <Flex wrap gap={8} style={{ marginBottom: 12 }}>
+              {modernization.targetArchitecture.principles.map((principle) => <Tag key={principle}>{principle}</Tag>)}
+            </Flex>
+            {modernization.targetArchitecture.components.map((component) => (
+              <Card key={component.id} size='small' style={{ marginBottom: 8 }}>
+                <Text strong>{component.name}</Text>
+                <Paragraph style={{ marginBottom: 6 }}>{component.description}</Paragraph>
+                <Text type='secondary'>来源：{component.sourceAssets.join('、') || '未记录'}</Text>
+              </Card>
+            ))}
+          </>
+        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='目标架构还没有实际组件。' />}
+        {modernization.targetArchitecture.openQuestions.length ? (
+          <div>
+            <Divider style={{ margin: '14px 0' }} />
+            <Text type='secondary'>还未解决</Text>
+            {modernization.targetArchitecture.openQuestions.map((item) => <div key={item}>· {item}</div>)}
+          </div>
+        ) : null}
+      </Card>
+
+      <Card className='results-modernization-card' title='新旧对应'>
+        {modernization.mappings.length ? (
+          <>
+            <Flex wrap gap={8} style={{ marginBottom: 12 }}>
+              <Tag>已保存 {modernization.mappings.length} 条</Tag>
+              <Tag color={modernization.mappingCoverage?.unmappedAssets.length ? 'orange' : 'green'}>
+                未对应 {modernization.mappingCoverage?.unmappedAssets.length ?? '未记录'}
+              </Tag>
+            </Flex>
+            <Table
+              size='small'
+              rowKey='id'
+              scroll={{ x: 1100 }}
+              dataSource={modernization.mappings}
+              columns={[
+                { title: '旧数据', dataIndex: 'sourceAsset', width: 180 },
+                { title: '新数据', dataIndex: 'targetAsset', width: 180 },
+                { title: '怎么改', dataIndex: 'transformation', width: 230, render: (value: string | undefined) => value || '未记录' },
+                { title: '业务规则', dataIndex: 'businessRule', width: 230, render: (value: string | undefined) => value || '未记录' },
+                { title: '怎么验证', dataIndex: 'validationRule', width: 230, render: (value: string | undefined) => value || '未记录' },
+                { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag>{value}</Tag> },
+                { title: 'Evidence', dataIndex: 'evidenceIds', width: 80, render: (value: string[]) => <Tag>{value?.length ?? 0}</Tag> },
+              ]}
+              pagination={false}
+            />
+          </>
+        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='还没有保存新旧对应结果。' />}
+      </Card>
+
+      <Card className='results-modernization-card' title='验证结果'>
+        <Table
+          size='small'
+          rowKey='id'
+          dataSource={modernization.validationPlan.checks}
+          columns={[
+            { title: '检查项', dataIndex: 'name', width: 220 },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 90,
+              render: (value: string, record: ResultModernization['validationPlan']['checks'][number]) => (
+                <Tag color={value === 'passed' ? 'green' : value === 'failed' ? 'red' : record.blocking ? 'orange' : undefined}>{value}</Tag>
+              ),
+            },
+            { title: '实际结果', dataIndex: 'result', render: (value: string | undefined) => value || '尚未执行' },
+            { title: 'Evidence', dataIndex: 'evidenceIds', width: 80, render: (value: string[]) => <Tag>{value?.length ?? 0}</Tag> },
+          ]}
+          pagination={false}
+        />
+        <Divider style={{ margin: '16px 0' }} />
+        <Flex gap={24} wrap>
+          <div><Text strong>切换条件</Text>{modernization.validationPlan.cutoverCriteria.map((item) => <div key={item}>· {item}</div>)}</div>
+          <div><Text strong>回退条件</Text>{modernization.validationPlan.rollbackCriteria.map((item) => <div key={item}>· {item}</div>)}</div>
+        </Flex>
+      </Card>
+    </>
+  );
 }
 
-function asCheckpoint(event: TrajectoryEvent): Checkpoint | undefined {
-  if (event.type !== 'checkpoint' || !event.details || typeof event.details !== 'object') return undefined;
-  const value = event.details as Record<string, unknown>;
-  if (typeof value.title !== 'string' || typeof value.summary !== 'string') return undefined;
-  return {
-    // checkpoint 的稳定 ID 是 trajectory event 的 ID；details 本身保存的是 AgentCheckpoint，
-    // 不包含单独的 id 字段。此前这里错误要求 details.id，导致所有阶段小结被静默丢弃。
-    id: event.id,
-    turnId: event.turnId,
-    timestamp: event.timestamp,
-    execution: typeof value.execution === 'number' ? value.execution : 0,
-    title: value.title,
-    summary: value.summary,
-    confirmed: Array.isArray(value.confirmed) ? value.confirmed.filter((item): item is string => typeof item === 'string') : [],
-    evidenceIds: Array.isArray(value.evidenceIds) ? value.evidenceIds.filter((item): item is string => typeof item === 'string') : [],
-    unknowns: Array.isArray(value.unknowns) ? value.unknowns.filter((item): item is string => typeof item === 'string') : [],
-    ...(typeof value.nextStep === 'string' ? { nextStep: value.nextStep } : {}),
-  };
+function renderAssessment(
+  section: ResultViewModel['assessment'],
+  onBack: () => void,
+) {
+  if (section.status !== 'available') {
+    return <ResultSectionState section={section} emptyMessage='还没有形成架构评估成果。' onBack={onBack} />;
+  }
+  const assessment: ResultAssessment = section.data;
+  return (
+    <>
+      <Card className='results-assessment-card' title='当前状态'>
+        <Flex wrap gap={8} style={{ marginBottom: 12 }}>
+          <Tag>数据集 {assessment.currentState.datasets}</Tag>
+          <Tag>语义资产 {assessment.currentState.semanticAssets}</Tag>
+          <Tag>Finding {assessment.currentState.findings}</Tag>
+          <Tag>Unknown {assessment.currentState.unknowns}</Tag>
+          <Tag>
+            血缘覆盖 {assessment.currentState.lineageCoverage === null
+              ? '未记录'
+              : Math.round(assessment.currentState.lineageCoverage * 100) + '%'}
+          </Tag>
+        </Flex>
+        <Paragraph>{assessment.goal}</Paragraph>
+        <Text type='secondary'>范围：{assessment.scope.join('、') || '未记录'}</Text>
+      </Card>
+
+      <Card className='results-assessment-card' title='主要问题'>
+        {assessment.findings.length ? (
+          assessment.findings.map((finding) => (
+            <Card key={finding.id} size='small' style={{ marginBottom: 8 }}>
+              <Flex align='center' gap={8} wrap>
+                <Text strong>{finding.title}</Text>
+                <Tag color={finding.severity === 'high' ? 'red' : undefined}>{finding.severity}</Tag>
+              </Flex>
+              <Paragraph style={{ marginBottom: 6 }}>{finding.description}</Paragraph>
+              <Text>建议：{finding.recommendation}</Text>
+              <div style={{ marginTop: 6 }}>
+                <Text type='secondary'>Evidence {finding.evidenceIds.length} 条</Text>
+              </div>
+            </Card>
+          ))
+        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='当前还没有形成可单独展示的 Finding。' />}
+      </Card>
+
+      <Card className='results-assessment-card' title='建议与路线'>
+        {assessment.recommendations.length ? (
+          <>
+            <Text strong>建议</Text>
+            {assessment.recommendations.map((item) => <div key={item}>· {item}</div>)}
+          </>
+        ) : null}
+        {assessment.roadmap.length ? (
+          <>
+            <Divider style={{ margin: '14px 0' }} />
+            <Text strong>路线</Text>
+            {assessment.roadmap.map((item) => (
+              <Card key={item.id} size='small' style={{ marginTop: 8 }}>
+                <Text strong>{item.title}</Text>
+                <Paragraph style={{ marginBottom: 6 }}>{item.objective}</Paragraph>
+                <Text type='secondary'>关联 Finding {item.findingIds.length} 项</Text>
+              </Card>
+            ))}
+          </>
+        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='还没有形成评估路线。' />}
+      </Card>
+    </>
+  );
 }
 
 export function InvestigationResultsPage(props: {
@@ -93,80 +214,30 @@ export function InvestigationResultsPage(props: {
   onOpenConfig: () => void;
   onOpenTrajectory: () => void;
 }) {
-  const [report, setReport] = useState('');
-  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
-  const [session, setSession] = useState<SessionSnapshot>();
-  const [modernization, setModernization] = useState<ModernizationPlan>();
+  const [result, setResult] = useState<ResultViewModel>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [reportGateError, setReportGateError] = useState<string>();
 
   const load = async () => {
     setLoading(true);
     setError(undefined);
-    setReportGateError(undefined);
     try {
-      const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
-      const [reportResponse, trajectoryResponse, sessionResponse, modernizationResponse] = await Promise.all([
-        fetch(sessionPath + '/report'),
-        fetch(sessionPath + '/trajectory?limit=5000'),
-        fetch(sessionPath),
-        fetch(sessionPath + '/modernization'),
-      ]);
-      if (!reportResponse.ok && reportResponse.status !== 409) {
-        throw new Error((await reportResponse.text()) || reportResponse.statusText);
-      }
-      if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
-      if (!sessionResponse.ok) throw new Error((await sessionResponse.text()) || sessionResponse.statusText);
-      if (!modernizationResponse.ok && modernizationResponse.status !== 409) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
-
-      const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        reportResponse.ok
-          ? reportResponse.text()
-          : reportResponse.json() as Promise<{error?: string}>,
-        trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
-        sessionResponse.json() as Promise<SessionSnapshot>,
-        modernizationResponse.ok
-          ? modernizationResponse.json() as Promise<{plan?: ModernizationPlan | null}>
-          : Promise.resolve({ plan: null }),
-      ]);
-
-      const unique = new Map<string, Checkpoint>();
-      for (const event of trajectoryData.events ?? []) {
-        const checkpoint = asCheckpoint(event);
-        if (checkpoint) unique.set(checkpoint.id, checkpoint);
-      }
-      if (reportResponse.ok) {
-        setReport(reportPayload as string);
-      } else {
-        setReport('');
-        setReportGateError(
-          typeof reportPayload === 'object' && reportPayload && typeof reportPayload.error === 'string'
-            ? reportPayload.error
-            : '范围还没有确认完整，正式报告暂时不能生成。',
-        );
-      }
-      setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
-      setSession(sessionData);
-      setModernization(modernizationData.plan ?? undefined);
+      const response = await fetch('/api/sessions/' + encodeURIComponent(props.sessionName) + '/results');
+      if (!response.ok) throw new Error((await response.text()) || response.statusText);
+      setResult(await response.json() as ResultViewModel);
     } catch (cause) {
+      setResult(undefined);
       setError(cause instanceof Error ? cause.message : '无法读取调查结果');
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     void load();
   }, [props.sessionName]);
 
-  const workflowLabel = useMemo(() => {
-    switch (session?.context.workflow) {
-      case 'legacy-modernization': return '改造已有系统';
-      case 'financial-ai-native-architecture': return '金融 AI / 数据架构设计';
-      case 'data-architecture-assessment': return '数据架构评估';
-      default: return '自主调查';
-    }
-  }, [session?.context.workflow]);
+  const workflow = useMemo(() => workflowLabel(result?.session.workflow ?? null), [result?.session.workflow]);
 
   return (
     <div className='subpage-app investigation-results-page'>
@@ -174,7 +245,7 @@ export function InvestigationResultsPage(props: {
         <Flex align='center' gap={10}>
           <Button type='text' icon={<ArrowLeftOutlined />} onClick={props.onBack}>返回调查</Button>
           <Title level={4} style={{ margin: 0 }}>调查结果</Title>
-          <Tag>{workflowLabel}</Tag>
+          <Tag>{workflow}</Tag>
         </Flex>
         <Space>
           <Button icon={<SettingOutlined />} onClick={props.onOpenConfig}>调查配置</Button>
@@ -183,179 +254,131 @@ export function InvestigationResultsPage(props: {
         </Space>
       </header>
 
-      <main className='investigation-results-body'>
-        <section className='results-checkpoints'>
-          <Flex align='center' justify='space-between' className='results-section-heading'>
-            <div>
-              <Title level={5} style={{ margin: 0 }}>阶段小结</Title>
-              <Text type='secondary'>每一阶段形成的关键结论都留在这里，方便回头看调查是怎么推进的。</Text>
-            </div>
-            <Tag>{checkpoints.length} 个阶段</Tag>
-          </Flex>
+      {error ? (
+        <Card className='results-error'>
+          <Text type='danger'>{error}</Text>
+        </Card>
+      ) : null}
 
-          {error ? <Card className='results-error'><Text type='danger'>{error}</Text></Card> : null}
-
-          {!loading && !checkpoints.length ? (
-            <Card><Empty description='还没有形成阶段小结。完成一次调查后，这里会保留每个阶段的结果。' /></Card>
-          ) : (
-            <div className='results-checkpoint-list'>
-              {checkpoints.map((checkpoint, index) => (
-                <Card key={checkpoint.id} className='results-checkpoint-card'>
-                  <Flex align='center' justify='space-between' gap={10} wrap>
-                    <Flex align='center' gap={8}>
-                      <Tag color='blue'>阶段 {index + 1}</Tag>
-                      <Text strong className='results-checkpoint-title'>{checkpoint.title}</Text>
-                    </Flex>
-                    <Text type='secondary'>{new Date(checkpoint.timestamp).toLocaleString()}</Text>
-                  </Flex>
-                  <Paragraph className='results-checkpoint-summary'>{checkpoint.summary}</Paragraph>
-                  {checkpoint.confirmed.length ? (
-                    <div>
-                      <Text type='secondary'>已确认</Text>
-                      <div className='results-checkpoint-items'>
-                        {checkpoint.confirmed.map(item => <div key={item}>· {item}</div>)}
-                      </div>
-                    </div>
-                  ) : null}
-                  <Flex wrap gap={8}>
-                    <Tag>Evidence {checkpoint.evidenceIds.length} 条</Tag>
-                    {checkpoint.unknowns.length ? <Tag color='orange'>未确认 {checkpoint.unknowns.length} 项</Tag> : null}
-                  </Flex>
-                  {checkpoint.nextStep ? (
-                    <div className='results-checkpoint-next'>
-                      <Text type='secondary'>下一步：</Text>{checkpoint.nextStep}
-                    </div>
-                  ) : null}
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {modernization ? (
-          <section className='results-modernization'>
+      {loading && !result ? (
+        <Card><Text type='secondary'>正在读取调查结果…</Text></Card>
+      ) : result ? (
+        <main className='investigation-results-body'>
+          <section className='results-checkpoints'>
             <Flex align='center' justify='space-between' className='results-section-heading'>
               <div>
-                <Title level={5} style={{ margin: 0 }}>改造工作成果</Title>
-                <Text type='secondary'>这里显示已经写入工作区的目标架构、新旧对应和验证结果，不以 Agent 的 success 回复代替成果。</Text>
+                <Title level={5} style={{ margin: 0 }}>阶段小结</Title>
+                <Text type='secondary'>每一阶段形成的关键结论都留在这里，方便回头看调查是怎么推进的。</Text>
               </div>
-              <Space wrap>
-                <Tag>目标组件 {modernization.targetArchitecture.components.length}</Tag>
-                <Tag>新旧对应 {modernization.mappings.length}</Tag>
-                <Tag color={modernization.validationPlan.checks.some((check) => check.blocking && check.status !== 'passed') ? 'orange' : 'green'}>
-                  验证通过 {modernization.validationPlan.checks.filter((check) => check.status === 'passed').length}/{modernization.validationPlan.checks.length}
-                </Tag>
-              </Space>
+              <Tag>{result.checkpoints.length} 个阶段</Tag>
             </Flex>
 
-            <Card className='results-modernization-card' title='目标架构'>
-              {modernization.targetArchitecture.components.length ? (
-                <>
-                  <Flex wrap gap={8} style={{ marginBottom: 12 }}>
-                    {modernization.targetArchitecture.principles.map((principle) => <Tag key={principle}>{principle}</Tag>)}
-                  </Flex>
-                  {modernization.targetArchitecture.components.map((component) => (
-                    <Card key={component.id} size='small' style={{ marginBottom: 8 }}>
-                      <Text strong>{component.name}</Text>
-                      <Paragraph style={{ marginBottom: 6 }}>{component.description}</Paragraph>
-                      <Text type='secondary'>来源：{component.sourceAssets.join('、') || '未记录'}</Text>
-                    </Card>
-                  ))}
-                </>
-              ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='目标架构还没有实际组件。' />}
-              {modernization.targetArchitecture.openQuestions.length ? (
+            {!result.checkpoints.length ? (
+              <Card><Empty description='还没有形成阶段小结。完成一次调查后，这里会保留每个阶段的结果。' /></Card>
+            ) : (
+              <div className='results-checkpoint-list'>
+                {result.checkpoints.map((checkpoint, index) => (
+                  <Card key={checkpoint.id} className='results-checkpoint-card'>
+                    <Flex align='center' justify='space-between' gap={10} wrap>
+                      <Flex align='center' gap={8}>
+                        <Tag color='blue'>阶段 {index + 1}</Tag>
+                        <Text strong className='results-checkpoint-title'>{checkpoint.title}</Text>
+                      </Flex>
+                      <Text type='secondary'>{new Date(checkpoint.timestamp).toLocaleString()}</Text>
+                    </Flex>
+                    <Paragraph className='results-checkpoint-summary'>{checkpoint.summary}</Paragraph>
+                    {checkpoint.confirmed.length ? (
+                      <div>
+                        <Text type='secondary'>已确认</Text>
+                        <div className='results-checkpoint-items'>
+                          {checkpoint.confirmed.map(item => <div key={item}>· {item}</div>)}
+                        </div>
+                      </div>
+                    ) : null}
+                    <Flex wrap gap={8}>
+                      <Tag>Evidence {checkpoint.evidenceIds.length} 条</Tag>
+                      {checkpoint.unknowns.length ? <Tag color='orange'>未确认 {checkpoint.unknowns.length} 项</Tag> : null}
+                    </Flex>
+                    {checkpoint.nextStep ? (
+                      <div className='results-checkpoint-next'>
+                        <Text type='secondary'>下一步：</Text>{checkpoint.nextStep}
+                      </div>
+                    ) : null}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {result.modernization.status !== 'not_applicable' ? (
+            <section className='results-modernization'>
+              <Flex align='center' justify='space-between' className='results-section-heading'>
                 <div>
-                  <Divider style={{ margin: '14px 0' }} />
-                  <Text type='secondary'>还未解决</Text>
-                  {modernization.targetArchitecture.openQuestions.map((item) => <div key={item}>· {item}</div>)}
+                  <Title level={5} style={{ margin: 0 }}>改造工作成果</Title>
+                  <Text type='secondary'>这里显示已经写入工作区的目标架构、新旧对应和验证结果，不以 Agent 的 success 回复代替成果。</Text>
                 </div>
-              ) : null}
-            </Card>
-
-            <Card className='results-modernization-card' title='新旧对应'>
-              {modernization.mappings.length ? (
-                <>
-                  <Flex wrap gap={8} style={{ marginBottom: 12 }}>
-                    <Tag>已保存 {modernization.mappings.length} 条</Tag>
-                    <Tag color={modernization.mappingCoverage?.unmappedAssets.length ? 'orange' : 'green'}>
-                      未对应 {modernization.mappingCoverage?.unmappedAssets.length ?? '未记录'}
+                {result.modernization.status === 'available' ? (
+                  <Space wrap>
+                    <Tag>目标组件 {result.modernization.data.targetArchitecture.components.length}</Tag>
+                    <Tag>新旧对应 {result.modernization.data.mappings.length}</Tag>
+                    <Tag color={result.modernization.data.validationPlan.checks.some((check) => check.blocking && check.status !== 'passed') ? 'orange' : 'green'}>
+                      验证通过 {result.modernization.data.validationPlan.checks.filter((check) => check.status === 'passed').length}/{result.modernization.data.validationPlan.checks.length}
                     </Tag>
-                  </Flex>
-                  <Table
-                    size='small'
-                    rowKey='id'
-                    scroll={{ x: 1100 }}
-                    dataSource={modernization.mappings}
-                    columns={[
-                      { title: '旧数据', dataIndex: 'sourceAsset', width: 180 },
-                      { title: '新数据', dataIndex: 'targetAsset', width: 180 },
-                      { title: '怎么改', dataIndex: 'transformation', width: 230, render: (value: string | undefined) => value || '未记录' },
-                      { title: '业务规则', dataIndex: 'businessRule', width: 230, render: (value: string | undefined) => value || '未记录' },
-                      { title: '怎么验证', dataIndex: 'validationRule', width: 230, render: (value: string | undefined) => value || '未记录' },
-                      { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag>{value}</Tag> },
-                      { title: 'Evidence', dataIndex: 'evidenceIds', width: 80, render: (value: string[]) => <Tag>{value?.length ?? 0}</Tag> },
-                    ]}
-                    pagination={false}
-                  />
-                </>
-              ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='还没有保存新旧对应结果。' />}
-            </Card>
-
-            <Card className='results-modernization-card' title='验证结果'>
-              <Table
-                size='small'
-                rowKey='id'
-                dataSource={modernization.validationPlan.checks}
-                columns={[
-                  { title: '检查项', dataIndex: 'name', width: 220 },
-                  { title: '状态', dataIndex: 'status', width: 90, render: (value: string, record: ModernizationPlan['validationPlan']['checks'][number]) => (
-                    <Tag color={value === 'passed' ? 'green' : value === 'failed' ? 'red' : record.blocking ? 'orange' : undefined}>{value}</Tag>
-                  )},
-                  { title: '实际结果', dataIndex: 'result', render: (value: string | undefined) => value || '尚未执行' },
-                  { title: 'Evidence', dataIndex: 'evidenceIds', width: 80, render: (value: string[]) => <Tag>{value?.length ?? 0}</Tag> },
-                ]}
-                pagination={false}
-              />
-              <Divider style={{ margin: '16px 0' }} />
-              <Flex gap={24} wrap>
-                <div><Text strong>切换条件</Text>{modernization.validationPlan.cutoverCriteria.map((item) => <div key={item}>· {item}</div>)}</div>
-                <div><Text strong>回退条件</Text>{modernization.validationPlan.rollbackCriteria.map((item) => <div key={item}>· {item}</div>)}</div>
+                  </Space>
+                ) : null}
               </Flex>
+              {renderModernization(result.modernization, props.onBack)}
+            </section>
+          ) : null}
+
+          {result.assessment.status !== 'not_applicable' ? (
+            <section className='results-assessment'>
+              <Flex align='center' justify='space-between' className='results-section-heading'>
+                <div>
+                  <Title level={5} style={{ margin: 0 }}>架构评估成果</Title>
+                  <Text type='secondary'>这里显示基于当前调查事实和 Finding 形成的评估、建议和路线。</Text>
+                </div>
+                {result.assessment.status === 'available' ? (
+                  <Space wrap>
+                    <Tag>Finding {result.assessment.data.findings.length}</Tag>
+                    <Tag>建议 {result.assessment.data.recommendations.length}</Tag>
+                    <Tag>路线 {result.assessment.data.roadmap.length}</Tag>
+                  </Space>
+                ) : null}
+              </Flex>
+              {renderAssessment(result.assessment, props.onBack)}
+            </section>
+          ) : null}
+
+          <section className='results-report'>
+            <Flex align='center' justify='space-between' className='results-section-heading'>
+              <div>
+                <Title level={5} style={{ margin: 0 }}>结果报告</Title>
+                <Text type='secondary'>根据当前调查资料生成的完整报告。</Text>
+              </div>
+              {result.session ? (
+                <Flex gap={8}>
+                  <Tag>配置 v{result.session.controlVersion}</Tag>
+                  <Tag>{result.session.agentDisplayName}</Tag>
+                  {result.report.status === 'available' ? (
+                    <Tag color={result.report.data.review.status === 'pass' ? 'green' : 'orange'}>
+                      Reviewer {result.report.data.review.score}
+                    </Tag>
+                  ) : null}
+                </Flex>
+              ) : null}
+            </Flex>
+
+            <Card className='results-report-card'>
+              {result.report.status === 'available' ? (
+                <XMarkdown content={result.report.data.markdown} className='result-report-markdown x-markdown-light' />
+              ) : (
+                <ResultSectionState section={result.report} emptyMessage='还没有可展示的结果报告。' onBack={props.onBack} />
+              )}
             </Card>
           </section>
-        ) : null}
-        <section className='results-report'>
-          <Flex align='center' justify='space-between' className='results-section-heading'>
-            <div>
-              <Title level={5} style={{ margin: 0 }}>结果报告</Title>
-              <Text type='secondary'>根据当前调查资料生成的完整报告。</Text>
-            </div>
-            <Flex gap={8}>
-              <Tag>{session ? `配置 v${session.control.version}` : '配置'}</Tag>
-              <Tag>{session?.control.agent.displayName ?? '秘书'}</Tag>
-            </Flex>
-          </Flex>
-          {reportGateError ? (
-            <Alert
-              type='warning'
-              showIcon
-              message='结果报告暂时不能生成'
-              description={reportGateError}
-              action={<Button type='link' onClick={props.onBack}>回调查确认范围</Button>}
-              style={{ marginBottom: 12 }}
-            />
-          ) : null}
-          <Card className='results-report-card'>
-            {loading ? <Text type='secondary'>正在读取结果…</Text> : report ? (
-              <XMarkdown content={report} className='result-report-markdown x-markdown-light' />
-            ) : reportGateError ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='完成范围确认后再生成正式报告。' />
-            ) : (
-              <Empty description='还没有可展示的结果报告。' />
-            )}
-          </Card>
-        </section>
-      </main>
+        </main>
+      ) : null}
     </div>
   );
 }
