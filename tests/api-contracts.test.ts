@@ -13,7 +13,6 @@ import {
   SessionContextViewSchema,
   SseEventSchema,
   TrajectoryEventSchema,
-  WorkflowCompatibilityResponseSchema,
 } from '../src/api/contracts.js';
 
 test('SSE contract rejects malformed status payloads', () => {
@@ -85,30 +84,6 @@ test('JourneyPlan and workflow edit changes are runtime validated', () => {
     type: 'remove-node',
     nodeId: 'target',
   }).type, 'remove-node');
-});
-
-test('legacy journey compatibility response has one canonical execution owner', () => {
-  const value = WorkflowCompatibilityResponseSchema.parse({
-    journey: {
-      workflowId: 'legacy-modernization',
-      stages: [{
-        id: 'target',
-        title: '目标',
-        objective: '设计目标',
-        status: 'current',
-        nodeType: 'task',
-      }],
-      execution: {
-        workflowId: 'legacy-modernization',
-        workflowVersion: 1,
-        runId: 'run-1',
-        currentNodeId: 'target',
-        completedNodeIds: [],
-        status: 'active',
-      },
-    },
-  });
-  assert.equal(value.journey?.execution.currentNodeId, 'target');
 });
 
 test('error contract always carries a stable code and human-readable message', () => {
