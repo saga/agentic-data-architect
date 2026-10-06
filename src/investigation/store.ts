@@ -341,8 +341,11 @@ export async function loadLatestDiscoverySnapshot(name: string): Promise<import(
   let files: string[];
   try {
     files = (await fs.readdir(discoveryDir(name))).filter((f) => f.endsWith('.json')).sort();
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
   }
   if (!files.length) return null;
   const last = files[files.length - 1] as string;
