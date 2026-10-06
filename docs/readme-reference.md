@@ -47,6 +47,8 @@ npm run dev
     discovery/
     reports/
     artifacts/
+      analysis/
+
     workflow/
       journey.md
       journey-meta.json
@@ -72,6 +74,8 @@ shared/ 保存跨 session 可以复用的研究资料。
 - `data-architecture-assessment`
 
 Workflow 只是当前 Investigation 的工作方法，不是 Investigation 类型。内置 Workflow 来自 Skill；进入全屏工作地图后可以复制为 Investigation 级自定义 Workflow，拖动节点、添加步骤和分支、修改 outcome，并在服务端验证通过后应用。工作方式本身的切换仍需要在“调查配置 → 工作方式”执行明确确认；Workflow Editor 的 draft/apply 不会修改内置 Skill。
+
+每次完整 Investigation 至少留下 `reports/report.md`；每个有效调查 turn 还会在 `artifacts/analysis/` 留下一份中间分析记录。最终报告只读，不会因为页面刷新重新调用模型。
 
 ## API
 
