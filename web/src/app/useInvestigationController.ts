@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as AntApp } from 'antd';
 import type { UploadFile } from 'antd';
 import { consumeSse, getJson } from './api';
+import { AnswerSummarySchema, ExecutionStatusSchema, SseEventSchema } from '../../../src/api/contracts.js';
+import type { AnswerSummaryContract } from '../../../src/api/contracts.js';
 import { buildInvestigationPath, parseRoute, type PageId } from './routing';
 import {
   workflowOptions,
@@ -674,13 +676,7 @@ export function useInvestigationController() {
         throw new Error(parsedBody?.error || body || response.statusText);
       }
 
-      let result: {
-        answer: string;
-        claimIds: string[];
-        warnings: string[];
-        unknowns: string[];
-        followUpQuestions: string[];
-      } | undefined;
+      let result: AnswerSummaryContract | undefined;
 
       let streamedReasoning = '';
       await consumeSse(response, ({ event, data }) => {
@@ -689,45 +685,34 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'status') {
-          const status = (data as { status?: unknown }).status;
-          if (typeof status === 'string' && status.trim()) {
-            setTurnStatus(status.trim());
-          }
+          if (data.status.trim()) setTurnStatus(data.status.trim());
           return;
         }
         if (event === 'companion_note') {
-          const note = (data as { note?: unknown }).note;
-          if (typeof note === 'string' && note.trim()) setAssistantCompanionNote(note.trim());
+          if (data.note.trim()) setAssistantCompanionNote(data.note.trim());
           return;
         }
         if (event === 'checkpoint') {
-          const checkpoint = data as InvestigationCheckpoint;
-          if (checkpoint && typeof checkpoint.id === 'string' && typeof checkpoint.title === 'string') {
-            setTurnStatus('已形成阶段小结：' + checkpoint.title);
-          }
+          setTurnStatus('已形成阶段小结：' + data.title);
           return;
         }
         if (event === 'reasoning') {
-          const delta = (data as { delta?: unknown }).delta;
-          if (typeof delta === 'string') {
-            streamedReasoning += delta;
-            setTurnStatus('助手正在分析你的问题，请稍候…');
-            setStreamingReasoning(streamedReasoning);
-          }
+          streamedReasoning += data.delta;
+          setTurnStatus('助手正在分析你的问题，请稍候…');
+          setStreamingReasoning(streamedReasoning);
           return;
         }
         if (event === 'delta') {
-          const delta = (data as { delta?: unknown }).delta;
-          if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
-            ? { ...currentAnswer, content: currentAnswer.content + delta }
+          setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
+            ? { ...currentAnswer, content: currentAnswer.content + data.delta }
             : currentAnswer);
           return;
         }
         if (event === 'error') {
-          throw new Error(String((data as { error?: unknown }).error ?? '请求失败'));
+          throw new Error(data.error);
         }
         if (event === 'completed') {
-          result = data as typeof result;
+          result = AnswerSummarySchema.parse(data);
         }
       });
 
