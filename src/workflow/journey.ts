@@ -338,8 +338,17 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
       return facts.blockingValidationTotal > 0
         && facts.blockingValidationReady >= facts.blockingValidationTotal;
     case 'current-data-architecture':
-      return Boolean(\n        facts.currentState\n        && facts.currentState.datasets > 0,\n      );\n    case 'current-data-architecture-ready':
-      return Boolean(\n        facts.currentState\n        && facts.currentState.datasets > 0\n        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage'].includes(kind)),\n      );\n    case 'assessment-current-state':
+      return Boolean(
+        facts.currentState
+        && facts.currentState.datasets > 0,
+      );
+    case 'current-data-architecture-ready':
+      return Boolean(
+        facts.currentState
+        && facts.currentState.datasets > 0
+        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage'].includes(kind)),
+      );
+    case 'assessment-current-state':
       return Boolean(
         facts.currentState
         && facts.currentState.datasets > 0
