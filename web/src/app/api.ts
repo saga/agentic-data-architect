@@ -16,11 +16,12 @@ export class ApiRequestError extends Error {
 }
 
 async function readApiError(response: Response): Promise<ApiError> {
+  const fallbackBody = () => response.clone().text().catch(() => '');
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    const body = await response.text().catch(() => '');
+    const body = await fallbackBody();
     return {
       code: 'HTTP_ERROR',
       error: body || response.statusText || '请求失败。',
