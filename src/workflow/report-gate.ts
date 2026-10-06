@@ -104,15 +104,28 @@ export function evaluateCurrentStateReportGate(
 }
 
 /** 从当前 Investigation 读取真实状态并执行 Current-State Report Gate。 */
-export async function runCurrentStateReportGate(name: string): Promise<ReportGateResult> {
+export async function runCurrentStateReportGate(
+  name: string,
+  source?: {
+    investigation: Parameters<typeof evaluateCurrentStateReportGate>[0];
+    snapshot: DiscoverySnapshot | null;
+  },
+): Promise<ReportGateResult> {
+  if (source) return evaluateCurrentStateReportGate(source.investigation, source.snapshot);
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   return evaluateCurrentStateReportGate(investigation, snapshot);
 }
 
 /** Gate 不通过时抛出明确错误，避免生成一份“看起来完成、实际上没有调查”的报告。 */
-export async function assertCurrentStateReportGate(name: string): Promise<ReportGateResult> {
-  const result = await runCurrentStateReportGate(name);
+export async function assertCurrentStateReportGate(
+  name: string,
+  source?: {
+    investigation: Parameters<typeof evaluateCurrentStateReportGate>[0];
+    snapshot: DiscoverySnapshot | null;
+  },
+): Promise<ReportGateResult> {
+  const result = await runCurrentStateReportGate(name, source);
   if (!result.passed) throw new ReportGateError(result);
   return result;
 }
