@@ -46,6 +46,55 @@ try {
         continue;
       }
 
+      const requiredSections = ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例'];
+      for (const section of requiredSections) {
+        const heading = new RegExp('^##\\s+' + section.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\      const hasFlow = /^##\s+@flow\s+/m.test(markdown);
+') + '\\s*
+      if (manifest.metadata.kind === 'capability') {
+        if (hasFlow) {
+          failed = true;
+          console.error('ERROR ' + file + ': capability Skill 不能定义 @flow');
+        } else {
+          console.log('OK ' + file + ' [capability]');
+        }
+        continue;
+      }
+
+      if (!hasFlow) {
+        failed = true;
+        console.error('ERROR ' + file + ': workflow Skill 必须定义 @flow');
+        continue;
+      }
+
+      const result = parseJourneyMarkdown(markdown);
+      if (result.issues.length) {
+        failed = true;
+        for (const issue of result.issues) {
+          console.error('ERROR ' + file + ': ' + issue);
+        }
+      } else {
+        console.log('OK ' + file + ' [workflow]');
+      }
+    } catch (error) {
+      failed = true;
+      console.error(
+        'ERROR ' + file + ': ' + (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  }
+
+  if (failed) process.exitCode = 1;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}
+, 'm');
+        if (!heading.test(markdown)) {
+          failed = true;
+          console.error('ERROR ' + file + ': 缺少 Skill Contract 章节：## ' + section);
+        }
+      }
+
       const hasFlow = /^##\s+@flow\s+/m.test(markdown);
 
       if (manifest.metadata.kind === 'capability') {
