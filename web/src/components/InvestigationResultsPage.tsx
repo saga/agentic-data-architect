@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
-import { getJson } from '../app/api.js';
+import { ApiRequestError, getJson, getText } from '../app/api.js';
 import {
-  ApiErrorSchema,
   ReportRegenerateResponseSchema,
   TrajectoryCheckpointDetailsSchema,
   TrajectoryResponseSchema,
@@ -11,6 +10,7 @@ import {
   SessionDataSchema,
   type TrajectoryEvent,
   type ModernizationPlanView,
+  type ArtifactLifecycleStatus,
 } from '../../../src/api/contracts.js';
 import type { InvestigationCheckpoint, SessionData } from '../app/types.js';
 import { XMarkdown } from '@ant-design/x-markdown';
@@ -41,6 +41,7 @@ export function InvestigationResultsPage(props: {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [session, setSession] = useState<SessionData>();
   const [modernization, setModernization] = useState<ModernizationPlan>();
+  const [modernizationStatus, setModernizationStatus] = useState<ArtifactLifecycleStatus>('missing');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [reportGateError, setReportGateError] = useState<string>();
@@ -51,24 +52,21 @@ export function InvestigationResultsPage(props: {
     setReportGateError(undefined);
     try {
       const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
-      const [reportResponse, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        fetch(sessionPath + '/report'),
+      const [reportResult, trajectoryData, sessionData, modernizationData] = await Promise.all([
+        getText(sessionPath + '/report')
+          .then((markdown) => ({ markdown, error: undefined as ApiRequestError | undefined }))
+          .catch((cause) => {
+            if (cause instanceof ApiRequestError && (cause.status === 404 || cause.status === 409)) {
+              return { markdown: undefined, error: cause };
+            }
+            throw cause;
+          }),
         getJson(sessionPath + '/trajectory?limit=5000', TrajectoryResponseSchema),
         getJson(sessionPath, SessionDataSchema),
         getJson(sessionPath + '/modernization', ModernizationResponseSchema),
       ]);
-      let reportUnavailableReason: string | undefined;
-      if (!reportResponse.ok) {
-        const payload = ApiErrorSchema.parse(await reportResponse.json());
-        if (reportResponse.status !== 404 && reportResponse.status !== 409) {
-          throw new Error(payload.error);
-        }
-        reportUnavailableReason = payload.error;
-      }
-
-      const reportPayload = reportResponse.ok
-        ? await reportResponse.text()
-        : undefined;
+      const reportPayload = reportResult.markdown;
+      const reportUnavailableReason = reportResult.error?.apiError.error;
 
       const unique = new Map<string, Checkpoint>();
       for (const event of trajectoryData.events) {
@@ -86,6 +84,7 @@ export function InvestigationResultsPage(props: {
       }
       setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
       setSession(sessionData);
+      setModernizationStatus(modernizationData.status);
       setModernization(modernizationData.plan ?? undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法读取调查结果');
@@ -191,6 +190,18 @@ export function InvestigationResultsPage(props: {
             </div>
           )}
         </section>
+
+        {modernizationStatus !== 'missing' && modernizationStatus !== 'current' ? (
+          <Alert
+            type={modernizationStatus === 'stale' ? 'warning' : 'info'}
+            showIcon
+            message={modernizationStatus === 'stale' ? '改造成果已经过期' : '改造成果当前不可用'}
+            description={modernizationStatus === 'stale'
+              ? '调查范围或事实来源已经变化，需要显式重新生成改造工作成果。'
+              : '当前改造工作成果还不能作为当前结果使用。'}
+            style={{ marginBottom: 12 }}
+          />
+        ) : null}
 
         {modernization ? (
           <section className='results-modernization'>
