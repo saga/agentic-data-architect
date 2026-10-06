@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
-import { MissionProgressSchema, ResultViewModelSchema, SseEventSchema, WorkflowSnapshotSchema } from './api/contracts.js';
+import { MissionContractApiSchema, MissionProgressSchema, ResultViewModelSchema, SseEventSchema, WorkflowSnapshotSchema } from './api/contracts.js';
 import {
   AbortBodySchema,
   CreateSessionBodySchema,
@@ -335,7 +335,7 @@ app.post('/api/sessions', async (req, res) => {
     const gate = evaluateMissionGate(context.mission);
     const progress = await buildMissionProgress(name, context.mission);
     res.json({
-      mission: context.mission ?? null,
+      mission: context.mission ? MissionContractApiSchema.parse(context.mission) : null,
       gate,
       progress: MissionProgressSchema.nullable().parse(progress),
       ...(context.mission ? {} : {
@@ -397,7 +397,7 @@ app.post('/api/sessions', async (req, res) => {
 
     res.json({
       context,
-      mission,
+      mission: MissionContractApiSchema.parse(mission),
       gate: evaluateMissionGate(mission),
       progress: await buildMissionProgress(name, mission),
     });
