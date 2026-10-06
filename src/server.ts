@@ -743,7 +743,10 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'WORKFLOW_REQUIRED',
+      error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。',
+    }));
       return;
     }
 
@@ -772,7 +775,10 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'WORKFLOW_REQUIRED',
+      error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。',
+    }));
       return;
     }
 
@@ -805,7 +811,10 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.status(409).json({ error: '这个调查还没有选择工作方式，无法推进 Workflow。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'WORKFLOW_REQUIRED',
+      error: '这个调查还没有选择工作方式，无法推进 Workflow。',
+    }));
       return;
     }
 
@@ -831,7 +840,10 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.status(409).json({ error: '这个调查还没有选择工作方式，无法恢复工作地图。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'WORKFLOW_REQUIRED',
+      error: '这个调查还没有选择工作方式，无法恢复工作地图。',
+    }));
       return;
     }
     res.json(WorkflowResetResponseSchema.parse(await resetJourneyCustomization(name, context.workflow)));
@@ -1265,21 +1277,30 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       return;
     }
     if (report.status === 'missing') {
-      res.status(404).json({ code: 'REPORT_NOT_GENERATED', error: '还没有生成正式报告，请显式重新生成。' });
+      res.status(404).json(ApiErrorSchema.parse({
+        code: 'REPORT_NOT_GENERATED',
+        error: '还没有生成正式报告，请显式重新生成。',
+      }));
       return;
     }
     if (report.status === 'stale') {
-      res.status(409).json({ code: 'REPORT_STALE', error: '正式报告对应的调查成果已经变化，需要重新生成。' });
+      res.status(409).json(ApiErrorSchema.parse({
+        code: 'REPORT_STALE',
+        error: '正式报告对应的调查成果已经变化，需要重新生成。',
+      }));
       return;
     }
     if (report.status === 'blocked') {
-      res.status(409).json({
+      res.status(409).json(ApiErrorSchema.parse({
         code: report.reviewStatus === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_REQUIRED',
         error: '正式报告尚未通过独立质量审核，不能作为当前结果发布。',
-      });
+      }));
       return;
     }
-    res.status(500).json({ code: 'REPORT_METADATA_INVALID', error: '正式报告的元数据无效，需要重新生成。' });
+    res.status(500).json(ApiErrorSchema.parse({
+      code: 'REPORT_METADATA_INVALID',
+      error: '正式报告的元数据无效，需要重新生成。',
+    }));
   });
 
   app.post('/api/sessions/:name/report/regenerate', async (req, res) => {
@@ -1301,10 +1322,10 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         return;
       }
       if (error instanceof ReportQualityGateError) {
-        res.status(409).json({
+        res.status(409).json(ApiErrorSchema.parse({
           code: error.review.availability === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_FAILED',
           error: error.message,
-        });
+        }));
         return;
       }
       throw error;
@@ -1339,7 +1360,10 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       })();
 
     if (body.routeId && !selectedRoute) {
-      res.status(409).json({ error: '这个下一步已经过期，请根据最新情况重新选择。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'ROUTE_PLAN_STALE',
+      error: '这个下一步已经过期，请根据最新情况重新选择。',
+    }));
       return;
     }
 
@@ -1347,12 +1371,14 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     if (!missionGate.passed) {
       const blockedTurnId = body.turnId ?? randomUUID();
       await preserveBlockedUserMessage(name, blockedTurnId, message);
-      res.status(409).json({
+      res.status(409).json(ApiErrorSchema.parse({
         code: 'MISSION_REQUIRED',
         error: formatMissionGateFailure(missionGate),
-        draft: buildMissionDraft(context.goal || context.userPrompt),
-        turnId: blockedTurnId,
-      });
+        details: {
+          draft: buildMissionDraft(context.goal || context.userPrompt),
+          turnId: blockedTurnId,
+        },
+      }));
       return;
     }
 
@@ -1377,7 +1403,10 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       ? context.journeyPlan?.routes.find((route) => route.id === body.routeId)
       : undefined;
     if (body.routeId && !selectedRoute) {
-      res.status(409).json({ error: '这个下一步已经过期，请根据最新情况重新选择。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'ROUTE_PLAN_STALE',
+      error: '这个下一步已经过期，请根据最新情况重新选择。',
+    }));
       return;
     }
     const message = body.message
