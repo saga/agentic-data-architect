@@ -587,8 +587,8 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const turnId = typeof req.query.turnId === 'string' ? req.query.turnId : undefined;
     const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 1000;
-    let events;
-    let trajectoryError;
+    let events: Awaited<ReturnType<typeof readTrajectory>> = [];
+    let trajectoryError: string | undefined;
     try {
       events = await readTrajectory(name, {
         ...(turnId ? { turnId } : {}),
