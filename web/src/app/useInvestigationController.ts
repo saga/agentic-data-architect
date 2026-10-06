@@ -64,6 +64,7 @@ export function useInvestigationController() {
   const [availableModels, setAvailableModels] = useState<CopilotModelOption[]>([]);
   const [modelSaving, setModelSaving] = useState(false);
   const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [assistantCompanionNote, setAssistantCompanionNote] = useState('');
   const [reasoningByMessage, setReasoningByMessage] = useState<Record<string, string>>({});
   // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
@@ -386,6 +387,8 @@ export function useInvestigationController() {
 
   useEffect(() => {
     setStreamingAnswer(undefined);
+    setStreamingReasoning('');
+    setAssistantCompanionNote('');
     setNextGuidance([]);
     setJourney(undefined);
     setPendingPermissions([]);
@@ -595,6 +598,7 @@ export function useInvestigationController() {
     setValue('');
     setNextGuidance([]);
     setStreamingReasoning('');
+    setAssistantCompanionNote('');
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
     setError(undefined);
@@ -620,6 +624,18 @@ export function useInvestigationController() {
       await waitForExecutionIdle(key as string);
 
       activeTurnRef.current = { key: key as string, turnId, controller };
+      setCurrent((existing) => {
+        if (!existing || existing.context.name !== key) return existing;
+        const messageId = turnId + ':user';
+        if (existing.messages.some((item) => item.id === messageId)) return existing;
+        return {
+          ...existing,
+          messages: [
+            ...existing.messages,
+            { id: messageId, role: 'user' as const, content: message, capturedAt: new Date().toISOString() },
+          ],
+        };
+      });
       setStreamingAnswer({ key: key as string, content: '' });
 
       const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
@@ -677,6 +693,11 @@ export function useInvestigationController() {
           if (typeof status === 'string' && status.trim()) {
             setTurnStatus(status.trim());
           }
+          return;
+        }
+        if (event === 'companion_note') {
+          const note = (data as { note?: unknown }).note;
+          if (typeof note === 'string' && note.trim()) setAssistantCompanionNote(note.trim());
           return;
         }
         if (event === 'checkpoint') {
@@ -747,6 +768,7 @@ export function useInvestigationController() {
     } finally {
       setStreamingAnswer(undefined);
       setStreamingReasoning('');
+      setAssistantCompanionNote('');
       setTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
         : '可以继续提问');
@@ -1011,6 +1033,7 @@ export function useInvestigationController() {
     modelOptions,
     modelSaving,
     streamingReasoning,
+    assistantCompanionNote,
     reasoningByMessage,
     assistantAvatarByMessage,
     value,
