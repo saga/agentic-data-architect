@@ -1225,6 +1225,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     try {
       const result = await buildArchitectureAssessmentPlan(name);
       res.json(ArchitectureAssessmentResponseSchema.parse({
+        status: 'current',
         plan: toArchitectureAssessmentView(result.plan),
         path: result.path,
       }));
@@ -1256,6 +1257,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     try {
       const result = await buildModernizationPlan(name);
       res.json(ModernizationResponseSchema.parse({
+        status: 'current',
         plan: toModernizationPlanView(result.plan),
         path: result.path,
       }));
