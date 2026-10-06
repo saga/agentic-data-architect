@@ -431,6 +431,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       ...(input.onBeforeWorkflowTransition ? { onBeforeWorkflowTransition: input.onBeforeWorkflowTransition } : {}),
       ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
       ...(input.workflowSkill !== undefined ? { workflowSkill: input.workflowSkill } : {}),
+      ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
       investigationName,
     });
   }
