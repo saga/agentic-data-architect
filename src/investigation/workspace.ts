@@ -7,7 +7,6 @@ import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
-import { migrateLegacyConversationInputs } from './conversation.js';
 import type { EvidenceRef } from '../evidence/types.js';
 import {
   SharedIndexSchema,
@@ -221,48 +220,11 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
   }
 }
 
-/** 读取并通过 Zod 校验 context.json，同时处理旧 conversation input 迁移。 */
+/** 读取并通过 Runtime Schema 校验当前 WorkspaceContext。 */
 export async function loadWorkspaceContext(name: string): Promise<WorkspaceContext> {
   await ensureWorkspace(name);
-  const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<WorkspaceContext>;
-  let context = WorkspaceContextSchema.parse({
-    schemaVersion: 3,
-    name,
-    userPrompt: raw.userPrompt ?? '',
-    // 新 context 缺失 workflow 时兼容旧数据；显式 null 必须保留为自主调查。
-    workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
-    // 旧版本可能只保存了 userPrompt；这里把它恢复成研究目标，避免 Agent 看到“目标未设置”。
-    goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
-    scope: raw.scope ?? [],
-    systems: raw.systems ?? [],
-    ...(raw.mission ? { mission: raw.mission } : {}),
-    questions: raw.questions ?? [],
-    discoveryRuns: raw.discoveryRuns ?? [],
-    evidence: raw.evidence ?? [],
-    claims: raw.claims ?? [],
-    findings: raw.findings ?? [],
-    unknowns: raw.unknowns ?? [],
-    importantInformation: raw.importantInformation ?? [],
-    inputs: raw.inputs ?? [],
-    ...(raw.journeyPlan ? { journeyPlan: raw.journeyPlan } : {}),
-    ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
-    ...(typeof raw.copilotConfigurationVersion === 'number'
-      ? { copilotConfigurationVersion: raw.copilotConfigurationVersion }
-      : {}),
-    updatedAt: raw.updatedAt ?? new Date().toISOString(),
-  });
-
-  const remainingInputs = migrateLegacyConversationInputs(name, context.inputs);
-  if (remainingInputs.length !== context.inputs.length) {
-    context = WorkspaceContextSchema.parse({
-      ...context,
-      inputs: remainingInputs,
-      updatedAt: new Date().toISOString(),
-    });
-    await writeJsonAtomic(contextFile(name), context);
-  }
-
-  return context;
+  const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as unknown;
+  return WorkspaceContextSchema.parse(raw);
 }
 
 // All context mutations must serialize against other mutations in the same session.
