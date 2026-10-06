@@ -942,8 +942,9 @@ export function useInvestigationController() {
       // 直接保存 Mission，并在 Session 页面加载后自动启动第一轮，不再要求用户输入“开始”。
       if (purpose && expectedResult) {
         try {
-          await getJson<{ context: SessionContext }>(
+          await getJson(
             '/api/sessions/' + encodeURIComponent(created.context.name) + '/mission',
+            MissionUpdateResponseSchema,
             {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
