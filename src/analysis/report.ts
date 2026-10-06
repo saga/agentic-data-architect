@@ -1,7 +1,7 @@
 /**
- * Current-State Report 生成器。
+ * Investigation 最终报告生成器。
  *
- * 这里负责把内部 Discovery / Evidence 结果整理成人可以直接阅读的报告。
+ * 这里把已经保存的调查结果整理成人可以直接阅读的报告。
  * 它不改变事实，只改变事实的选择、组织和表达方式。
  */
 import fs from 'node:fs/promises';
@@ -9,8 +9,9 @@ import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import type { Investigation } from '../investigation/store.js';
 import { assertInvestigationScopeGate, isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
-import { assertCurrentStateReportGate } from '../workflow/report-gate.js';
+import { assertInvestigationReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
+import { loadArchitectureAssessmentPlan } from '../workflow/assessment.js';
 import {
   datasetLineageRelations,
   edgesFrom,
@@ -132,6 +133,28 @@ function summarizeDatasetFlows(estate: DataEstate, limit = 8): string[] {
     );
 }
 
+async function listAnalysisArtifacts(name: string): Promise<string[]> {
+  const root = path.join(path.dirname(reportsDir(name)), 'artifacts');
+  async function walk(dir: string, relative = ''): Promise<string[]> {
+    let entries: Array<import('node:fs').Dirent>;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+    const result: string[] = [];
+    for (const entry of entries) {
+      const child = path.join(dir, entry.name);
+      const childRelative = path.join(relative, entry.name);
+      if (entry.isDirectory()) result.push(...await walk(child, childRelative));
+      else if (entry.isFile()) result.push(childRelative);
+    }
+    return result;
+  }
+  return walk(root);
+}
+
 function buildOpenQuestions(
   unknowns: string[],
   findings: Array<{ type: string; affectedAssets: string[]; questions?: string[] | undefined }>,
@@ -184,16 +207,13 @@ export async function buildReport(
     modernization?: Awaited<ReturnType<typeof loadModernizationPlan>> | null;
   },
 ): Promise<{ markdown: string; path: string }> {
-  if (!source) {
-    await assertInvestigationScopeGate(name);
-    await assertCurrentStateReportGate(name);
-  }
 
   const inv = source?.investigation ?? await loadInvestigation(name);
   const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = source
     ? source.modernization ?? null
     : await loadModernizationPlan(name);
+  const analysisArtifacts = await listAnalysisArtifacts(name);
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
   const coverage = current?.coverage;
@@ -226,115 +246,156 @@ export async function buildReport(
   const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
 
   const lines: string[] = [
-    '# Current-State Assessment: ' + inv.name,
+    '# 调查报告：' + inv.name,
     '',
-    '**用户目标**：' + (inv.userPrompt || inv.goal || '未记录'),
+    '## 先说结论',
     '',
-    modernizationGoal
-      ? '这份报告先回答“旧系统现在怎么工作、哪里会影响后续 replatform”。它不是最终目标架构；目标架构尚未形成时，这里不会把草案写成已经确定的方案。'
-      : '这份报告先把当前系统、主要问题和证据整理清楚；它不会把尚未形成的后续方案写成已经确定的结论。',
+    inv.mission?.expectedResult
+      ? '这次调查要解决的是：' + inv.mission.purpose
+      : '**用户目标**：' + (inv.userPrompt || inv.goal || '未记录'),
     '',
-    '## 1. 结论先说',
+    inv.mission?.expectedResult
+      ? '最后希望拿到：' + inv.mission.expectedResult
+      : '',
     '',
     coverage
-      ? '目前已经查到 ' + String(coverage.datasets) + ' 个数据集，' + String(sqlFiles.length) + ' 个 SQL 文件；其中 SQL 解析失败 ' + String(sqlParseFailures) + ' 个，数据集血缘连接为 ' + connectedDatasets + '。'
-      : '当前还没有形成完整的 Current-State coverage，不能可靠判断系统全貌。',
+      ? '目前已经查到 ' + String(coverage.datasets) + ' 个数据集，' + String(sqlFiles.length)
+        + ' 个 SQL 文件；SQL 解析失败 ' + String(sqlParseFailures) + ' 个。'
+      : '目前没有形成数据发现快照，这份报告主要根据已经保存的调查结果整理。',
+    '',
+    inv.claims.length
+      ? '已经形成 ' + String(inv.claims.length) + ' 条关键结论。'
+      : '目前还没有单独保存的关键结论。',
     inv.findings.length
-      ? '现在最值得注意的是 ' + String(inv.findings.length) + ' 个问题：' + preview(inv.findings.slice(0, 4).map((finding) => finding.title), 4) + '。'
-      : '当前没有发现已经形成 Finding 的明显问题。',
+      ? '已经记录 ' + String(inv.findings.length) + ' 个需要注意的问题。'
+      : '目前没有记录需要单独处理的问题。',
     '',
-    (modernizationGoal ? '对 replatform 的直接影响：' : '对下一步工作的直接影响：') + (implications[0] ?? '还没有形成可以支撑决策的结论。'),
+    '## 这次查到了什么',
     '',
-    '## 2. 当前系统和数据',
-    '',
-    inv.systems.length
-      ? '涉及的系统包括 ' + preview(inv.systems, 6) + '。'
-      : '当前范围中没有记录具体系统。',
-    inv.scope.length
-      ? '这次重点看的是 ' + preview(inv.scope, 6) + '。'
-      : '当前范围没有记录具体业务对象。',
-    datasets.length
-      ? '已发现的数据集主要包括：' + preview(datasets, 12) + '。'
-      : '还没有发现可以展示的数据集。',
-    '',
-    '## 3. 关键数据流',
-    '',
-    ...(datasetFlows.length
-      ? datasetFlows.map((item) => '- ' + item)
-      : ['当前没有形成可直接阅读的数据集上下游关系。']),
-    '',
-    ...(sqlTransforms.length
-      ? ['### 关键 SQL 转换', '', ...sqlTransforms.map((item) => '- ' + item), '']
+    ...(inv.systems.length
+      ? ['涉及的系统：' + preview(inv.systems, 8), '']
       : []),
-    '## 4. 主要问题',
-    '',
-    ...(inv.findings.length
-      ? inv.findings.slice(0, 8).flatMap((finding) => [
-          '### ' + finding.title + '（' + finding.severity + '）',
-          '',
-          finding.description,
-          '',
-          '影响：' + impactForFinding(finding.type),
-          '',
-          finding.affectedAssets.length
-            ? '涉及对象：' + preview(finding.affectedAssets, 5)
-            : '',
-          evidenceText(finding.evidenceIds),
-          '',
-        ])
-      : ['当前没有记录需要单独处理的问题。', '']),
-    '## 5. 已形成的关键结论',
+    ...(inv.scope.length
+      ? ['这次重点看的范围：' + preview(inv.scope, 8), '']
+      : []),
+    ...(datasets.length
+      ? ['已经找到的数据集：' + preview(datasets, 12), '']
+      : []),
+    ...(datasetFlows.length
+      ? ['### 关键数据流', '', ...datasetFlows.map((item) => '- ' + item), '']
+      : ['### 关键数据流', '', '目前还没有形成可以直接解释的上下游关系。', '']),
+    ...(sqlTransforms.length
+      ? ['### 关键转换', '', ...sqlTransforms.map((item) => '- ' + item), '']
+      : []),
+    '## 已经确认的结论',
     '',
     ...(inv.claims.length
-      ? inv.claims.slice(0, 8).flatMap((claim) => [
+      ? inv.claims.slice(0, 12).flatMap((claim) => [
           '### ' + claimStatusText(claim.status),
           '',
           claim.claim.split('\n')[0].trim(),
-          evidenceText(claim.evidenceIds),
+          claim.evidenceIds.length ? '资料编号：' + claim.evidenceIds.slice(0, 3).join('、') : '',
           '',
         ])
-      : ['当前还没有形成单独保存的关键结论。', '']),
-    '## 6. 后续影响',
+      : ['目前还没有形成单独保存的关键结论。', '']),
+    '## 需要注意的问题',
     '',
-    ...(currentStateOnly
-      ? ['本次范围明确只做当前状态分析，因此这里不展开目标架构、迁移步骤或新旧映射。', '如后续需要这些内容，再基于已经确认的现状结果启动对应工作。']
-      : implications.map((item) => '- ' + item)),
-    '',
-    currentStateOnly
-      ? '下一步：继续补齐当前状态中仍然缺失、且对现状判断有影响的事实。'
-      : '下一步：进入目标架构设计，重点处理目前尚未闭合的 ' + (openQuestions.length ? '问题和 ' + String(openQuestions.length) + ' 个待确认事项' : '范围') + '。',
-    '',
-    '## 7. 待确认问题',
+    ...(inv.findings.length
+      ? inv.findings.slice(0, 10).flatMap((finding) => [
+          '### ' + finding.title,
+          '',
+          finding.description,
+          '',
+          '为什么要注意：' + impactForFinding(finding.type),
+          finding.affectedAssets.length ? '涉及对象：' + preview(finding.affectedAssets, 5) : '',
+          finding.evidenceIds.length ? '资料编号：' + finding.evidenceIds.slice(0, 3).join('、') : '',
+          '',
+        ])
+      : ['目前没有记录需要单独处理的问题。', '']),
+    '## 还不能确认',
     '',
     ...(openQuestions.length
       ? openQuestions.map((question) => '- ' + question)
-      : ['当前没有记录需要业务方直接回答的问题；这不代表所有信息都已经确认。']),
-    '',
-    '## 8. 证据与覆盖情况',
-    '',
-    'SQL：' + sqlCoverage,
-    '数据集血缘：' + connectedDatasets + ' 已建立结构连接；这不等于已经确认业务上的权威来源。',
-    '列级血缘：' + String(columnEdges) + ' 条',
-    '数据质量画像：' + String(snapshot?.profiles.length ?? 0) + ' 个数据集',
-    'Evidence：' + String(inv.evidence.length) + ' 条',
-    'Findings：' + String(inv.findings.length) + ' 个；Claims：' + String(inv.claims.length) + ' 个；Unknowns：' + String(inv.unknowns.length) + ' 个',
+      : ['目前没有记录需要用户直接回答的事项；这不代表所有信息都已经确认。']),
     '',
   ];
+  if (current && !currentStateOnly) {
+    lines.push(
+      '## 数据检查情况',
+      '',
+      'SQL 文件：' + sqlCoverage + '。',
+      '数据集上下游连接：' + connectedDatasets + '。',
+      '列级数据关系：' + String(columnEdges) + ' 条。',
+      '已经做过数据画像的数据集：' + String(snapshot?.profiles.length ?? 0) + ' 个。',
+      '',
+    );
+  }
 
   if (modernization && !currentStateOnly) {
     lines.push(
-      '## 9. Modernization 状态',
+      '## 改造工作进展',
       '',
       modernization.targetArchitecture.components.length
-        ? '目标架构已经有 ' + String(modernization.targetArchitecture.components.length) + ' 个组件草案。'
+        ? '目标架构目前有 ' + String(modernization.targetArchitecture.components.length) + ' 个组件草案。'
         : '目标架构还没有形成实际组件。',
       modernization.mappings.length
         ? '已经记录 ' + String(modernization.mappings.length) + ' 条新旧对应关系。'
         : '还没有记录新旧数据对应关系。',
-      '验证检查：' + String(modernization.validationPlan.checks.length) + ' 项。',
+      '验证检查目前有 ' + String(modernization.validationPlan.checks.length) + ' 项。',
       '',
     );
   }
+
+  if (inv.workflow === 'data-architecture-assessment') {
+    try {
+      const assessment = await loadArchitectureAssessmentPlan(name);
+      if (assessment) {
+        lines.push(
+          '## 架构评估',
+          '',
+          '这部分不是在重新描述现状，而是在回答“现在怎么样、哪里最值得先改”。',
+          '',
+          assessment.findings.length
+            ? ...assessment.findings.slice(0, 8).flatMap((finding) => [
+                '### ' + finding.title,
+                '',
+                finding.description,
+                '',
+                '建议：' + finding.recommendation,
+                '',
+              ])
+            : '目前没有保存的评估问题。',
+          '',
+          assessment.roadmap.length
+            ? '建议先做：' + assessment.roadmap.map((item) => item.title).slice(0, 5).join('、') + '。',
+            : '目前还没有形成实施顺序。',
+          '',
+        );
+      }
+    } catch {
+      lines.push('评估结果暂时无法读取；这不影响已经保存的调查内容。', '');
+    }
+  }
+
+  lines.push(
+    '## 调查过程中留下的资料',
+    '',
+    analysisArtifacts.length
+      ? ...analysisArtifacts.slice(0, 30).map((item) => '- ' + item)
+      : '- 目前没有额外的分析文件。',
+    '',
+    '## 下一步',
+    '',
+    currentStateOnly
+      ? '如果还要继续调查，就优先补齐那些会影响当前架构理解的未确认事项。'
+      : '如果还要继续工作，就优先处理上面已经明确会影响结果的问题；不要为了把所有未知项清零而无限调查。',
+    '',
+    '## 资料依据',
+    '',
+    '这份报告使用了本次 Investigation 已保存的调查资料、数据发现和分析文件。具体资料编号可在对应记录中回看。',
+    '本报告只表达已经保存的结果；不能确认的内容会保留为未确认，不会为了完整而补猜。',
+    '',
+  );
 
   const markdown = lines.join('\n');
   const dir = reportsDir(name);
