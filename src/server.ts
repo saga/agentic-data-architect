@@ -676,7 +676,7 @@ app.post('/api/sessions', async (req, res) => {
       body.definition,
       body.layout,
     );
-    res.json(result);
+    res.json({ ...result, snapshot: WorkflowSnapshotSchema.parse(result.snapshot) });
   });
 
   /** 工作地图专用 AI：只生成/修改 Workflow，不参与数据分析。 */
