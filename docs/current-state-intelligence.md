@@ -123,6 +123,6 @@ Business Meaning
 - `domain-modeling`：当业务术语影响模型、Mapping 或架构决定时统一 canonical language，并关联 Evidence。
 - `research`：调查外部事实和第三方能力，优先使用第一方资料并留下可复核的 Research Artifact。
 - `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
-- `current-state-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状。
+- `current-data-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状，并作为可直接选择的工作方式。
 
 这些 Skill 不增加 Workflow DSL 的复杂度，也不替代权限、Policy 或业务审批。
