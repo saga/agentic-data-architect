@@ -10,6 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
+import { SseEventSchema } from './api/contracts.js';
 import {
   AbortBodySchema,
   CreateSessionBodySchema,
@@ -39,7 +40,7 @@ import {
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
 import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
-import { runReport } from './workflow/report.js';
+import { loadReportArtifact, runReport } from './workflow/report.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
@@ -1125,17 +1126,63 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }
   });
 
+  /** Canonical Result read: GET 不生成、不调用 LLM/Reviewer。 */
+  app.get('/api/sessions/:name/results', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const result = await loadReportArtifact(name);
+    if (result.status === 'available') {
+      res.json({ status: 'available', report: result.markdown, review: result.review });
+      return;
+    }
+    if (result.status === 'missing') {
+      res.status(404).json({ code: 'RESULT_NOT_GENERATED', error: '结果报告尚未生成，请显式执行重新生成。' });
+      return;
+    }
+    if (result.status === 'stale') {
+      res.status(409).json({ code: 'RESULT_STALE', error: result.reason });
+      return;
+    }
+    res.status(409).json({ code: 'RESULT_BLOCKED', error: result.reason });
+  });
+
+  /** 显式生成 Result；生成完成后才允许 GET /results 读取。 */
+  app.post('/api/sessions/:name/results/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    try {
+      const report = await runReport(name);
+      res.json({ status: 'available', report: report.markdown, review: report.review });
+    } catch (error) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
+        res.status(409).json({ code: 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  /** 旧 /report 接口保留兼容，但只读；新代码统一使用 /results。 */
   app.get('/api/sessions/:name/report', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const result = await loadReportArtifact(name);
+    if (result.status === 'available') {
+      res.type('text/markdown').send(result.markdown);
+      return;
+    }
+    if (result.status === 'missing') {
+      res.status(404).json({ code: 'RESULT_NOT_GENERATED', error: '结果报告尚未生成，请显式执行重新生成。' });
+      return;
+    }
+    res.status(409).json({ code: result.status === 'stale' ? 'RESULT_STALE' : 'RESULT_BLOCKED', error: result.reason });
+  });
+
+  app.post('/api/sessions/:name/report/regenerate', async (req, res) => {
     const name = sessionKey(req.params.name);
     try {
       const report = await runReport(name);
       res.type('text/markdown').send(report.markdown);
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError) {
-        res.status(409).json({
-          error: error.message,
-          checks: error.result.checks,
-        });
+        res.status(409).json({ code: 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
         return;
       }
       throw error;
@@ -1240,8 +1287,9 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     let finished = false;
     const send = (event: string, data: unknown) => {
       if (finished || res.writableEnded) return;
-      res.write(`event: ${event}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      const payload = SseEventSchema.parse({ event, data });
+      res.write(`event: ${payload.event}\n`);
+      res.write(`data: ${JSON.stringify(payload.data)}\n\n`);
     };
 
     send('started', { turnId });
