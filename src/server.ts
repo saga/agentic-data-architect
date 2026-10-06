@@ -78,10 +78,10 @@ import {
 } from './workflow/journey-editor.js';
 import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { readReport, runReport, ReportQualityGateError } from './workflow/report.js';
-import { buildModernizationPlan, loadModernizationPlan, toModernizationPlanView } from './workflow/modernization.js';
+import { buildModernizationPlan, readModernizationArtifact, toModernizationPlanView } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
-  loadArchitectureAssessmentPlan,
+  readArchitectureAssessmentArtifact,
   toArchitectureAssessmentView,
 } from './workflow/assessment.js';
 import { config } from './config.js';
@@ -1197,12 +1197,17 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (context.workflow !== 'data-architecture-assessment') {
-      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: null, path: null }));
+      res.json(ArchitectureAssessmentResponseSchema.parse({
+        status: 'blocked',
+        plan: null,
+        path: null,
+      }));
       return;
     }
-    const existing = await loadArchitectureAssessmentPlan(name);
+    const result = await readArchitectureAssessmentArtifact(name);
     res.json(ArchitectureAssessmentResponseSchema.parse({
-      plan: existing ? toArchitectureAssessmentView(existing) : null,
+      status: result.status,
+      plan: result.plan ? toArchitectureAssessmentView(result.plan) : null,
       path: null,
     }));
   });
@@ -1238,9 +1243,10 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   app.get('/api/sessions/:name/modernization', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const existing = await loadModernizationPlan(name);
+    const result = await readModernizationArtifact(name);
     res.json(ModernizationResponseSchema.parse({
-      plan: existing ? toModernizationPlanView(existing) : null,
+      status: result.status,
+      plan: result.plan ? toModernizationPlanView(result.plan) : null,
       path: null,
     }));
   });
