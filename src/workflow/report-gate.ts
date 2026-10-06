@@ -1,31 +1,20 @@
-/**
- * Current-State Report 的确定性 Gate。
- *
- * 目标不是要求调查“看起来很完整”，而是阻止 Agent 在没有真实调查结果、
- * 没有 Evidence 或 Claim/Finding 引用失效时，把结果包装成正式 Current-State Report。
- */
-import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
-import type { DiscoverySnapshot } from './discover.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { loadInvestigation, loadLatestSnapshot, artifactsDir } from '../investigation/store.js';
+import { evaluateMissionGate } from './mission-gate.js';
+import { evaluateInvestigationScopeGate } from './scope-gate.js';
 import { calibrateStatus, type EvidenceRef } from '../evidence/types.js';
+import { isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
+import type { DiscoverySnapshot } from './discover.js';
 
-export interface ReportGateCheck {
-  name: string;
-  passed: boolean;
-  detail: string;
-}
-
-export interface ReportGateResult {
-  passed: boolean;
-  checks: ReportGateCheck[];
-}
+export interface ReportGateCheck { name: string; passed: boolean; detail: string; }
+export interface ReportGateResult { passed: boolean; checks: ReportGateCheck[]; }
 
 export class ReportGateError extends Error {
   readonly result: ReportGateResult;
-
   constructor(result: ReportGateResult) {
-    const failed = result.checks.filter((item) => !item.passed)
-      .map((item) => item.name + '：' + item.detail).join('；');
-    super('Current-State Report 还不能生成。' + (failed ? ' ' + failed : ''));
+    const failed = result.checks.filter((item) => !item.passed).map((item) => item.detail);
+    super('现在还不能生成最终报告。' + (failed.length ? ' ' + failed.join(' ') : ''));
     this.name = 'ReportGateError';
     this.result = result;
   }
@@ -35,97 +24,80 @@ function allKnown(ids: string[], known: Set<string>): boolean {
   return ids.every((id) => known.has(id));
 }
 
-/** 纯函数版本，方便脚本和报告生成器共用。 */
-export function evaluateCurrentStateReportGate(
-  investigation: {
-    discoveryRuns: Array<unknown>;
-    evidence: EvidenceRef[];
-    claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
-    findings: Array<{ evidenceIds: string[] }>;
-  },
+export interface InvestigationReportGateInput {
+  mission: unknown;
+  goal: string;
+  scope: string[];
+  systems: string[];
+  scopeValidation?: { status: string; goal: string; scope: string[]; systems: string[]; source: 'user' | 'materials' | 'mixed'; userConfirmed: boolean; evidenceIds: string[]; validatedAt: string; };
+  evidence: EvidenceRef[];
+  claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
+  findings: Array<{ evidenceIds: string[] }>;
+  resultArtifactCount?: number;
+}
+
+export function evaluateInvestigationReportGate(
+  investigation: InvestigationReportGateInput,
   snapshot: DiscoverySnapshot | null,
 ): ReportGateResult {
   const checks: ReportGateCheck[] = [];
   const add = (name: string, passed: boolean, detail: string) => checks.push({ name, passed, detail });
   const evidenceIds = new Set(investigation.evidence.map((item) => item.id));
 
-  add(
-    '至少完成过一次 Discovery',
-    investigation.discoveryRuns.length > 0,
-    'discoveryRuns=' + String(investigation.discoveryRuns.length),
-  );
+  const missionGate = evaluateMissionGate(investigation.mission as Parameters<typeof evaluateMissionGate>[0]);
+  add('任务已经确认', missionGate.passed, missionGate.passed ? '这次报告对应的任务已经确认。' : '还没有确认这次调查为什么做、最后要拿到什么。');
 
-  add(
-    '最新 Discovery 快照真实存在',
-    Boolean(snapshot),
-    snapshot ? '已找到最新 Discovery snapshot。' : '找不到 Discovery snapshot。',
+  const scopeGate = evaluateInvestigationScopeGate(
+    investigation as Parameters<typeof evaluateInvestigationScopeGate>[0],
+    evidenceIds,
   );
+  add('调查范围已经确认', scopeGate.passed, scopeGate.passed ? '报告范围已经确认。' : '报告范围还没有完成确认，不能把局部结果当成正式结果。');
 
-  const current = snapshot?.currentState;
-  add(
-    'Current-State Intelligence 已生成',
-    Boolean(current),
-    current ? 'coverage 已生成。' : '没有 Current-State Intelligence。',
-  );
-
-  add(
-    'Discovery 确实扫描到了材料',
-    Boolean(current && (current.coverage.filesScanned > 0 || current.coverage.datasets > 0)),
-    current
-      ? 'files=' + String(current.coverage.filesScanned) + ', datasets=' + String(current.coverage.datasets)
-      : '没有 coverage。',
-  );
+  const hasResult = investigation.evidence.length > 0
+    || investigation.claims.length > 0
+    || investigation.findings.length > 0
+    || (investigation.resultArtifactCount ?? 0) > 0;
+  add('已经形成真实调查成果', hasResult, hasResult ? '已经保存了可以写入报告的调查成果。' : '目前只有任务说明，还没有形成可交付的调查成果。');
 
   const invalidClaims = investigation.claims.filter((claim) => {
     if (claim.status === 'unknown') return false;
     if (!allKnown(claim.evidenceIds, evidenceIds)) return true;
     const kept = investigation.evidence.filter((item) => claim.evidenceIds.includes(item.id));
-    const calibrated = calibrateStatus(kept, claim.status);
-    return calibrated !== claim.status;
+    return calibrateStatus(kept, claim.status) !== claim.status;
   });
-  add(
-    '已确认 Claim 没有超出 Evidence 能证明的范围',
-    invalidClaims.length === 0,
-    invalidClaims.length
-      ? '发现 ' + String(invalidClaims.length) + ' 条 Claim 的状态或 Evidence 不成立。'
-      : 'Claim 状态与 Evidence 一致。',
-  );
+  add('结论有足够的资料依据', invalidClaims.length === 0, invalidClaims.length ? '有一些结论的资料依据不足或已经失效。' : '已保存的结论都能回到现有资料。');
 
   const invalidFindings = investigation.findings.filter((finding) => !allKnown(finding.evidenceIds, evidenceIds));
-  add(
-    'Finding 的 Evidence 引用全部有效',
-    invalidFindings.length === 0,
-    invalidFindings.length
-      ? '发现 ' + String(invalidFindings.length) + ' 条 Finding 引用了不存在的 Evidence。'
-      : '所有 Finding 引用均有效。',
-  );
+  add('问题引用的资料有效', invalidFindings.length === 0, invalidFindings.length ? '有一些问题引用了不存在的资料。' : '问题所引用的资料都存在。');
+
+  const snapshotValid = isDiscoverySnapshotCompatible(investigation, snapshot);
+  add('发现结果仍属于当前范围', snapshotValid, snapshotValid ? '发现结果与当前调查范围一致。' : '发现结果属于旧的调查范围，需要重新执行发现。');
 
   return { passed: checks.every((item) => item.passed), checks };
 }
 
-/** 从当前 Investigation 读取真实状态并执行 Current-State Report Gate。 */
-export async function runCurrentStateReportGate(
-  name: string,
-  source?: {
-    investigation: Parameters<typeof evaluateCurrentStateReportGate>[0];
-    snapshot: DiscoverySnapshot | null;
-  },
-): Promise<ReportGateResult> {
-  if (source) return evaluateCurrentStateReportGate(source.investigation, source.snapshot);
-  const investigation = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-  return evaluateCurrentStateReportGate(investigation, snapshot);
+async function countAnalysisArtifacts(name: string): Promise<number> {
+  const root = path.join(artifactsDir(name), 'analysis');
+  try {
+    const entries = await fs.readdir(root, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    throw error;
+  }
 }
 
-/** Gate 不通过时抛出明确错误，避免生成一份“看起来完成、实际上没有调查”的报告。 */
-export async function assertCurrentStateReportGate(
-  name: string,
-  source?: {
-    investigation: Parameters<typeof evaluateCurrentStateReportGate>[0];
-    snapshot: DiscoverySnapshot | null;
-  },
-): Promise<ReportGateResult> {
-  const result = await runCurrentStateReportGate(name, source);
+export async function runInvestigationReportGate(name: string): Promise<ReportGateResult> {
+  const investigation = await loadInvestigation(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  return evaluateInvestigationReportGate(
+    { ...investigation, resultArtifactCount: await countAnalysisArtifacts(name) },
+    snapshot,
+  );
+}
+
+export async function assertInvestigationReportGate(name: string): Promise<ReportGateResult> {
+  const result = await runInvestigationReportGate(name);
   if (!result.passed) throw new ReportGateError(result);
   return result;
 }
