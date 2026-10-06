@@ -71,7 +71,14 @@ export async function appendTrajectoryEvent(name: string, event: Omit<Trajectory
 /** 读取最近的执行轨迹；UI 可按 turnId 再筛选。 */
 export async function readTrajectory(name: string, options: { turnId?: string; limit?: number } = {}): Promise<TrajectoryEvent[]> {
   let text = '';
-  try { text = await fs.readFile(trajectoryFile(name), 'utf8'); } catch { return []; }
+  try {
+    text = await fs.readFile(trajectoryFile(name), 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 500), 5000));
   const events = text.split('\n').filter(Boolean).map((line, index) => {
     try {
