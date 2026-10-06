@@ -419,11 +419,11 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const activeTurn = getActiveInvestigationTurn(name);
     if (activeTurn) {
-      res.status(409).json({
+      res.status(409).json(ApiErrorSchema.parse({
         code: 'MISSION_CHANGE_BLOCKED',
         error: '本次调查正在执行，任务目标不能在执行中途修改。请先停止当前执行，再修改任务目的或期望结果。',
-        execution: activeTurn,
-      });
+        details: { execution: activeTurn },
+      }));
       return;
     }
 
@@ -434,12 +434,14 @@ app.post('/api/sessions', async (req, res) => {
       { model: (await loadInvestigationControl(name)).agent.model, workingDirectory: workspaceRoot(name) },
     );
     if (clarity && !clarity.clear) {
-      res.status(409).json({
+      res.status(409).json(ApiErrorSchema.parse({
         code: 'MISSION_CLARITY_REQUIRED',
         error: clarity.reason,
-        clarity,
-        draft: buildMissionDraft(body.purpose, body.expectedResult),
-      });
+        details: {
+          clarity,
+          draft: buildMissionDraft(body.purpose, body.expectedResult),
+        },
+      }));
       return;
     }
 
@@ -636,7 +638,10 @@ app.post('/api/sessions', async (req, res) => {
       body.scope,
     );
     if (!handled) {
-      res.status(404).json({ error: '这个权限请求已经处理、已结束，或不属于当前执行。' });
+      res.status(404).json(ApiErrorSchema.parse({
+        code: 'PERMISSION_NOT_FOUND',
+        error: '这个权限请求已经处理、已结束，或不属于当前执行。',
+      }));
       return;
     }
     await appendAuditEvent(name, {
@@ -673,7 +678,10 @@ app.post('/api/sessions', async (req, res) => {
     );
     const handled = respondToCopilotUserInput(name, body.turnId, body.requestId, body.answer, body.wasFreeform);
     if (!handled) {
-      res.status(404).json({ error: '这个用户输入请求已经处理、已结束，或答案不符合请求要求。' });
+      res.status(404).json(ApiErrorSchema.parse({
+        code: 'USER_INPUT_NOT_FOUND',
+        error: '这个用户输入请求已经处理、已结束，或答案不符合请求要求。',
+      }));
       return;
     }
     await appendAuditEvent(name, {
@@ -721,7 +729,10 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
+      res.status(409).json(ApiErrorSchema.parse({
+      code: 'WORKFLOW_REQUIRED',
+      error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。',
+    }));
       return;
     }
     res.json(WorkflowSnapshotSchema.parse(await getJourneySnapshot(name, context.workflow)));
@@ -739,10 +750,11 @@ app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(JourneyEditBodySchema, req.body);
     const validation = validateJourneyEdit(body.definition, body.layout);
     if (validation.issues.length) {
-      res.status(400).json({
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'WORKFLOW_VALIDATION_FAILED',
         error: '工作地图还不能保存，请先修正这些问题。',
-        issues: validation.issues,
-      });
+        details: { issues: validation.issues },
+      }));
       return;
     }
 
@@ -770,7 +782,10 @@ app.post('/api/sessions', async (req, res) => {
       : JourneyDefinitionSchema.parse(body.definition);
 
     if (currentDefinition && currentDefinition.id !== context.workflow) {
-      res.status(400).json({ error: '当前工作地图与所选 Workflow 不一致，请刷新后重试。' });
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'WORKFLOW_MISMATCH',
+        error: '当前工作地图与所选 Workflow 不一致，请刷新后重试。',
+      }));
       return;
     }
 
@@ -802,7 +817,10 @@ app.post('/api/sessions', async (req, res) => {
       body.outcome,
     );
     if (!result.applied) {
-      res.status(409).json({ error: result.error || 'Workflow 没有推进。' });
+      res.status(409).json(ApiErrorSchema.parse({
+        code: 'WORKFLOW_TRANSITION_REJECTED',
+        error: result.error || 'Workflow 没有推进。',
+      }));
       return;
     }
     res.json(WorkflowTransitionResponseSchema.parse(result));
@@ -826,7 +844,10 @@ app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(UpdateAgentModelBodySchema, req.body);
     const current = await loadInvestigationControl(name);
     if (body.model !== 'auto' && body.autoTier) {
-      res.status(400).json({ error: '只有选择 Auto 时才能设置自动选择方式。' });
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'AUTO_TIER_INVALID',
+        error: '只有选择 Auto 时才能设置自动选择方式。',
+      }));
       return;
     }
     const control = await updateInvestigationControl(
@@ -858,7 +879,10 @@ app.post('/api/sessions', async (req, res) => {
 app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) => {
     const name = sessionKey(String(req.params.name));
     if (!req.file) {
-      res.status(400).json({ error: '没有收到文件，请重新选择要上传的文件。' });
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'FILE_REQUIRED',
+        error: '没有收到文件，请重新选择要上传的文件。',
+      }));
       return;
     }
 
@@ -923,7 +947,10 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
   app.post('/api/sessions/:name/assistant/avatar', upload.single('file'), async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
     if (!req.file) {
-      res.status(400).json({ error: '没有收到头像文件，请重新选择。' });
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'AVATAR_REQUIRED',
+        error: '没有收到头像文件，请重新选择。',
+      }));
       return;
     }
     const allowedAvatarTypes = new Set([
@@ -931,11 +958,17 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       'video/mp4', 'video/webm', 'video/quicktime',
     ]);
     if (!allowedAvatarTypes.has(req.file.mimetype)) {
-      res.status(400).json({ error: '头像只支持 PNG、JPEG、WebP、GIF、MP4、WebM 或 MOV。' });
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'AVATAR_TYPE_UNSUPPORTED',
+        error: '头像只支持 PNG、JPEG、WebP、GIF、MP4、WebM 或 MOV。',
+      }));
       return;
     }
     if (req.file.size > 10 * 1024 * 1024) {
-      res.status(413).json({ error: '头像文件过大，请重新裁剪后上传。' });
+      res.status(413).json(ApiErrorSchema.parse({
+        code: 'AVATAR_TOO_LARGE',
+        error: '头像文件过大，请重新裁剪后上传。',
+      }));
       return;
     }
 
@@ -1114,7 +1147,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
-      res.json({ journey: null, routePlan: context.journeyPlan ?? null });
+      res.json(WorkflowCompatibilityResponseSchema.parse({ journey: null, routePlan: context.journeyPlan ?? null }));
       return;
     }
 
@@ -1286,7 +1319,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json(index);
     } catch (error) {
       if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        res.json({ schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() });
+        res.json(SharedIndexSchema.parse({ schemaVersion: 1, artifacts: [], updatedAt: new Date().toISOString() }));
         return;
       }
       throw error;
@@ -1331,7 +1364,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       undefined,
       selectedRoute ? { selectedRoute } : body.guided ? { selectedGuidance: message } : undefined,
     );
-    res.json(result);
+    res.json(AnswerSummarySchema.parse(result));
   });
 
   // Agent SSE API：把执行中的 delta/status/heartbeat/completed/error 实时推送给浏览器。
@@ -1421,7 +1454,10 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     const { turnId } = parseRequest(AbortBodySchema, req.body);
     const turn = getConversationTurn(turnId);
     if (!turn || turn.sessionName !== name) {
-      res.status(404).json({ error: '找不到这次请求，请刷新页面后重试。' });
+      res.status(404).json(ApiErrorSchema.parse({
+        code: 'TURN_NOT_FOUND',
+        error: '找不到这次请求，请刷新页面后重试。',
+      }));
       return;
     }
     const requested = requestAbort(name, turnId);
