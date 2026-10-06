@@ -534,11 +534,12 @@ export async function updateGlobalConfiguration(
   try {
     const current = await loadGlobalConfiguration();
     const now = new Date().toISOString();
-    const nextConfig = buildGlobalConfiguration({
+    const mergedAgent = {
       ...current.agent,
       ...overrides,
       platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
-    }, current.version + 1, now);
+    } as InvestigationControl['agent'];
+    const nextConfig = buildGlobalConfiguration(mergedAgent, current.version + 1, now);
     await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
     await writeJsonAtomic(globalConfigFile(), nextConfig);
     return nextConfig;
