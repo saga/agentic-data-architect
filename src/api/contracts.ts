@@ -71,6 +71,23 @@ export const MissionProgressSchema = z.object({
 }).strict();
 export type MissionProgress = z.infer<typeof MissionProgressSchema>;
 
+export const JourneyRouteOptionSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(120),
+  reason: z.string().trim().min(1).max(400),
+  steps: z.array(z.string().trim().min(1).max(300)).min(1).max(6),
+}).strict();
+export type JourneyRouteOption = z.infer<typeof JourneyRouteOptionSchema>;
+
+export const JourneyPlanSchema = z.object({
+  version: z.literal(1),
+  source: z.literal('agent'),
+  generatedAt: z.string().datetime(),
+  turnId: z.string().min(1).optional(),
+  routes: z.array(JourneyRouteOptionSchema).max(3),
+}).strict();
+export type JourneyPlan = z.infer<typeof JourneyPlanSchema>;
+
 export const JourneyStageSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -611,18 +628,7 @@ export const SessionContextViewSchema = z.object({
   unknowns: z.array(z.string()),
   claims: z.array(z.unknown()),
   inputs: z.array(WorkspaceInputViewSchema),
-  journeyPlan: z.object({
-    version: z.literal(1),
-    source: z.literal('agent'),
-    generatedAt: z.string().min(1),
-    turnId: z.string().min(1).optional(),
-    routes: z.array(z.object({
-      id: z.string().min(1),
-      title: z.string().min(1),
-      reason: z.string().min(1),
-      steps: z.array(z.string().min(1)),
-    }).strict()).max(3),
-  }).strict().optional(),
+  journeyPlan: JourneyPlanSchema.optional(),
   updatedAt: z.string().min(1),
 }).strict();
 export type SessionContextView = z.infer<typeof SessionContextViewSchema>;
@@ -750,7 +756,7 @@ export const WorkflowCompatibilityJourneySchema = z.object({
 
 export const WorkflowCompatibilityResponseSchema = z.object({
   journey: WorkflowCompatibilityJourneySchema.nullable(),
-  routePlan: z.unknown().nullable().optional(),
+  routePlan: JourneyPlanSchema.nullable().optional(),
   workflow: z.object({
     source: z.enum(['base', 'custom']),
     baseWorkflowId: WorkflowIdSchema,
