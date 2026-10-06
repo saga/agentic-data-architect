@@ -149,6 +149,9 @@ export function InvestigationConfigPage(props:{
         {tab==='research'&&<div className='settings-page'>
           <Title level={4}>研究范围</Title><Paragraph type='secondary'>决定 Agent 优先查什么资料。这里是调查输入，不改变工作方式。</Paragraph>
           <Card title='GitHub 仓库' className='settings-card'>
+            <Paragraph type='secondary' style={{marginBottom:10}}>
+              首次启动调查至少需要配置一个 GitHub 仓库。保存后，如果任务目的和期望结果已经确认，调查会自动开始；留空可以继续保存配置，但不会启动。
+            </Paragraph>
             <Select
               mode='tags'
               value={draft.research.githubRepositories}
