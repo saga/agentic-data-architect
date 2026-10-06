@@ -37,8 +37,9 @@ export async function buildCurrentArtifactProvenance(
       return null;
     }
   };
-  const modernizationVersion = artifactKind === 'modernization' ? null : await readArtifactVersion('modernization-plan.json');
-  const assessmentVersion = artifactKind === 'assessment' ? null : await readArtifactVersion('architecture-assessment.json');
+  const includeWorkProducts = artifactKind === 'report';
+  const modernizationVersion = includeWorkProducts ? await readArtifactVersion('modernization-plan.json') : null;
+  const assessmentVersion = includeWorkProducts ? await readArtifactVersion('architecture-assessment.json') : null;
   const sourceRevision = fingerprint({
     discoveryRuns: investigation.discoveryRuns.map((run) => run.id),
     evidence: investigation.evidence.map((item) => ({
