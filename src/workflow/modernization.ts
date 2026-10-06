@@ -275,7 +275,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
 
   const planWithProvenance = ModernizationPlanSchema.parse({
     ...plan,
-    provenance: await buildCurrentArtifactProvenance(name, plan.version),
+    provenance: await buildCurrentArtifactProvenance(name, plan.version, 'modernization'),
   });
 
   const dir = reportsDir(name);
@@ -461,7 +461,7 @@ export async function persistModernizationAgentResult(
 
     const persistedPlan = ModernizationPlanSchema.parse({
       ...nextPlan,
-      provenance: await buildCurrentArtifactProvenance(name, nextPlan.version),
+      provenance: await buildCurrentArtifactProvenance(name, nextPlan.version, 'modernization'),
     });
 
     const dir = reportsDir(name);
@@ -482,7 +482,7 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
     const plan = ModernizationPlanSchema.parse(raw);
-    if (!(await isArtifactCurrent(name, plan.provenance))) return null;
+    if (!(await isArtifactCurrent(name, plan.provenance, 'modernization'))) return null;
     const inv = await loadInvestigation(name);
     const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
     const current = snapshot?.currentState ?? null;
