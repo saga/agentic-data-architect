@@ -165,7 +165,7 @@ export async function answerQuestion(
   };
   const emitReasoning = (delta: string): void => {
     updateLiveActivity('正在分析问题');
-    onReasoningDelta?.(delta);
+    options?.onReasoningDelta?.(delta);
     emitStatus('助手正在分析你的问题，请稍候…');
   };
 
