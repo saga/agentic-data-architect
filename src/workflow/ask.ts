@@ -682,7 +682,28 @@ export async function answerQuestion(
       ? [...new Set(unknownReviewsForTurn.filter((item) => item.affectsMission).map((item) => item.unknown))].slice(0, 12)
       : currentUnknowns;
 
-    const answer = parsed.answer || raw.slice(0, 2000);
+    const taskAnswer = parsed.answer || raw.slice(0, 2000);
+    let answer = taskAnswer;
+    if (control.agent.personality.trim()) {
+      try {
+        const rendered = await askCopilot({
+          prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer),
+          systemPrompt: '你是最终回答渲染器，不是任务 Agent。只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
+          model: control.agent.model,
+          workingDirectory: workspaceRoot(inv.name),
+          purpose: 'review',
+        });
+        if (rendered.trim()) answer = rendered.trim();
+      } catch (error) {
+        await appendAuditEvent(investigationName, {
+          actor: 'system',
+          action: 'assistant.persona.render_failed',
+          summary: '人格渲染失败，保留任务 Agent 原始答案。',
+          configurationVersion: control.version,
+          details: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
     await saveInvestigation(inv);
     const journeyPlan = { version: 1 as const, source: 'agent' as const, generatedAt: new Date().toISOString(), turnId, routes: parsed.routeOptions };
     await updateInvestigationJourneyPlan(investigationName, journeyPlan, inv.workflow);
