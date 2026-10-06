@@ -7,7 +7,7 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import { assertMissionGate } from './mission-gate.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertCurrentStateReportGate } from './report-gate.js';
-import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact } from '../investigation/artifact-provenance.js';
+import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
 import type { DiscoverySnapshot } from './discover.js';
 
@@ -69,6 +69,13 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
 
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  if (!isDiscoverySnapshotCompatible(investigation, snapshot)) {
+    return ReportArtifactStateSchema.parse({
+      status: 'stale',
+      generatedAt: metadata.generatedAt,
+      sourceRevision: metadata.provenance.sourceRevision,
+    });
+  }
   const currentProvenance = computeArtifactProvenance(investigation, snapshot, metadata.version);
   if (!artifactProvenanceMatches(metadata.provenance, currentProvenance)) {
     return ReportArtifactStateSchema.parse({
@@ -131,6 +138,12 @@ export async function runReport(
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
   const investigation = await loadInvestigation(name);
   assertMissionGate(investigation.mission);
+  await assertInvestigationScopeGate(name);
+  await assertCurrentStateReportGate(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  if (!isDiscoverySnapshotCompatible(investigation, snapshot)) {
+    throw new Error('最近的 Discovery Snapshot 不属于当前 Scope generation，请重新执行 Discovery。');
+  }
   const existingRaw = await readOptional(reportMetadataFile(name));
   let nextVersion = 1;
   if (existingRaw) {
@@ -142,8 +155,7 @@ export async function runReport(
     }
   }
 
-  const report = await buildReport(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const report = await buildReport(name, { investigation, snapshot });
   const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
   const artifactHash = hashArtifact(report.markdown);
   const review = await reviewArtifact({
