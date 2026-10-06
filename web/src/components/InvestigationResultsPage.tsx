@@ -12,7 +12,7 @@ import {
   type TrajectoryEvent,
   type ModernizationPlanView,
 } from '../../../src/api/contracts.js';
-import type { InvestigationCheckpoint } from '../app/types.js';
+import type { InvestigationCheckpoint, SessionData } from '../app/types.js';
 import { XMarkdown } from '@ant-design/x-markdown';
 
 type Checkpoint = InvestigationCheckpoint;
@@ -39,7 +39,7 @@ export function InvestigationResultsPage(props: {
 }) {
   const [report, setReport] = useState('');
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
-  const [session, setSession] = useState<SessionSnapshot>();
+  const [session, setSession] = useState<SessionData>();
   const [modernization, setModernization] = useState<ModernizationPlan>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -57,14 +57,13 @@ export function InvestigationResultsPage(props: {
         getJson(sessionPath, SessionDataSchema),
         getJson(sessionPath + '/modernization', ModernizationResponseSchema),
       ]);
-      if (!reportResponse.ok && reportResponse.status !== 404 && reportResponse.status !== 409) {
-        throw new Error((await reportResponse.text()) || reportResponse.statusText);
-      }
+      let reportUnavailableReason: string | undefined;
       if (!reportResponse.ok) {
         const payload = ApiErrorSchema.parse(await reportResponse.json());
         if (reportResponse.status !== 404 && reportResponse.status !== 409) {
           throw new Error(payload.error);
         }
+        reportUnavailableReason = payload.error;
       }
 
       const reportPayload = reportResponse.ok
@@ -82,7 +81,7 @@ export function InvestigationResultsPage(props: {
       } else {
         setReport('');
         setReportGateError(
-          '正式报告当前不可用；请根据最新调查状态重新生成。',
+          reportUnavailableReason || '正式报告当前不可用；请根据最新调查状态重新生成。',
         );
       }
       setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
