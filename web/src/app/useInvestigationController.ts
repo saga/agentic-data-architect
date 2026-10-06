@@ -961,7 +961,7 @@ export function useInvestigationController() {
       if (purpose && expectedResult) {
         pendingInitialAutoStartRef.current = {
           sessionName: created.context.name,
-          message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
+          message: '请按照已经确认的任务目的和期望结果直接开始调查。',
         };
         try {
           await getJson(
