@@ -119,6 +119,50 @@ export const JourneyDefinitionSchema = z.object({
   nodes: z.array(JourneyNodeSchema).min(1),
 }).strict();
 
+export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('replace-definition'),
+    definition: JourneyDefinitionSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('add-node'),
+    node: JourneyNodeSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('update-node'),
+    nodeId: z.string().min(1),
+    patch: z.object({
+      type: JourneyNodeTypeSchema.optional(),
+      title: z.string().min(1).optional(),
+      objective: z.string().optional(),
+      actor: JourneyActorSchema.optional(),
+      completeWhen: z.string().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    type: z.literal('remove-node'),
+    nodeId: z.string().min(1),
+  }).strict(),
+  z.object({
+    type: z.literal('add-route'),
+    nodeId: z.string().min(1),
+    route: JourneyRouteSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('update-route'),
+    nodeId: z.string().min(1),
+    outcome: z.string().min(1),
+    patch: z.object({ target: z.string().min(1).optional() }).strict(),
+  }).strict(),
+  z.object({
+    type: z.literal('remove-route'),
+    nodeId: z.string().min(1),
+    outcome: z.string().min(1),
+  }).strict(),
+]);
+export type JourneyWorkflowChange = z.infer<typeof JourneyWorkflowChangeSchema>;
+export const JourneyWorkflowChangesSchema = z.array(JourneyWorkflowChangeSchema).min(1).max(60);
+
 export const JourneyExecutionSchema = z.object({
   workflowId: z.string().min(1),
   workflowVersion: z.number().int().nonnegative(),
@@ -864,7 +908,13 @@ export const WorkflowTransitionResponseSchema = z.object({
 
 export const WorkflowResetResponseSchema = WorkflowSnapshotSchema;
 
-export const JourneyAiResponseSchema = z.unknown();
+export const JourneyAiResponseSchema = z.object({
+  definition: JourneyDefinitionSchema,
+  message: z.string().min(1),
+  changes: JourneyWorkflowChangesSchema,
+  summary: z.array(z.string()),
+}).strict();
+export type JourneyAiResponse = z.infer<typeof JourneyAiResponseSchema>;
 
 export const ReportErrorResponseSchema = z.object({
   code: z.string().min(1),
