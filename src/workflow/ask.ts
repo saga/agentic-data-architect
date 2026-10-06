@@ -6,7 +6,7 @@
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
-import { buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
+import { buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { persistModernizationAgentResult } from './modernization.js';
 import {
@@ -346,18 +346,12 @@ export async function answerQuestion(
       prompt,
       systemPrompt: [
         LEAD_SYSTEM_PROMPT,
+        buildAssistantSoulPrompt(control.agent.personality),
         inv.workflow
           ? '当前工作方式：' + inv.workflow + '。它是当前 Investigation 的可执行工作流；Agent 必须围绕当前节点工作，并且只能使用工作流定义中存在的 outcome 推进。是否推进由本轮实际结果和证据决定，不能猜。'
           : '当前没有固定工作方式。根据目标、Evidence、未知项和最有价值的下一步自主推进；可以建议工作方式，但不能假定必须使用某一条路线。',
         knowledgeText,
         buildResearchConfigPrompt(control),
-        control.agent.personality?.trim()
-          ? [
-              '## Assistant Soul / 人格',
-              '这段人格只影响用户可见的表达方式，不改变调查方法、Evidence 规则、权限或 Workflow。',
-              control.agent.personality.trim(),
-            ].join('\n')
-          : '',
         repositoryPrompt,
       ].filter(Boolean).join('\n\n'),
       ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId ? { sessionId: inv.copilotSessionId } : {}),
