@@ -172,6 +172,26 @@ function sessionKey(name: string): string {
   return safe;
 }
 
+/** Session API 的明确 Context Projection；不把 WorkspaceContext persistence schema 暴露给 Web。 */
+function toSessionContextView(context: Awaited<ReturnType<typeof loadWorkspaceContext>>) {
+  return {
+    name: context.name,
+    ...(context.mission ? { mission: context.mission } : {}),
+    workflow: context.workflow,
+    userPrompt: context.userPrompt,
+    goal: context.goal,
+    scope: context.scope,
+    systems: context.systems,
+    evidence: context.evidence,
+    findings: context.findings,
+    unknowns: context.unknowns,
+    claims: context.claims,
+    inputs: context.inputs,
+    ...(context.journeyPlan ? { journeyPlan: context.journeyPlan } : {}),
+    updatedAt: context.updatedAt,
+  };
+}
+
 /** 枚举 workspace 下的 Investigation，并组合 context 与 conversation 摘要返回给 UI。 */
 async function listSessions(): Promise<SessionSummary[]> {
   await fs.mkdir(config.workspaceDir, { recursive: true });
