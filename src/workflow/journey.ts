@@ -102,24 +102,25 @@ export type JourneyRunEventType =
   | 'workflow-completed'
   | 'transition-rejected';
 
-export interface JourneyRunEvent {
-  id: string;
-  runId: string;
-  workflowId: string;
-  workflowVersion: number;
-  type: JourneyRunEventType;
-  timestamp: string;
-  nodeId?: string;
-  outcome?: string;
-  error?: string;
-  data?: unknown;
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-    cost?: number;
-  };
-}
+export const JourneyRunEventSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  workflowId: z.string().min(1),
+  workflowVersion: z.number().int().nonnegative(),
+  type: z.enum(['workflow-started','node-started','node-completed','node-waiting','node-failed','workflow-completed','transition-rejected']),
+  timestamp: z.string().datetime(),
+  nodeId: z.string().optional(),
+  outcome: z.string().optional(),
+  error: z.string().optional(),
+  data: z.unknown().optional(),
+  usage: z.object({
+    inputTokens: z.number().nonnegative().optional(),
+    outputTokens: z.number().nonnegative().optional(),
+    totalTokens: z.number().nonnegative().optional(),
+    cost: z.number().nonnegative().optional(),
+  }).strict().optional(),
+}).strict();
+export type JourneyRunEvent = z.infer<typeof JourneyRunEventSchema>;
 
 export interface JourneyExecution {
   workflowId: string;
