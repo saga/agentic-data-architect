@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
-import { ResultViewModelSchema, SseEventSchema } from './api/contracts.js';
+import { ResultViewModelSchema, SseEventSchema, WorkflowSnapshotSchema } from './api/contracts.js';
 import {
   AbortBodySchema,
   CreateSessionBodySchema,
@@ -648,7 +648,7 @@ app.post('/api/sessions', async (req, res) => {
       res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
       return;
     }
-    res.json(await getJourneySnapshot(name, context.workflow));
+    res.json(WorkflowSnapshotSchema.parse(await getJourneySnapshot(name, context.workflow)));
   });
 
   /** 保存工作地图；服务端先做完整结构检查，通过后才创建新版本。 */
