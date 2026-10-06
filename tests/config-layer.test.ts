@@ -42,7 +42,7 @@ test('Global changes flow into inheriting tasks but never overwrite task overrid
   const before = await loadInvestigationControl('task-a');
   const globalModel = before.agent.model === 'auto' ? 'gpt-5' : 'auto';
 
-  await updateGlobalConfiguration({ ...before.agent, model: globalModel });
+  await updateGlobalConfiguration({ model: globalModel });
 
   const a = await loadInvestigationControl('task-a');
   const b = await loadInvestigationControl('task-b');
@@ -55,7 +55,7 @@ test('Global changes flow into inheriting tasks but never overwrite task overrid
     agent: { ...a.agent, model: 'task-specific-model' },
   }, 'task model override');
 
-  await updateGlobalConfiguration({ ...a.agent, model: 'new-global-model' });
+  await updateGlobalConfiguration({ model: 'new-global-model' });
 
   const a2 = await loadInvestigationControl('task-a');
   const b2 = await loadInvestigationControl('task-b');
