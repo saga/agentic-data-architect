@@ -361,7 +361,7 @@ app.post('/api/sessions', async (req, res) => {
     const missionProgress = await buildMissionProgress(name, context.mission);
     const current = snapshot?.currentState;
     res.json(SessionDataSchema.parse({
-      context,
+      context: toSessionContextView(context),
       missionProgress,
       control: await loadInvestigationControl(name),
       localDatasets: listLocalDatasets(name),
