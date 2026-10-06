@@ -4,6 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
 import fs from 'node:fs/promises';
+import * as z from 'zod';
 import path from 'node:path';
 import { config } from '../config.js';
 import {
@@ -314,14 +315,13 @@ export async function saveDiscoverySnapshot(name: string, runId: string, snapsho
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, runId + '.json');
-  // Discovery snapshots are later used as agent evidence, so never leave a
-  // partially written JSON file behind.
-  await writeJsonAtomic(fp, snapshot);
+  const validated = DiscoverySnapshotSchema.parse(snapshot);
+  await writeJsonAtomic(fp, validated);
   return fp;
 }
 
 /** 按 run 文件名排序读取最近一次 Discovery 快照。 */
-export async function loadLatestSnapshot<T>(name: string): Promise<T | null> {
+export async function loadLatestSnapshot<T>(name: string, schema?: z.ZodType<T>): Promise<T | null> {
   let files: string[];
   try {
     files = (await fs.readdir(discoveryDir(name))).filter((f) => f.endsWith('.json')).sort();
@@ -330,5 +330,6 @@ export async function loadLatestSnapshot<T>(name: string): Promise<T | null> {
   }
   if (files.length === 0) return null;
   const last = files[files.length - 1] as string;
-  return JSON.parse(await fs.readFile(path.join(discoveryDir(name), last), 'utf-8')) as T;
+  const raw = JSON.parse(await fs.readFile(path.join(discoveryDir(name), last), 'utf-8')) as unknown;
+  return schema ? schema.parse(raw) : raw as T;
 }
