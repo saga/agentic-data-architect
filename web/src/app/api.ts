@@ -1,7 +1,48 @@
 import * as z from 'zod';
-import { SseEventSchema, type SseEvent } from '../../../src/api/contracts.js';
+import { ApiErrorSchema, SseEventSchema, type ApiError, type SseEvent } from '../../../src/api/contracts.js';
 
 export type StreamEvent = SseEvent;
+
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly apiError: ApiError;
+
+  constructor(status: number, apiError: ApiError) {
+    super(apiError.error);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.apiError = apiError;
+  }
+}
+
+async function readApiError(response: Response): Promise<ApiError> {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    const body = await response.text().catch(() => '');
+    return {
+      code: 'HTTP_ERROR',
+      error: body || response.statusText || '请求失败。',
+    };
+  }
+
+  const parsed = ApiErrorSchema.safeParse(payload);
+  if (parsed.success) return parsed.data;
+  return {
+    code: 'HTTP_ERROR',
+    error: response.statusText || '请求失败。',
+    ...(payload && typeof payload === 'object' ? { details: payload as Record<string, unknown> } : {}),
+  };
+}
+
+export async function getText(url: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, await readApiError(response));
+  }
+  return response.text();
+}
 
 export async function getJson<T>(url: string, init?: RequestInit): Promise<T>;
 export async function getJson<T>(url: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T>;
@@ -18,8 +59,7 @@ export async function getJson<T>(
   const requestInit = schema ? init : schemaOrInit as RequestInit | undefined;
   const response = await fetch(url, requestInit);
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(body || response.statusText);
+    throw new ApiRequestError(response.status, await readApiError(response));
   }
   const data: unknown = await response.json();
   return schema ? schema.parse(data) : data as T;
