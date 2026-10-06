@@ -161,7 +161,7 @@ export async function confirmInvestigationMission(
     const next = WorkspaceContextSchema.parse({
       ...current,
       mission,
-      // 兼容现有代码：goal 继续保存任务目的，但 Mission 是新的最高优先级来源。
+      // 保留 goal 作为当前 Mission 的任务目的投影；Mission 是正式来源。
       goal: mission.purpose,
       updatedAt: new Date().toISOString(),
     });
