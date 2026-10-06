@@ -13,42 +13,13 @@ import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
 
-export const ReviewArtifactTypeSchema = z.enum([
-  'report',
-  'target_architecture',
-  'mapping',
-  'validation',
-]);
-export type ReviewArtifactType = z.infer<typeof ReviewArtifactTypeSchema>;
-
-export const ReviewIssueSchema = z.object({
-  category: z.enum([
-    'goal_alignment',
-    'readability',
-    'conclusion',
-    'signal_noise',
-    'consistency',
-    'decision_usefulness',
-  ]),
-  severity: z.enum(['high', 'medium', 'low']),
-  description: z.string().trim().min(1),
-  suggestion: z.string().trim().min(1),
-}).strict();
-
-export const ArtifactReviewSchema = z.object({
-  artifactType: ReviewArtifactTypeSchema,
-  status: z.enum(['pass', 'fail']),
-  /** Reviewer 是否实际完成审核；unavailable 表示没有返回可验证结果。 */
-  availability: z.enum(['completed', 'unavailable']).default('completed'),
-  score: z.number().int().min(0).max(100),
-  summary: z.string().trim().min(1),
-  issues: z.array(ReviewIssueSchema),
-  reviewedAt: z.string().datetime(),
-  artifactHash: z.string().min(1).optional(),
-  sourceRevision: z.string().min(1).optional(),
-  artifactVersion: z.number().int().positive().optional(),
-}).strict();
-export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
+export {
+  ArtifactReviewContractSchema as ArtifactReviewSchema,
+  ReviewArtifactTypeSchema,
+  ReviewIssueSchema,
+  type ArtifactReviewContract as ArtifactReview,
+  type ReviewArtifactType,
+} from '../api/contracts.js';
 
 const REVIEWER_SYSTEM_PROMPT = [
   '你是一个独立的 Data Architect 工作成果 Reviewer。',
