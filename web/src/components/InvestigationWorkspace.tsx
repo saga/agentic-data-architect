@@ -159,6 +159,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             loading={loading}
             value={value}
             streamingReasoning={streamingReasoning}
+            assistantCompanionNote={assistantCompanionNote}
             reasoningByMessage={reasoningByMessage}
             assistantAvatarByMessage={assistantAvatarByMessage}
             streamingAnswer={streamingAnswer}
