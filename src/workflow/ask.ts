@@ -6,7 +6,7 @@
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
-import { buildAssistantAnswerPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
+import { buildAssistantAnswerPrompt, buildAssistantCompanionPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { persistModernizationAgentResult } from './modernization.js';
 import {
@@ -89,6 +89,8 @@ export async function answerQuestion(
     onReasoningDelta?: (delta: string) => void;
     /** 阶段小结完成后立即推送给主聊天区。 */
     onCheckpoint?: (checkpoint: AgentCheckpoint & { turnId: string; execution: number; createdAt: string }) => void;
+    /** 长任务中偶尔显示给用户的 Soul 陪伴性提示，不写入持久化对话。 */
+    onCompanionNote?: (note: string) => void;
   },
 ): Promise<AnswerSummary> {
   const selectedRoute = options?.selectedRoute;
@@ -209,6 +211,53 @@ export async function answerQuestion(
     // not added to the Task Agent prompt; it is presentation/continuity state only.
     await captureExplicitRelationshipMemories(userVisibleQuestion);
     const mission = inv.mission!;
+
+    // Companion Note 是独立的人格层输出，不参与任务 Agent 的判断；只在长任务中偶尔出现。
+    let companionMemories: Array<{ category: string; key: string; value: string }> = [];
+    try {
+      companionMemories = await getRelevantRelationshipMemories(userVisibleQuestion, 4);
+    } catch {
+      // Relationship Memory 仅用于表达连续感；读取失败不能影响正式调查。
+    }
+    let companionNoteCount = 0;
+    let lastCompanionNoteAt = 0;
+    let companionNoteTask: Promise<void> = Promise.resolve();
+    const requestCompanionNote = (activity: string, force = false): void => {
+      const now = Date.now();
+      const minimumFirstDelay = 12_000;
+      const minimumGap = 45_000;
+      if (!options?.onCompanionNote || companionNoteCount >= 2) return;
+      if (!force && companionNoteCount === 0 && now - new Date(turnStartedAt).getTime() < minimumFirstDelay) return;
+      if (!force && companionNoteCount > 0 && now - lastCompanionNoteAt < minimumGap) return;
+
+      companionNoteCount += 1;
+      lastCompanionNoteAt = now;
+      companionNoteTask = companionNoteTask.then(async () => {
+        try {
+          const note = await askCopilot({
+            prompt: buildAssistantCompanionPrompt(control.agent.personality, activity, companionMemories),
+            systemPrompt: '这是人格陪伴层。只生成一句自然、克制的陪伴性话语，不做任务分析，不调用工具，不汇报顶部状态，也不输出角色名或标题。',
+            model: control.agent.model,
+            workingDirectory: workspaceRoot(investigationName),
+            purpose: 'review',
+          });
+          const value = note.trim();
+          if (value && value.length <= 120) options.onCompanionNote?.(value);
+        } catch (error) {
+          await appendAuditEvent(investigationName, {
+            actor: 'system',
+            action: 'assistant.companion_note_failed',
+            summary: 'Soul 陪伴提示生成失败，不影响正式调查。',
+            details: { error: error instanceof Error ? error.message : String(error) },
+          });
+        }
+      }).catch(() => undefined);
+    };
+
+    const companionTimer = setTimeout(() => {
+      requestCompanionNote('长时间调查进行中，用户不需要跟随内部执行细节。');
+    }, 12_000);
+    companionTimer.unref?.();
 
     const githubRepositories = [...new Set([
       ...control.research.githubRepositories,
@@ -610,6 +659,7 @@ export async function answerQuestion(
             createdAt,
           });
           emitStatus('阶段小结：' + checkpoint.title);
+          requestCompanionNote('阶段成果已经形成，接下来继续把剩余问题处理干净。');
         }
 
         stageGateBaseline = stageAfter;
@@ -800,6 +850,7 @@ export async function answerQuestion(
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
+    clearTimeout(companionTimer);
     clearInterval(liveHeartbeat);
     if (activeInvestigationTurns.get(investigationName)?.turnId === turnId) activeInvestigationTurns.delete(investigationName);
     abortRequestedTurns.delete(turnId);
