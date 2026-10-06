@@ -569,8 +569,11 @@ export const ReviewIssueSchema = z.object({
 }).strict();
 export type ReviewIssue = z.infer<typeof ReviewIssueSchema>;
 
+export const ReviewArtifactTypeSchema = z.enum(['report', 'target_architecture', 'mapping', 'validation']);
+export type ReviewArtifactType = z.infer<typeof ReviewArtifactTypeSchema>;
+
 export const ArtifactReviewContractSchema = z.object({
-  artifactType: z.enum(['report', 'target_architecture', 'mapping', 'validation']),
+  artifactType: ReviewArtifactTypeSchema,
   status: z.enum(['pass', 'fail']),
   availability: z.enum(['completed', 'unavailable']),
   score: z.number().int().min(0).max(100),
