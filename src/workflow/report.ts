@@ -5,6 +5,7 @@ import { buildReport } from '../analysis/report.js';
 import { ArtifactReviewSchema, reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { assertMissionGate } from './mission-gate.js';
+import { assertCurrentStateReportGate } from './report-gate.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact } from '../investigation/artifact-provenance.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
 import type { DiscoverySnapshot } from './discover.js';
