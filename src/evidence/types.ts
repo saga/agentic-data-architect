@@ -97,6 +97,8 @@ export const DiscoveryRunSchema = z.object({
   startedAt: z.string().min(1),
   completedAt: z.string().min(1),
   parserVersion: z.string().min(1),
+  // Legacy runs may omit this field; every new formal Discovery Run must set it.
+  scopeFingerprint: z.string().min(1).optional(),
   filesScanned: z.number().int().nonnegative(),
   datasetsFound: z.number().int().nonnegative(),
   lineageEdgesFound: z.number().int().nonnegative(),
