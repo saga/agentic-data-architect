@@ -141,47 +141,47 @@ export async function answerQuestion(
   }
 
   const turnStartedAt = new Date().toISOString();
-    activeInvestigationTurns.set(investigationName, {
-      turnId,
-      phase: 'executing',
-      startedAt: turnStartedAt,
-      lastActivityAt: turnStartedAt,
-      lastActivity: '正在准备调查上下文',
-    });
+  activeInvestigationTurns.set(investigationName, {
+    turnId,
+    phase: 'executing',
+    startedAt: turnStartedAt,
+    lastActivityAt: turnStartedAt,
+    lastActivity: '正在准备调查上下文',
+  });
 
-    const updateLiveActivity = (activity: string): void => {
-      const active = activeInvestigationTurns.get(investigationName);
-      if (!active || active.turnId !== turnId) return;
-      active.lastActivityAt = new Date().toISOString();
-      active.lastActivity = activity;
-    };
-    const emitStatus = (status: string): void => {
-      updateLiveActivity(status);
-      onStatus?.(status);
-    };
-    const emitDelta = (delta: string): void => {
-      updateLiveActivity('正在生成回答');
-      onDelta?.(delta);
-    };
-    const emitReasoning = (delta: string): void => {
-      updateLiveActivity('正在分析问题');
-      onReasoningDelta?.(delta);
-      emitStatus('助手正在分析你的问题，请稍候…');
-    };
+  const updateLiveActivity = (activity: string): void => {
+    const active = activeInvestigationTurns.get(investigationName);
+    if (!active || active.turnId !== turnId) return;
+    active.lastActivityAt = new Date().toISOString();
+    active.lastActivity = activity;
+  };
+  const emitStatus = (status: string): void => {
+    updateLiveActivity(status);
+    onStatus?.(status);
+  };
+  const emitDelta = (delta: string): void => {
+    updateLiveActivity('正在生成回答');
+    onDelta?.(delta);
+  };
+  const emitReasoning = (delta: string): void => {
+    updateLiveActivity('正在分析问题');
+    onReasoningDelta?.(delta);
+    emitStatus('助手正在分析你的问题，请稍候…');
+  };
 
-    const liveHeartbeat = setInterval(() => {
-      const active = activeInvestigationTurns.get(investigationName);
-      if (!active || active.turnId !== turnId) return;
-      const elapsedMs = Date.now() - new Date(active.startedAt).getTime();
-      const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      const elapsed = minutes > 0
-        ? `${minutes} 分 ${String(seconds).padStart(2, '0')} 秒`
-        : `${seconds} 秒`;
-      emitStatus(`${active.lastActivity} · 已运行 ${elapsed}`);
-    }, 15_000);
-    liveHeartbeat.unref?.();
+  const liveHeartbeat = setInterval(() => {
+    const active = activeInvestigationTurns.get(investigationName);
+    if (!active || active.turnId !== turnId) return;
+    const elapsedMs = Date.now() - new Date(active.startedAt).getTime();
+    const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const elapsed = minutes > 0
+      ? `${minutes} 分 ${String(seconds).padStart(2, '0')} 秒`
+      : `${seconds} 秒`;
+    emitStatus(`${active.lastActivity} · 已运行 ${elapsed}`);
+  }, 15_000);
+  liveHeartbeat.unref?.();
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
