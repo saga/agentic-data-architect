@@ -178,6 +178,16 @@ export const WorkflowSnapshotSchema = z.object({
 }).strict();
 export type WorkflowSnapshot = z.infer<typeof WorkflowSnapshotSchema>;
 
+export const TrajectoryCheckpointDetailsSchema = z.object({
+  execution: z.number().int().nonnegative(),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  confirmed: z.array(z.string()),
+  evidenceIds: z.array(z.string()),
+  unknowns: z.array(z.string()),
+  nextStep: z.string().optional(),
+}).strict();
+
 export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
@@ -197,7 +207,15 @@ export const TrajectoryEventSchema = z.object({
   outputTokens: z.number().nonnegative().optional(),
   premiumRequestCost: z.number().nonnegative().optional(),
   details: z.record(z.string(), z.unknown()).default({}),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.type === 'checkpoint' && !TrajectoryCheckpointDetailsSchema.safeParse(value.details).success) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['details'],
+      message: 'checkpoint event 的 details 不符合 Stage Checkpoint contract。',
+    });
+  }
+});
 export type TrajectoryEvent = z.infer<typeof TrajectoryEventSchema>;
 
 export const TrajectoryCheckpointSchema = z.object({
