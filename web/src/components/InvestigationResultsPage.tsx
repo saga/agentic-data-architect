@@ -75,7 +75,7 @@ function asCheckpoint(event: TrajectoryEvent): Checkpoint | undefined {
     // checkpoint 的稳定 ID 是 trajectory event 的 ID；details 本身保存的是 AgentCheckpoint，
     // 不包含单独的 id 字段。此前这里错误要求 details.id，导致所有阶段小结被静默丢弃。
     id: event.id,
-    turnId: typeof value.turnId === 'string' ? value.turnId : '',
+    turnId: event.turnId,
     timestamp: event.timestamp,
     execution: typeof value.execution === 'number' ? value.execution : 0,
     title: value.title,
