@@ -24,6 +24,7 @@ export function InvestigationChatPanel(props: {
   loading: boolean;
   value: string;
   streamingReasoning: string;
+  assistantCompanionNote: string;
   reasoningByMessage: Record<string, string>;
   assistantAvatarByMessage: Record<string, string>;
   streamingAnswer?: { key: string; content: string };
@@ -155,6 +156,9 @@ export function InvestigationChatPanel(props: {
               speaker={props.current.control.agent.displayName?.trim() || '秘书'}
               capturedAt={new Date().toISOString()}
             />
+            {props.assistantCompanionNote ? (
+              <div className="assistant-companion-note">{props.assistantCompanionNote}</div>
+            ) : null}
             {props.streamingReasoning ? (
               <Think
                 title="助手正在分析问题"
@@ -171,8 +175,8 @@ export function InvestigationChatPanel(props: {
             ) : null}
             {displayAssistantContent(currentStreamingAnswer.content)
               ? <ChatMarkdown content={currentStreamingAnswer.content} />
-              : !props.streamingReasoning
-                ? <Text type="secondary">{props.turnStatus || '助手正在处理，请稍候…'}</Text>
+              : !props.streamingReasoning && !props.assistantCompanionNote
+                ? <Text type="secondary" className="assistant-typing-indicator">…</Text>
                 : null}
           </div>
         ),
@@ -183,6 +187,7 @@ export function InvestigationChatPanel(props: {
   }, [
     props.active,
     props.assistantAvatarByMessage,
+    props.assistantCompanionNote,
     props.current,
     props.loading,
     props.nextGuidance,
