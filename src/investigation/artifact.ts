@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
-import { loadInvestigation, loadLatestSnapshot } from './store.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { loadInvestigation, loadLatestSnapshot, reportsDir } from './store.js';
 import { ArtifactProvenanceSchema, type ArtifactProvenance } from './schemas.js';
 
 function fingerprint(value: unknown): string {
@@ -26,6 +28,16 @@ export async function buildCurrentArtifactProvenance(
 
   const missionFingerprint = fingerprint(investigation.mission ?? null);
   const scopeFingerprint = fingerprint(investigation.scopeValidation ?? null);
+  const readArtifactVersion = async (fileName: string): Promise<number | null> => {
+    try {
+      const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), fileName), 'utf8')) as { version?: unknown };
+      return typeof raw.version === 'number' ? raw.version : null;
+    } catch {
+      return null;
+    }
+  };
+  const modernizationVersion = await readArtifactVersion('modernization-plan.json');
+  const assessmentVersion = await readArtifactVersion('architecture-assessment.json');
   const sourceRevision = fingerprint({
     discoveryRuns: investigation.discoveryRuns.map((run) => run.id),
     evidence: investigation.evidence.map((item) => ({
@@ -44,6 +56,8 @@ export async function buildCurrentArtifactProvenance(
       evidenceIds: finding.evidenceIds,
     })),
     latestDiscoveryRunId: snapshot?.run?.id ?? null,
+    modernizationVersion,
+    assessmentVersion,
   });
 
   return ArtifactProvenanceSchema.parse({
