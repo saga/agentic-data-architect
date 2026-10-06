@@ -301,6 +301,21 @@ export const ApiErrorSchema = z.object({
 }).strict();
 export type ApiError = z.infer<typeof ApiErrorSchema>;
 
+export const AnswerSummarySchema = z.object({
+  answer: z.string(),
+  claimIds: z.array(z.string()),
+  warnings: z.array(z.string()),
+  unknowns: z.array(z.string()),
+  followUpQuestions: z.array(z.string()),
+  routeOptions: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    reason: z.string().min(1),
+    steps: z.array(z.string().min(1)),
+  }).strict()),
+}).strict();
+export type AnswerSummaryContract = z.infer<typeof AnswerSummarySchema>;
+
 export const SseEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('started'), data: z.object({ turnId: z.string().min(1) }).strict() }).strict(),
   z.object({ event: z.literal('heartbeat'), data: z.object({ timestamp: z.string().datetime() }).strict() }).strict(),
@@ -713,21 +728,6 @@ export const WorkflowCompatibilityResponseSchema = z.object({
   }).strict().optional(),
   error: z.string().optional(),
 }).strict();
-
-export const AnswerSummarySchema = z.object({
-  answer: z.string(),
-  claimIds: z.array(z.string()),
-  warnings: z.array(z.string()),
-  unknowns: z.array(z.string()),
-  followUpQuestions: z.array(z.string()),
-  routeOptions: z.array(z.object({
-    id: z.string().min(1),
-    title: z.string().min(1),
-    reason: z.string().min(1),
-    steps: z.array(z.string().min(1)),
-  }).strict()),
-}).strict();
-export type AnswerSummaryContract = z.infer<typeof AnswerSummarySchema>;
 
 export const ReportRegenerateResponseSchema = z.object({
   markdown: z.string(),
