@@ -31,7 +31,7 @@
 7. Mission 真正改变后，旧的 ScopeValidation、Copilot Session 和动态路线失效，需要重新对齐。
 8. Mission Gate 负责确定性检查“有没有明确且用户确认的任务契约”；不让模型替用户确认。
 9. deliverables 是导航和覆盖检查依据，不是事实证明，也不替代 Evidence Gate。
-10. “当前系统的数据架构 / Data Source / Data Flow / Data Model”属于常见能力场景，不新增独立 Workflow；使用 capability Skill current-state-architecture。
+10. 当前系统的数据架构 / Data Source / Data Flow / Data Model 现在有独立的可选工作方式 `current-data-architecture`；它仍然只负责现状分析，不负责架构评估或改造方案。具体边界见 ADR-022。
 11. Scope Validation 独立回答“本次任务究竟调查哪些对象”，通过 Mission Gate 不代表 Scope 已验证；正式调查和依赖 scope completeness 的最终交付还需满足 ADR-015 的 Scope Validation。
 
 ## Consequences
@@ -64,6 +64,6 @@
 
 不采用。Mission 是 Investigation 的任务契约，Workflow 是实现任务的路线；两者职责不同。为了一个任务边界扩展 Workflow DSL 会让 DSL 变复杂。
 
-### 为“当前架构分析”增加固定 Workflow
+### 把“当前架构分析”继续只做成 capability
 
-不采用。Data Source、Data Flow、Data Model 属于常见 capability，可以被现代化、评估、普通调查等多个任务组合使用。
+不采用。用户需要在新建 Investigation 时明确选择“分析当前数据架构”；因此现在提供独立的 `current-data-architecture` Workflow。它仍然复用已有 Current-State Intelligence，不建立新的事实模型。
