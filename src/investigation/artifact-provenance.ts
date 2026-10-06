@@ -22,6 +22,8 @@ export function computeArtifactProvenance(
     expectedResult: investigation.mission?.expectedResult ?? '',
     deliverables: investigation.mission?.deliverables.map((item) => ({
       id: item.id,
+      title: item.title,
+      description: item.description,
       required: item.required,
     })) ?? [],
   });
@@ -33,7 +35,7 @@ export function computeArtifactProvenance(
   });
 
   const sourceRevision = digest({
-    snapshotRunId: snapshot?.run.id ?? null,
+    snapshot: snapshot ?? null,
     discoveryRuns: investigation.discoveryRuns.map((run) => ({
       id: run.id,
       parserVersion: run.parserVersion,
