@@ -7,7 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import {
