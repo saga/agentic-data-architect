@@ -7,7 +7,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import {
   ModernizationPlanSchema,
@@ -25,7 +26,6 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, deriveModernizationFacts, loadModernizationJourney } from './journey.js';
 import type { ModernizationPlanView } from '../api/contracts.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
-import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
 function productId(prefix: string): string {
@@ -277,11 +277,21 @@ export function toModernizationPlanView(plan: ModernizationPlan): ModernizationP
 }
 
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
-  // 正式阶段成果不能在范围仍是 unset 时生成；先通过独立 Scope Gate。
-  const inv = await loadInvestigation(name);
-  assertMissionGate(inv.mission);
-  await assertInvestigationScopeGate(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const source = await captureInvestigationArtifactSource(name);
+  assertMissionGate(source.investigation.mission);
+  assertInvestigationArtifactSourceScope(source);
+  return buildModernizationPlanFromSource(name, source);
+}
+
+async function buildModernizationPlanFromSource(
+  name: string,
+  source: {
+    investigation: Awaited<ReturnType<typeof loadInvestigation>>,
+    snapshot: DiscoverySnapshot | null;
+  },
+): Promise<{ plan: ModernizationPlan; path: string }> {
+  const inv = source.investigation;
+  const snapshot = source.snapshot;
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({
     currentState: current,
@@ -380,15 +390,17 @@ export async function persistModernizationAgentResult(
 ): Promise<{ saved: boolean; path?: string; changedSections: string[] }> {
   if (!result) return { saved: false, changedSections: [] };
 
-  // 这个函数也可能被 Workflow / CLI 直接调用；Modernization 工作成果必须绑定已确认 Mission。
-  const preflight = await loadInvestigation(name);
-  assertMissionGate(preflight.mission);
-
   return withWorkspaceContextLock(name, async () => {
-    let plan = await loadModernizationPlan(name);
-    if (!plan) plan = (await buildModernizationPlan(name)).plan;
+    const source = await captureInvestigationArtifactSource(name);
+    assertMissionGate(source.investigation.mission);
+    assertInvestigationArtifactSourceScope(source);
 
-    const inv = await loadInvestigation(name);
+    const currentArtifact = await readModernizationArtifact(name, source);
+    const plan = currentArtifact.status === 'current' && currentArtifact.plan
+      ? currentArtifact.plan
+      : (await buildModernizationPlanFromSource(name, source)).plan;
+
+    const inv = source.investigation;
     const knownEvidence = new Set(inv.evidence.map((item) => item.id));
     const timestamp = now();
     const changedSections: string[] = [];
@@ -525,7 +537,7 @@ export async function persistModernizationAgentResult(
     }
 
     const nextVersion = plan.version + 1;
-    const latestSnapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+    const latestSnapshot = source.snapshot;
     const nextPlan = ModernizationPlanSchema.parse({
       ...plan,
       version: nextVersion,

@@ -33,6 +33,7 @@ const investigation = {
 
 function snapshot(estateName: string) {
   return {
+    generation: { id: 'run-1', scopeFingerprint: computeScopeFingerprint(investigation) },
     run: { id: 'run-1', scopeFingerprint: computeScopeFingerprint(investigation) },
     currentState: {
       coverage: { datasets: 2 },
@@ -78,4 +79,22 @@ test('discovery snapshot compatibility is bound to the current scope generation'
   assert.equal(isDiscoverySnapshotCompatible(investigation, currentSnapshot), true);
   const changedScope = { ...investigation, scope: ['positions', 'trades'] };
   assert.equal(isDiscoverySnapshotCompatible(changedScope, currentSnapshot), false);
+});
+
+
+test('artifact provenance records the explicit Discovery generation identity', () => {
+  const value = computeArtifactProvenance(investigation, snapshot('legacy-a'), 1);
+  assert.equal(value.discoveryRunId, 'run-1');
+  assert.equal(value.discoveryScopeFingerprint, value.scopeFingerprint);
+});
+
+test('Discovery generation scope overrides legacy run fingerprint for compatibility checks', () => {
+  const current = computeScopeFingerprint(investigation);
+  const different = computeScopeFingerprint({ ...investigation, scope: ['positions', 'trades'] });
+  const mismatched = {
+    ...snapshot('legacy-a'),
+    generation: { id: 'run-1', scopeFingerprint: different },
+    run: { id: 'run-1', scopeFingerprint: current },
+  } as Parameters<typeof computeArtifactProvenance>[1];
+  assert.equal(isDiscoverySnapshotCompatible(investigation, mismatched), false);
 });

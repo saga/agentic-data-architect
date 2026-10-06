@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { buildReport } from '../analysis/report.js';
 import { ArtifactReviewSchema, reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { assertMissionGate } from './mission-gate.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertCurrentStateReportGate } from './report-gate.js';
@@ -137,15 +138,13 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
 export async function runReport(
   name: string,
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
-  const investigation = await loadInvestigation(name);
+  const source = await captureInvestigationArtifactSource(name);
+  const investigation = source.investigation;
+  const snapshot = source.snapshot;
   assertMissionGate(investigation.mission);
-  await assertInvestigationScopeGate(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-  if (!isDiscoverySnapshotCompatible(investigation, snapshot)) {
-    throw new Error('最近的 Discovery Snapshot 不属于当前 Scope generation，请重新执行 Discovery。');
-  }
-  await assertCurrentStateReportGate(name, { investigation, snapshot });
-  const modernizationResult = await readModernizationArtifact(name, { investigation, snapshot });
+  assertInvestigationArtifactSourceScope(source);
+  await assertCurrentStateReportGate(name, source);
+  const modernizationResult = await readModernizationArtifact(name, source);
   const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
   const existingRaw = await readOptional(reportMetadataFile(name));
   let nextVersion = 1;

@@ -2,6 +2,12 @@ import * as z from 'zod';
 import { DiscoveryRunSchema, EvidenceRefSchema } from '../evidence/types.js';
 import { SemanticAssetListSchema } from '../semantic/types.js';
 
+export const DiscoveryGenerationSchema = z.object({
+  id: z.string().min(1),
+  scopeFingerprint: z.string().min(1),
+}).strict();
+export type DiscoveryGeneration = z.infer<typeof DiscoveryGenerationSchema>;
+
 const SourceFileSchema = z.object({
   path: z.string().min(1),
   kind: z.enum(['sql', 'python', 'doc', 'yaml', 'json', 'other']),
@@ -95,6 +101,7 @@ const DataEstateSchema = z.object({
 }).strict();
 
 export const DiscoverySnapshotSchema = z.object({
+  generation: DiscoveryGenerationSchema.optional(),
   run: DiscoveryRunSchema,
   inventory: InventorySchema.nullable(),
   lineage: LineageSnapshotSchema.nullable(),
@@ -103,4 +110,20 @@ export const DiscoverySnapshotSchema = z.object({
   semanticAssets: SemanticAssetListSchema,
   currentState: CurrentStateIntelligenceSchema,
   findingIds: z.array(z.string()),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (!value.generation) return;
+  if (value.generation.id !== value.run.id) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['generation', 'id'],
+      message: 'Discovery generation id 必须与 run.id 一致。',
+    });
+  }
+  if (value.run.scopeFingerprint && value.generation.scopeFingerprint !== value.run.scopeFingerprint) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['generation', 'scopeFingerprint'],
+      message: 'Discovery generation scopeFingerprint 必须与 run.scopeFingerprint 一致。',
+    });
+  }
+});

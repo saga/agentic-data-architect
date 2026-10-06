@@ -37,11 +37,16 @@ async function readApiError(response: Response): Promise<ApiError> {
   };
 }
 
-export async function getText(url: string, init?: RequestInit): Promise<string> {
+export async function request(url: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(url, init);
   if (!response.ok) {
     throw new ApiRequestError(response.status, await readApiError(response));
   }
+  return response;
+}
+
+export async function getText(url: string, init?: RequestInit): Promise<string> {
+  const response = await request(url, init);
   return response.text();
 }
 
@@ -58,10 +63,7 @@ export async function getJson<T>(
     && typeof (schemaOrInit as { parse?: unknown }).parse === 'function';
   const schema = looksLikeSchema ? schemaOrInit as z.ZodType<T> : undefined;
   const requestInit = schema ? init : schemaOrInit as RequestInit | undefined;
-  const response = await fetch(url, requestInit);
-  if (!response.ok) {
-    throw new ApiRequestError(response.status, await readApiError(response));
-  }
+  const response = await request(url, requestInit);
   const data: unknown = await response.json();
   return schema ? schema.parse(data) : data as T;
 }

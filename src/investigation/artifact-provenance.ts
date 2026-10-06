@@ -27,7 +27,7 @@ export function isDiscoverySnapshotCompatible(
   snapshot: DiscoverySnapshot | null | undefined,
 ): boolean {
   if (!snapshot) return true;
-  const scopeFingerprint = snapshot.run.scopeFingerprint;
+  const scopeFingerprint = snapshot.generation?.scopeFingerprint ?? snapshot.run.scopeFingerprint;
   return Boolean(scopeFingerprint && scopeFingerprint === computeScopeFingerprint(investigation));
 }
 
@@ -97,8 +97,12 @@ export function computeArtifactProvenance(
     scopeFingerprint,
     sourceRevision,
     artifactVersion,
-    ...(snapshot?.run.id ? { discoveryRunId: snapshot.run.id } : {}),
-    ...(snapshot?.run.scopeFingerprint ? { discoveryScopeFingerprint: snapshot.run.scopeFingerprint } : {}),
+    ...(snapshot?.generation?.id ?? snapshot?.run.id
+      ? { discoveryRunId: snapshot?.generation?.id ?? snapshot?.run.id }
+      : {}),
+    ...(snapshot?.generation?.scopeFingerprint ?? snapshot?.run.scopeFingerprint
+      ? { discoveryScopeFingerprint: snapshot?.generation?.scopeFingerprint ?? snapshot?.run.scopeFingerprint }
+      : {}),
   };
 }
 

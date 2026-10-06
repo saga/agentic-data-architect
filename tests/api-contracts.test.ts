@@ -5,6 +5,8 @@ import {
   ApiErrorSchema,
   ArtifactReviewContractSchema,
   ArtifactLifecycleStatusSchema,
+  ArchitectureAssessmentResponseSchema,
+  ModernizationResponseSchema,
   ConversationTurnSummarySchema,
   JourneyPlanSchema,
   JourneyWorkflowChangeSchema,
@@ -145,10 +147,32 @@ test('conversation turn summary is a shared transport contract', () => {
 });
 
 
-test('artifact lifecycle exposes missing, stale and current states', () => {
+test('artifact lifecycle exposes one shared contract for all result types', () => {
   assert.equal(ArtifactLifecycleStatusSchema.parse('missing'), 'missing');
   assert.equal(ArtifactLifecycleStatusSchema.parse('stale'), 'stale');
   assert.equal(ArtifactLifecycleStatusSchema.parse('current'), 'current');
+  assert.equal(ModernizationResponseSchema.parse({ status: 'stale', plan: null, path: null }).status, 'stale');
+  assert.equal(ArchitectureAssessmentResponseSchema.parse({ status: 'missing', plan: null, path: null }).status, 'missing');
+  assert.equal(ModernizationResponseSchema.parse({ status: 'blocked', plan: null, path: null }).status, 'blocked');
+});
+
+test('previously generic trajectory detail payloads now use strict nested contracts', () => {
+  assert.throws(() => TrajectoryEventSchema.parse({
+    id: 'start-1', turnId: 'turn-1', timestamp: '2026-10-06T08:00:00.000Z',
+    type: 'turn_start', name: '开始', details: { sessionId: 's1', unexpected: true },
+  }));
+  assert.throws(() => TrajectoryEventSchema.parse({
+    id: 'assistant-start-1', turnId: 'turn-1', timestamp: '2026-10-06T08:00:00.000Z',
+    type: 'assistant_turn_start', name: '模型开始', details: { turnId: 'turn-1', unexpected: true },
+  }));
+  assert.throws(() => TrajectoryEventSchema.parse({
+    id: 'assistant-end-1', turnId: 'turn-1', timestamp: '2026-10-06T08:00:00.000Z',
+    type: 'assistant_turn_end', name: '模型完成', details: { turnId: 'turn-1', unexpected: true },
+  }));
+  assert.throws(() => TrajectoryEventSchema.parse({
+    id: 'user-1', turnId: 'turn-1', timestamp: '2026-10-06T08:00:00.000Z',
+    type: 'user_input', name: '用户问题', details: { question: '检查', unexpected: true },
+  }));
 });
 
 test('known trajectory nested payloads reject undeclared fields', () => {

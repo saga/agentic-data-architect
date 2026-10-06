@@ -331,10 +331,17 @@ export async function saveDiscoverySnapshot(name: string, runId: string, snapsho
   const parsed = DiscoverySnapshotSchema.parse(snapshot);
   if (parsed.run.id !== runId) throw new Error('Discovery Snapshot runId 与文件 runId 不一致。');
   if (!parsed.run.scopeFingerprint) throw new Error('Discovery Snapshot 缺少 Scope fingerprint，不能作为新的 current source。');
+  const normalized = DiscoverySnapshotSchema.parse({
+    ...parsed,
+    generation: parsed.generation ?? {
+      id: parsed.run.id,
+      scopeFingerprint: parsed.run.scopeFingerprint,
+    },
+  });
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, runId + '.json');
-  await writeJsonAtomic(fp, parsed);
+  await writeJsonAtomic(fp, normalized);
   return fp;
 }
 

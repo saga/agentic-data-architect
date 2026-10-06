@@ -285,6 +285,24 @@ export const TrajectoryCheckpointDetailsSchema = z.object({
   nextStep: z.string().optional(),
 }).strict();
 
+export const TrajectoryTurnStartDetailsSchema = z.object({
+  sessionId: z.string().min(1),
+  autoTier: z.string().optional(),
+}).strict();
+
+export const TrajectoryAssistantTurnStartDetailsSchema = z.object({
+  turnId: z.string().min(1),
+  interactionId: z.string().optional(),
+}).strict();
+
+export const TrajectoryAssistantTurnEndDetailsSchema = z.object({
+  turnId: z.string().min(1),
+}).strict();
+
+export const TrajectoryUserInputDetailsSchema = z.object({
+  question: z.string().min(1),
+}).strict();
+
 export const TrajectoryTurnUsageSchema = z.object({
   inputTokens: z.number().nonnegative().optional(),
   outputTokens: z.number().nonnegative().optional(),
@@ -511,6 +529,10 @@ export const TrajectoryEventSchema = z.object({
     turn_end: TrajectoryTurnEndDetailsSchema,
     error: TrajectoryErrorDetailsSchema,
     stage_gate: TrajectoryStageGateDetailsSchema,
+    turn_start: TrajectoryTurnStartDetailsSchema,
+    assistant_turn_start: TrajectoryAssistantTurnStartDetailsSchema,
+    assistant_turn_end: TrajectoryAssistantTurnEndDetailsSchema,
+    user_input: TrajectoryUserInputDetailsSchema,
   };
   const schema = schemas[value.type];
   if (schema && !schema.safeParse(value.details).success) {

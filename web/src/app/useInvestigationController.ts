@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as AntApp } from 'antd';
 import type { UploadFile } from 'antd';
-import { consumeSse, getJson } from './api';
+import { ApiRequestError, consumeSse, getJson, request } from './api';
 import { workflowOptions } from './workflow-options';
 import {
   AnswerSummarySchema,
@@ -529,7 +529,7 @@ export function useInvestigationController() {
     const turnId = activeTurn?.turnId ?? executionStatus.turnId;
     if (!key || !turnId) return;
 
-    void fetch(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
+    void request(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ turnId }),
@@ -661,47 +661,42 @@ export function useInvestigationController() {
       });
       setStreamingAnswer({ key: key as string, content: '' });
 
-      const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(routeId ? { routeId, turnId } : { message, guided, turnId }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await request(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(routeId ? { routeId, turnId } : { message, guided, turnId }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error instanceof ApiRequestError) {
+          const apiError = error.apiError;
+          const errorDetails = apiError.details;
+          const missionDraft = errorDetails
+            && typeof errorDetails === 'object'
+            && 'draft' in errorDetails
+            ? MissionDraftSchema.safeParse((errorDetails as { draft?: unknown }).draft).data
+            : undefined;
 
-      if (!response.ok) {
-        const body = await response.text();
-        let parsedBody;
-        try {
-          parsedBody = ApiErrorSchema.parse(JSON.parse(body));
-        } catch {
-          parsedBody = undefined;
+          if (error.status === 409 && apiError.code === 'MISSION_REQUIRED') {
+            setMissionDraft(missionDraft ?? {
+              purpose: current?.context.mission?.purpose ?? '',
+              expectedResult: current?.context.mission?.expectedResult ?? '',
+              deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
+            });
+            setPendingMissionMessage(message);
+            setPendingMissionTurnId(turnId);
+            setMissionOpen(true);
+            missionBlocked = true;
+            // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
+            // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
+            await loadSession(key);
+            setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
+            return;
+          }
         }
-
-        const errorDetails = parsedBody?.details;
-        const missionDraft = errorDetails
-          && typeof errorDetails === 'object'
-          && 'draft' in errorDetails
-          ? MissionDraftSchema.safeParse((errorDetails as { draft?: unknown }).draft).data
-          : undefined;
-
-        if (response.status === 409 && parsedBody?.code === 'MISSION_REQUIRED') {
-          setMissionDraft(missionDraft ?? {
-            purpose: current?.context.mission?.purpose ?? '',
-            expectedResult: current?.context.mission?.expectedResult ?? '',
-            deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
-          });
-          setPendingMissionMessage(message);
-          setPendingMissionTurnId(turnId);
-          setMissionOpen(true);
-          missionBlocked = true;
-          // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
-          // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
-          await loadSession(key);
-          setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
-          return;
-        }
-
-        throw new Error(parsedBody?.error || body || response.statusText);
+        throw error;
       }
 
       let result: AnswerSummaryContract | undefined;
@@ -853,9 +848,8 @@ export function useInvestigationController() {
         void send(nextMessage, undefined, false, nextTurnId);
       }
     } catch (e) {
-      const raw = e instanceof Error ? e.message : '无法保存任务目标';
-      try {
-        const body = ApiErrorSchema.parse(JSON.parse(raw));
+      if (e instanceof ApiRequestError) {
+        const body = e.apiError;
         const details = body.details;
         const clarity = details && typeof details === 'object' && 'clarity' in details
           ? (details as { clarity?: { reason?: string } }).clarity
@@ -868,11 +862,10 @@ export function useInvestigationController() {
           setMissionError(body.error || '当前调查正在执行，请先停止后再修改任务。');
           return;
         }
-        setError(body.error || raw);
-      } catch {
-        setError(raw);
+        setError(body.error);
+        return;
       }
-    } finally {
+      setError(e instanceof Error ? e.message : '无法保存任务目标');    } finally {
       setMissionSaving(false);
     }
   };
@@ -966,20 +959,12 @@ export function useInvestigationController() {
             message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
           };
         } catch (e) {
-          const raw = e instanceof Error ? e.message : '无法确认任务';
-          let clarityHandled = false;
-          try {
-            const body = ApiErrorSchema.parse(JSON.parse(raw));
-            if (body.code === 'MISSION_CLARITY_REQUIRED') {
-              pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
-              pendingInitialMissionErrorRef.current = body.error || '任务目的和期望结果还不够具体。';
-              clarityHandled = true;
-            }
-          } catch {
-            // 非 JSON 错误继续抛出，让用户看到真正的创建失败原因。
+          if (e instanceof ApiRequestError && e.apiError.code === 'MISSION_CLARITY_REQUIRED') {
+            pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
+            pendingInitialMissionErrorRef.current = e.apiError.error || '任务目的和期望结果还不够具体。';
+            return;
           }
-          if (!clarityHandled) throw e;
-        }
+          throw e;        }
       }
 
       setNewSessionOpen(false);

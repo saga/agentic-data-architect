@@ -1,14 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
-import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
 /**
@@ -104,11 +104,12 @@ function dedupe(values: string[]): string[] { return [...new Set(values.filter(B
 
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
-  const inv = await loadInvestigation(name);
+  const source = await captureInvestigationArtifactSource(name);
+  const inv = source.investigation;
+  const snapshot = source.snapshot;
   assertMissionGate(inv.mission);
-  // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
-  await assertInvestigationScopeGate(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  // Gate 与产物内容必须基于同一个已捕获的 source snapshot。
+  assertInvestigationArtifactSourceScope(source);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
   const timestamp = new Date().toISOString();

@@ -20,6 +20,7 @@ import type { SemanticAsset } from '../semantic/types.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { assertMissionGate } from './mission-gate.js';
 import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
+import type { DiscoveryGeneration } from '../investigation/discovery-snapshot-schema.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -35,6 +36,8 @@ export interface DiscoverOptions {
 
 /** 一次完整 Discovery 的不可变结果快照，供后续 Agent 问答检索。 */
 export interface DiscoverySnapshot {
+  /** 本次 Discovery 的不可变 generation identity；新 snapshot 必须显式携带。 */
+  generation?: DiscoveryGeneration;
   run: DiscoveryRun;
   inventory: Inventory | null;
   lineage: LineageGraph | null;
@@ -216,6 +219,10 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   const currentState = buildCurrentStateIntelligence({ inventory, estate, lineage, profiles, semanticAssets });
 
   const snapshot: DiscoverySnapshot = {
+    generation: {
+      id: run.id,
+      scopeFingerprint: run.scopeFingerprint!,
+    },
     run,
     inventory,
     lineage,
