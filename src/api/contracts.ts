@@ -97,3 +97,21 @@ export const WorkflowSnapshotSchema = z.object({
   events: z.array(z.record(z.string(), z.unknown())),
 }).strict();
 export type WorkflowSnapshot = z.infer<typeof WorkflowSnapshotSchema>;
+
+
+export const MissionDeliverableProgressSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  required: z.boolean(),
+  status: z.enum(['covered', 'in_progress', 'not_started', 'not_tracked']),
+  detail: z.string().min(1),
+}).strict();
+
+export const MissionProgressSchema = z.object({
+  covered: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  percent: z.number().int().min(0).max(100),
+  deliverables: z.array(MissionDeliverableProgressSchema),
+}).strict();
+export type MissionProgressContract = z.infer<typeof MissionProgressSchema>;
