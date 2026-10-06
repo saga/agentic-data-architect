@@ -36,23 +36,23 @@ function evidenceText(ids: string[]): string {
 function impactForFinding(type: string): string {
   switch (type) {
     case 'missing_lineage':
-      return '迁移范围还没有完全闭合，受影响对象需要先把来源和下游用途查清楚。';
+      return '现在还看不完整，后续分析可能遗漏真正受影响的对象。';
     case 'multiple_sources_of_truth':
-      return '迁移前需要确认哪个来源代表真正业务口径，否则容易把不同系统的数据混在一起。';
+      return '多个来源可能给出不同结果，先确定业务上真正采用的口径更稳妥。';
     case 'duplicate_transformation':
-      return '可能存在重复计算或重复转换，迁移时应先确认这些逻辑是否可以合并。';
+      return '同一个结果可能被重复计算，容易让不同地方出现不一致。';
     case 'semantic_conflict':
-      return '同名字段或指标可能采用了不同业务口径，迁移前需要确认统一定义。';
+      return '同名字段或指标可能不是同一个口径，直接比较容易得出错误结论。';
     case 'identifier_fragmentation':
-      return '同一业务对象可能使用多个标识，迁移时需要先确认它们之间的对应关系。';
+      return '同一个业务对象可能有多个标识，数据关联时容易对不上。';
     case 'data_quality_issue':
-      return '数据质量问题会直接影响迁移后的结果校验，需要明确哪些问题可以接受、哪些必须修复。';
+      return '数据本身存在缺陷，后面的分析和结论可能因此受到影响。';
     case 'temporal_risk':
-      return '时间口径存在风险，迁移时需要明确生效时间、历史数据和时间窗口。';
+      return '不同时间口径可能让历史结果和当前结果出现差异。';
     case 'possible_stale_documentation':
-      return '文档与实际实现可能不一致，迁移依据应优先采用已经验证的代码和数据证据。';
+      return '文档和实际实现可能不一致，只看其中一边容易判断错误。';
     default:
-      return '这个问题需要在进入下一步设计前确认影响范围。';
+      return '这个问题可能影响当前结论，需要再确认它的实际影响。';
   }
 }
 
