@@ -6,16 +6,10 @@ import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlin
 const { Title, Text, Paragraph } = Typography;
 
 import type { InvestigationControl, WorkflowId } from '../app/types.js';
+import { workflowOptions } from '../app/workflow-options';
 
 export type ConfigPageControl = InvestigationControl;
 export type ConfigWorkflow = '' | WorkflowId;
-
-const workflowOptions: { value: ConfigWorkflow; label: string }[] = [
-  { value: '', label: '自主调查' },
-  { value: 'legacy-modernization', label: '改造已有系统' },
-  { value: 'financial-ai-native-architecture', label: '金融 AI / 数据架构设计' },
-  { value: 'data-architecture-assessment', label: '数据架构评估' },
-];
 
 function clone<T>(value:T):T{return JSON.parse(JSON.stringify(value)) as T;}
 function formatTime(value:string){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString();}
