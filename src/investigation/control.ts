@@ -417,123 +417,137 @@ export async function updateInvestigationControl(
   next: Pick<InvestigationControl, 'research' | 'agent'>,
   reason = 'configuration updated',
 ): Promise<InvestigationControl> {
-  return withControlUpdateLock(name, () =>
-    updateInvestigationControlImpl(name, next, reason),
-  );
-}
+  return withControlUpdateLock(name, async () => {
+    const current = await loadInvestigationControl(name);
+    const global = await loadGlobalConfiguration();
+    const now = new Date().toISOString();
 
-async function updateInvestigationControlImpl(
-  name: string,
-  next: Pick<InvestigationControl, 'research' | 'agent'>,
-  reason = 'configuration updated',
-): Promise<InvestigationControl> {
-  const current = await loadInvestigationControl(name);
-  const now = new Date().toISOString();
+    const currentMcp = new Map(current.agent.mcpServers.map((item) => [item.name, item]));
+    const nextMcp = normalizeMcpServers(next.agent.mcpServers).map((item) => {
+      const old = currentMcp.get(item.name);
+      if (!old) return { ...item, version: 1 };
+      const { version: _version, ...oldComparable } = old;
+      const { version: _nextVersion, ...nextComparable } = item;
+      return {
+        ...item,
+        version: sameValue(oldComparable, nextComparable) ? old.version : old.version + 1,
+      };
+    });
 
-  const currentMcp = new Map(current.agent.mcpServers.map((item) => [item.name, item]));
-  const nextMcp = normalizeMcpServers(next.agent.mcpServers).map((item) => {
-    const old = currentMcp.get(item.name);
-    if (!old) return { ...item, version: 1 };
-    const { version: _version, ...oldComparable } = old;
-    const { version: _nextVersion, ...nextComparable } = item;
-    return {
-      ...item,
-      version: JSON.stringify(oldComparable) === JSON.stringify(nextComparable) ? old.version : old.version + 1,
-    };
-  });
-
-  const promptChanged = current.agent.systemPrompt.content !== next.agent.systemPrompt.content;
-  const control: InvestigationControl = {
-    schemaVersion: 1,
-    version: current.version + 1,
-    updatedAt: now,
-    research: {
-      githubRepositories: normalizeStringList(next.research.githubRepositories),
-      githubSearchMode: next.research.githubSearchMode,
-      keywords: normalizeStringList(next.research.keywords),
-      importantDocuments: next.research.importantDocuments.map((item) => ({
-        id: item.id || randomUUID(),
-        title: item.title.trim(),
-        reference: item.reference.trim(),
-      })).filter((item) => item.title && item.reference),
-    },
-    agent: {
-      model: next.agent.model.trim().slice(0, 200),
-      ...(next.agent.autoTier ? { autoTier: next.agent.autoTier } : {}),
-      permissionMode: next.agent.permissionMode,
-      autoContinuationTurns: normalizeAvatarDimension(next.agent.autoContinuationTurns, current.agent.autoContinuationTurns, 0, 6),
-      displayName: next.agent.displayName.trim().slice(0, 40),
-      personality: next.agent.personality.slice(0, 4000),
-      ...(next.agent.avatarPath ? { avatarPath: next.agent.avatarPath } : {}),
-      ...(next.agent.avatarPaths?.length ? { avatarPaths: [...next.agent.avatarPaths] } : {}),
-      ...(next.agent.avatarSources?.length ? { avatarSources: next.agent.avatarSources.map((item) => ({ ...item })) } : {}),
-      ...(next.agent.avatarMimeType ? { avatarMimeType: next.agent.avatarMimeType } : {}),
-      avatarWidth: normalizeAvatarDimension(next.agent.avatarWidth, current.agent.avatarWidth, 40, 800),
-      avatarHeight: normalizeAvatarDimension(next.agent.avatarHeight, current.agent.avatarHeight, 40, 1200),
-      // Platform capabilities are controlled by the application, not the per-Investigation UI.
-      // Custom MCP servers remain user-configurable for this Investigation.
-      platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
+    const effectiveAgent: InvestigationControl['agent'] = {
+      ...next.agent,
+      mcpServers: nextMcp,
+      platformCapabilities: global.agent.platformCapabilities.map((item) => ({ ...item })),
       systemPrompt: {
-        version: promptChanged ? current.agent.systemPrompt.version + 1 : current.agent.systemPrompt.version,
+        version: current.agent.systemPrompt.content === next.agent.systemPrompt.content
+          ? current.agent.systemPrompt.version
+          : current.agent.systemPrompt.version + 1,
         content: next.agent.systemPrompt.content,
       },
-      mcpServers: nextMcp,
-    },
-    history: [],
-  };
+    };
 
-  control.history = [
-    ...current.history,
-    {
-      version: control.version,
+    const task: TaskConfiguration = {
+      schemaVersion: 2,
+      version: current.version + 1,
+      globalVersion: global.version,
       updatedAt: now,
-      reason,
-      snapshot: snapshotOf(control),
-    },
-  ].slice(-30);
-
-  await writeJsonAtomic(controlFile(name), control);
-
-  const changed: string[] = [];
-  if (JSON.stringify(current.research) !== JSON.stringify(control.research)) changed.push('research');
-  if (promptChanged) changed.push('guidance');
-  if (JSON.stringify(current.agent.mcpServers) !== JSON.stringify(control.agent.mcpServers)) changed.push('mcp');
-  if (current.agent.model !== control.agent.model) changed.push('model');
-  if (current.agent.autoTier !== control.agent.autoTier) changed.push('autoTier');
-  if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
-  if (current.agent.autoContinuationTurns !== control.agent.autoContinuationTurns) changed.push('autoContinuation');
-  if (current.agent.displayName !== control.agent.displayName) changed.push('displayName');
-  if (
-    current.agent.avatarPath !== control.agent.avatarPath
-    || current.agent.avatarMimeType !== control.agent.avatarMimeType
-    || current.agent.avatarWidth !== control.agent.avatarWidth
-    || current.agent.avatarHeight !== control.agent.avatarHeight
-  ) changed.push('avatar');
-
-  await appendAuditEvent(name, {
-    actor: 'user',
-    action: 'configuration.updated',
-    summary: 'Updated investigation configuration: ' + (changed.join(', ') || 'no semantic changes'),
-    configurationVersion: control.version,
-    details: {
-      changed,
-      guidanceVersion: control.agent.systemPrompt.version,
-      model: control.agent.model,
-      ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
-      permissionMode: control.agent.permissionMode,
-      autoContinuationTurns: control.agent.autoContinuationTurns,
-      displayName: control.agent.displayName,
-      avatar: {
-        configured: Boolean(control.agent.avatarPath),
-        width: control.agent.avatarWidth,
-        height: control.agent.avatarHeight,
+      research: {
+        githubRepositories: normalizeStringList(next.research.githubRepositories),
+        githubSearchMode: next.research.githubSearchMode,
+        keywords: normalizeStringList(next.research.keywords),
+        importantDocuments: next.research.importantDocuments.map((item) => ({
+          id: item.id || randomUUID(),
+          title: item.title.trim(),
+          reference: item.reference.trim(),
+        })).filter((item) => item.title && item.reference),
       },
-      mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
-      platformCapabilities: control.agent.platformCapabilities.map((item) => ({ ...item })),
-    },
-  });
+      // Only task-specific deviations are persisted. Everything else follows Global.
+      agent: extractTaskAgentOverrides(effectiveAgent, global.agent),
+      history: [
+        ...current.history.map((entry) => ({
+          version: entry.version,
+          globalVersion: global.version,
+          updatedAt: entry.updatedAt,
+          reason: entry.reason,
+          snapshot: { research: clone(entry.snapshot.research), agent: clone(entry.snapshot.agent) },
+        })),
+        {
+          version: current.version + 1,
+          globalVersion: global.version,
+          updatedAt: now,
+          reason,
+          snapshot: { research: clone(task.research), agent: clone(effectiveAgent) },
+        },
+      ].slice(-30),
+    };
 
-  return control;
+    await writeJsonAtomic(controlFile(name), task);
+    const control = resolveTaskConfiguration(task, global);
+
+    const changed: string[] = [];
+    if (!sameValue(current.research, control.research)) changed.push('research');
+    if (current.agent.systemPrompt.content !== control.agent.systemPrompt.content) changed.push('guidance');
+    if (!sameValue(current.agent.mcpServers, control.agent.mcpServers)) changed.push('mcp');
+    if (current.agent.model !== control.agent.model) changed.push('model');
+    if (current.agent.autoTier !== control.agent.autoTier) changed.push('autoTier');
+    if (current.agent.permissionMode !== control.agent.permissionMode) changed.push('permission');
+    if (current.agent.autoContinuationTurns !== control.agent.autoContinuationTurns) changed.push('autoContinuation');
+    if (current.agent.displayName !== control.agent.displayName) changed.push('displayName');
+    if (
+      current.agent.personality !== control.agent.personality
+      || current.agent.avatarPath !== control.agent.avatarPath
+      || current.agent.avatarMimeType !== control.agent.avatarMimeType
+      || current.agent.avatarWidth !== control.agent.avatarWidth
+      || current.agent.avatarHeight !== control.agent.avatarHeight
+    ) changed.push('assistant');
+
+    await appendAuditEvent(name, {
+      actor: 'user',
+      action: 'configuration.updated',
+      summary: 'Updated task configuration: ' + (changed.join(', ') || 'no semantic changes'),
+      configurationVersion: control.version,
+      details: {
+        changed,
+        globalVersion: global.version,
+        inheritedAgentFields: Object.keys(global.agent).filter((key) => !(key in task.agent)),
+        guidanceVersion: control.agent.systemPrompt.version,
+        model: control.agent.model,
+        ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
+        permissionMode: control.agent.permissionMode,
+        autoContinuationTurns: control.agent.autoContinuationTurns,
+        displayName: control.agent.displayName,
+        avatar: {
+          configured: Boolean(control.agent.avatarPath),
+          width: control.agent.avatarWidth,
+          height: control.agent.avatarHeight,
+        },
+        mcpVersions: Object.fromEntries(control.agent.mcpServers.map((item) => [item.name, item.version])),
+      },
+    });
+
+    return control;
+  });
+}
+
+/** 更新 Global 配置。已有任务不会被写入；未覆盖对应字段的任务下次读取时自动继承新版本。 */
+export async function updateGlobalConfiguration(
+  next: InvestigationControl['agent'],
+  reason = 'global configuration updated',
+): Promise<GlobalConfiguration> {
+  const previous = globalConfigLock;
+  let release!: () => void;
+  globalConfigLock = new Promise<void>((resolve) => { release = resolve; });
+  await previous.catch(() => undefined);
+  try {
+    const current = await loadGlobalConfiguration();
+    const now = new Date().toISOString();
+    const nextConfig = buildGlobalConfiguration(next, current.version + 1, now);
+    await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
+    await writeJsonAtomic(globalConfigFile(), nextConfig);
+    return nextConfig;
+  } finally {
+    release();
+  }
 }
 
 /** 向 audit.jsonl 追加一条经过 Schema 校验的审计事件。 */
