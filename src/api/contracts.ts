@@ -95,12 +95,14 @@ export const JourneyStageSchema = z.object({
   status: z.enum(['completed', 'current', 'locked', 'future']),
   nodeType: z.enum(['task', 'review', 'end']),
 }).strict();
+export type JourneyStage = z.infer<typeof JourneyStageSchema>;
 
 export const JourneyRouteSchema = z.object({
   outcome: z.string().min(1),
   target: z.string().min(1),
   line: z.number().int().positive().optional(),
 }).strict();
+export type JourneyRoute = z.infer<typeof JourneyRouteSchema>;
 
 export const JourneyNodeSchema = z.object({
   id: z.string().min(1),
@@ -112,12 +114,16 @@ export const JourneyNodeSchema = z.object({
   routes: z.array(JourneyRouteSchema),
   line: z.number().int().positive().optional(),
 }).strict();
+export type JourneyActor = z.infer<typeof JourneyActorSchema>;
+export type JourneyNodeType = z.infer<typeof JourneyNodeTypeSchema>;
+export type JourneyNode = z.infer<typeof JourneyNodeSchema>;
 
 export const JourneyDefinitionSchema = z.object({
   id: z.string().min(1),
   start: z.string().min(1),
   nodes: z.array(JourneyNodeSchema).min(1),
 }).strict();
+export type JourneyDefinition = z.infer<typeof JourneyDefinitionSchema>;
 
 export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
   z.object({
@@ -177,16 +183,19 @@ export const JourneyExecutionSchema = z.object({
     requestedAt: z.string().datetime(),
   }).optional(),
 }).strict();
+export type JourneyExecution = z.infer<typeof JourneyExecutionSchema>;
 
 export const JourneyDerivedStateSchema = z.object({
   workflowId: z.string().min(1),
   stages: z.array(JourneyStageSchema),
 }).strict();
+export type JourneyDerivedState = z.infer<typeof JourneyDerivedStateSchema>;
 
 export const JourneyLayoutNodeSchema = z.object({
   x: z.number().finite(),
   y: z.number().finite(),
 }).strict();
+export type JourneyLayoutNode = z.infer<typeof JourneyLayoutNodeSchema>;
 
 export const JourneyLayoutSchema = z.object({
   version: z.literal(1),
@@ -198,6 +207,7 @@ export const JourneyLayoutSchema = z.object({
     zoom: z.number().finite().positive(),
   }).optional(),
 }).strict();
+export type JourneyLayout = z.infer<typeof JourneyLayoutSchema>;
 
 export const JourneyRunEventSchema = z.object({
   id: z.string().min(1),
@@ -225,6 +235,7 @@ export const JourneyRunEventSchema = z.object({
     cost: z.number().nonnegative().optional(),
   }).strict().optional(),
 }).strict();
+export type JourneyRunEvent = z.infer<typeof JourneyRunEventSchema>;
 
 export const WorkflowSnapshotSchema = z.object({
   workflowId: WorkflowIdSchema,
