@@ -107,7 +107,6 @@ export interface WorkflowSnapshot {
   version: number;
   definition: WorkflowDefinition;
   layout: WorkflowLayout;
-  execution: WorkflowExecution;
   state: WorkflowState;
   events: WorkflowRunEvent[];
 }
