@@ -11,7 +11,6 @@ import {
   type ResultViewModel,
   type ResultSection,
 } from '../api/results.js';
-import { loadInvestigation } from '../investigation/store.js';
 import { loadWorkspaceContext } from '../investigation/workspace.js';
 import { listTrajectoryCheckpoints, readTrajectory } from '../investigation/trajectory.js';
 import { loadInvestigationControl } from '../investigation/control.js';
@@ -43,10 +42,9 @@ function notApplicableSection(): ResultSection<never> {
 
 export async function buildResultViewModel(name: string): Promise<ResultViewModel> {
   // 这三个是结果页面本身必须存在的基础状态；它们失败才让整个 API 失败。
-  const [context, control, investigation, trajectory] = await Promise.all([
+  const [context, control, trajectory] = await Promise.all([
     loadWorkspaceContext(name),
     loadInvestigationControl(name),
-    loadInvestigation(name),
     readTrajectory(name, { limit: 5000 }),
   ]);
 
