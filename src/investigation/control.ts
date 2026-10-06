@@ -14,7 +14,6 @@ import {
   InvestigationControlSchema,
   McpServerSettingSchema,
   type AuditEvent,
-  type ImportantDocumentRef,
   type InvestigationControl,
   type McpServerSetting,
   type GlobalConfiguration,
@@ -92,7 +91,6 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
     .filter((item) => item.name);
 }
 
-const LEGACY_DEFAULT_PERSONALITY = '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。';
 const DEFAULT_PERSONALITY = '长期陪伴用户工作的专业秘书。亲近、自然、有温度，但不油腻，不刻意卖萌；工作问题直接、清楚、克制，复杂问题保持耐心，轻松交流可以有一点自然的俏皮。保持稳定的身份和表达习惯，让长期相处有连续感，但不要虚构记忆、经历或关系。人格只影响表达方式，不决定任务判断。';
 
 /** 创建一个新 Investigation 的默认配置。技能由 Copilot 根据当前任务自动发现。 */
@@ -160,15 +158,6 @@ async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
 }
 
 /** 只把与 Global 不同的 Agent 字段保存到任务 workspace，避免任务复制出一份全局配置。 */
-function extractTaskAgentOverrides(agent: InvestigationControl['agent'], globalAgent: InvestigationControl['agent']): TaskAgentOverride {
-  const override: Record<string, unknown> = {};
-  for (const key of Object.keys(agent) as Array<keyof InvestigationControl['agent']>) {
-    if (key === 'platformCapabilities') continue;
-    if (!sameValue(agent[key], globalAgent[key])) override[key] = clone(agent[key]);
-  }
-  return override as TaskAgentOverride;
-}
-
 function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfiguration): InvestigationControl {
   // task.agent 只是 partial override（缺的键由 global 补），合并后过一次完整
   // schema：既拿到完整类型，缺失字段也按 schema 默认值补齐。
@@ -236,118 +225,6 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
   };
 }
 
-/** 读取旧 control.json 后补默认值、清理历史格式，并通过 Zod 得到可信 Control。 */
-export function normalizeControl(raw: Partial<InvestigationControl>): InvestigationControl {
-  const defaults = defaultControl();
-  const research = raw.research ?? defaults.research;
-  const agent = raw.agent ?? defaults.agent;
-  const base = {
-    schemaVersion: 1,
-    version: Number(raw.version ?? 1) || 1,
-    updatedAt: raw.updatedAt ?? new Date().toISOString(),
-    research: {
-      githubRepositories: normalizeStringList(research.githubRepositories),
-      githubSearchMode: research.githubSearchMode === 'selected_and_broad' ? 'selected_and_broad' as const : 'only_selected' as const,
-      keywords: normalizeStringList(research.keywords),
-      importantDocuments: Array.isArray(research.importantDocuments)
-        ? research.importantDocuments
-            .filter((item): item is ImportantDocumentRef => Boolean(item) && typeof item === 'object')
-            .map((item) => ({
-              id: String(item.id ?? randomUUID()),
-              title: String(item.title ?? '').trim(),
-              reference: String(item.reference ?? '').trim(),
-            }))
-            .filter((item) => item.title && item.reference)
-        : [],
-    },
-    agent: {
-      model: typeof agent.model === 'string' && agent.model.trim() ? agent.model.trim().slice(0, 200) : defaults.agent.model,
-      ...(agent.autoTier === 'efficiency' || agent.autoTier === 'balance' || agent.autoTier === 'intelligence' || agent.autoTier === 'fast'
-        ? { autoTier: agent.autoTier }
-        : {}),
-      permissionMode: (agent.permissionMode ?? defaults.agent.permissionMode) === 'allow_all' ? 'allow_all' : 'permission',
-      autoContinuationTurns: normalizeAvatarDimension(agent.autoContinuationTurns, 4, 0, 6),
-      displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
-        ? agent.displayName.trim().slice(0, 40)
-        : '秘书',
-      personality: typeof agent.personality === 'string'
-        ? (agent.personality.trim() === LEGACY_DEFAULT_PERSONALITY ? defaults.agent.personality : agent.personality.slice(0, 4000))
-        : defaults.agent.personality,
-      ...(typeof agent.avatarPath === 'string' && agent.avatarPath.trim()
-        ? { avatarPath: agent.avatarPath.trim() }
-        : {}),
-      ...(Array.isArray(agent.avatarPaths)
-        ? { avatarPaths: [...new Set(agent.avatarPaths.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))] }
-        : agent.avatarPath ? { avatarPaths: [agent.avatarPath] } : {}),
-      ...(Array.isArray(agent.avatarSources)
-        ? {
-            avatarSources: agent.avatarSources
-              .filter((item) => Boolean(item) && typeof item === 'object')
-              .map((item) => {
-                const source = item as unknown as Record<string, unknown>;
-                return {
-                  src: String(source.src ?? '').trim(),
-                  kind: source.kind === 'image' || source.kind === 'video' || source.kind === 'remote' ? source.kind : 'remote',
-                  ...(typeof source.mimeType === 'string' && source.mimeType.trim() ? { mimeType: source.mimeType.trim() } : {}),
-                };
-              })
-              .filter((item) => item.src),
-          }
-        : {}),
-      ...(agent.avatarMimeType ? { avatarMimeType: String(agent.avatarMimeType).trim() } : {}),
-      avatarWidth: normalizeAvatarDimension(agent.avatarWidth, 180, 40, 800),
-      avatarHeight: normalizeAvatarDimension(agent.avatarHeight, 240, 40, 1200),
-      platformCapabilities: config.graphifyEnabled
-        ? [{
-            name: 'graphify-structural-analysis',
-            version: config.graphifyPlatformCapabilityVersion,
-            enabled: true,
-          }]
-        : [],
-      systemPrompt: {
-        version: Number(agent.systemPrompt?.version ?? 1) || 1,
-        content: typeof agent.systemPrompt?.content === 'string' ? agent.systemPrompt.content : '',
-      },
-      mcpServers: normalizeMcpServers(agent.mcpServers),
-    },
-  } as Omit<InvestigationControl, 'history'>;
-
-  // 旧版配置可能只有 avatarPaths，没有 avatarPath。默认头像应该直接使用第一张已上传图片。
-  if (!base.agent.avatarPath && base.agent.avatarPaths?.length) {
-    base.agent.avatarPath = base.agent.avatarPaths[0];
-  }
-
-  return InvestigationControlSchema.parse({
-    ...base,
-    history: Array.isArray(raw.history)
-      ? raw.history
-          .filter((item): item is InvestigationControl['history'][number] => Boolean(item) && typeof item === 'object')
-          .map((item) => {
-            // Skill configuration used to live inside each historical Agent snapshot.
-            // Strip that obsolete field while preserving the rest of the historical record.
-            const snapshot = item.snapshot as unknown as Record<string, unknown>;
-            const snapshotAgent = snapshot?.agent;
-            if (snapshotAgent && typeof snapshotAgent === 'object' && !Array.isArray(snapshotAgent)) {
-              const agentRecord = snapshotAgent as Record<string, unknown>;
-              // 兼容权限模式字段加入前生成的旧历史快照。
-              const { skills: _skills, ...agentWithoutSkills } = agentRecord;
-              return {
-                ...item,
-                snapshot: {
-                  ...snapshot,
-                  agent: {
-                    ...agentWithoutSkills,
-                    permissionMode: (agentRecord.permissionMode ?? base.agent.permissionMode) === 'allow_all' ? 'allow_all' : 'permission',
-                  },
-                },
-              };
-            }
-            return item;
-          })
-      : [],
-  });
-}
-
 /** 读取 Control；首次访问时负责创建 v1 默认配置，并用初始化锁避免并发重复创建。 */
 export async function loadInvestigationControl(name: string): Promise<InvestigationControl> {
   const global = await loadGlobalConfiguration();
@@ -356,27 +233,7 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
     if (raw.schemaVersion === 2) {
       return resolveTaskConfiguration(TaskConfigurationSchema.parse(raw), global);
     }
-
-    // Migrate the old v1 full snapshot: preserve explicit task customizations,
-    // while allowing unchanged fields to inherit future Global changes.
-    const legacy = normalizeControl(raw as Partial<InvestigationControl>);
-    const migrated: TaskConfiguration = {
-      schemaVersion: 2,
-      version: legacy.version,
-      globalVersion: global.version,
-      updatedAt: legacy.updatedAt,
-      research: clone(legacy.research),
-      agent: extractTaskAgentOverrides(legacy.agent, global.agent),
-      history: legacy.history.map((entry) => ({
-        version: entry.version,
-        globalVersion: global.version,
-        updatedAt: entry.updatedAt,
-        reason: entry.reason,
-        snapshot: { research: clone(entry.snapshot.research), agent: clone(entry.snapshot.agent) },
-      })),
-    };
-    await writeJsonAtomic(controlFile(name), migrated);
-    return resolveTaskConfiguration(migrated, global);
+    return resolveTaskConfiguration(TaskConfigurationSchema.parse(raw), global);
   } catch (error) {
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
