@@ -69,3 +69,14 @@ Confluence 下载页面保存为：
 4. 不保存 password、token、cookie、OAuth access token 等凭据。
 5. 能由脚本确定性获得的事实，直接运行脚本；不要在 SKILL 或 prompt 中写一份会漂移的“内置答案”。
 6. GitHub / LeanIX / Confluence 的具体访问流程由对应 SKILL 决定。
+## 输入校验
+所有文件操作必须限制在当前 Investigation workspace 或明确允许的 shared 目录。
+禁止保存 password、token、cookie、OAuth access token 等凭据；生成文件前必须确认目标路径属于允许目录。
+## 输出
+这个 Skill 不产生业务结论；它保证调查状态、报告和中间分析文件都有稳定、安全的保存位置。
+## 输出与验证
+路径必须在允许目录内，文件可以被重新读取，shared 文件必须能通过 index.json 找回。
+## Gate
+Gate 是路径安全、文件可读和来源可追溯。业务结果是否正确由对应 Skill / Workflow 另外检查。
+## 期望结果示例
+> 本轮分析已经保存到当前调查的 artifacts/analysis/；共享的 GitHub 资料保存到 shared/github/，下一轮可以直接继续使用。
