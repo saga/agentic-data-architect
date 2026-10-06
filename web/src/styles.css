@@ -125,13 +125,21 @@ body {
   overflow: hidden;
 }
 
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
 .topbar-title {
   min-width: 0;
   overflow: hidden;
 }
 
 .topbar-actions {
-  margin-inline-start: auto;
+  margin-inline-start: auto !important;
+  flex: 0 0 auto;
   flex-wrap: nowrap;
   justify-content: flex-end;
 }
@@ -224,6 +232,25 @@ body {
 .assistant-message-content {
   display: grid;
   gap: 2px;
+}
+
+.assistant-companion-note {
+  margin: 2px 0 4px;
+  color: rgba(0, 0, 0, 0.58);
+  font-size: var(--font-size-md);
+  line-height: 1.65;
+}
+
+.assistant-typing-indicator {
+  display: inline-block;
+  min-height: 20px;
+  letter-spacing: 0.18em;
+  animation: assistant-typing 1.4s ease-in-out infinite;
+}
+
+@keyframes assistant-typing {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.8; }
 }
 
 .assistant-action-bar {
