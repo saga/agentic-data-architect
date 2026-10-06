@@ -23,6 +23,7 @@ import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadModernizationJourney } from './journey.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
+import { buildCurrentArtifactProvenance, isArtifactCurrent } from '../investigation/artifact.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
@@ -271,11 +272,16 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     evidenceIds,
   });
 
+  const planWithProvenance = ModernizationPlanSchema.parse({
+    ...plan,
+    provenance: await buildCurrentArtifactProvenance(name, plan.version),
+  });
+
   const dir = reportsDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, 'modernization-plan.json');
-  await fs.writeFile(fp, JSON.stringify(plan, null, 2), 'utf-8');
-  return { plan, path: fp };
+  await fs.writeFile(fp, JSON.stringify(planWithProvenance, null, 2), 'utf-8');
+  return { plan: planWithProvenance, path: fp };
 }
 
 /**
@@ -452,10 +458,15 @@ export async function persistModernizationAgentResult(
       ])],
     });
 
+    const persistedPlan = ModernizationPlanSchema.parse({
+      ...nextPlan,
+      provenance: await buildCurrentArtifactProvenance(name, nextPlan.version),
+    });
+
     const dir = reportsDir(name);
     await fs.mkdir(dir, { recursive: true });
     const filePath = path.join(dir, 'modernization-plan.json');
-    await writeJsonAtomic(filePath, nextPlan);
+    await writeJsonAtomic(filePath, persistedPlan);
 
     return {
       saved: true,
@@ -470,6 +481,7 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
     const plan = ModernizationPlanSchema.parse(raw);
+    if (!(await isArtifactCurrent(name, plan.provenance))) return null;
     const inv = await loadInvestigation(name);
     const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
     const current = snapshot?.currentState ?? null;
