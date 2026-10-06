@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { computeArtifactProvenance, artifactProvenanceMatches } from '../investigation/artifact-provenance.js';
+import { ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
@@ -22,6 +24,7 @@ export const ArchitectureAssessmentPlanSchema = z.object({
   updatedAt: z.string().min(1),
   goal: z.string(),
   scope: z.array(z.string()),
+  provenance: ArtifactProvenanceSchema.optional(),
   currentState: z.object({
     datasets: z.number().int().nonnegative(),
     lineageCoverage: z.number().min(0).max(1).nullable(),
@@ -32,7 +35,7 @@ export const ArchitectureAssessmentPlanSchema = z.object({
   findings: z.array(z.object({
     id: z.string().min(1),
     title: z.string().min(1),
-    severity: z.string().min(1),
+    severity: FindingSeveritySchema,
     description: z.string().min(1),
     recommendation: z.string().min(1),
     evidenceIds: z.array(z.string()),
@@ -50,6 +53,25 @@ export const ArchitectureAssessmentPlanSchema = z.object({
 export type ArchitectureAssessmentPlan = z.infer<typeof ArchitectureAssessmentPlanSchema>;
 
 const planFile = (name: string): string => path.join(reportsDir(name), 'architecture-assessment.json');
+export function toArchitectureAssessmentView(plan: ArchitectureAssessmentPlan): ArchitectureAssessmentView {
+  return {
+    id: plan.id,
+    title: plan.title,
+    status: plan.status,
+    version: plan.version,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt,
+    goal: plan.goal,
+    scope: plan.scope,
+    currentState: plan.currentState,
+    findings: plan.findings,
+    recommendations: plan.recommendations,
+    roadmap: plan.roadmap,
+    evidenceIds: plan.evidenceIds,
+    ...(plan.provenance ? { provenance: plan.provenance } : {}),
+  };
+}
+
 
 interface FindingRecommendationRule {
   id: string;
@@ -90,6 +112,14 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
   const timestamp = new Date().toISOString();
+  let version = 1;
+  try {
+    const existingRaw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
+    const existingPlan = ArchitectureAssessmentPlanSchema.safeParse(existingRaw);
+    if (existingPlan.success) version = existingPlan.data.version + 1;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) throw error;
+  }
   const recommendationRules = (await loadFindingRecommendationRules()).rules;
 
   const findings = inv.findings.slice(0, 50).map((finding) => ({
@@ -113,8 +143,9 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 
   const plan: ArchitectureAssessmentPlan = ArchitectureAssessmentPlanSchema.parse({
     id: 'assessment-' + Date.now().toString(36),
-    title: '架构评估结果', status: 'draft', version: 1, createdAt: timestamp, updatedAt: timestamp,
+    title: '架构评估结果', status: 'draft', version, createdAt: timestamp, updatedAt: timestamp,
     goal: inv.goal || inv.userPrompt, scope: inv.scope,
+    provenance: computeArtifactProvenance(inv, snapshot, version),
     currentState: { datasets: current?.coverage.datasets ?? 0, lineageCoverage: current?.coverage.datasetLineageConnectionRate ?? null, semanticAssets: current?.coverage.semanticAssets ?? 0, findings: findings.length, unknowns: inv.unknowns.length },
     findings, recommendations, roadmap, evidenceIds: dedupe(findings.flatMap((finding) => finding.evidenceIds)),
   });
@@ -129,7 +160,12 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
   try {
     const raw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
-    return ArchitectureAssessmentPlanSchema.parse(raw);
+    const plan = ArchitectureAssessmentPlanSchema.parse(raw);
+    const inv = await loadInvestigation(name);
+    const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+    const currentProvenance = computeArtifactProvenance(inv, snapshot, plan.version);
+    if (!artifactProvenanceMatches(plan.provenance, currentProvenance)) return null;
+    return plan;
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;

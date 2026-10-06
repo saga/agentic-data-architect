@@ -13,35 +13,24 @@ import * as z from 'zod';
 import { config } from '../config.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { parseSkillManifest } from '../skills/catalog.js';
+import {
+  JourneyDefinitionSchema,
+  JourneyNodeSchema,
+  JourneyRouteSchema,
+  JourneyExecutionSchema,
+  JourneyRunEventSchema,
+  JourneyStageSchema,
+  type JourneyNode as SharedJourneyNode,
+  type JourneyRoute as SharedJourneyRoute,
+  type JourneyExecution as SharedJourneyExecution,
+  type JourneyRunEvent as SharedJourneyRunEvent,
+} from '../api/contracts.js';
+
+export { JourneyDefinitionSchema, JourneyNodeSchema, JourneyRouteSchema, JourneyExecutionSchema, JourneyRunEventSchema } from '../api/contracts.js';
 
 export type JourneyNodeType = 'task' | 'review' | 'end';
 export type JourneyActor = 'agent' | 'human';
 export type JourneyStatus = 'completed' | 'current' | 'locked' | 'future';
-
-export interface JourneyRoute {
-  outcome: string;
-  target: string;
-  line?: number | undefined;
-}
-
-export interface JourneyNode {
-  id: string;
-  type: JourneyNodeType;
-  title: string;
-  objective?: string | undefined;
-  /** 主要执行者；默认是 Agent，@review 默认是人工。 */
-  actor: JourneyActor;
-  /** 存在 completeWhen 时由已有事实自动推进；否则等待 Agent/人工选择 outcome。 */
-  completeWhen?: string | undefined;
-  routes: JourneyRoute[];
-  line?: number | undefined;
-}
-
-export interface JourneyDefinition {
-  id: string;
-  start: string;
-  nodes: JourneyNode[];
-}
 
 export interface ParsedJourney {
   definition?: JourneyDefinition;
@@ -54,6 +43,32 @@ export interface ParsedJourney {
  * 这些字段属于应用状态，而不是 Markdown DSL。Workflow 只保存 completeWhen 的名字，
  * 这里才决定这个名字如何映射到真实事实。这样增加业务事实时，不需要继续增加 DSL 字段。
  */
+export interface ModernizationDerivedFacts {
+  targetComponentCount: number;
+  mappingCount: number;
+  validationCount: number;
+  blockingValidationReady: number;
+  blockingValidationTotal: number;
+}
+
+/** Modernization 相关完成语义的唯一确定性解释器。 */
+export function deriveModernizationFacts(input: {
+  targetStatus: string;
+  targetComponentCount: number;
+  mappingStatuses: string[];
+  validationStatuses: Array<{ status: string; blocking: boolean }>;
+}): ModernizationDerivedFacts {
+  return {
+    targetComponentCount: input.targetStatus === 'draft' ? 0 : input.targetComponentCount,
+    mappingCount: input.mappingStatuses.filter((status) => status === 'reviewed' || status === 'approved').length,
+    validationCount: input.validationStatuses.length,
+    blockingValidationReady: input.validationStatuses.filter(
+      (item) => item.blocking && item.status === 'passed',
+    ).length,
+    blockingValidationTotal: input.validationStatuses.filter((item) => item.blocking).length,
+  };
+}
+
 export interface JourneyFacts {
   /** 用户明确给出的本次调查目标；为空时通常不能自动完成 intake。 */
   goal: string;
@@ -78,58 +93,14 @@ export interface JourneyFacts {
   blockingValidationTotal: number;
 }
 
-export interface JourneyStage {
-  id: string;
-  title: string;
-  objective: string;
-  status: JourneyStatus;
-  nodeType: JourneyNodeType;
-}
-
-export interface JourneyPendingInteraction {
-  id: string;
-  nodeId: string;
-  reason: string;
-  requestedAt: string;
-}
-
-export type JourneyRunEventType =
-  | 'workflow-started'
-  | 'node-started'
-  | 'node-completed'
-  | 'node-waiting'
-  | 'node-failed'
-  | 'workflow-completed'
-  | 'transition-rejected';
-
-export interface JourneyRunEvent {
-  id: string;
-  runId: string;
-  workflowId: string;
-  workflowVersion: number;
-  type: JourneyRunEventType;
-  timestamp: string;
-  nodeId?: string;
-  outcome?: string;
-  error?: string;
-  data?: unknown;
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-    cost?: number;
-  };
-}
-
-export interface JourneyExecution {
-  workflowId: string;
-  workflowVersion: number;
-  runId: string;
-  currentNodeId: string;
-  completedNodeIds: string[];
-  status: 'active' | 'waiting' | 'completed';
-  pendingInteraction?: JourneyPendingInteraction | undefined;
-}
+export type JourneyRoute = SharedJourneyRoute;
+export type JourneyNode = SharedJourneyNode;
+export type JourneyDefinition = z.infer<typeof JourneyDefinitionSchema>;
+export type JourneyStage = z.infer<typeof JourneyStageSchema>;
+export type JourneyPendingInteraction = z.infer<typeof JourneyExecutionSchema>['pendingInteraction'];
+export type JourneyRunEvent = SharedJourneyRunEvent;
+export type JourneyRunEventType = SharedJourneyRunEvent['type'];
+export type JourneyExecution = SharedJourneyExecution;
 
 export interface JourneyState {
   workflowId: string;
@@ -734,26 +705,3 @@ export function describeJourneyCurrentNode(
   };
 }
 
-/** 编辑器和运行时共用的结构 schema（节点/边另行导出，供 journey-edit 等复用）。 */
-export const JourneyRouteSchema = z.object({
-  outcome: z.string().min(1),
-  target: z.string().min(1),
-  line: z.number().int().positive().optional(),
-}).strict();
-
-export const JourneyNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.enum(['task', 'review', 'end']),
-  title: z.string().min(1),
-  objective: z.string().optional(),
-  actor: z.enum(['agent', 'human']).default('agent'),
-  completeWhen: z.string().optional(),
-  routes: z.array(JourneyRouteSchema),
-  line: z.number().int().positive().optional(),
-}).strict();
-
-export const JourneyDefinitionSchema = z.object({
-  id: z.string().min(1),
-  start: z.string().min(1),
-  nodes: z.array(JourneyNodeSchema).min(1),
-}).strict().transform((value) => value as JourneyDefinition);

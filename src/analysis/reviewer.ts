@@ -44,6 +44,9 @@ export const ArtifactReviewSchema = z.object({
   summary: z.string().trim().min(1),
   issues: z.array(ReviewIssueSchema),
   reviewedAt: z.string().datetime(),
+  artifactHash: z.string().min(1).optional(),
+  sourceRevision: z.string().min(1).optional(),
+  artifactVersion: z.number().int().positive().optional(),
 }).strict();
 export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
 
@@ -99,6 +102,9 @@ function buildReviewPrompt(input: {
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
+  artifactHash?: string;
+  sourceRevision?: string;
+  artifactVersion?: number;
 }): string {
   return [
     '原始用户目标：',
@@ -143,6 +149,9 @@ async function runReviewerOnce(
     artifactType: ReviewArtifactType;
     artifact: string;
     facts?: string;
+    artifactHash?: string;
+    sourceRevision?: string;
+    artifactVersion?: number;
   },
   structured: boolean,
 ): Promise<ArtifactReview> {
@@ -175,6 +184,9 @@ async function runReviewerOnce(
   const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
+    ...(input.artifactHash ? { artifactHash: input.artifactHash } : {}),
+    ...(input.sourceRevision ? { sourceRevision: input.sourceRevision } : {}),
+    ...(input.artifactVersion ? { artifactVersion: input.artifactVersion } : {}),
     availability: 'completed',
     status: normalizedStatus,
     reviewedAt: new Date().toISOString(),
@@ -187,6 +199,9 @@ export async function reviewArtifact(input: {
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
+  artifactHash?: string;
+  sourceRevision?: string;
+  artifactVersion?: number;
 }): Promise<ArtifactReview> {
   try {
     return await runReviewerOnce(input, true);
@@ -207,6 +222,9 @@ export async function reviewArtifact(input: {
           suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
         }],
         reviewedAt: new Date().toISOString(),
+        ...(input.artifactHash ? { artifactHash: input.artifactHash } : {}),
+        ...(input.sourceRevision ? { sourceRevision: input.sourceRevision } : {}),
+        ...(input.artifactVersion ? { artifactVersion: input.artifactVersion } : {}),
       };
     }
   }

@@ -5,19 +5,16 @@ import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlin
 
 const { Title, Text, Paragraph } = Typography;
 
-export interface ConfigPageControl {
-  version:number; updatedAt:string;
-  research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; personality:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:string; avatarSources?:Array<{src:string;kind:'image'|'video'|'remote';mimeType?:string}>; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
-  history:Array<{version:number;updatedAt:string;reason:string}>;
-}
-export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
+import type { InvestigationControl, WorkflowId } from '../app/types.js';
 
-const workflowOptions:{value:ConfigWorkflow;label:string}[]=[
- {value:'',label:'自主调查'},
- {value:'legacy-modernization',label:'改造已有系统'},
- {value:'financial-ai-native-architecture',label:'金融 AI / 数据架构设计'},
- {value:'data-architecture-assessment',label:'数据架构评估'},
+export type ConfigPageControl = InvestigationControl;
+export type ConfigWorkflow = '' | WorkflowId;
+
+const workflowOptions: { value: ConfigWorkflow; label: string }[] = [
+  { value: '', label: '自主调查' },
+  { value: 'legacy-modernization', label: '改造已有系统' },
+  { value: 'financial-ai-native-architecture', label: '金融 AI / 数据架构设计' },
+  { value: 'data-architecture-assessment', label: '数据架构评估' },
 ];
 
 function clone<T>(value:T):T{return JSON.parse(JSON.stringify(value)) as T;}

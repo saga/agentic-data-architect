@@ -1,5 +1,5 @@
 /** Investigation 路由解析与 URL 构造。 */
-import type { WorkflowId } from './types';
+import { WorkflowIdSchema, type WorkflowId } from '../../../src/api/contracts.js';
 
 export type PageId = 'chat' | 'config' | 'trajectory' | 'journey' | 'results';
 export interface RouteInfo { session: string; page: PageId; }
@@ -16,5 +16,5 @@ export function buildInvestigationPath(session: string, page: PageId = 'chat'): 
 }
 
 export function isWorkflowId(value: string): value is WorkflowId {
-  return value === 'legacy-modernization' || value === 'financial-ai-native-architecture' || value === 'data-architecture-assessment';
+  return WorkflowIdSchema.safeParse(value).success;
 }

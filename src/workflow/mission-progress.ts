@@ -13,6 +13,7 @@ import type { DiscoverySnapshot } from './discover.js';
 import { loadArchitectureAssessmentPlan } from './assessment.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
+import { deriveModernizationFacts } from './journey.js';
 
 export type MissionDeliverableStatus =
   | 'covered'
@@ -252,13 +253,12 @@ export async function buildMissionProgress(
   if (investigation.workflow === 'legacy-modernization') {
     const plan = await loadModernizationPlan(name);
     if (plan) {
-      signals.modernization = {
+      signals.modernization = deriveModernizationFacts({
+        targetStatus: plan.targetArchitecture.status,
         targetComponentCount: plan.targetArchitecture.components.length,
-        mappingCount: plan.mappings.length,
-        validationCount: plan.validationPlan.checks.length,
-        blockingValidationReady: plan.validationPlan.checks.filter((item) => item.blocking && item.status === 'passed').length,
-        blockingValidationTotal: plan.validationPlan.checks.filter((item) => item.blocking).length,
-      };
+        mappingStatuses: plan.mappings.map((item) => item.status),
+        validationStatuses: plan.validationPlan.checks.map((item) => ({ status: item.status, blocking: item.blocking })),
+      });
     }
   }
 

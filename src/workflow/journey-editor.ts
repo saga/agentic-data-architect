@@ -22,6 +22,8 @@ import {
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
+import { loadArchitectureAssessmentPlan } from './assessment.js';
+import { JourneyLayoutSchema, WorkflowSnapshotSchema, JourneyRunEventSchema } from '../api/contracts.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
@@ -47,6 +49,7 @@ import {
   type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
+import { deriveModernizationFacts } from './journey.js';
 
 
 const JOURNEY_DIR = 'workflow';
@@ -55,23 +58,6 @@ const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
 const EXECUTION_FILE = 'journey-execution.json';
 const EVENTS_FILE = 'journey-run-events.jsonl';
-
-export const JourneyLayoutNodeSchema = z.object({
-  x: z.number().finite(),
-  y: z.number().finite(),
-}).strict();
-
-export const JourneyLayoutSchema = z.object({
-  version: z.literal(1),
-  nodes: z.record(z.string(), JourneyLayoutNodeSchema),
-  /** 当前使用的自动布局算法；旧 layout 可以没有这个字段。 */
-  engine: z.enum(['workflow-v1', 'workflow-v2']).optional(),
-  viewport: z.object({
-    x: z.number().finite(),
-    y: z.number().finite(),
-    zoom: z.number().finite().positive(),
-  }).optional(),
-}).strict();
 
 export type JourneyLayout = z.infer<typeof JourneyLayoutSchema>;
 
@@ -88,17 +74,7 @@ const JourneyMetaSchema = z.object({
 
 type JourneyMeta = z.infer<typeof JourneyMetaSchema>;
 
-export interface JourneySnapshot {
-  workflowId: WorkflowId;
-  source: 'base' | 'custom';
-  baseWorkflowId: WorkflowId;
-  version: number;
-  definition: JourneyDefinition;
-  layout: JourneyLayout;
-  execution: JourneyExecution;
-  state: JourneyState;
-   events: JourneyRunEvent[];
-}
+export type JourneySnapshot = z.infer<typeof WorkflowSnapshotSchema>;
 
 function journeyDir(name: string): string {
   return path.join(workspaceRoot(name), JOURNEY_DIR);
@@ -130,20 +106,16 @@ async function readTextOrNull(file: string): Promise<string | null> {
  */
 export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
   await fs.mkdir(journeyDir(name), { recursive: true });
-  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(event) + '\n', 'utf8');
+  const validated = JourneyRunEventSchema.parse(event);
+  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(validated) + '\n', 'utf8');
 }
 
 /** 只读取最近事件供 UI/诊断使用；完整历史文件仍留在 workspace，不塞进当前快照。 */
 export async function loadJourneyRunEvents(name: string, limit = 80): Promise<JourneyRunEvent[]> {
   const raw = await readTextOrNull(journeyFile(name, EVENTS_FILE));
   if (!raw) return [];
-  return raw.split(/\r?\n/).filter(Boolean).slice(-limit).flatMap((line) => {
-    try {
-      return [JSON.parse(line) as JourneyRunEvent];
-    } catch {
-      return [];
-    }
-  });
+  const lines = raw.split(/\r?\n/).filter(Boolean).slice(-Math.max(1, Math.min(Math.trunc(limit), 5000)));
+  return lines.map((line) => JourneyRunEventSchema.parse(JSON.parse(line)) as JourneyRunEvent);
 }
 
 /**
@@ -344,6 +316,20 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const modernization = context.workflow === 'legacy-modernization'
     ? await loadModernizationPlan(name)
     : null;
+  const assessment = context.workflow === 'data-architecture-assessment'
+    ? await loadArchitectureAssessmentPlan(name)
+    : null;
+  const modernizationFacts = modernization
+    ? deriveModernizationFacts({
+        targetStatus: modernization.targetArchitecture.status,
+        targetComponentCount: modernization.targetArchitecture.components.length,
+        mappingStatuses: modernization.mappings.map((mapping) => mapping.status),
+        validationStatuses: modernization.validationPlan.checks.map((check) => ({
+          status: check.status,
+          blocking: check.blocking,
+        })),
+      })
+    : null;
 
   return {
     goal: context.goal || context.userPrompt,
@@ -361,17 +347,16 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
       estate: snapshot?.estate ?? null,
       findings: context.findings,
     }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    targetComponentCount: modernization?.targetArchitecture.status !== 'draft'
-      ? modernization?.targetArchitecture.components.length ?? 0
-      : 0,
-    mappingCount: modernization?.mappings.filter((mapping) => mapping.status !== 'rejected').length ?? 0,
-    // “ready”只是准备好了，不能算验证已经通过；地图上的 validation 事实只统计 passed。
-    blockingValidationReady: modernization?.validationPlan.checks.filter(
-      (check) => check.blocking && check.status === 'passed',
-    ).length ?? 0,
-    blockingValidationTotal: modernization?.validationPlan.checks.filter(
-      (check) => check.blocking,
-    ).length ?? 0,
+    ...(modernizationFacts ?? {
+      targetComponentCount: 0,
+      mappingCount: 0,
+      validationCount: 0,
+      blockingValidationReady: 0,
+      blockingValidationTotal: 0,
+    }),
+    findingCount: assessment?.findings.length ?? 0,
+    recommendationCount: assessment?.recommendations.length ?? 0,
+    roadmapItemCount: assessment?.roadmap.length ?? 0,
   };
 }
 
@@ -484,7 +469,7 @@ export async function getJourneySnapshot(
   // 事件必须在自动推进持久化之后重新读取，否则本次 snapshot 会落后一轮。
   const events = await loadJourneyRunEvents(name);
 
-  return {
+  return WorkflowSnapshotSchema.parse({
     workflowId,
     source: active.source,
     baseWorkflowId: active.baseWorkflowId,
@@ -492,9 +477,12 @@ export async function getJourneySnapshot(
     definition: active.definition,
     layout: active.layout,
     execution: state.execution,
-    state,
-     events,
-  };
+    state: {
+      workflowId: state.workflowId,
+      stages: state.stages,
+    },
+    events,
+  });
 }
 
 /** 图验证入口；同时检查每个节点是否有画布位置。 */
@@ -1217,5 +1205,5 @@ export async function getJourneyState(
   workflowId: WorkflowId,
 ): Promise<JourneyState> {
   const snapshot = await getJourneySnapshot(name, workflowId);
-  return snapshot.state;
+  return { ...snapshot.state, execution: snapshot.execution };
 }

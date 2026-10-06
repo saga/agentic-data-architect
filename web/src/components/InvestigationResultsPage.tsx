@@ -1,78 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
-import { ArrowLeftOutlined, HistoryOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
+import { TrajectoryResponseSchema, ModernizationResponseSchema, type TrajectoryEvent, type ModernizationPlanView } from '../../../src/api/contracts.js';
+import type { InvestigationCheckpoint } from '../app/types.js';
 import { XMarkdown } from '@ant-design/x-markdown';
 
-const { Title, Text, Paragraph } = Typography;
-
-interface Checkpoint {
-  id: string;
-  turnId: string;
-  timestamp: string;
-  execution: number;
-  title: string;
-  summary: string;
-  confirmed: string[];
-  evidenceIds: string[];
-  unknowns: string[];
-  nextStep?: string;
-}
-
-interface TrajectoryEvent {
-  type: string;
-  timestamp: string;
-  details?: unknown;
-}
+type Checkpoint = InvestigationCheckpoint;
+type ModernizationPlan = ModernizationPlanView;
 
 interface SessionSnapshot {
   context: { workflow: string | null };
   control: { version: number; agent: { model: string; displayName: string } };
 }
 
-interface ModernizationPlan {
-  version: number;
-  status: string;
-  targetArchitecture: {
-    title: string;
-    status: string;
-    principles: string[];
-    components: Array<{ id: string; name: string; description: string; sourceAssets: string[] }>;
-    openQuestions: string[];
-    evidenceIds: string[];
-  };
-  mappings: Array<{
-    id: string;
-    title: string;
-    status: string;
-    sourceAsset: string;
-    targetAsset: string;
-    transformation?: string;
-    businessRule?: string;
-    validationRule?: string;
-    evidenceIds: string[];
-  }>;
-  mappingCoverage?: { sourceAssets: string[]; unmappedAssets: string[] };
-  validationPlan: {
-    checks: Array<{
-      id: string;
-      name: string;
-      status: string;
-      blocking: boolean;
-      evidenceIds: string[];
-      result?: string;
-    }>;
-    cutoverCriteria: string[];
-    rollbackCriteria: string[];
-  };
-}
 
-function asCheckpoint(event: TrajectoryEvent): Checkpoint | undefined {
+const { Title, Text, Paragraph } = Typography;
+
+function asCheckpoint(event: TrajectoryEvent): InvestigationCheckpoint | undefined {
   if (event.type !== 'checkpoint' || !event.details || typeof event.details !== 'object') return undefined;
   const value = event.details as Record<string, unknown>;
   if (typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.summary !== 'string') return undefined;
   return {
     id: value.id,
-    turnId: typeof value.turnId === 'string' ? value.turnId : '',
+    turnId: event.turnId,
     timestamp: event.timestamp,
     execution: typeof value.execution === 'number' ? value.execution : 0,
     title: value.title,
@@ -110,7 +60,7 @@ export function InvestigationResultsPage(props: {
         fetch(sessionPath),
         fetch(sessionPath + '/modernization'),
       ]);
-      if (!reportResponse.ok && reportResponse.status !== 409) {
+      if (!reportResponse.ok && reportResponse.status !== 404 && reportResponse.status !== 409) {
         throw new Error((await reportResponse.text()) || reportResponse.statusText);
       }
       if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
@@ -120,16 +70,16 @@ export function InvestigationResultsPage(props: {
       const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
         reportResponse.ok
           ? reportResponse.text()
-          : reportResponse.json() as Promise<{error?: string}>,
-        trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
+          : reportResponse.json() as Promise<{error?: string; code?: string}>,
+        trajectoryResponse.json().then((payload: unknown) => TrajectoryResponseSchema.parse(payload)),
         sessionResponse.json() as Promise<SessionSnapshot>,
         modernizationResponse.ok
-          ? modernizationResponse.json() as Promise<{plan?: ModernizationPlan | null}>
+          ? modernizationResponse.json().then((payload: unknown) => ModernizationResponseSchema.parse(payload))
           : Promise.resolve({ plan: null }),
       ]);
 
       const unique = new Map<string, Checkpoint>();
-      for (const event of trajectoryData.events ?? []) {
+      for (const event of trajectoryData.events) {
         const checkpoint = asCheckpoint(event);
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
       }
@@ -177,6 +127,26 @@ export function InvestigationResultsPage(props: {
           <Button icon={<SettingOutlined />} onClick={props.onOpenConfig}>调查配置</Button>
           <Button icon={<ToolOutlined />} onClick={props.onOpenTrajectory}>Agent 轨迹</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void load()} loading={loading}>刷新</Button>
+          <Button
+            icon={<ReloadOutlined />}
+            type='primary'
+            onClick={async () => {
+              setLoading(true);
+              setError(undefined);
+              setReportGateError(undefined);
+              try {
+                const response = await fetch('/api/sessions/' + encodeURIComponent(props.sessionName) + '/report/regenerate', { method: 'POST' });
+                if (!response.ok) throw new Error((await response.text()) || response.statusText);
+                const payload = await response.json() as { markdown?: string };
+                setReport(payload.markdown ?? '');
+                await load();
+              } catch (cause) {
+                setReportGateError(cause instanceof Error ? cause.message : '报告重新生成失败');
+                setLoading(false);
+              }
+            }}
+            loading={loading}
+          >重新生成报告</Button>
         </Space>
       </header>
 

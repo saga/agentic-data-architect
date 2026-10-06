@@ -29,6 +29,7 @@ import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, getActiveInvestigationTurn, requestAbort } from './workflow/ask.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
+import { SseEventSchema, ApiErrorSchema, ExecutionStatusSchema, TrajectoryResponseSchema, ArchitectureAssessmentResponseSchema, ModernizationResponseSchema, type SseEvent } from './api/contracts.js';
 import {
   buildJourneyAgentInstruction,
   getJourneySnapshot,
@@ -38,15 +39,18 @@ import {
   validateJourneyEdit,
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
-import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
-import { runReport } from './workflow/report.js';
-import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
+import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
+import { readReport, runReport, ReportQualityGateError } from './workflow/report.js';
+import { buildModernizationPlan, loadModernizationPlan, toModernizationPlanView } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
   loadArchitectureAssessmentPlan,
+  toArchitectureAssessmentView,
 } from './workflow/assessment.js';
 import { config } from './config.js';
 import { ScopeGateError } from './workflow/scope-gate.js';
+import { ReportGateError } from './workflow/report-gate.js';
+
 import {
   buildMissionDraft,
   evaluateMissionGate,
@@ -319,7 +323,6 @@ app.post('/api/sessions', async (req, res) => {
         content: message.content,
         capturedAt: message.createdAt,
       })),
-      checkpoints: listTrajectoryCheckpoints(trajectory, 20),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
       currentState: snapshot?.currentState ?? null,
@@ -489,7 +492,7 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const active = getActiveInvestigationTurn(name);
     if (!active) {
-      res.json({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
+      res.json(ExecutionStatusSchema.parse({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0, startedAt: null, lastActivityAt: null, lastActivity: null }));
       return;
     }
     const pendingPermissions = listPendingCopilotPermissions(name);
@@ -501,14 +504,17 @@ app.post('/api/sessions', async (req, res) => {
         : pendingUserInputs.length > 0
           ? 'waiting_user_input'
           : 'running';
-    res.json({
+    res.json(ExecutionStatusSchema.parse({
       state,
       running: true,
       turnId: active.turnId,
       phase: active.phase,
       pendingPermissionCount: pendingPermissions.length,
       pendingUserInputCount: pendingUserInputs.length,
-    });
+      startedAt: null,
+      lastActivityAt: null,
+      lastActivity: null,
+    }));
   });
 
   app.get('/api/sessions/:name/trajectory', async (req, res) => {
@@ -1043,7 +1049,8 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     try {
       const snapshot = await getJourneySnapshot(name, context.workflow);
       res.json({
-        journey: snapshot.state,
+        // Compatibility projection only; canonical workflow state is /workflow.
+        journey: { ...snapshot.state, execution: snapshot.execution },
         routePlan: context.journeyPlan ?? null,
         workflow: {
           source: snapshot.source,
@@ -1076,25 +1083,29 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     if (context.workflow !== 'data-architecture-assessment') {
-      res.json({ plan: null, path: null });
+      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: null, path: null }));
       return;
     }
     const rebuild = req.query.rebuild === 'true';
     const existing = await loadArchitectureAssessmentPlan(name);
     if (existing && !rebuild) {
-      res.json({ plan: existing, path: null });
+      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: toArchitectureAssessmentView(existing), path: null }));
       return;
     }
     if (!existing && !rebuild) {
-      res.json({ plan: null, path: null });
+      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: null, path: null }));
       return;
     }
     try {
       const result = await buildArchitectureAssessmentPlan(name);
-      res.json(result);
+      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: toArchitectureAssessmentView(result.plan), path: result.path }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError) {
-        res.status(409).json({ error: error.message, checks: error.result.checks });
+        res.status(409).json(ApiErrorSchema.parse({
+          code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : 'SCOPE_REQUIRED',
+          error: error.message,
+          details: { checks: error.result.checks },
+        }));
         return;
       }
       throw error;
@@ -1106,19 +1117,23 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const rebuild = req.query.rebuild === 'true';
     const existing = await loadModernizationPlan(name);
     if (existing && !rebuild) {
-      res.json({ plan: existing, path: null });
+      res.json(ModernizationResponseSchema.parse({ plan: toModernizationPlanView(existing), path: null }));
       return;
     }
     if (!existing && !rebuild) {
-      res.json({ plan: null, path: null });
+      res.json(ModernizationResponseSchema.parse({ plan: null, path: null }));
       return;
     }
     try {
       const result = await buildModernizationPlan(name);
-      res.json(result);
+      res.json(ModernizationResponseSchema.parse({ plan: toModernizationPlanView(result.plan), path: result.path }));
     } catch (error) {
       if (error instanceof ScopeGateError) {
-        res.status(409).json({ error: error.message, checks: error.result.checks });
+        res.status(409).json(ApiErrorSchema.parse({
+          code: 'SCOPE_REQUIRED',
+          error: error.message,
+          details: { checks: error.result.checks },
+        }));
         return;
       }
       throw error;
@@ -1127,14 +1142,51 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   app.get('/api/sessions/:name/report', async (req, res) => {
     const name = sessionKey(req.params.name);
-    try {
-      const report = await runReport(name);
+    const report = await readReport(name);
+    if (report.status === 'current' && report.markdown) {
       res.type('text/markdown').send(report.markdown);
+      return;
+    }
+    if (report.status === 'missing') {
+      res.status(404).json({ code: 'REPORT_NOT_GENERATED', error: '还没有生成正式报告，请显式重新生成。' });
+      return;
+    }
+    if (report.status === 'stale') {
+      res.status(409).json({ code: 'REPORT_STALE', error: '正式报告对应的调查成果已经变化，需要重新生成。' });
+      return;
+    }
+    if (report.status === 'blocked') {
+      res.status(409).json({
+        code: report.reviewStatus === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_REQUIRED',
+        error: '正式报告尚未通过独立质量审核，不能作为当前结果发布。',
+      });
+      return;
+    }
+    res.status(500).json({ code: 'REPORT_METADATA_INVALID', error: '正式报告的元数据无效，需要重新生成。' });
+  });
+
+  app.post('/api/sessions/:name/report/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    try {
+      const result = await runReport(name);
+      res.json({
+        markdown: result.markdown,
+        path: result.path,
+        review: result.review,
+      });
     } catch (error) {
-      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
         res.status(409).json({
+          code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : error instanceof ReportGateError ? 'REPORT_PRECONDITION_FAILED' : 'SCOPE_REQUIRED',
           error: error.message,
-          checks: error.result.checks,
+          details: error.result.checks,
+        });
+        return;
+      }
+      if (error instanceof ReportQualityGateError) {
+        res.status(409).json({
+          code: error.review.availability === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_FAILED',
+          error: error.message,
         });
         return;
       }
@@ -1319,16 +1371,25 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     console.error(error);
     if (res.headersSent) return;
     if (error instanceof RequestValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json(ApiErrorSchema.parse({ code: 'VALIDATION_ERROR', error: error.message }));
       return;
     }
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      res.status(413).json({ error: '文件太大，单个文件最多 50 MB。' });
+      res.status(413).json(ApiErrorSchema.parse({ code: 'PAYLOAD_TOO_LARGE', error: '文件太大，单个文件最多 50 MB。' }));
       return;
     }
-    res.status(500).json({
+    if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
+      res.status(409).json(ApiErrorSchema.parse({
+        code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : error instanceof ScopeGateError ? 'SCOPE_REQUIRED' : 'REPORT_PRECONDITION_FAILED',
+        error: error.message,
+        details: { checks: error.result.checks },
+      }));
+      return;
+    }
+    res.status(500).json(ApiErrorSchema.parse({
+      code: 'INTERNAL_ERROR',
       error: error instanceof Error ? error.message : '服务暂时无法处理这个请求，请稍后重试。',
-    });
+    }));
   });
 
   return app;

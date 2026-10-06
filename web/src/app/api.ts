@@ -1,17 +1,28 @@
-/** 浏览器 API 与 SSE 的最小封装。 */
+import * as z from 'zod';
+import { SseEventSchema, type SseEvent } from '../../../src/api/contracts.js';
 
-export interface StreamEvent {
-  event: string;
-  data: unknown;
-}
+export type StreamEvent = SseEvent;
 
-export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+export async function getJson<T>(url: string, init?: RequestInit): Promise<T>;
+export async function getJson<T>(url: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T>;
+export async function getJson<T>(
+  url: string,
+  schemaOrInit?: z.ZodType<T> | RequestInit,
+  init?: RequestInit,
+): Promise<T> {
+  const looksLikeSchema = typeof schemaOrInit === 'object'
+    && schemaOrInit !== null
+    && 'parse' in schemaOrInit
+    && typeof (schemaOrInit as { parse?: unknown }).parse === 'function';
+  const schema = looksLikeSchema ? schemaOrInit as z.ZodType<T> : undefined;
+  const requestInit = schema ? init : schemaOrInit as RequestInit | undefined;
+  const response = await fetch(url, requestInit);
   if (!response.ok) {
     const body = await response.text();
     throw new Error(body || response.statusText);
   }
-  return response.json() as Promise<T>;
+  const data: unknown = await response.json();
+  return schema ? schema.parse(data) : data as T;
 }
 
 export async function consumeSse(
@@ -33,13 +44,14 @@ export async function consumeSse(
       else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
     }
     if (!data.length) return;
-    onEvent({ event, data: JSON.parse(data.join('\n')) });
+    const payload = JSON.parse(data.join('\n')) as unknown;
+    onEvent(SseEventSchema.parse({ event, data: payload }));
   };
 
   while (true) {
     const { done, value } = await reader.read();
     buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
-    const blocks = buffer.split('\n\n');
+    const blocks = buffer.split(/\r?\n\r?\n/);
     buffer = blocks.pop() ?? '';
     for (const block of blocks) {
       if (block.trim()) processBlock(block);

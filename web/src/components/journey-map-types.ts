@@ -1,3 +1,4 @@
+import type { WorkflowSnapshot as SharedWorkflowSnapshot } from '../../../src/api/contracts.js';
 /** 工作地图使用的最小节点集合：普通任务、人工评审、结束。不要把画布样式概念加进这里。 */
 export type WorkflowNodeType = 'task' | 'review' | 'end';
 
@@ -100,17 +101,7 @@ export interface WorkflowState {
   execution: WorkflowExecution;
 }
 
-export interface WorkflowSnapshot {
-  workflowId: string;
-  source: 'base' | 'custom';
-  baseWorkflowId: string;
-  version: number;
-  definition: WorkflowDefinition;
-  layout: WorkflowLayout;
-  execution: WorkflowExecution;
-  state: WorkflowState;
-  events: WorkflowRunEvent[];
-}
+export type WorkflowSnapshot = SharedWorkflowSnapshot;
 
 export type JourneyEdgeKind = 'success' | 'fail' | 'retry' | 'other';
 

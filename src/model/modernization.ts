@@ -6,6 +6,7 @@
  * 和最终的 Modernization Plan。它们都保留 Evidence 引用，但不把 Evidence 嵌进来。
  */
 import * as z from 'zod';
+import { ArtifactProvenanceSchema } from '../api/contracts.js';
 export const JourneyStateSchema = z.object({
   workflowId: z.string().min(1),
   stages: z.array(z.object({
@@ -263,6 +264,8 @@ export const ModernizationPlanSchema = z.object({
   validationPlan: ValidationPlanSchema,
   /** 根据 Markdown Workflow 计算出的当前关卡；旧版本计划可暂时没有这一项。 */
   journey: JourneyStateSchema.optional(),
+  /** Artifact provenance：旧版本没有该字段时，读取路径将视为 stale。 */
+  provenance: ArtifactProvenanceSchema.optional(),
   /** Mapping Gate 使用的覆盖范围记录。 */
   mappingCoverage: z.object({
     sourceAssets: z.array(z.string()),
