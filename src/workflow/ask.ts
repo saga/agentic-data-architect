@@ -688,9 +688,9 @@ export async function answerQuestion(
 
     const taskAnswer = parsed.answer || raw.slice(0, 2000);
     let answer = taskAnswer;
-    if (control.agent.personality.trim()) {
+    const relationshipMemories = await getRelevantRelationshipMemories(effectiveQuestion + '\n' + taskAnswer);
+    if (control.agent.personality.trim() || relationshipMemories.length > 0) {
       try {
-        const relationshipMemories = await getRelevantRelationshipMemories(effectiveQuestion + '\n' + taskAnswer);
         const rendered = await askCopilot({
           prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer, relationshipMemories),
           systemPrompt: '你是最终回答渲染器，不是任务 Agent。只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
