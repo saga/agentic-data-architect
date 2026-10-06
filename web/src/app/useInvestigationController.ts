@@ -143,10 +143,12 @@ export function useInvestigationController() {
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const NEW_SESSION_GOAL_SAMPLE = '研究现有项目的数据架构设计，调查data model，data source，vendor input方式，重要的数据转换逻辑';
+  const NEW_SESSION_EXPECTED_RESULT_SAMPLE = '生成一份深入浅出，详细的分析报告，分析报告应该包含mermaid形式的架构图、数据流图等等';
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
-  const [newSessionGoal, setNewSessionGoal] = useState('');
-  const [newSessionExpectedResult, setNewSessionExpectedResult] = useState('');
+  const [newSessionGoal, setNewSessionGoal] = useState(NEW_SESSION_GOAL_SAMPLE);
+  const [newSessionExpectedResult, setNewSessionExpectedResult] = useState(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
   const [workflowSaving, setWorkflowSaving] = useState(false);
   // undefined = 尚未选择；'' = 明确选择“自主调查”；WorkflowId = 选择具体工作方式。
   const [workflowTarget, setWorkflowTarget] = useState<WorkflowId | '' | undefined>(undefined);
@@ -976,8 +978,8 @@ export function useInvestigationController() {
 
       setNewSessionOpen(false);
       setNewSessionName('');
-      setNewSessionGoal('');
-      setNewSessionExpectedResult('');
+      setNewSessionGoal(NEW_SESSION_GOAL_SAMPLE);
+      setNewSessionExpectedResult(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
