@@ -79,36 +79,50 @@ function snapshot() {
 }
 
 test('report gate rejects an investigation without a confirmed mission', () => {
-  const input = base();
-  input.mission = undefined;
-  const result = evaluateInvestigationReportGate(input, snapshot());
+  const input = { ...base(), mission: undefined };
+  const result = evaluateInvestigationReportGate(input, null);
   assert.equal(result.passed, false);
 });
 
 test('report gate rejects an investigation without scope validation', () => {
-  const input = base();
-  input.scopeValidation = undefined;
-  const result = evaluateInvestigationReportGate(input, snapshot());
+  const input = { ...base(), scopeValidation: undefined };
+  const result = evaluateInvestigationReportGate(input, null);
   assert.equal(result.passed, false);
 });
 
 test('report gate rejects a result with unsupported claims', () => {
-  const input = base();
-  input.claims = [{
-    status: 'supported',
-    evidenceIds: ['ev-1'],
-  }];
-  const result = evaluateInvestigationReportGate(input, snapshot());
+  const input = {
+    ...base(),
+    claims: [{
+      status: 'supported' as const,
+      evidenceIds: ['ev-1'],
+    }],
+  };
+  const result = evaluateInvestigationReportGate(input, null);
   assert.equal(result.passed, false);
 });
 
 test('report gate passes a valid non-empty investigation result', () => {
-  const input = base();
-  input.claims = [{
-    status: 'supported',
-    evidenceIds: ['ev-1', 'ev-2'],
-  }];
-  input.findings = [{ evidenceIds: ['ev-1'] }];
-  const result = evaluateInvestigationReportGate(input, snapshot());
+  const input = {
+    ...base(),
+    claims: [{
+      status: 'supported' as const,
+      evidenceIds: ['ev-1', 'ev-2'],
+    }],
+    findings: [{ evidenceIds: ['ev-1'] }],
+  };
+  const result = evaluateInvestigationReportGate(input, null);
   assert.equal(result.passed, true);
+});
+
+
+test('report gate rejects a stale discovery snapshot', () => {
+  const input = base();
+  const stale = {
+    ...snapshot(),
+    run: { id: 'run-1', scopeFingerprint: 'stale-scope' },
+  } as never;
+  const result = evaluateInvestigationReportGate(input, stale);
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((check) => check.name === '发现结果仍属于当前范围' && !check.passed));
 });
