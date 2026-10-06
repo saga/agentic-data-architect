@@ -80,6 +80,9 @@ function normalizeMcpServers(value: unknown): McpServerSetting[] {
     .filter((item) => item.name);
 }
 
+const LEGACY_DEFAULT_PERSONALITY = '温柔、亲近、俏皮，偶尔带一点小小的调侃和撒娇。说话自然，有人的温度，但不要为了卖萌影响结论的准确性。';
+const DEFAULT_PERSONALITY = '你是一个长期陪伴用户工作的专业秘书：亲近、自然、有温度，但不油腻，不刻意卖萌。你会主动推进能自己完成的事情，尽量不让用户重复提供已经说过的信息；发现用户的判断或方案有明显问题时直接指出，并说明原因，不为了讨好而附和。你会根据事情的重要程度调整表达：工作问题简洁明确，复杂问题耐心解释，轻松交流可以有一点俏皮。信息不足时坦率说不知道，不装懂；已经有足够依据时给出明确判断，不用“可能、也许、视情况而定”逃避结论。你把用户当作长期合作的人来相处，保持上下文连续感，但不虚构记忆或经历。准确性和用户真正要解决的问题始终比表现人格更重要。';
+
 /** 创建一个新 Investigation 的默认配置。技能由 Copilot 根据当前任务自动发现。 */
 function defaultControl(): Omit<InvestigationControl, 'history'> {
   const now = new Date().toISOString();
@@ -99,7 +102,7 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       permissionMode: 'allow_all',
       autoContinuationTurns: 4,
       displayName: '秘书',
-      personality: '你是一个长期陪伴用户工作的专业秘书：亲近、自然、有温度，但不油腻，不刻意卖萌。你会主动推进能自己完成的事情，尽量不让用户重复提供已经说过的信息；发现用户的判断或方案有明显问题时直接指出，并说明原因，不为了讨好而附和。你会根据事情的重要程度调整表达：工作问题简洁明确，复杂问题耐心解释，轻松交流可以有一点俏皮。信息不足时坦率说不知道，不装懂；已经有足够依据时给出明确判断，不用“可能、也许、视情况而定”逃避结论。你把用户当作长期合作的人来相处，保持上下文连续感，但不虚构记忆或经历。准确性和用户真正要解决的问题始终比表现人格更重要。',
+      personality: DEFAULT_PERSONALITY,
       avatarWidth: 180,
       avatarHeight: 240,
       avatarSources: [],
@@ -184,7 +187,9 @@ export function normalizeControl(raw: Partial<InvestigationControl>): Investigat
       displayName: typeof agent.displayName === 'string' && agent.displayName.trim()
         ? agent.displayName.trim().slice(0, 40)
         : '秘书',
-      personality: typeof agent.personality === 'string' ? agent.personality.slice(0, 4000) : defaults.agent.personality,
+      personality: typeof agent.personality === 'string'
+        ? (agent.personality.trim() === LEGACY_DEFAULT_PERSONALITY ? defaults.agent.personality : agent.personality.slice(0, 4000))
+        : defaults.agent.personality,
       ...(typeof agent.avatarPath === 'string' && agent.avatarPath.trim()
         ? { avatarPath: agent.avatarPath.trim() }
         : {}),
