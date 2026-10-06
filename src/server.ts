@@ -29,7 +29,29 @@ import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, getActiveInvestigationTurn, requestAbort } from './workflow/ask.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
-import { SseEventSchema, ApiErrorSchema, ExecutionStatusSchema, TrajectoryResponseSchema, ArchitectureAssessmentResponseSchema, ModernizationResponseSchema, type SseEvent } from './api/contracts.js';
+import {
+  SseEventSchema,
+  ApiErrorSchema,
+  ExecutionStatusSchema,
+  TrajectoryResponseSchema,
+  ArchitectureAssessmentResponseSchema,
+  ModernizationResponseSchema,
+  SessionsResponseSchema,
+  SessionDataSchema,
+  MissionResponseSchema,
+  OpenCodeStatusSchema,
+  ModelsResponseSchema,
+  PermissionsResponseSchema,
+  UserInputsResponseSchema,
+  AuditResponseSchema,
+  MessagesResponseSchema,
+  DatasetsResponseSchema,
+  WorkflowCompatibilityResponseSchema,
+  AnswerSummarySchema,
+  ReportRegenerateResponseSchema,
+  ControlResponseSchema,
+  type SseEvent,
+} from './api/contracts.js';
 import {
   buildJourneyAgentInstruction,
   getJourneySnapshot,
@@ -294,7 +316,7 @@ app.get('/api/health', (_req, res) => {
 
   // Session 列表 API：返回 UI 左侧历史 Investigation。
 app.get('/api/sessions', async (_req, res) => {
-    res.json({ sessions: await listSessions() });
+    res.json(SessionsResponseSchema.parse({ sessions: await listSessions() }));
   });
 
   // 创建 Session API：body 先经 Zod，再进入业务层。
@@ -309,9 +331,9 @@ app.post('/api/sessions', async (req, res) => {
     const context = await loadWorkspaceContext(name);
     const snapshot = await loadLatestSnapshot<any>(name);
     const conversation = getConversationSummary(name);
-    const trajectory = await readTrajectory(name, { limit: 5000 });
     const missionProgress = await buildMissionProgress(name, context.mission);
-    res.json({
+    const current = snapshot?.currentState;
+    res.json(SessionDataSchema.parse({
       context,
       missionProgress,
       control: await loadInvestigationControl(name),
@@ -325,9 +347,21 @@ app.post('/api/sessions', async (req, res) => {
       })),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
-      currentState: snapshot?.currentState ?? null,
+      currentState: current ? {
+        coverage: {
+          datasets: current.coverage.datasets,
+          connectedDatasets: current.coverage.connectedDatasets,
+          datasetLineageConnectionRate: current.coverage.datasetLineageConnectionRate,
+          sqlParseFailures: current.coverage.sqlParseFailures,
+          semanticAssets: current.coverage.semanticAssets,
+          profiledDatasets: current.coverage.profiledDatasets,
+        },
+        sourceOfTruthCandidates: current.sourceOfTruthCandidates,
+        semanticCandidates: current.semanticCandidates,
+        highValueAssets: current.highValueAssets,
+      } : null,
       semanticAssets: snapshot?.semanticAssets ?? [],
-    });
+    }));
   });
 
 
@@ -337,14 +371,14 @@ app.post('/api/sessions', async (req, res) => {
     const context = await loadWorkspaceContext(name);
     const gate = evaluateMissionGate(context.mission);
     const progress = await buildMissionProgress(name, context.mission);
-    res.json({
+    res.json(MissionResponseSchema.parse({
       mission: context.mission ?? null,
       gate,
       progress,
       ...(context.mission ? {} : {
         draft: buildMissionDraft(context.goal || context.userPrompt),
       }),
-    });
+    }));
   });
 
   /** 用户确认 Mission；这是解除 Mission Gate 的唯一接口。 */
@@ -413,31 +447,31 @@ app.post('/api/sessions', async (req, res) => {
   /** 返回本机 OpenCode 连接状态，不返回密码等敏感配置。 */
   app.get('/api/opencode/status', async (_req, res) => {
     if (!config.openCodeEnabled) {
-      res.json({
+      res.json(OpenCodeStatusSchema.parse({
         enabled: false,
         reachable: false,
         baseUrl: config.openCodeBaseUrl,
         modelCount: 0,
-      });
+      }));
       return;
     }
 
     try {
       const models = await listOpenCodeModels();
-      res.json({
+      res.json(OpenCodeStatusSchema.parse({
         enabled: true,
         reachable: true,
         baseUrl: config.openCodeBaseUrl,
         modelCount: models.length,
-      });
+      }));
     } catch (error) {
-      res.json({
+      res.json(OpenCodeStatusSchema.parse({
         enabled: true,
         reachable: false,
         baseUrl: config.openCodeBaseUrl,
         modelCount: 0,
         error: error instanceof Error ? error.message : 'OpenCode 服务不可用。',
-      });
+      }));
     }
   });
 
@@ -485,7 +519,7 @@ app.post('/api/sessions', async (req, res) => {
       // OpenCode 未启动很常见；模型菜单仍然可以正常显示 Copilot。
     }
 
-    res.json({ models });
+    res.json(ModelsResponseSchema.parse({ models }));
   });
 
   app.get('/api/sessions/:name/execution', async (req, res) => {
@@ -549,7 +583,7 @@ app.post('/api/sessions', async (req, res) => {
   /** 返回当前 Investigation 正在等待用户处理的 Agent 权限请求。 */
   app.get('/api/sessions/:name/permissions', async (req, res) => {
     const name = sessionKey(req.params.name);
-    res.json({ permissions: listPendingCopilotPermissions(name) });
+    res.json(PermissionsResponseSchema.parse({ permissions: listPendingCopilotPermissions(name) }));
   });
 
   /** 处理一个待确认权限；允许后继续执行被暂停的 Agent 工具。 */
@@ -589,7 +623,7 @@ app.post('/api/sessions', async (req, res) => {
   /** 返回当前 Investigation 的 Agent 待回答问题。 */
   app.get('/api/sessions/:name/user-inputs', async (req, res) => {
     const name = sessionKey(req.params.name);
-    res.json({ requests: listPendingCopilotUserInputs(name) });
+    res.json(UserInputsResponseSchema.parse({ requests: listPendingCopilotUserInputs(name) }));
   });
 
   /** 把用户回答交回 ask_user；Agent 会从等待的 Promise 继续执行。 */
@@ -622,7 +656,7 @@ app.post('/api/sessions', async (req, res) => {
   app.get('/api/sessions/:name/audit', async (req, res) => {
     const name = sessionKey(req.params.name);
     const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 100;
-    res.json({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) });
+    res.json(AuditResponseSchema.parse({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) }));
   });
 
   app.patch('/api/sessions/:name/workflow', async (req, res) => {
@@ -1010,13 +1044,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const datasets = refresh
       ? await discoverLocalDatasets(name)
       : listLocalDatasets(name);
-    res.json({
+    res.json(DatasetsResponseSchema.parse({
       datasets,
       engine: {
         type: 'duckdb',
         databaseFile: path.relative(workspaceRoot(name), path.join(workspaceRoot(name), 'local.duckdb')),
       },
-    });
+    }));
   });
 
   app.get('/api/sessions/:name/messages', async (req, res) => {
@@ -1026,7 +1060,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const messages = query
       ? searchConversation(name, query, { limit: Number.isFinite(limit) ? limit : 50 })
       : listConversationMessages(name, Number.isFinite(limit) ? limit : 100);
-    res.json({
+    res.json(MessagesResponseSchema.parse({
       messages: messages.map((message) => ({
         id: message.id,
         role: message.role,
@@ -1034,7 +1068,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         capturedAt: message.createdAt,
       })),
       search: query || null,
-    });
+    }));
   });
 
   /** 兼容旧 Journey UI；如果当前 Investigation 选择了 Workflow，统一返回当前 Workflow state。 */
@@ -1048,7 +1082,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
     try {
       const snapshot = await getJourneySnapshot(name, context.workflow);
-      res.json({
+      res.json(WorkflowCompatibilityResponseSchema.parse({
         // Compatibility projection only; canonical workflow state is /workflow.
         journey: { ...snapshot.state, execution: snapshot.execution },
         routePlan: context.journeyPlan ?? null,
@@ -1057,16 +1091,16 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
           baseWorkflowId: snapshot.baseWorkflowId,
           version: snapshot.version,
         },
-      });
+      }));
     } catch (error) {
       // /journey 是旧首页侧栏的兼容接口，不能因为历史自定义路线损坏而阻塞整个 Investigation 页面。
       // 真正的工作地图仍通过 /workflow 返回，并继续使用完整 validation，因此这里不静默修复 Definition。
       console.error('Failed to build legacy journey snapshot for session ' + name, error);
-      res.json({
+      res.json(WorkflowCompatibilityResponseSchema.parse({
         journey: null,
         routePlan: context.journeyPlan ?? null,
         error: error instanceof Error ? error.message : String(error),
-      });
+      }));
     }
   });
 
@@ -1169,11 +1203,11 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     try {
       const result = await runReport(name);
-      res.json({
+      res.json(ReportRegenerateResponseSchema.parse({
         markdown: result.markdown,
         path: result.path,
         review: result.review,
-      });
+      }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
         res.status(409).json({
