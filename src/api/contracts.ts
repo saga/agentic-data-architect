@@ -1146,23 +1146,6 @@ export const DatasetsResponseSchema = z.object({
   }).strict(),
 }).strict();
 
-export const WorkflowCompatibilityJourneySchema = z.object({
-  workflowId: WorkflowIdSchema,
-  stages: z.array(JourneyStageSchema),
-  execution: JourneyExecutionSchema,
-}).strict();
-
-export const WorkflowCompatibilityResponseSchema = z.object({
-  journey: WorkflowCompatibilityJourneySchema.nullable(),
-  routePlan: JourneyPlanSchema.nullable().optional(),
-  workflow: z.object({
-    source: z.enum(['base', 'custom']),
-    baseWorkflowId: WorkflowIdSchema,
-    version: z.number().int().nonnegative(),
-  }).strict().optional(),
-  error: z.string().optional(),
-}).strict();
-
 export const ReportRegenerateResponseSchema = z.object({
   markdown: z.string(),
   path: z.string().min(1),
