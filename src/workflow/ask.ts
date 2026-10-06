@@ -222,6 +222,7 @@ export async function answerQuestion(
     let companionNoteCount = 0;
     let lastCompanionNoteAt = 0;
     let companionNoteTask: Promise<void> = Promise.resolve();
+    let companionTimer: ReturnType<typeof setTimeout> | undefined;
     const requestCompanionNote = (activity: string, force = false): void => {
       const now = Date.now();
       const minimumFirstDelay = 12_000;
@@ -254,7 +255,7 @@ export async function answerQuestion(
       }).catch(() => undefined);
     };
 
-    const companionTimer = setTimeout(() => {
+    companionTimer = setTimeout(() => {
       requestCompanionNote('长时间调查进行中，用户不需要跟随内部执行细节。');
     }, 12_000);
     companionTimer.unref?.();
@@ -850,7 +851,7 @@ export async function answerQuestion(
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
-    clearTimeout(companionTimer);
+    if (companionTimer) clearTimeout(companionTimer);
     clearInterval(liveHeartbeat);
     if (activeInvestigationTurns.get(investigationName)?.turnId === turnId) activeInvestigationTurns.delete(investigationName);
     abortRequestedTurns.delete(turnId);
