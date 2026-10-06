@@ -865,7 +865,8 @@ export function useInvestigationController() {
         setError(body.error);
         return;
       }
-      setError(e instanceof Error ? e.message : '无法保存任务目标');    } finally {
+      setError(e instanceof Error ? e.message : '无法保存任务目标');
+    } finally {
       setMissionSaving(false);
     }
   };
@@ -964,7 +965,8 @@ export function useInvestigationController() {
             pendingInitialMissionErrorRef.current = e.apiError.error || '任务目的和期望结果还不够具体。';
             return;
           }
-          throw e;        }
+          throw e;
+        }
       }
 
       setNewSessionOpen(false);
