@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 import { parseSkillManifest, SkillKindSchema } from '../src/skills/catalog.js';
+
+const requiredSections = ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例'] as const;
 
 test('Skill kind only has capability and workflow', () => {
   assert.equal(SkillKindSchema.safeParse('capability').success, true);
@@ -27,31 +29,11 @@ test('当前数据架构是独立 workflow', async () => {
 });
 
 test('每个 Skill 都有完整的输入、输出、验证、Gate 和期望结果章节', async () => {
-  const { readdir } = await import('node:fs/promises');
   for (const entry of await readdir('skills', { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const markdown = await readFile(`skills/${entry.name}/SKILL.md`, 'utf8');
-    for (const section of ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例']) {
-      assert.match(markdown, new RegExp(`^##\\s+${section}\\s*import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { test } from 'node:test';
-import { parseSkillManifest, SkillKindSchema } from '../src/skills/catalog.js';
-
-test('Skill kind only has capability and workflow', () => {
-  assert.equal(SkillKindSchema.safeParse('capability').success, true);
-  assert.equal(SkillKindSchema.safeParse('workflow').success, true);
-  assert.equal(SkillKindSchema.safeParse('task').success, false);
-});
-
-test('解析 capability Skill 元数据', async () => {
-  const markdown = await readFile('skills/search-confluence/SKILL.md', 'utf8');
-  const manifest = parseSkillManifest(markdown, 'skills/search-confluence/SKILL.md');
-  assert.equal(manifest.name, 'search-confluence');
-  assert.equal(manifest.metadata.kind, 'capability');
-  assert.match(manifest.description, /公司内部 Confluence/);
-});
-
-, 'm'), `${entry.name} 缺少 ${section}`);
+    for (const section of requiredSections) {
+      assert.equal(markdown.includes('## ' + section), true, entry.name + ' 缺少 ' + section);
     }
   }
 });
