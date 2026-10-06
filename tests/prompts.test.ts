@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
+import { buildAssistantAnswerPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
 
 const mission = {
   purpose: '理解老系统当前的数据架构，为后续迁移判断提供依据。',
@@ -49,11 +49,11 @@ test('question prompt starts from Mission and treats the user question as execut
   assert.match(prompt, /当前执行请求把 Mission 改写/);
 });
 
-test('Assistant Soul is an identity layer, not only a tone hint', () => {
-  const prompt = buildAssistantSoulPrompt('主动推进、发现问题直接指出，不为了讨好而附和。');
+test('Assistant Soul is isolated to final answer rendering', () => {
+  const prompt = buildAssistantAnswerPrompt('自然、直接、长期合作感。', 'Global 配置作为默认值，Task 只保存显式 override。');
 
-  assert.match(prompt, /长期稳定的身份/);
-  assert.match(prompt, /直接指出/);
-  assert.match(prompt, /Mission、Evidence/);
-  assert.ok(prompt.indexOf('长期稳定的身份') < prompt.indexOf('主动推进'));
+  assert.match(prompt, /怎么和用户相处/);
+  assert.match(prompt, /严禁参与事实判断/);
+  assert.match(prompt, /不得新增、删除、合并或改变任何事实/);
+  assert.match(prompt, /Global 配置作为默认值/);
 });
