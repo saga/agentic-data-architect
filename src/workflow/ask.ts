@@ -140,7 +140,7 @@ export async function answerQuestion(
     throw new Error('这次请求已经结束，不能重复执行，请重新发送问题。');
   }
 
-  const turnStartedAt = new Date().toISOString();
+    const turnStartedAt = new Date().toISOString();
     activeInvestigationTurns.set(investigationName, {
       turnId,
       phase: 'executing',
@@ -460,7 +460,7 @@ export async function answerQuestion(
         return review;
       },
       onDelta: emitDelta,
-      ...(onStatus ? { onStatus } : {}),
+      onStatus: emitStatus,
       onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
         const latestStage = await loadInvestigation(investigationName);

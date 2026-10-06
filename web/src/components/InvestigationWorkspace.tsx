@@ -162,6 +162,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             reasoningByMessage={reasoningByMessage}
             assistantAvatarByMessage={assistantAvatarByMessage}
             streamingAnswer={streamingAnswer}
+            turnStatus={turnStatus}
             nextGuidance={nextGuidance}
             pendingPermissions={pendingPermissions}
             pendingUserInputs={pendingUserInputs}

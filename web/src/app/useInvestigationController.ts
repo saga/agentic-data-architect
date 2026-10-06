@@ -275,7 +275,7 @@ export function useInvestigationController() {
             currentAnswer?.key === key ? currentAnswer : { key, content: '' },
           );
           setTurnStatus(executionStatusText(status));
-        } else if (previous.running && previous.turnId && previous.turnId === status.turnId) {
+        } else if (previous.running && previous.turnId && !status.running) {
           setStreamingAnswer((currentAnswer) =>
             currentAnswer?.key === key ? undefined : currentAnswer,
           );

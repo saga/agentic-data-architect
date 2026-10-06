@@ -40,6 +40,7 @@ export function InvestigationChatPanel(props: {
   modelOptions: CopilotModelOption[];
   modelSaving: boolean;
   executionStatus: ExecutionStatus;
+  turnStatus: string;
   error?: string;
   missionOpen: boolean;
   missionDraft: MissionDraft;
@@ -181,7 +182,7 @@ export function InvestigationChatPanel(props: {
             {displayAssistantContent(currentStreamingAnswer.content)
               ? <ChatMarkdown content={currentStreamingAnswer.content} />
               : !props.streamingReasoning
-                ? <Text type="secondary">助手正在整理答案，请稍候…</Text>
+                ? <Text type="secondary">{props.turnStatus || '助手正在处理，请稍候…'}</Text>
                 : null}
           </div>
         ),
@@ -199,6 +200,7 @@ export function InvestigationChatPanel(props: {
     props.send,
     props.streamingAnswer,
     props.streamingReasoning,
+    props.turnStatus,
   ]);
 
   return (
