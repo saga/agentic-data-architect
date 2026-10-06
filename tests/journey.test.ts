@@ -423,3 +423,20 @@ test('assessment findings gate does not pass from current-state alone', () => {
   );
   assert.equal(withFinding.execution.currentNodeId, 'done');
 });
+
+test('current data architecture has its own completion conditions', async () => {
+  const definition = await loadWorkflowJourney('current-data-architecture');
+  assert.equal(definition.id, 'current-data-architecture');
+  assert.ok(definition.nodes.some((node) => node.completeWhen === 'current-data-architecture'));
+  assert.ok(definition.nodes.some((node) => node.completeWhen === 'current-data-architecture-ready'));
+});
+
+test('current data architecture is not the same as assessment', async () => {
+  const current = await loadWorkflowJourney('current-data-architecture');
+  const assessment = await loadWorkflowJourney('data-architecture-assessment');
+  assert.notDeepEqual(
+    current.nodes.map((node) => node.id),
+    assessment.nodes.map((node) => node.id),
+  );
+  assert.ok(assessment.nodes.some((node) => node.completeWhen === 'assessment-findings'));
+});
