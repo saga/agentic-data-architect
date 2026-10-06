@@ -7,6 +7,7 @@ import {
   loadWorkflowJourney,
   parseJourneyMarkdown,
   validateJourneyDefinition,
+  deriveModernizationFacts,
   type JourneyFacts,
 } from '../src/workflow/journey.js';
 
@@ -20,6 +21,29 @@ const baseFacts: JourneyFacts = {
   blockingValidationReady: 0,
   blockingValidationTotal: 0,
 };
+
+
+test('modernization completion facts use one deterministic semantic definition', () => {
+  assert.deepEqual(
+    deriveModernizationFacts({
+      targetStatus: 'draft',
+      targetComponentCount: 3,
+      mappingStatuses: ['proposed', 'reviewed', 'approved', 'rejected'],
+      validationStatuses: [
+        { status: 'ready', blocking: true },
+        { status: 'passed', blocking: true },
+        { status: 'failed', blocking: false },
+      ],
+    }),
+    {
+      targetComponentCount: 0,
+      mappingCount: 2,
+      validationCount: 3,
+      blockingValidationReady: 1,
+      blockingValidationTotal: 2,
+    },
+  );
+});
 
 test('parses the minimal workflow DSL', () => {
   const result = parseJourneyMarkdown([

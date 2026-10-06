@@ -1,10 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as AntApp } from 'antd';
 import type { UploadFile } from 'antd';
-import { consumeSse, getJson } from './api';
+import { ApiRequestError, consumeSse, getJson, request } from './api';
+import { workflowOptions } from './workflow-options';
+import {
+  AnswerSummarySchema,
+  CreateSessionResponseSchema,
+  ExecutionStatusSchema,
+  FileUploadResponseSchema,
+  MissionDraftSchema,
+  MissionUpdateResponseSchema,
+  ModelsResponseSchema,
+  PermissionsResponseSchema,
+  SessionsResponseSchema,
+  SessionDataSchema,
+  SimpleOkResponseSchema,
+  UserInputsResponseSchema,
+  WorkflowCompatibilityResponseSchema,
+  WorkflowContextResponseSchema,
+} from '../../../src/api/contracts.js';
+import type { AnswerSummaryContract } from '../../../src/api/contracts.js';
 import { buildInvestigationPath, parseRoute, type PageId } from './routing';
 import {
-  workflowOptions,
   type AutoTier,
   type CopilotModelOption,
   type ExecutionStatus,
@@ -185,7 +202,7 @@ export function useInvestigationController() {
   }, [active]);
 
   const reloadSessions = async (selectLatest = true) => {
-    const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
+    const result = await getJson('/api/sessions', SessionsResponseSchema);
     setSessions(result.sessions);
     const routed = routeSession();
     const routedExists = routed && result.sessions.some((session) => session.key === routed);
@@ -211,8 +228,8 @@ export function useInvestigationController() {
       setAttachmentsOpen(false);
     }
     const [result, journeyResult] = await Promise.all([
-      getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
-      getJson<{ journey: JourneyState | null }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
+      getJson(`/api/sessions/${encodeURIComponent(key)}`, SessionDataSchema),
+      getJson(`/api/sessions/${encodeURIComponent(key)}/journey`, WorkflowCompatibilityResponseSchema),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
@@ -263,8 +280,9 @@ export function useInvestigationController() {
   /** 查询当前 Node.js 进程的真实执行状态；不使用 trajectory 推断 live state。 */
   const loadExecutionStatus = async (key: string): Promise<ExecutionStatus> => {
     try {
-      const status = await getJson<ExecutionStatus>(
+      const status = await getJson(
         `/api/sessions/${encodeURIComponent(key)}/execution`,
+        ExecutionStatusSchema,
       );
       const previous = executionStatusRef.current;
       executionStatusRef.current = status;
@@ -337,11 +355,13 @@ export function useInvestigationController() {
   const loadPendingInteractions = async (key: string) => {
     try {
       const [permissionResult, inputResult] = await Promise.all([
-        getJson<{ permissions: PendingPermission[] }>(
+        getJson(
           `/api/sessions/${encodeURIComponent(key)}/permissions`,
+          PermissionsResponseSchema,
         ),
-        getJson<{ requests: PendingUserInput[] }>(
+        getJson(
           `/api/sessions/${encodeURIComponent(key)}/user-inputs`,
+          UserInputsResponseSchema,
         ),
       ]);
       if (key === activeRef.current) {
@@ -354,7 +374,7 @@ export function useInvestigationController() {
   };
 
   useEffect(() => {
-    void getJson<{ models: CopilotModelOption[] }>('/api/copilot/models')
+    void getJson('/api/copilot/models', ModelsResponseSchema)
       .then((result) => setAvailableModels(result.models ?? []))
       .catch(() => setAvailableModels([]));
   }, []);
@@ -460,8 +480,9 @@ export function useInvestigationController() {
     setModelSaving(true);
     setError(undefined);
     try {
-      const result = await getJson<{ control: InvestigationControl }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/agent/model`,
+        ControlResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -508,7 +529,7 @@ export function useInvestigationController() {
     const turnId = activeTurn?.turnId ?? executionStatus.turnId;
     if (!key || !turnId) return;
 
-    void fetch(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
+    void request(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ turnId }),
@@ -525,8 +546,9 @@ export function useInvestigationController() {
   ) => {
     if (permission.sessionName !== active) return;
     try {
-      await getJson<{ ok: true }>(
+      await getJson(
         `/api/sessions/${encodeURIComponent(permission.sessionName)}/permissions/respond`,
+        SimpleOkResponseSchema,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -559,8 +581,9 @@ export function useInvestigationController() {
   ) => {
     if (request.sessionName !== active || !answer.trim()) return;
     try {
-      await getJson<{ ok: true }>(
+      await getJson(
         `/api/sessions/${encodeURIComponent(request.sessionName)}/user-inputs/respond`,
+        SimpleOkResponseSchema,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -609,7 +632,7 @@ export function useInvestigationController() {
     try {
       let key = active;
       if (!key) {
-        const created = await getJson<{ context: SessionContext }>('/api/sessions', {
+        const created = await getJson('/api/sessions', CreateSessionResponseSchema, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userPrompt: message }),
@@ -638,49 +661,45 @@ export function useInvestigationController() {
       });
       setStreamingAnswer({ key: key as string, content: '' });
 
-      const response = await fetch(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(routeId ? { routeId, turnId } : { message, guided, turnId }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await request(`/api/sessions/${encodeURIComponent(key as string)}/messages/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(routeId ? { routeId, turnId } : { message, guided, turnId }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error instanceof ApiRequestError) {
+          const apiError = error.apiError;
+          const errorDetails = apiError.details;
+          const missionDraft = errorDetails
+            && typeof errorDetails === 'object'
+            && 'draft' in errorDetails
+            ? MissionDraftSchema.safeParse((errorDetails as { draft?: unknown }).draft).data
+            : undefined;
 
-      if (!response.ok) {
-        const body = await response.text();
-        let parsedBody: { code?: string; error?: string; draft?: MissionDraft } | undefined;
-        try {
-          parsedBody = JSON.parse(body) as typeof parsedBody;
-        } catch {
-          parsedBody = undefined;
+          if (error.status === 409 && apiError.code === 'MISSION_REQUIRED') {
+            setMissionDraft(missionDraft ?? {
+              purpose: current?.context.mission?.purpose ?? '',
+              expectedResult: current?.context.mission?.expectedResult ?? '',
+              deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
+            });
+            setPendingMissionMessage(message);
+            setPendingMissionTurnId(turnId);
+            setMissionOpen(true);
+            missionBlocked = true;
+            // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
+            // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
+            await loadSession(key);
+            setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
+            return;
+          }
         }
-
-        if (response.status === 409 && parsedBody?.code === 'MISSION_REQUIRED') {
-          setMissionDraft(parsedBody.draft ?? {
-            purpose: current?.context.mission?.purpose ?? '',
-            expectedResult: current?.context.mission?.expectedResult ?? '',
-            deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
-          });
-          setPendingMissionMessage(message);
-          setPendingMissionTurnId(turnId);
-          setMissionOpen(true);
-          missionBlocked = true;
-          // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
-          // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
-          await loadSession(key);
-          setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
-          return;
-        }
-
-        throw new Error(parsedBody?.error || body || response.statusText);
+        throw error;
       }
 
-      let result: {
-        answer: string;
-        claimIds: string[];
-        warnings: string[];
-        unknowns: string[];
-        followUpQuestions: string[];
-      } | undefined;
+      let result: AnswerSummaryContract | undefined;
 
       let streamedReasoning = '';
       await consumeSse(response, ({ event, data }) => {
@@ -689,45 +708,34 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'status') {
-          const status = (data as { status?: unknown }).status;
-          if (typeof status === 'string' && status.trim()) {
-            setTurnStatus(status.trim());
-          }
+          if (data.status.trim()) setTurnStatus(data.status.trim());
           return;
         }
         if (event === 'companion_note') {
-          const note = (data as { note?: unknown }).note;
-          if (typeof note === 'string' && note.trim()) setAssistantCompanionNote(note.trim());
+          if (data.note.trim()) setAssistantCompanionNote(data.note.trim());
           return;
         }
         if (event === 'checkpoint') {
-          const checkpoint = data as InvestigationCheckpoint;
-          if (checkpoint && typeof checkpoint.id === 'string' && typeof checkpoint.title === 'string') {
-            setTurnStatus('已形成阶段小结：' + checkpoint.title);
-          }
+          setTurnStatus('已形成阶段小结：' + data.title);
           return;
         }
         if (event === 'reasoning') {
-          const delta = (data as { delta?: unknown }).delta;
-          if (typeof delta === 'string') {
-            streamedReasoning += delta;
-            setTurnStatus('助手正在分析你的问题，请稍候…');
-            setStreamingReasoning(streamedReasoning);
-          }
+          streamedReasoning += data.delta;
+          setTurnStatus('助手正在分析你的问题，请稍候…');
+          setStreamingReasoning(streamedReasoning);
           return;
         }
         if (event === 'delta') {
-          const delta = (data as { delta?: unknown }).delta;
-          if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
-            ? { ...currentAnswer, content: currentAnswer.content + delta }
+          setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
+            ? { ...currentAnswer, content: currentAnswer.content + data.delta }
             : currentAnswer);
           return;
         }
         if (event === 'error') {
-          throw new Error(String((data as { error?: unknown }).error ?? '请求失败'));
+          throw new Error(data.error);
         }
         if (event === 'completed') {
-          result = data as typeof result;
+          result = AnswerSummarySchema.parse(data);
         }
       });
 
@@ -809,8 +817,9 @@ export function useInvestigationController() {
     setError(undefined);
     setMissionError(undefined);
     try {
-      const result = await getJson<{ context: SessionContext; mission: MissionContract }>(
+      const result = await getJson(
         '/api/sessions/' + encodeURIComponent(active) + '/mission',
+        MissionUpdateResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -839,25 +848,24 @@ export function useInvestigationController() {
         void send(nextMessage, undefined, false, nextTurnId);
       }
     } catch (e) {
-      const raw = e instanceof Error ? e.message : '无法保存任务目标';
-      try {
-        const body = JSON.parse(raw) as {
-          code?: string;
-          error?: string;
-          clarity?: { reason?: string };
-        };
+      if (e instanceof ApiRequestError) {
+        const body = e.apiError;
+        const details = body.details;
+        const clarity = details && typeof details === 'object' && 'clarity' in details
+          ? (details as { clarity?: { reason?: string } }).clarity
+          : undefined;
         if (body.code === 'MISSION_CLARITY_REQUIRED') {
-          setMissionError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
+          setMissionError(body.error || clarity?.reason || '任务目的和期望结果还不够具体。');
           return;
         }
         if (body.code === 'MISSION_CHANGE_BLOCKED') {
           setMissionError(body.error || '当前调查正在执行，请先停止后再修改任务。');
           return;
         }
-        setError(body.error || raw);
-      } catch {
-        setError(raw);
+        setError(body.error);
+        return;
       }
+      setError(e instanceof Error ? e.message : '无法保存任务目标');
     } finally {
       setMissionSaving(false);
     }
@@ -869,8 +877,9 @@ export function useInvestigationController() {
     setWorkflowSaving(true);
     setError(undefined);
     try {
-      const result = await getJson<{ context: SessionContext }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/workflow`,
+        WorkflowContextResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -921,7 +930,7 @@ export function useInvestigationController() {
         deliverableIds: [],
       };
 
-      const created = await getJson<{ context: SessionContext }>('/api/sessions', {
+      const created = await getJson('/api/sessions', CreateSessionResponseSchema, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -935,8 +944,9 @@ export function useInvestigationController() {
       // 直接保存 Mission，并在 Session 页面加载后自动启动第一轮，不再要求用户输入“开始”。
       if (purpose && expectedResult) {
         try {
-          await getJson<{ context: SessionContext }>(
+          await getJson(
             '/api/sessions/' + encodeURIComponent(created.context.name) + '/mission',
+            MissionUpdateResponseSchema,
             {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
@@ -950,19 +960,12 @@ export function useInvestigationController() {
             message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
           };
         } catch (e) {
-          const raw = e instanceof Error ? e.message : '无法确认任务';
-          let clarityHandled = false;
-          try {
-            const body = JSON.parse(raw) as { code?: string; error?: string };
-            if (body.code === 'MISSION_CLARITY_REQUIRED') {
-              pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
-              pendingInitialMissionErrorRef.current = body.error || '任务目的和期望结果还不够具体。';
-              clarityHandled = true;
-            }
-          } catch {
-            // 非 JSON 错误继续抛出，让用户看到真正的创建失败原因。
+          if (e instanceof ApiRequestError && e.apiError.code === 'MISSION_CLARITY_REQUIRED') {
+            pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
+            pendingInitialMissionErrorRef.current = e.apiError.error || '任务目的和期望结果还不够具体。';
+            return;
           }
-          if (!clarityHandled) throw e;
+          throw e;
         }
       }
 
@@ -992,8 +995,9 @@ export function useInvestigationController() {
     try {
       const form = new FormData();
       form.append('file', source as Blob, file.name);
-      const result = await getJson<{ file: { id: string; name: string } }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/files`,
+        FileUploadResponseSchema,
         { method: 'POST', body: form },
       );
       setAttachments((items) => items.map((item) => item.uid === file.uid

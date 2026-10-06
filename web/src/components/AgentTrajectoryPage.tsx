@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { getJson } from '../app/api.js';
+import { ConversationTurnSummarySchema, ExecutionStatusSchema, TrajectoryResponseSchema, type TrajectoryEvent, type TrajectorySummary, type TrajectoryTurnSummary, type ExecutionStatus, type ConversationTurnSummary } from '../../../src/api/contracts.js';
+
 import {
   Alert,
   Badge,
@@ -36,73 +39,6 @@ const RECENT_TURN_COUNT = 5;
 /** 每轮默认只展示最新事件；更早事件按需展开。 */
 const RECENT_EVENT_COUNT = 60;
 
-interface TrajectoryEvent {
-  id: string;
-  turnId: string;
-  timestamp: string;
-  type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'checkpoint' | 'stage_gate' | 'status';
-  name: string;
-  status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
-  durationMs?: number;
-  model?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  premiumRequestCost?: number;
-  details: Record<string, unknown>;
-}
-
-interface TrajectorySummary {
-  turnId?: string;
-  startedAt: string;
-  finishedAt?: string;
-  durationMs?: number;
-  model?: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  totalNanoAiu?: number;
-  totalPremiumRequestCost?: number;
-  models: Record<string, { inputTokens: number; outputTokens: number; totalNanoAiu?: number }>;
-  eventCount: number;
-  state?: 'running' | 'waiting' | 'completed' | 'failed' | 'aborted';
-  waitingOn?: 'permission' | 'user_input' | 'tool' | 'model' | 'session';
-  lastActivityAt?: string;
-  lastActivity?: string;
-  lastActivityType?: string;
-  idleObserved?: boolean;
-  assistantTurnEnded?: boolean;
-  pendingToolCount?: number;
-  pendingPermissionCount?: number;
-  pendingUserInputCount?: number;
-}
-
-interface TrajectoryTurnSummary {
-  turnId: string;
-  summary: TrajectorySummary;
-  userQuestion?: string;
-  modelCalls: number;
-  toolCalls: number;
-  failedEvents: number;
-  compactions: number;
-}
-
-interface ExecutionStatus {
-  state: 'idle' | 'running' | 'waiting_permission' | 'waiting_user_input' | 'committing';
-  running: boolean;
-  turnId: string | null;
-  phase: 'executing' | 'committing' | null;
-  pendingPermissionCount: number;
-  pendingUserInputCount: number;
-}
-
-interface ConversationTurnSummary {
-  turnId: string;
-  sessionName: string;
-  status: 'running' | 'completed' | 'failed' | 'aborted';
-  createdAt: string;
-  updatedAt: string;
-  question?: string;
-}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -614,24 +550,15 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
   const load = async () => {
     setLoading(true);
     try {
-      const [trajectoryResponse, executionResponse] = await Promise.all([
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/trajectory?limit=5000`),
-        fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/execution`),
+      const [data, execution] = await Promise.all([
+        getJson(`/api/sessions/${encodeURIComponent(props.sessionName)}/trajectory?limit=5000`, TrajectoryResponseSchema),
+        getJson(`/api/sessions/${encodeURIComponent(props.sessionName)}/execution`, ExecutionStatusSchema),
       ]);
-      if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
-      if (executionResponse.ok) {
-        setExecutionStatus(await executionResponse.json() as ExecutionStatus);
-      }
-      const data = await trajectoryResponse.json() as {
-        events: TrajectoryEvent[];
-        summary: TrajectorySummary | null;
-        turns: TrajectoryTurnSummary[];
-        conversationTurns: ConversationTurnSummary[];
-      };
+      setExecutionStatus(execution);
       setEvents(data.events);
       setSummary(data.summary);
       setTurns(data.turns);
-      setConversationTurns(data.conversationTurns);
+      setConversationTurns(data.conversationTurns.map((turn) => ConversationTurnSummarySchema.parse(turn)));
     } finally {
       setLoading(false);
     }

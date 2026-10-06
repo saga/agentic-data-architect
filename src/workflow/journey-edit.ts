@@ -8,55 +8,11 @@ import {
 } from './journey.js';
 
 /** Workflow 编辑器和 Workflow AI 共用的语义修改操作；只描述业务结构变化，不描述画布实现。 */
-export const JourneyWorkflowChangeSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('replace-definition'),
-    definition: JourneyDefinitionSchema,
-  }).strict(),
-  z.object({
-    type: z.literal('add-node'),
-    node: JourneyNodeSchema,
-  }).strict(),
-  z.object({
-    type: z.literal('update-node'),
-    nodeId: z.string().min(1),
-    patch: z.object({
-      type: z.enum(['task', 'review', 'end']).optional(),
-      title: z.string().min(1).optional(),
-      objective: z.string().optional(),
-      actor: z.enum(['agent', 'human']).optional(),
-      completeWhen: z.string().optional(),
-    }).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('remove-node'),
-    nodeId: z.string().min(1),
-  }).strict(),
-  z.object({
-    type: z.literal('add-route'),
-    nodeId: z.string().min(1),
-    route: z.object({
-      outcome: z.string().min(1),
-      target: z.string().min(1),
-    }).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('update-route'),
-    nodeId: z.string().min(1),
-    outcome: z.string().min(1),
-    patch: z.object({
-      target: z.string().min(1).optional(),
-    }).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('remove-route'),
-    nodeId: z.string().min(1),
-    outcome: z.string().min(1),
-  }).strict(),
-]);
-
-export type JourneyWorkflowChange = z.infer<typeof JourneyWorkflowChangeSchema>;
-export const JourneyWorkflowChangesSchema = z.array(JourneyWorkflowChangeSchema).min(1).max(60);
+export {
+  JourneyWorkflowChangeSchema,
+  JourneyWorkflowChangesSchema,
+  type JourneyWorkflowChange,
+} from '../api/contracts.js';
 
 /** 深拷贝 Definition，避免编辑操作直接修改当前快照。Workflow 很小，不需要引入 immutable 框架。 */
 function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {

@@ -98,3 +98,37 @@ flowchart LR
 - Result、Workflow、Runtime Event、Artifact provenance、Derived State、Stage Checkpoint 的 canonical ownership 已明确。
 - 既有架构不一致已经被记录为正式 ADR，而不是只存在于代码注释或讨论中。
 - 第一阶段不改变业务代码；第二阶段才按这些 ADR 执行 Align。
+
+
+## 7. Phase-2 / Phase-3 implementation status
+
+### Phase 2 — Contract Align
+
+阶段 2 已完成主要 Contract 与 lifecycle 对齐：
+
+- Shared browser-safe API Contract 已建立，Server / Web 不再各自维护 Mission、Workflow、Trajectory、Control 等跨边界类型。
+- WorkflowSnapshot 顶层 execution 成为 canonical runtime owner，`/journey` 仅保留 compatibility projection。
+- Report / Modernization / Assessment 的 artifact 生命周期增加 provenance / version freshness 约束。
+- Report GET 只读，生成通过显式 action endpoint。
+- Reviewer unavailable / fail 按统一规则阻断正式结果。
+- Discovery Snapshot、Trajectory / Journey Event 增加 runtime validation。
+
+### Phase 3 — Final Hardening
+
+阶段 3 聚焦“contract declared but not enforced”的剩余问题：
+
+- Report generation 真正执行 Current-State deterministic Gate。
+- Assessment / Modernization GET 只读，新增显式 regenerate action。
+- SSE Server / Web 双向运行时校验，checkpoint / completed payload 均使用结构化 Contract。
+- Session / Mission / Workflow / Trajectory / Control / File Upload 等关键 HTTP response 使用 Runtime Schema。
+- SessionContext 改为明确 API Projection，不再直接暴露完整 persistence object。
+- Web controller、Result、Trajectory、Config 页面统一消费 Shared Contract，移除重复 interface / response casts。
+- JourneyPlan / Workflow AI Change / Artifact Review 等剩余跨边界对象统一 canonical owner。
+- 持久化 Schema 与 Shared API Contract 同名对象通过 re-export 对齐，避免语义漂移。
+- 增加 artifact provenance、checkpoint、shared contract 相关 regression tests。
+
+## 8. Remaining work / phase boundary
+
+本轮三阶段的目标是完成现有 Contract Consolidation Map 中识别出的架构不一致，不扩展新的业务流程或引入新的基础设施。
+
+未完成的事项不应再通过“继续增加类型/接口”解决；后续变更应遵循本文件的 ownership / projection / lifecycle 规则，并优先修改 canonical contract 和确定性 evaluator，再修改消费者。

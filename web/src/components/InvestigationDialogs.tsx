@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Button, Card, Flex, Input, Modal, Select, Space, Tag, Typography } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
-import { workflowOptions } from '../app/types';
+import { workflowOptions } from '../app/workflow-options';
 import type { PendingUserInput } from '../app/types';
 import type { SessionData, WorkflowId } from '../app/types';
 

@@ -1,115 +1,35 @@
-/** 工作地图使用的最小节点集合：普通任务、人工评审、结束。不要把画布样式概念加进这里。 */
-export type WorkflowNodeType = 'task' | 'review' | 'end';
+import type {
+  JourneyActor,
+  JourneyDerivedState,
+  JourneyDefinition,
+  JourneyExecution,
+  JourneyNode,
+  JourneyNodeType,
+  JourneyRoute,
+  JourneyStage,
+  JourneyWorkflowChange,
+  JourneyRunEvent,
+  WorkflowSnapshot as SharedWorkflowSnapshot,
+} from '../../../src/api/contracts.js';
 
-export type WorkflowActor = 'agent' | 'human';
-
-export interface JourneyMapStage {
-  id: string;
-  title: string;
-  objective: string;
-  status: 'completed' | 'current' | 'locked' | 'future';
-  nodeType: WorkflowNodeType;
-}
+/** Workflow business types come from the canonical shared contract. Canvas-only types are defined below. */
+export type WorkflowNodeType = JourneyNodeType;
+export type WorkflowActor = JourneyActor;
+export type JourneyMapStage = JourneyStage;
+export type JourneyRouteDefinition = JourneyRoute;
+export type WorkflowNodeDefinition = JourneyNode;
+export type WorkflowChange = JourneyWorkflowChange;
+export type WorkflowDefinition = JourneyDefinition;
+export type WorkflowExecution = JourneyExecution;
+export type WorkflowState = JourneyDerivedState;
+export type WorkflowRunEvent = JourneyRunEvent;
+export type WorkflowSnapshot = SharedWorkflowSnapshot;
 
 export interface JourneyMapRoute {
   id: string;
   title: string;
   reason: string;
   steps: string[];
-}
-
-export interface JourneyRouteDefinition {
-  outcome: string;
-  target: string;
-   /** Markdown 中的原始行号，只用于错误提示；不参与运行语义。 */
-  line?: number;
-}
-
-export interface WorkflowNodeDefinition {
-  id: string;
-  type: WorkflowNodeType;
-  title: string;
-  objective?: string;
-  actor: WorkflowActor;
-  completeWhen?: string;
-  routes: JourneyRouteDefinition[];
-  line?: number;
-}
-
-export type WorkflowChange =
-  | { type: 'replace-definition'; definition: WorkflowDefinition }
-  | { type: 'add-node'; node: WorkflowNodeDefinition }
-  | { type: 'update-node'; nodeId: string; patch: Partial<Omit<WorkflowNodeDefinition, 'id' | 'routes' | 'line'>> }
-  | { type: 'remove-node'; nodeId: string }
-  | { type: 'add-route'; nodeId: string; route: { outcome: string; target: string } }
-  | { type: 'update-route'; nodeId: string; outcome: string; patch: { target?: string } }
-  | { type: 'remove-route'; nodeId: string; outcome: string };
-
-export interface WorkflowDefinition {
-  id: string;
-  start: string;
-  nodes: WorkflowNodeDefinition[];
-}
-
-export interface WorkflowLayout {
-  version: 1;
-  nodes: Record<string, { x: number; y: number }>;
-  engine?: 'workflow-v1' | 'workflow-v2';
-  viewport?: { x: number; y: number; zoom: number };
-}
-
-export interface WorkflowPendingInteraction {
-  id: string;
-  nodeId: string;
-  reason: string;
-  requestedAt: string;
-}
-
-export interface WorkflowRunEvent {
-  id: string;
-  runId: string;
-  workflowId: string;
-  workflowVersion: number;
-  type: string;
-  timestamp: string;
-  nodeId?: string;
-  outcome?: string;
-  error?: string;
-  data?: unknown;
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-    cost?: number;
-  };
-}
-
-export interface WorkflowExecution {
-  workflowId: string;
-  workflowVersion: number;
-  runId: string;
-  currentNodeId: string;
-  completedNodeIds: string[];
-  status: 'active' | 'waiting' | 'completed';
-  pendingInteraction?: WorkflowPendingInteraction;
-}
-
-export interface WorkflowState {
-  workflowId: string;
-  stages: JourneyMapStage[];
-  execution: WorkflowExecution;
-}
-
-export interface WorkflowSnapshot {
-  workflowId: string;
-  source: 'base' | 'custom';
-  baseWorkflowId: string;
-  version: number;
-  definition: WorkflowDefinition;
-  layout: WorkflowLayout;
-  execution: WorkflowExecution;
-  state: WorkflowState;
-  events: WorkflowRunEvent[];
 }
 
 export type JourneyEdgeKind = 'success' | 'fail' | 'retry' | 'other';
@@ -158,7 +78,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
   outcome: string;
   /** 仅用于工作地图视觉；真实业务语义仍以 outcome 为准。 */
   kind?: JourneyEdgeKind;
-   onSelect?: (id: string) => void;
+  onSelect?: (id: string) => void;
 }
 
 export interface FlowEdge {

@@ -13,39 +13,13 @@ import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
 
-export const ReviewArtifactTypeSchema = z.enum([
-  'report',
-  'target_architecture',
-  'mapping',
-  'validation',
-]);
-export type ReviewArtifactType = z.infer<typeof ReviewArtifactTypeSchema>;
-
-export const ReviewIssueSchema = z.object({
-  category: z.enum([
-    'goal_alignment',
-    'readability',
-    'conclusion',
-    'signal_noise',
-    'consistency',
-    'decision_usefulness',
-  ]),
-  severity: z.enum(['high', 'medium', 'low']),
-  description: z.string().trim().min(1),
-  suggestion: z.string().trim().min(1),
-}).strict();
-
-export const ArtifactReviewSchema = z.object({
-  artifactType: ReviewArtifactTypeSchema,
-  status: z.enum(['pass', 'fail']),
-  /** Reviewer 是否实际完成审核；unavailable 表示没有返回可验证结果。 */
-  availability: z.enum(['completed', 'unavailable']).default('completed'),
-  score: z.number().int().min(0).max(100),
-  summary: z.string().trim().min(1),
-  issues: z.array(ReviewIssueSchema),
-  reviewedAt: z.string().datetime(),
-}).strict();
-export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
+export {
+  ArtifactReviewContractSchema as ArtifactReviewSchema,
+  ReviewArtifactTypeSchema,
+  ReviewIssueSchema,
+  type ArtifactReviewContract as ArtifactReview,
+  type ReviewArtifactType,
+} from '../api/contracts.js';
 
 const REVIEWER_SYSTEM_PROMPT = [
   '你是一个独立的 Data Architect 工作成果 Reviewer。',
@@ -99,6 +73,9 @@ function buildReviewPrompt(input: {
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
+  artifactHash?: string;
+  sourceRevision?: string;
+  artifactVersion?: number;
 }): string {
   return [
     '原始用户目标：',
@@ -143,6 +120,9 @@ async function runReviewerOnce(
     artifactType: ReviewArtifactType;
     artifact: string;
     facts?: string;
+    artifactHash?: string;
+    sourceRevision?: string;
+    artifactVersion?: number;
   },
   structured: boolean,
 ): Promise<ArtifactReview> {
@@ -175,6 +155,9 @@ async function runReviewerOnce(
   const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
+    ...(input.artifactHash ? { artifactHash: input.artifactHash } : {}),
+    ...(input.sourceRevision ? { sourceRevision: input.sourceRevision } : {}),
+    ...(input.artifactVersion ? { artifactVersion: input.artifactVersion } : {}),
     availability: 'completed',
     status: normalizedStatus,
     reviewedAt: new Date().toISOString(),
@@ -187,6 +170,9 @@ export async function reviewArtifact(input: {
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
+  artifactHash?: string;
+  sourceRevision?: string;
+  artifactVersion?: number;
 }): Promise<ArtifactReview> {
   try {
     return await runReviewerOnce(input, true);
@@ -207,6 +193,9 @@ export async function reviewArtifact(input: {
           suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
         }],
         reviewedAt: new Date().toISOString(),
+        ...(input.artifactHash ? { artifactHash: input.artifactHash } : {}),
+        ...(input.sourceRevision ? { sourceRevision: input.sourceRevision } : {}),
+        ...(input.artifactVersion ? { artifactVersion: input.artifactVersion } : {}),
       };
     }
   }

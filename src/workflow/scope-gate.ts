@@ -195,9 +195,22 @@ export async function persistAgentIntake(
       : intake.userConfirmed && evidenceIds.length > 0;
   if (!sourceValid) return false;
 
+  const changed =
+    inv.goal !== goal
+    || JSON.stringify(normalized(inv.scope)) !== JSON.stringify(scope)
+    || JSON.stringify(normalized(inv.systems)) !== JSON.stringify(systems);
+
   inv.goal = goal;
   inv.scope = scope;
   inv.systems = systems;
+  if (changed) {
+    inv.claims = [];
+    inv.findings = [];
+    inv.unknowns = [];
+    delete inv.journeyPlan;
+    delete inv.copilotSessionId;
+    delete inv.copilotConfigurationVersion;
+  }
   inv.scopeValidation = {
     status: 'validated',
     goal,

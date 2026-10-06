@@ -1,12 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
+import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
+import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
-import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
 /**
@@ -22,6 +24,7 @@ export const ArchitectureAssessmentPlanSchema = z.object({
   updatedAt: z.string().min(1),
   goal: z.string(),
   scope: z.array(z.string()),
+  provenance: ArtifactProvenanceSchema.optional(),
   currentState: z.object({
     datasets: z.number().int().nonnegative(),
     lineageCoverage: z.number().min(0).max(1).nullable(),
@@ -32,7 +35,7 @@ export const ArchitectureAssessmentPlanSchema = z.object({
   findings: z.array(z.object({
     id: z.string().min(1),
     title: z.string().min(1),
-    severity: z.string().min(1),
+    severity: FindingSeveritySchema,
     description: z.string().min(1),
     recommendation: z.string().min(1),
     evidenceIds: z.array(z.string()),
@@ -50,6 +53,25 @@ export const ArchitectureAssessmentPlanSchema = z.object({
 export type ArchitectureAssessmentPlan = z.infer<typeof ArchitectureAssessmentPlanSchema>;
 
 const planFile = (name: string): string => path.join(reportsDir(name), 'architecture-assessment.json');
+export function toArchitectureAssessmentView(plan: ArchitectureAssessmentPlan): ArchitectureAssessmentView {
+  return {
+    id: plan.id,
+    title: plan.title,
+    status: plan.status,
+    version: plan.version,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt,
+    goal: plan.goal,
+    scope: plan.scope,
+    currentState: plan.currentState,
+    findings: plan.findings,
+    recommendations: plan.recommendations,
+    roadmap: plan.roadmap,
+    evidenceIds: plan.evidenceIds,
+    ...(plan.provenance ? { provenance: plan.provenance } : {}),
+  };
+}
+
 
 interface FindingRecommendationRule {
   id: string;
@@ -82,14 +104,23 @@ function dedupe(values: string[]): string[] { return [...new Set(values.filter(B
 
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
-  const inv = await loadInvestigation(name);
+  const source = await captureInvestigationArtifactSource(name);
+  const inv = source.investigation;
+  const snapshot = source.snapshot;
   assertMissionGate(inv.mission);
-  // 正式评估成果同样要求 Goal / Scope / Systems 已确认。
-  await assertInvestigationScopeGate(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  // Gate 与产物内容必须基于同一个已捕获的 source snapshot。
+  assertInvestigationArtifactSourceScope(source);
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({ currentState: current, estate: snapshot?.estate, findings: inv.findings });
   const timestamp = new Date().toISOString();
+  let version = 1;
+  try {
+    const existingRaw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
+    const existingPlan = ArchitectureAssessmentPlanSchema.safeParse(existingRaw);
+    if (existingPlan.success) version = existingPlan.data.version + 1;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) throw error;
+  }
   const recommendationRules = (await loadFindingRecommendationRules()).rules;
 
   const findings = inv.findings.slice(0, 50).map((finding) => ({
@@ -113,8 +144,9 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 
   const plan: ArchitectureAssessmentPlan = ArchitectureAssessmentPlanSchema.parse({
     id: 'assessment-' + Date.now().toString(36),
-    title: '架构评估结果', status: 'draft', version: 1, createdAt: timestamp, updatedAt: timestamp,
+    title: '架构评估结果', status: 'draft', version, createdAt: timestamp, updatedAt: timestamp,
     goal: inv.goal || inv.userPrompt, scope: inv.scope,
+    provenance: computeArtifactProvenance(inv, snapshot, version),
     currentState: { datasets: current?.coverage.datasets ?? 0, lineageCoverage: current?.coverage.datasetLineageConnectionRate ?? null, semanticAssets: current?.coverage.semanticAssets ?? 0, findings: findings.length, unknowns: inv.unknowns.length },
     findings, recommendations, roadmap, evidenceIds: dedupe(findings.flatMap((finding) => finding.evidenceIds)),
   });
@@ -125,15 +157,40 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   return { plan, path: outputPath };
 }
 
-/** 读取已经生成的评估结果；读取后仍经过 Zod，不信任磁盘里的 JSON。 */
-export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
+/** 读取评估 Artifact，并明确区分 missing / stale / current / error。 */
+export async function readArchitectureAssessmentArtifact(
+  name: string,
+): Promise<{ status: ArtifactLifecycleStatus; plan: ArchitectureAssessmentPlan | null }> {
+  let plan: ArchitectureAssessmentPlan;
   try {
     const raw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
-    return ArchitectureAssessmentPlanSchema.parse(raw);
+    plan = ArchitectureAssessmentPlanSchema.parse(raw);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: ArtifactLifecycleStatusSchema.parse('missing'), plan: null };
+    }
+    return { status: ArtifactLifecycleStatusSchema.parse('error'), plan: null };
   }
+
+  const inv = await loadInvestigation(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
+    return { status: ArtifactLifecycleStatusSchema.parse('stale'), plan: null };
+  }
+  if (!artifactProvenanceMatches(
+    plan.provenance,
+    computeArtifactProvenance(inv, snapshot, plan.version),
+  )) {
+    return { status: ArtifactLifecycleStatusSchema.parse('stale'), plan: null };
+  }
+
+  return { status: ArtifactLifecycleStatusSchema.parse('current'), plan };
+}
+
+/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
+  const result = await readArchitectureAssessmentArtifact(name);
+  return result.status === 'current' ? result.plan : null;
 }
 
 async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeof loadInvestigation>>, current: DiscoverySnapshot['currentState'] | null, plan: ArchitectureAssessmentPlan): Promise<JourneyState> {

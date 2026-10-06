@@ -19,6 +19,8 @@ import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { assertMissionGate } from './mission-gate.js';
+import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
+import type { DiscoveryGeneration } from '../investigation/discovery-snapshot-schema.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -34,6 +36,8 @@ export interface DiscoverOptions {
 
 /** 一次完整 Discovery 的不可变结果快照，供后续 Agent 问答检索。 */
 export interface DiscoverySnapshot {
+  /** 本次 Discovery 的不可变 generation identity；新 snapshot 必须显式携带。 */
+  generation?: DiscoveryGeneration;
   run: DiscoveryRun;
   inventory: Inventory | null;
   lineage: LineageGraph | null;
@@ -177,6 +181,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     startedAt,
     completedAt: new Date().toISOString(),
     parserVersion: PARSER_VERSION,
+    scopeFingerprint: computeScopeFingerprint(inv),
     filesScanned: inventory?.files.length ?? 0,
     datasetsFound: tables.length,
     lineageEdgesFound: lineage?.edges.length ?? 0,
@@ -214,6 +219,10 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   const currentState = buildCurrentStateIntelligence({ inventory, estate, lineage, profiles, semanticAssets });
 
   const snapshot: DiscoverySnapshot = {
+    generation: {
+      id: run.id,
+      scopeFingerprint: run.scopeFingerprint!,
+    },
     run,
     inventory,
     lineage,
@@ -248,7 +257,9 @@ async function findReusablePathDiscoveryRun(
   inventory: Inventory,
 ): Promise<Awaited<ReturnType<typeof loadInvestigation>>['discoveryRuns'][number] | null> {
   const normalizedRoot = path.resolve(root);
+  const currentScopeFingerprint = computeScopeFingerprint(investigation);
   for (const run of [...investigation.discoveryRuns].reverse()) {
+    if (run.scopeFingerprint !== currentScopeFingerprint) continue;
     if (run.parserVersion !== PARSER_VERSION || path.resolve(run.root) !== normalizedRoot) continue;
 
     const sourceEvidence = investigation.evidence.filter(

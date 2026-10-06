@@ -4,61 +4,19 @@ import { randomUUID } from 'node:crypto';
 import * as z from 'zod';
 import { workspaceRoot } from './workspace.js';
 
-export const TrajectoryEventSchema = z.object({
-  id: z.string().min(1),
-  turnId: z.string().min(1),
-  timestamp: z.string().datetime(),
-  type: z.enum(['user_input','turn_start','assistant_turn_start','assistant_turn_end','intent','model_call','tool_call','tool_result','tool_progress','permission','permission_completed','user_input_requested','user_input_completed','compaction','session_idle','session_error','context_changed','turn_end','error','checkpoint','stage_gate','status']),
-  name: z.string().min(1),
-  status: z.enum(['started','completed','failed','waiting','info']).optional(),
-  durationMs: z.number().nonnegative().optional(),
-  model: z.string().optional(),
-  inputTokens: z.number().nonnegative().optional(),
-  outputTokens: z.number().nonnegative().optional(),
-  premiumRequestCost: z.number().nonnegative().optional(),
-  details: z.record(z.string(), z.unknown()).default({}),
-}).strict();
-export type TrajectoryEvent = z.infer<typeof TrajectoryEventSchema>;
-
-export const TrajectorySummarySchema = z.object({
-  turnId: z.string().min(1).optional(),
-  startedAt: z.string().datetime(),
-  finishedAt: z.string().datetime().optional(),
-  durationMs: z.number().nonnegative().optional(),
-  model: z.string().optional(),
-  inputTokens: z.number().nonnegative().default(0),
-  outputTokens: z.number().nonnegative().default(0),
-  totalTokens: z.number().nonnegative().default(0),
-  totalNanoAiu: z.number().nonnegative().optional(),
-  totalPremiumRequestCost: z.number().nonnegative().optional(),
-  models: z.record(z.string(), z.object({
-    inputTokens: z.number().nonnegative().default(0),
-    outputTokens: z.number().nonnegative().default(0),
-    totalNanoAiu: z.number().nonnegative().optional(),
-  }).strict()).default({}),
-  eventCount: z.number().int().nonnegative().default(0),
-  state: z.enum(['running', 'waiting', 'completed', 'failed', 'aborted']).default('running'),
-  waitingOn: z.enum(['permission', 'user_input', 'tool', 'model', 'session']).optional(),
-  lastActivityAt: z.string().datetime().optional(),
-  lastActivity: z.string().optional(),
-  lastActivityType: z.string().optional(),
-  idleObserved: z.boolean().default(false),
-  assistantTurnEnded: z.boolean().default(false),
-  pendingToolCount: z.number().int().nonnegative().default(0),
-  pendingPermissionCount: z.number().int().nonnegative().default(0),
-  pendingUserInputCount: z.number().int().nonnegative().default(0),
-}).strict();
-export type TrajectorySummary = z.infer<typeof TrajectorySummarySchema>;
-
-export interface TrajectoryTurnSummary {
-  turnId: string;
-  summary: TrajectorySummary;
-  userQuestion?: string;
-  modelCalls: number;
-  toolCalls: number;
-  failedEvents: number;
-  compactions: number;
-}
+export {
+  TrajectoryEventSchema,
+  TrajectorySummarySchema,
+  TrajectoryTurnSummarySchema,
+  TrajectoryCheckpointSchema,
+  TrajectoryCheckpointDetailsSchema,
+} from '../api/contracts.js';
+export type {
+  TrajectoryEvent,
+  TrajectorySummary,
+  TrajectoryTurnSummary,
+  TrajectoryCheckpoint,
+} from '../api/contracts.js';
 
 export function summarizeTrajectoryTurns(events: TrajectoryEvent[]): TrajectoryTurnSummary[] {
   const groups = new Map<string, TrajectoryEvent[]>();
@@ -113,52 +71,40 @@ export async function appendTrajectoryEvent(name: string, event: Omit<Trajectory
 /** 读取最近的执行轨迹；UI 可按 turnId 再筛选。 */
 export async function readTrajectory(name: string, options: { turnId?: string; limit?: number } = {}): Promise<TrajectoryEvent[]> {
   let text = '';
-  try { text = await fs.readFile(trajectoryFile(name), 'utf8'); } catch { return []; }
+  try {
+    text = await fs.readFile(trajectoryFile(name), 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 500), 5000));
-  const events = text.split('\n').filter(Boolean).map((line) => { try { return TrajectoryEventSchema.parse(JSON.parse(line)); } catch { return null; } }).filter((event): event is TrajectoryEvent => Boolean(event));
+  const events = text.split('\n').filter(Boolean).map((line, index) => {
+    try {
+      return TrajectoryEventSchema.parse(JSON.parse(line));
+    } catch (error) {
+      throw new Error(
+        'Trajectory 数据损坏：trajectory.jsonl 第 ' + String(index + 1) + ' 条事件无法通过 Runtime Schema 校验。',
+        { cause: error },
+      );
+    }
+  });
   const filtered = options.turnId ? events.filter((event) => event.turnId === options.turnId) : events;
   return filtered.slice(-limit);
 }
 
 /** 读取最近的阶段性调查小结；checkpoint 本身作为 trajectory 的可追溯事件保存。 */
-export interface TrajectoryCheckpoint {
-  id: string;
-  turnId: string;
-  timestamp: string;
-  execution: number;
-  title: string;
-  summary: string;
-  confirmed: string[];
-  evidenceIds: string[];
-  unknowns: string[];
-  nextStep?: string;
-}
-
-const trajectoryCheckpointDetails = z.object({
-  execution: z.number().int().nonnegative(),
-  title: z.string().min(1),
-  summary: z.string().min(1),
-  confirmed: z.array(z.string()).default([]),
-  evidenceIds: z.array(z.string()).default([]),
-  unknowns: z.array(z.string()).default([]),
-  nextStep: z.string().optional(),
-}).strict();
-
 export function listTrajectoryCheckpoints(events: TrajectoryEvent[], limit = 20): TrajectoryCheckpoint[] {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
   return events
     .filter((event) => event.type === 'checkpoint')
-    .map((event) => {
-      const parsed = trajectoryCheckpointDetails.safeParse(event.details);
-      if (!parsed.success) return null;
-      return {
-        id: event.id,
-        turnId: event.turnId,
-        timestamp: event.timestamp,
-        ...parsed.data,
-      };
-    })
-    .filter((item): item is TrajectoryCheckpoint => Boolean(item))
+    .map((event) => ({
+      id: event.id,
+      turnId: event.turnId,
+      timestamp: event.timestamp,
+      ...TrajectoryCheckpointDetailsSchema.parse(event.details),
+    }))
     .slice(-safeLimit);
 }
 

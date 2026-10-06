@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import { DiscoverySnapshotSchema } from './discovery-snapshot-schema.js';
 import {
   contextFile,
   discoveryDir,
@@ -174,7 +175,18 @@ export async function confirmInvestigationMission(
     const current = await loadWorkspaceContext(name);
     const missionChanged =
       current.mission?.purpose !== mission.purpose
-      || current.mission?.expectedResult !== mission.expectedResult;
+      || current.mission?.expectedResult !== mission.expectedResult
+      || JSON.stringify(current.mission?.deliverables.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        required: item.required,
+      }))) !== JSON.stringify(mission.deliverables.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        required: item.required,
+      })));
 
     const next = WorkspaceContextSchema.parse({
       ...current,
@@ -191,6 +203,11 @@ export async function confirmInvestigationMission(
       delete nextState.copilotSessionId;
       delete nextState.copilotConfigurationVersion;
       delete nextState.journeyPlan;
+      // Findings / Claims / Unknowns 是针对 Mission 的解释结果，不属于新的 Mission generation。
+      // Evidence / Discovery history 保留，供重新调查时复用，但旧结论不得进入新报告。
+      nextState.claims = [];
+      nextState.findings = [];
+      nextState.unknowns = [];
     }
 
     await writeJsonAtomic(contextFile(name), nextState);
@@ -311,24 +328,39 @@ export async function investigationExists(name: string): Promise<boolean> {
 
 /** 原子保存一次 Discovery 快照，避免 Agent 读取到半写入 JSON。 */
 export async function saveDiscoverySnapshot(name: string, runId: string, snapshot: unknown): Promise<string> {
+  const parsed = DiscoverySnapshotSchema.parse(snapshot);
+  if (parsed.run.id !== runId) throw new Error('Discovery Snapshot runId 与文件 runId 不一致。');
+  if (!parsed.run.scopeFingerprint) throw new Error('Discovery Snapshot 缺少 Scope fingerprint，不能作为新的 current source。');
+  const normalized = DiscoverySnapshotSchema.parse({
+    ...parsed,
+    generation: parsed.generation ?? {
+      id: parsed.run.id,
+      scopeFingerprint: parsed.run.scopeFingerprint,
+    },
+  });
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, runId + '.json');
-  // Discovery snapshots are later used as agent evidence, so never leave a
-  // partially written JSON file behind.
-  await writeJsonAtomic(fp, snapshot);
+  await writeJsonAtomic(fp, normalized);
   return fp;
 }
 
-/** 按 run 文件名排序读取最近一次 Discovery 快照。 */
-export async function loadLatestSnapshot<T>(name: string): Promise<T | null> {
+export async function loadLatestDiscoverySnapshot(name: string): Promise<import('../workflow/discover.js').DiscoverySnapshot | null> {
   let files: string[];
   try {
     files = (await fs.readdir(discoveryDir(name))).filter((f) => f.endsWith('.json')).sort();
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
   }
-  if (files.length === 0) return null;
+  if (!files.length) return null;
   const last = files[files.length - 1] as string;
-  return JSON.parse(await fs.readFile(path.join(discoveryDir(name), last), 'utf-8')) as T;
+  return DiscoverySnapshotSchema.parse(JSON.parse(await fs.readFile(path.join(discoveryDir(name), last), 'utf-8'))) as import('../workflow/discover.js').DiscoverySnapshot;
+}
+
+/** 兼容旧调用入口；Discovery Snapshot 统一经过 Runtime Schema 校验。 */
+export async function loadLatestSnapshot<T>(name: string): Promise<T | null> {
+  return await loadLatestDiscoverySnapshot(name) as T | null;
 }

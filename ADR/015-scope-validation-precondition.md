@@ -30,9 +30,41 @@ Scope Validation 必须记录：
 - validation status；
 - provenance / validation evidence；
 - snapshot 或等价版本信息；
-- validation time。
+- validation time;
+- `scopeFingerprint`，由服务端根据 canonicalized 的 confirmed Scope 确定性计算。
 
 不能仅因为用户写了一段范围描述，就把 Scope 当成 validated。
+
+### 2.1 Discovery generation 必须绑定 Scope
+
+每一次正式 Discovery Run 都必须记录生成时的 `scopeFingerprint`；Run 的 `id` 就是该次 Discovery generation 的稳定身份。当前 schema 对历史 Run 允许缺失该字段，但任何新生成并作为 current source 使用的 Run 都必须有它。
+
+Discovery Snapshot 不单独建立第二套 Scope identity；它只能继承并引用其 `run.scopeFingerprint` 和 `run.id`。因此：
+
+- Snapshot 只能作为生成时 Scope 的事实来源；
+- 当前 Scope fingerprint 与 Snapshot 的 Scope fingerprint 不一致时，Snapshot 不能被复用为当前调查事实；
+- legacy Snapshot 若没有 Scope fingerprint，可以读取和审计，但不能被新一代 Artifact 当作 current source；
+- Scope 不变时，原始 Evidence / Discovery 可以复用，不要求因为 Mission 文案变化而重新扫描来源。
+
+这样可以区分“原始来源仍然可复用”和“旧任务结论不能继续作为当前结论”两种不同的失效语义。
+
+### 2.2 Current Scope 与 Discovery generation 的权威判定
+
+当前 Scope fingerprint 只能由服务端从 confirmed Scope 的 canonical representation 计算；Web、Agent、Reviewer 都不能自行产生或覆盖该 fingerprint。
+
+Discovery 是否可以作为 current source，只由以下关系确定：
+
+```text
+current confirmed Scope
+        ↓
+current scopeFingerprint
+        ↓
+Discovery Run.scopeFingerprint
+        ↓
+Discovery Snapshot.run.id
+```
+
+不能用文件名、生成时间或“latest snapshot”作为 generation identity。Scope fingerprint 相同只表示边界一致，不表示新的 Mission 结论自动成立；Mission-scoped Claims / Findings / Artifacts 仍需按照 ADR-011 / ADR-017 的 generation 规则重新验证。
 
 ### 3. Scope 未验证时不得正式推进
 
@@ -50,6 +82,8 @@ Mission 真正改变后，原 Scope 可能不再适用。
 
 因此 Mission change 必须使关联的 Scope Validation 进入 invalid / needs revalidation 状态，并阻止沿用旧 Scope 作为已验证边界。
 
+Mission change 本身不要求删除原始 Evidence 或历史 Discovery。历史来源可以保留并在新的 Scope 下复用；只有 Scope / Discovery generation 不再兼容时，才禁止把旧 Snapshot 当作当前事实源。
+
 ### 5. Scope Validation 与 Evidence Gate 分工不同
 
 Scope Validation 回答“调查哪些对象属于本次任务范围”。
@@ -65,7 +99,7 @@ Evidence Gate 回答“某个事实是否有足够的来源证据”。
 - Mission 改变后的 stale scope 可以被确定性识别；
 - Scope provenance 可以被审计。
 
-代价是需要保存 scope snapshot / version，并在 Mission 改变时显式 invalidation。
+代价是需要保存 Scope snapshot / version 与 `scopeFingerprint`，并在 Mission 改变时显式 invalidation；不需要为 Scope 本身引入新的 storage subsystem。
 
 ## Rejected Alternatives
 

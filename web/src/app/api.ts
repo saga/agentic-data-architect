@@ -1,17 +1,71 @@
-/** 浏览器 API 与 SSE 的最小封装。 */
+import * as z from 'zod';
+import { ApiErrorSchema, SseEventSchema, type ApiError, type SseEvent } from '../../../src/api/contracts.js';
 
-export interface StreamEvent {
-  event: string;
-  data: unknown;
+export type StreamEvent = SseEvent;
+
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly apiError: ApiError;
+
+  constructor(status: number, apiError: ApiError) {
+    super(apiError.error);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.apiError = apiError;
+  }
 }
 
-export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+async function readApiError(response: Response): Promise<ApiError> {
+  const fallbackBody = () => response.clone().text().catch(() => '');
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    const body = await fallbackBody();
+    return {
+      code: 'HTTP_ERROR',
+      error: body || response.statusText || '请求失败。',
+    };
+  }
+
+  const parsed = ApiErrorSchema.safeParse(payload);
+  if (parsed.success) return parsed.data;
+  return {
+    code: 'HTTP_ERROR',
+    error: response.statusText || '请求失败。',
+    ...(payload && typeof payload === 'object' ? { details: payload as Record<string, unknown> } : {}),
+  };
+}
+
+export async function request(url: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(body || response.statusText);
+    throw new ApiRequestError(response.status, await readApiError(response));
   }
-  return response.json() as Promise<T>;
+  return response;
+}
+
+export async function getText(url: string, init?: RequestInit): Promise<string> {
+  const response = await request(url, init);
+  return response.text();
+}
+
+export async function getJson<T>(url: string, init?: RequestInit): Promise<T>;
+export async function getJson<T>(url: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T>;
+export async function getJson<T>(
+  url: string,
+  schemaOrInit?: z.ZodType<T> | RequestInit,
+  init?: RequestInit,
+): Promise<T> {
+  const looksLikeSchema = typeof schemaOrInit === 'object'
+    && schemaOrInit !== null
+    && 'parse' in schemaOrInit
+    && typeof (schemaOrInit as { parse?: unknown }).parse === 'function';
+  const schema = looksLikeSchema ? schemaOrInit as z.ZodType<T> : undefined;
+  const requestInit = schema ? init : schemaOrInit as RequestInit | undefined;
+  const response = await request(url, requestInit);
+  const data: unknown = await response.json();
+  return schema ? schema.parse(data) : data as T;
 }
 
 export async function consumeSse(
@@ -33,13 +87,14 @@ export async function consumeSse(
       else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
     }
     if (!data.length) return;
-    onEvent({ event, data: JSON.parse(data.join('\n')) });
+    const payload = JSON.parse(data.join('\n')) as unknown;
+    onEvent(SseEventSchema.parse({ event, data: payload }));
   };
 
   while (true) {
     const { done, value } = await reader.read();
     buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
-    const blocks = buffer.split('\n\n');
+    const blocks = buffer.split(/\r?\n\r?\n/);
     buffer = blocks.pop() ?? '';
     for (const block of blocks) {
       if (block.trim()) processBlock(block);

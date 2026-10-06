@@ -12,6 +12,7 @@ import { loadModernizationPlan } from './modernization.js';
 import { runInvestigationScopeGate } from './scope-gate.js';
 import type { ModernizationPlan } from '../model/modernization.js';
 import { reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
+import { hashArtifact } from '../investigation/artifact-provenance.js';
 
 export type ModernizationGateStage = 'target' | 'mapping' | 'validation';
 
@@ -236,10 +237,15 @@ export async function runModernizationGate(
           : 'validation',
       artifact,
       facts,
+      ...(plan.provenance ? {
+        artifactHash: hashArtifact(artifact),
+        sourceRevision: plan.provenance.sourceRevision,
+        artifactVersion: plan.version,
+      } : {}),
     });
     await saveArtifactReview(name, review);
 
-    const reviewPassed = review.status === 'pass';
+    const reviewPassed = review.availability === 'completed' && review.status === 'pass';
     return {
       ...result,
       passed: result.passed && reviewPassed,

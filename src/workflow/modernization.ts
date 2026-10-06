@@ -7,7 +7,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
+import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import {
   ModernizationPlanSchema,
   SourceToTargetMappingSchema,
@@ -21,9 +23,9 @@ import {
 } from '../model/modernization.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
-import { buildJourneyState, loadModernizationJourney } from './journey.js';
+import { buildJourneyState, deriveModernizationFacts, loadModernizationJourney } from './journey.js';
+import type { ModernizationPlanView } from '../api/contracts.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
-import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
 function productId(prefix: string): string {
@@ -197,12 +199,99 @@ function buildTargetArchitecture(
 }
 
 /** 把这次整理出来的内容保存下来，UI 和助手以后都能继续用。 */
+export function toModernizationPlanView(plan: ModernizationPlan): ModernizationPlanView {
+  return {
+    id: plan.id,
+    title: plan.title,
+    status: plan.status,
+    version: plan.version,
+    generatedAt: plan.generatedAt,
+    goal: plan.goal,
+    scope: plan.scope,
+    currentState: plan.currentState,
+    targetArchitecture: {
+      id: plan.targetArchitecture.id,
+      title: plan.targetArchitecture.title,
+      status: plan.targetArchitecture.status,
+      principles: plan.targetArchitecture.principles,
+      components: plan.targetArchitecture.components.map((component) => ({
+        id: component.id,
+        name: component.name,
+        description: component.description,
+        sourceAssets: component.sourceAssets,
+      })),
+      openQuestions: plan.targetArchitecture.openQuestions,
+      evidenceIds: plan.targetArchitecture.evidenceIds,
+      findingIds: plan.targetArchitecture.findingIds,
+      decisionIds: plan.targetArchitecture.decisionIds,
+      type: plan.targetArchitecture.type,
+      version: plan.targetArchitecture.version,
+      createdAt: plan.targetArchitecture.createdAt,
+      updatedAt: plan.targetArchitecture.updatedAt,
+    },
+    mappings: plan.mappings.map((mapping) => ({
+      id: mapping.id,
+      title: mapping.title,
+      status: mapping.status,
+      sourceAsset: mapping.sourceAsset,
+      targetAsset: mapping.targetAsset,
+      ...(mapping.transformation !== undefined ? { transformation: mapping.transformation } : {}),
+      ...(mapping.businessRule !== undefined ? { businessRule: mapping.businessRule } : {}),
+      ...(mapping.validationRule !== undefined ? { validationRule: mapping.validationRule } : {}),
+      evidenceIds: mapping.evidenceIds,
+      findingIds: mapping.findingIds,
+      decisionIds: mapping.decisionIds,
+      type: mapping.type,
+      version: mapping.version,
+      createdAt: mapping.createdAt,
+      updatedAt: mapping.updatedAt,
+    })),
+    ...(plan.mappingCoverage ? { mappingCoverage: plan.mappingCoverage } : {}),
+    validationPlan: {
+      id: plan.validationPlan.id,
+      type: plan.validationPlan.type,
+      title: plan.validationPlan.title,
+      status: plan.validationPlan.status,
+      version: plan.validationPlan.version,
+      createdAt: plan.validationPlan.createdAt,
+      updatedAt: plan.validationPlan.updatedAt,
+      evidenceIds: plan.validationPlan.evidenceIds,
+      findingIds: plan.validationPlan.findingIds,
+      decisionIds: plan.validationPlan.decisionIds,
+      scope: plan.validationPlan.scope,
+      checks: plan.validationPlan.checks.map((check) => ({
+        id: check.id,
+        type: check.type,
+        name: check.name,
+        description: check.description,
+        status: check.status,
+        blocking: check.blocking,
+        evidenceIds: check.evidenceIds,
+        ...(check.result !== undefined ? { result: check.result } : {}),
+      })),
+      cutoverCriteria: plan.validationPlan.cutoverCriteria,
+      rollbackCriteria: plan.validationPlan.rollbackCriteria,
+    },
+    ...(plan.provenance ? { provenance: plan.provenance } : {}),
+  };
+}
+
 export async function buildModernizationPlan(name: string): Promise<{ plan: ModernizationPlan; path: string }> {
-  // 正式阶段成果不能在范围仍是 unset 时生成；先通过独立 Scope Gate。
-  const inv = await loadInvestigation(name);
-  assertMissionGate(inv.mission);
-  await assertInvestigationScopeGate(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const source = await captureInvestigationArtifactSource(name);
+  assertMissionGate(source.investigation.mission);
+  assertInvestigationArtifactSourceScope(source);
+  return buildModernizationPlanFromSource(name, source);
+}
+
+async function buildModernizationPlanFromSource(
+  name: string,
+  source: {
+    investigation: Awaited<ReturnType<typeof loadInvestigation>>,
+    snapshot: DiscoverySnapshot | null;
+  },
+): Promise<{ plan: ModernizationPlan; path: string }> {
+  const inv = source.investigation;
+  const snapshot = source.snapshot;
   const current = snapshot?.currentState ?? null;
   const gaps = buildModernizationGaps({
     currentState: current,
@@ -230,19 +319,26 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     } : null,
     unknowns: inv.unknowns,
     highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    // target/mapping 的 draft/proposed 产物不能算“通关”；否则刚生成计划，地图就会跳过真正的工作。
-    targetComponentCount: targetArchitecture.status === 'draft' ? 0 : targetArchitecture.components.length,
-    mappingCount: mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length,
-    blockingValidationReady: validationPlan.checks.filter(
-      (check) => check.blocking && ['ready', 'passed'].includes(check.status),
-    ).length,
-    blockingValidationTotal: validationPlan.checks.filter((check) => check.blocking).length,
+    ...deriveModernizationFacts({
+      targetStatus: targetArchitecture.status,
+      targetComponentCount: targetArchitecture.components.length,
+      mappingStatuses: mappings.map((mapping) => mapping.status),
+      validationStatuses: validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
+    }),
   });
+  let artifactVersion = 1;
+  try {
+    const existingRaw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf8')) as unknown;
+    const existingPlan = ModernizationPlanSchema.safeParse(existingRaw);
+    if (existingPlan.success) artifactVersion = existingPlan.data.version + 1;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) throw error;
+  }
   const plan: ModernizationPlan = ModernizationPlanSchema.parse({
     id: productId('modernization'),
     title: inv.goal || '老系统改造计划',
     status: 'draft',
-    version: 1,
+    version: artifactVersion,
     generatedAt: now(),
     goal: inv.goal,
     scope: inv.scope,
@@ -269,6 +365,7 @@ export async function buildModernizationPlan(name: string): Promise<{ plan: Mode
     validationPlan,
     journey,
     evidenceIds,
+    provenance: computeArtifactProvenance(inv, snapshot, artifactVersion),
   });
 
   const dir = reportsDir(name);
@@ -293,15 +390,17 @@ export async function persistModernizationAgentResult(
 ): Promise<{ saved: boolean; path?: string; changedSections: string[] }> {
   if (!result) return { saved: false, changedSections: [] };
 
-  // 这个函数也可能被 Workflow / CLI 直接调用；Modernization 工作成果必须绑定已确认 Mission。
-  const preflight = await loadInvestigation(name);
-  assertMissionGate(preflight.mission);
-
   return withWorkspaceContextLock(name, async () => {
-    let plan = await loadModernizationPlan(name);
-    if (!plan) plan = (await buildModernizationPlan(name)).plan;
+    const source = await captureInvestigationArtifactSource(name);
+    assertMissionGate(source.investigation.mission);
+    assertInvestigationArtifactSourceScope(source);
 
-    const inv = await loadInvestigation(name);
+    const currentArtifact = await readModernizationArtifact(name, source);
+    const plan = currentArtifact.status === 'current' && currentArtifact.plan
+      ? currentArtifact.plan
+      : (await buildModernizationPlanFromSource(name, source)).plan;
+
+    const inv = source.investigation;
     const knownEvidence = new Set(inv.evidence.map((item) => item.id));
     const timestamp = now();
     const changedSections: string[] = [];
@@ -437,13 +536,16 @@ export async function persistModernizationAgentResult(
       changedSections.push('validationPlan');
     }
 
+    const nextVersion = plan.version + 1;
+    const latestSnapshot = source.snapshot;
     const nextPlan = ModernizationPlanSchema.parse({
       ...plan,
-      version: plan.version + 1,
+      version: nextVersion,
       targetArchitecture,
       mappings,
       validationPlan,
       ...(mappingCoverage ? { mappingCoverage } : {}),
+      provenance: computeArtifactProvenance(inv, latestSnapshot, nextVersion),
       evidenceIds: [...new Set([
         ...plan.evidenceIds,
         ...targetArchitecture.evidenceIds,
@@ -465,41 +567,63 @@ export async function persistModernizationAgentResult(
   });
 }
 
-/** 读取已经保存的改造计划；还没有生成时就返回空。 */
-export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
+/** 读取改造 Artifact，并明确区分 missing / stale / current / error。 */
+export async function readModernizationArtifact(
+  name: string,
+  source?: {
+    investigation: Awaited<ReturnType<typeof loadInvestigation>>;
+    snapshot: DiscoverySnapshot | null;
+  },
+): Promise<{ status: import('../api/contracts.js').ArtifactLifecycleStatus; plan: ModernizationPlan | null }> {
+  let plan: ModernizationPlan;
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
-    const plan = ModernizationPlanSchema.parse(raw);
-    const inv = await loadInvestigation(name);
-    const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-    const current = snapshot?.currentState ?? null;
-    const gaps = buildModernizationGaps({
-      currentState: current,
-      estate: snapshot?.estate,
-      findings: inv.findings,
-    });
-    const journey = buildJourneyState(await loadModernizationJourney(), {
-      goal: inv.goal || inv.userPrompt,
-      currentState: current ? {
-        datasets: current.coverage.datasets,
-          semanticAssets: current.coverage.semanticAssets,
-        parseFailures: current.coverage.sqlParseFailures,
-      } : null,
-      unknowns: inv.unknowns,
-      highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-      targetComponentCount: plan.targetArchitecture.status === 'draft'
-        ? 0
-        : plan.targetArchitecture.components.length,
-      mappingCount: plan.mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length,
-      blockingValidationReady: plan.validationPlan.checks.filter(
-        (check) => check.blocking && ['ready', 'passed'].includes(check.status),
-      ).length,
-      blockingValidationTotal: plan.validationPlan.checks.filter((check) => check.blocking).length,
-    });
-
-    return { ...plan, journey };
+    plan = ModernizationPlanSchema.parse(raw);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: 'missing', plan: null };
+    }
+    return { status: 'error', plan: null };
   }
+
+  const inv = source?.investigation ?? await loadInvestigation(name);
+  const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const current = snapshot?.currentState ?? null;
+  if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
+    return { status: 'stale', plan: null };
+  }
+  const currentProvenance = computeArtifactProvenance(inv, snapshot, plan.version);
+  if (!artifactProvenanceMatches(plan.provenance, currentProvenance)) {
+    return { status: 'stale', plan: null };
+  }
+
+  const gaps = buildModernizationGaps({
+    currentState: current,
+    estate: snapshot?.estate,
+    findings: inv.findings,
+  });
+  const journey = buildJourneyState(await loadModernizationJourney(), {
+    goal: inv.goal || inv.userPrompt,
+    currentState: current ? {
+      datasets: current.coverage.datasets,
+      semanticAssets: current.coverage.semanticAssets,
+      parseFailures: current.coverage.sqlParseFailures,
+    } : null,
+    unknowns: inv.unknowns,
+    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+    ...deriveModernizationFacts({
+      targetStatus: plan.targetArchitecture.status,
+      targetComponentCount: plan.targetArchitecture.components.length,
+      mappingStatuses: plan.mappings.map((mapping) => mapping.status),
+      validationStatuses: plan.validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
+    }),
+  });
+
+  return { status: 'current', plan: { ...plan, journey } };
+}
+
+/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
+  const result = await readModernizationArtifact(name);
+  return result.status === 'current' ? result.plan : null;
 }

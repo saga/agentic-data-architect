@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import ImgCrop from 'antd-img-crop';
+import { getJson } from '../app/api.js';
 import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
 import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
-export interface ConfigPageControl {
-  version:number; updatedAt:string;
-  research:{ githubRepositories:string[]; githubSearchMode:'only_selected'|'selected_and_broad'; keywords:string[]; importantDocuments:Array<{id:string;title:string;reference:string}> };
-  agent:{ model:string; autoTier?:'efficiency'|'balance'|'intelligence'|'fast'; permissionMode:'permission'|'allow_all'; autoContinuationTurns:number; displayName:string; personality:string; avatarPath?:string; avatarPaths?:string[]; avatarMimeType?:string; avatarSources?:Array<{src:string;kind:'image'|'video'|'remote';mimeType?:string}>; avatarWidth:number; avatarHeight:number; systemPrompt:{version:number;content:string}; mcpServers:Array<{name:string;version:number;enabled:boolean;type:'local'|'http';command?:string;args?:string[];url?:string;tools?:string[];headers?:Record<string,string>}> };
-  history:Array<{version:number;updatedAt:string;reason:string}>;
-}
-export type ConfigWorkflow = ''|'legacy-modernization'|'financial-ai-native-architecture'|'data-architecture-assessment';
+import type { InvestigationControl, WorkflowId } from '../app/types.js';
+import { workflowOptions } from '../app/workflow-options';
+import {
+  ControlResponseSchema,
+  OpenCodeStatusSchema,
+} from '../../../src/api/contracts.js';
 
-const workflowOptions:{value:ConfigWorkflow;label:string}[]=[
- {value:'',label:'自主调查'},
- {value:'legacy-modernization',label:'改造已有系统'},
- {value:'financial-ai-native-architecture',label:'金融 AI / 数据架构设计'},
- {value:'data-architecture-assessment',label:'数据架构评估'},
-];
+export type ConfigPageControl = InvestigationControl;
+export type ConfigWorkflow = '' | WorkflowId;
 
 function clone<T>(value:T):T{return JSON.parse(JSON.stringify(value)) as T;}
 function formatTime(value:string){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString();}
@@ -42,14 +38,13 @@ export function InvestigationConfigPage(props:{
   const [confirmText,setConfirmText]=useState('');
   const [avatarUploading,setAvatarUploading]=useState(false);
   const [avatarError,setAvatarError]=useState<string>();
-  const [openCodeStatus,setOpenCodeStatus]=useState<{enabled:boolean;reachable:boolean;baseUrl:string;modelCount:number;error?:string}>();
+  const [openCodeStatus,setOpenCodeStatus]=useState<import('../../../src/api/contracts.js').OpenCodeStatus | undefined>();
 
   useEffect(()=>setDraft(clone(props.control)),[props.control]);
   useEffect(()=>{
     let cancelled=false;
-    void fetch('/api/opencode/status')
-      .then(async response=>response.ok ? await response.json() as typeof openCodeStatus : undefined)
-      .then(result=>{if(!cancelled&&result)setOpenCodeStatus(result);})
+    void getJson('/api/opencode/status', OpenCodeStatusSchema)
+      .then(result=>{if(!cancelled)setOpenCodeStatus(result);})
       .catch(()=>{if(!cancelled)setOpenCodeStatus(undefined);});
     return ()=>{cancelled=true;};
   },[]);
@@ -58,12 +53,14 @@ export function InvestigationConfigPage(props:{
   const save=async()=>{
     setSaving(true);
     try{
-      const response=await fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/config`,{
-        method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({research:draft.research,agent:draft.agent}),
-      });
-      if(!response.ok) throw new Error((await response.text())||response.statusText);
-      const data=await response.json() as {control:ConfigPageControl};
+      const data=await getJson(
+        `/api/sessions/${encodeURIComponent(props.sessionName)}/config`,
+        ControlResponseSchema,
+        {
+          method:'PUT',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({research:draft.research,agent:draft.agent}),
+        },
+      );
       setDraft(data.control);
       await props.onSaved(data.control);
     }finally{setSaving(false);}
@@ -113,16 +110,11 @@ export function InvestigationConfigPage(props:{
       body.append('width', String(draft.agent.avatarWidth));
       body.append('height', String(draft.agent.avatarHeight));
 
-      const response = await fetch(
+      const data = await getJson(
         `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar`,
+        ControlResponseSchema,
         { method: 'POST', body },
       );
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || response.statusText);
-      }
-
-      const data = await response.json() as { control: ConfigPageControl };
       setDraft(clone(data.control));
       await props.onSaved(data.control);
     } catch (error) {

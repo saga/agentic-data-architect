@@ -156,6 +156,31 @@ test('user input request and completion use the same runtime request id', () => 
 });
 
 
+test('malformed checkpoint details are rejected instead of silently disappearing', () => {
+  const events: TrajectoryEvent[] = [
+    event({
+      id: 'checkpoint-bad',
+      turnId: 'turn-5',
+      timestamp: '2026-10-04T14:00:00.000Z',
+      type: 'checkpoint',
+      name: '阶段小结：损坏数据',
+      status: 'completed',
+      details: {
+        execution: 0,
+        title: '损坏数据',
+        summary: '缺少 evidenceIds。',
+        confirmed: [],
+        unknowns: [],
+      },
+    }),
+  ];
+
+  assert.throws(
+    () => listTrajectoryCheckpoints(events),
+    /Stage Checkpoint contract/,
+  );
+});
+
 test('trajectory checkpoints can be listed without affecting runtime state', () => {
   const events: TrajectoryEvent[] = [
     event({
