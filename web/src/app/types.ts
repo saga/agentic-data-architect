@@ -236,7 +236,6 @@ export interface SessionData {
   control: InvestigationControl;
   recentAudit: AuditEvent[];
   messages: Message[];
-  checkpoints: InvestigationCheckpoint[];
   currentState?: {
     coverage: {
       datasets: number;
