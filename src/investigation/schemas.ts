@@ -4,16 +4,23 @@
  * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
  */
 import * as z from 'zod';
+import {
+  JourneyPlanSchema as SharedJourneyPlanSchema,
+  MissionContractSchema as SharedMissionContractSchema,
+  MissionDeliverableSchema as SharedMissionDeliverableSchema,
+  MissionDraftSchema as SharedMissionDraftSchema,
+  WorkflowIdSchema as SharedWorkflowIdSchema,
+  type JourneyPlan as SharedJourneyPlan,
+  type MissionContract as SharedMissionContract,
+  type MissionDeliverable as SharedMissionDeliverable,
+  type MissionDraft as SharedMissionDraft,
+  type WorkflowId as SharedWorkflowId,
+} from '../api/contracts.js';
 import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
 
 /** 任务契约中的单个交付物；用于判断调查是否一直在朝用户最终结果推进。 */
-export const MissionDeliverableSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  title: z.string().trim().min(1).max(120),
-  description: z.string().trim().min(1).max(500),
-  required: z.boolean().default(true),
-}).strict();
-export type MissionDeliverable = z.infer<typeof MissionDeliverableSchema>;
+export const MissionDeliverableSchema = SharedMissionDeliverableSchema;
+export type MissionDeliverable = SharedMissionDeliverable;
 
 /**
  * Investigation 的 Mission Contract。
@@ -24,32 +31,16 @@ export type MissionDeliverable = z.infer<typeof MissionDeliverableSchema>;
  *
  * 只有用户明确确认后，Mission 才能进入 confirmed 状态。模型不能替用户确认 Mission。
  */
-export const MissionContractSchema = z.object({
-  version: z.literal(1),
-  purpose: z.string().trim().min(10).max(2000),
-  expectedResult: z.string().trim().min(10).max(4000),
-  deliverables: z.array(MissionDeliverableSchema).min(1).max(12),
-  status: z.literal('confirmed'),
-  confirmedAt: z.string().datetime(),
-  confirmedBy: z.literal('user'),
-}).strict();
-export type MissionContract = z.infer<typeof MissionContractSchema>;
+export const MissionContractSchema = SharedMissionContractSchema;
+export type MissionContract = SharedMissionContract;
 
 /** UI / API 展示的 Mission 草稿；草稿没有确认资格，也不能解除 Mission Gate。 */
-export const MissionDraftSchema = z.object({
-  purpose: z.string().trim().min(1).max(2000),
-  expectedResult: z.string().trim().min(1).max(4000),
-  deliverableIds: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
-}).strict();
-export type MissionDraft = z.infer<typeof MissionDraftSchema>;
+export const MissionDraftSchema = SharedMissionDraftSchema;
+export type MissionDraft = SharedMissionDraft;
 
 /** Investigation 可选的工作路线；null 表示由 Agent 自主调查，不采用固定路线。 */
-export const WorkflowIdSchema = z.enum([
-  'legacy-modernization',
-  'financial-ai-native-architecture',
-  'data-architecture-assessment',
-]);
-export type WorkflowId = z.infer<typeof WorkflowIdSchema>;
+export const WorkflowIdSchema = SharedWorkflowIdSchema;
+export type WorkflowId = SharedWorkflowId;
 
 /** Workspace 输入事件的来源类型；用于区分用户、Agent、Discovery 和外部文档。 */
 export const WorkspaceInputKindSchema = z.enum([
@@ -74,23 +65,11 @@ export const WorkspaceInputSchema = z.object({
 export type WorkspaceInput = z.infer<typeof WorkspaceInputSchema>;
 
 /** Agent 根据当前问题和证据生成的可选动态路线；它只是导引，不是强制执行的 Workflow。 */
-export const JourneyRouteOptionSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  title: z.string().trim().min(1).max(120),
-  reason: z.string().trim().min(1).max(400),
-  steps: z.array(z.string().trim().min(1).max(300)).min(1).max(6),
-}).strict();
-export type JourneyRouteOption = z.infer<typeof JourneyRouteOptionSchema>;
+export { JourneyRouteOptionSchema, type JourneyRouteOption } from '../api/contracts.js';
 
 /** 最近一次 Agent 生成的动态路线集合；旧 Workflow 地图仍然独立存在。 */
-export const JourneyPlanSchema = z.object({
-  version: z.literal(1),
-  source: z.literal('agent'),
-  generatedAt: z.string().min(1),
-  turnId: z.string().min(1).optional(),
-  routes: z.array(JourneyRouteOptionSchema).max(3),
-}).strict();
-export type JourneyPlan = z.infer<typeof JourneyPlanSchema>;
+export const JourneyPlanSchema = SharedJourneyPlanSchema;
+export type JourneyPlan = SharedJourneyPlan;
 
 /** 阶段性调查小结的持久化结构；是否生成由服务器 Stage Script Gate 决定，不由 Agent 自行宣布。 */
 export const AgentCheckpointSchema = z.object({
