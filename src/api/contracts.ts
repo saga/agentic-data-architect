@@ -60,3 +60,40 @@ export const ResultViewModelSchema = z.object({
   review: ArtifactReviewViewSchema,
 }).strict();
 export type ResultViewModel = z.infer<typeof ResultViewModelSchema>;
+
+const WorkflowExecutionContractSchema = z.object({
+  workflowId: z.string().min(1),
+  workflowVersion: z.number().int().nonnegative(),
+  runId: z.string().min(1),
+  currentNodeId: z.string().min(1),
+  completedNodeIds: z.array(z.string()),
+  status: z.enum(['active', 'waiting', 'completed']),
+  pendingInteraction: z.object({
+    id: z.string().min(1),
+    nodeId: z.string().min(1),
+    reason: z.string().min(1),
+    requestedAt: z.string().datetime(),
+  }).optional(),
+}).strict();
+
+export const WorkflowSnapshotSchema = z.object({
+  workflowId: WorkflowIdSchema,
+  source: z.enum(['base', 'custom']),
+  baseWorkflowId: WorkflowIdSchema,
+  version: z.number().int().nonnegative(),
+  definition: z.unknown(),
+  layout: z.unknown(),
+  state: z.object({
+    workflowId: z.string().min(1),
+    stages: z.array(z.object({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      objective: z.string().min(1),
+      status: z.enum(['completed', 'current', 'locked', 'future']),
+      nodeType: z.enum(['task', 'review', 'end']),
+    }).strict()),
+    execution: WorkflowExecutionContractSchema,
+  }).strict(),
+  events: z.array(z.record(z.string(), z.unknown())),
+}).strict();
+export type WorkflowSnapshot = z.infer<typeof WorkflowSnapshotSchema>;
