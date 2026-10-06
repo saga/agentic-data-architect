@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadInvestigation, loadLatestSnapshot, artifactsDir } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
+import { artifactsDir } from '../investigation/workspace.js';
 import { evaluateMissionGate } from './mission-gate.js';
 import { evaluateInvestigationScopeGate } from './scope-gate.js';
 import { calibrateStatus, type EvidenceRef } from '../evidence/types.js';
