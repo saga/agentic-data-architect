@@ -588,10 +588,18 @@ app.post('/api/sessions', async (req, res) => {
     const name = sessionKey(req.params.name);
     const turnId = typeof req.query.turnId === 'string' ? req.query.turnId : undefined;
     const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 1000;
-    const events = await readTrajectory(name, {
-      ...(turnId ? { turnId } : {}),
-      limit: Number.isFinite(limit) ? limit : 1000,
-    });
+    let events;
+    let trajectoryError;
+    try {
+      events = await readTrajectory(name, {
+        ...(turnId ? { turnId } : {}),
+        limit: Number.isFinite(limit) ? limit : 1000,
+      });
+    } catch (error) {
+      console.error('Failed to read trajectory for session ' + name, error);
+      events = [];
+      trajectoryError = '执行轨迹数据出现异常，秘书暂时无法完整展示这次执行过程。核心调查结果不会因此丢失，请继续当前调查；如果问题持续，请重新启动本次调查。';
+    }
     const summary = summarizeTrajectory(events);
     const turns = summarizeTrajectoryTurns(events);
     const conversationTurns = listConversationTurns(name, 200);
@@ -615,6 +623,7 @@ app.post('/api/sessions', async (req, res) => {
       summary,
       turns: normalizedTurns,
       conversationTurns,
+      ...(trajectoryError ? { error: trajectoryError } : {}),
     }));
   });
 
