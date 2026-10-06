@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
-import { SseEventSchema } from './api/contracts.js';
+import { ResultViewModelSchema, SseEventSchema } from './api/contracts.js';
 import {
   AbortBodySchema,
   CreateSessionBodySchema,
@@ -1161,7 +1161,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const result = await loadReportArtifact(name);
     if (result.status === 'available') {
-      res.json({ status: 'available', report: result.markdown, review: result.review });
+      res.json(ResultViewModelSchema.parse({ status: 'available', report: result.markdown, review: result.review }));
       return;
     }
     if (result.status === 'missing') {
@@ -1180,7 +1180,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     try {
       const report = await runReport(name);
-      res.json({ status: 'available', report: report.markdown, review: report.review });
+      res.json(ResultViewModelSchema.parse({ status: 'available', report: report.markdown, review: report.review }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
         res.status(409).json({ code: error instanceof ReportGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
