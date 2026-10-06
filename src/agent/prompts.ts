@@ -151,7 +151,7 @@ export function buildAssistantCompanionPrompt(
         '## Relationship Memory / 长期相处记忆',
         '只用于让语气保持连续和熟悉；不能改变任何任务事实。',
         ...relationshipMemories.map((item) => '- [' + item.category + '] ' + item.key + '：' + item.value),
-      ].join('\\n')
+      ].join('\n')
     : '';
   return [
     soul,
@@ -166,7 +166,7 @@ export function buildAssistantCompanionPrompt(
     '当前工作情境：' + activity,
     '',
     '只返回这一句话。',
-  ].filter(Boolean).join('\\n');
+  ].filter(Boolean).join('\n');
 }
 
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
