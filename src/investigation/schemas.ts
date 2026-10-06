@@ -45,6 +45,19 @@ export const ArtifactProvenanceSchema = z.object({
 }).strict();
 export type ArtifactProvenance = z.infer<typeof ArtifactProvenanceSchema>;
 
+/** Discovery snapshot 的持久化边界；复杂 domain payload 在各自 domain schema 中继续验证。 */
+export const DiscoverySnapshotSchema = z.object({
+  run: z.record(z.string(), z.unknown()),
+  inventory: z.record(z.string(), z.unknown()).nullable(),
+  lineage: z.record(z.string(), z.unknown()).nullable(),
+  estate: z.record(z.string(), z.unknown()),
+  profiles: z.array(z.unknown()),
+  semanticAssets: z.array(z.unknown()),
+  currentState: z.record(z.string(), z.unknown()),
+  findingIds: z.array(z.string()),
+}).strict();
+export type DiscoverySnapshotRecord = z.infer<typeof DiscoverySnapshotSchema>;
+
 /** UI / API 展示的 Mission 草稿；草稿没有确认资格，也不能解除 Mission Gate。 */
 export const MissionDraftSchema = z.object({
   purpose: z.string().trim().min(1).max(2000),
