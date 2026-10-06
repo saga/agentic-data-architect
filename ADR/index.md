@@ -29,6 +29,8 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-019](./019-derived-state-semantic-consistency.md) | Mission、Workflow、Result 的 derived state 使用统一 deterministic semantics | Accepted |
 | [ADR-020](./020-runtime-events-error-and-persistence-contracts.md) | SSE、HTTP error、Trajectory 和 durable data 使用统一 runtime contract | Accepted |
 | [ADR-021](./021-stage-checkpoint-semantics.md) | Stage Checkpoint 表示真实执行阶段，不等同 Deliverable completion | Accepted |
+| [ADR-022](./022-current-data-architecture-and-assessment-separation.md) | Current Data Architecture 负责看清现状；Data Architecture Assessment 负责评价现状并给出改进顺序 | Accepted |
+| [ADR-023](./023-investigation-report-and-analysis-artifacts.md) | 每次完整 Investigation 都要有用户可读报告，并保留可继续使用的中间分析产物 | Accepted |
 
 ## 如何使用 ADR
 
