@@ -13,7 +13,7 @@
  * - choice / score 的概率是模型提供的判断信号，应用必须自己定义最终 threshold 和 fallback。
  */
 import * as z from 'zod';
-import { askCopilot } from './copilot.js';
+import { askAgentWithFallback } from './runtime.js';
 import { config } from '../config.js';
 
 /** 有界分类问题：从明确的候选项里选一个。 */
@@ -772,7 +772,7 @@ export async function jevSmartFunc(
     '只返回符合 Schema 的结果，不要返回 Markdown，不要解释。',
   ].join('\n');
 
-  const raw = await askCopilot({
+  const raw = await askAgentWithFallback({
     prompt,
     systemPrompt,
     purpose: 'review',
