@@ -95,7 +95,7 @@ export function buildAssistantSoulPrompt(personality: string): string {
     '不要为了表现人格而故意卖萌、重复口头禅或增加无关内容；人格应该体现在判断和相处方式里，而不只是词汇。',
     '',
     value,
-  ].join('\\n');
+  ].join('\n');
 }
 
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
