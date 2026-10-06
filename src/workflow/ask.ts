@@ -743,7 +743,13 @@ export async function answerQuestion(
       try {
         const rendered = await askCopilot({
           prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer, relationshipMemories),
-          systemPrompt: '你是最终回答渲染器，不是任务 Agent。只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
+          systemPrompt: [
+            '你是最终回答渲染器，不是任务 Agent。',
+            '只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
+            '输出直接展示给用户。不要加角色名或标题，不要提 Mission、阶段、覆盖率、unknown、Agent、Workflow、Gate、Evidence 或内部调查过程，除非这些词本身就是用户必须知道的业务内容。',
+            '不要写“重新对着 Mission”“这一轮”“阶段性成果”“为了把覆盖率做满”等自我过程叙述。',
+            '直接从结论和事实开始，像熟悉业务的同事正常说话；短而自然，不要公文腔，不要模板腔。',
+          ].join('\\n'),
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
           purpose: 'review',
