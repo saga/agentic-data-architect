@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
-import { computeArtifactProvenance, artifactProvenanceMatches } from '../investigation/artifact-provenance.js';
+import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import {
   ModernizationPlanSchema,
   SourceToTargetMappingSchema,
@@ -555,42 +555,59 @@ export async function persistModernizationAgentResult(
   });
 }
 
-/** 读取已经保存的改造计划；旧 artifact 没有 provenance 或与当前 Investigation 不一致时视为 stale。 */
-export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
+/** 读取改造 Artifact，并明确区分 missing / stale / current / error。 */
+export async function readModernizationArtifact(
+  name: string,
+): Promise<{ status: import('../api/contracts.js').ArtifactLifecycleStatus; plan: ModernizationPlan | null }> {
+  let plan: ModernizationPlan;
   try {
     const raw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf-8'));
-    const plan = ModernizationPlanSchema.parse(raw);
-    const inv = await loadInvestigation(name);
-    const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-    const current = snapshot?.currentState ?? null;
-    const currentProvenance = computeArtifactProvenance(inv, snapshot, plan.version);
-    if (!artifactProvenanceMatches(plan.provenance, currentProvenance)) return null;
-
-    const gaps = buildModernizationGaps({
-      currentState: current,
-      estate: snapshot?.estate,
-      findings: inv.findings,
-    });
-    const journey = buildJourneyState(await loadModernizationJourney(), {
-      goal: inv.goal || inv.userPrompt,
-      currentState: current ? {
-        datasets: current.coverage.datasets,
-        semanticAssets: current.coverage.semanticAssets,
-        parseFailures: current.coverage.sqlParseFailures,
-      } : null,
-      unknowns: inv.unknowns,
-      highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-      ...deriveModernizationFacts({
-        targetStatus: plan.targetArchitecture.status,
-        targetComponentCount: plan.targetArchitecture.components.length,
-        mappingStatuses: plan.mappings.map((mapping) => mapping.status),
-        validationStatuses: plan.validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
-      }),
-    });
-
-    return { ...plan, journey };
+    plan = ModernizationPlanSchema.parse(raw);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: 'missing', plan: null };
+    }
+    return { status: 'error', plan: null };
   }
+
+  const inv = await loadInvestigation(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const current = snapshot?.currentState ?? null;
+  if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
+    return { status: 'stale', plan: null };
+  }
+  const currentProvenance = computeArtifactProvenance(inv, snapshot, plan.version);
+  if (!artifactProvenanceMatches(plan.provenance, currentProvenance)) {
+    return { status: 'stale', plan: null };
+  }
+
+  const gaps = buildModernizationGaps({
+    currentState: current,
+    estate: snapshot?.estate,
+    findings: inv.findings,
+  });
+  const journey = buildJourneyState(await loadModernizationJourney(), {
+    goal: inv.goal || inv.userPrompt,
+    currentState: current ? {
+      datasets: current.coverage.datasets,
+      semanticAssets: current.coverage.semanticAssets,
+      parseFailures: current.coverage.sqlParseFailures,
+    } : null,
+    unknowns: inv.unknowns,
+    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+    ...deriveModernizationFacts({
+      targetStatus: plan.targetArchitecture.status,
+      targetComponentCount: plan.targetArchitecture.components.length,
+      mappingStatuses: plan.mappings.map((mapping) => mapping.status),
+      validationStatuses: plan.validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
+    }),
+  });
+
+  return { status: 'current', plan: { ...plan, journey } };
+}
+
+/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
+  const result = await readModernizationArtifact(name);
+  return result.status === 'current' ? result.plan : null;
 }
