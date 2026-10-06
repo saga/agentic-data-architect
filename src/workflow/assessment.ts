@@ -3,7 +3,7 @@ import path from 'node:path';
 import * as z from 'zod';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { computeArtifactProvenance, artifactProvenanceMatches } from '../investigation/artifact-provenance.js';
-import { ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView } from '../api/contracts.js';
+import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
@@ -156,20 +156,37 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   return { plan, path: outputPath };
 }
 
-/** 读取已经生成的评估结果；读取后仍经过 Zod，不信任磁盘里的 JSON。 */
-export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
+/** 读取评估 Artifact，并明确区分 missing / stale / current / error。 */
+export async function readArchitectureAssessmentArtifact(
+  name: string,
+): Promise<{ status: ArtifactLifecycleStatus; plan: ArchitectureAssessmentPlan | null }> {
+  let plan: ArchitectureAssessmentPlan;
   try {
     const raw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
-    const plan = ArchitectureAssessmentPlanSchema.parse(raw);
-    const inv = await loadInvestigation(name);
-    const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-    const currentProvenance = computeArtifactProvenance(inv, snapshot, plan.version);
-    if (!artifactProvenanceMatches(plan.provenance, currentProvenance)) return null;
-    return plan;
+    plan = ArchitectureAssessmentPlanSchema.parse(raw);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: ArtifactLifecycleStatusSchema.parse('missing'), plan: null };
+    }
+    return { status: ArtifactLifecycleStatusSchema.parse('error'), plan: null };
   }
+
+  const inv = await loadInvestigation(name);
+  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  if (!artifactProvenanceMatches(
+    plan.provenance,
+    computeArtifactProvenance(inv, snapshot, plan.version),
+  )) {
+    return { status: ArtifactLifecycleStatusSchema.parse('stale'), plan: null };
+  }
+
+  return { status: ArtifactLifecycleStatusSchema.parse('current'), plan };
+}
+
+/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
+  const result = await readArchitectureAssessmentArtifact(name);
+  return result.status === 'current' ? result.plan : null;
 }
 
 async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeof loadInvestigation>>, current: DiscoverySnapshot['currentState'] | null, plan: ArchitectureAssessmentPlan): Promise<JourneyState> {
