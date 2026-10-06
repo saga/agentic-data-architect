@@ -31,3 +31,29 @@ export const SseEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('error'), data: z.object({ code: z.string().optional(), error: z.string().min(1) }).strict() }),
 ]).strict();
 export type SseEvent = z.infer<typeof SseEventSchema>;
+
+
+export const ArtifactReviewViewSchema = z.object({
+  artifactType: z.enum(['report', 'target_architecture', 'mapping', 'validation']),
+  status: z.enum(['pass', 'fail']),
+  availability: z.enum(['completed', 'unavailable']),
+  score: z.number().int().min(0).max(100),
+  summary: z.string().min(1),
+  issues: z.array(z.object({
+    category: z.enum(['goal_alignment','readability','conclusion','signal_noise','consistency','decision_usefulness']),
+    severity: z.enum(['high','medium','low']),
+    description: z.string().min(1),
+    suggestion: z.string().min(1),
+  }).strict()),
+  reviewedAt: z.string().datetime(),
+  artifactVersion: z.number().int().positive(),
+  artifactHash: z.string().regex(/^[a-f0-9]{64}$/),
+  sourceRevision: z.string().regex(/^[a-f0-9]{24}$/),
+}).strict();
+
+export const ResultViewModelSchema = z.object({
+  status: z.literal('available'),
+  report: z.string(),
+  review: ArtifactReviewViewSchema,
+}).strict();
+export type ResultViewModel = z.infer<typeof ResultViewModelSchema>;
