@@ -749,7 +749,7 @@ app.post('/api/sessions', async (req, res) => {
       body.definition,
       body.layout,
     );
-    res.json(result);
+    res.json(WorkflowSaveResponseSchema.parse(result));
   });
 
   /** 工作地图专用 AI：只生成/修改 Workflow，不参与数据分析。 */
