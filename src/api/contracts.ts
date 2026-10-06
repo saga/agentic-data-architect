@@ -285,6 +285,42 @@ export const TrajectoryCheckpointDetailsSchema = z.object({
   nextStep: z.string().optional(),
 }).strict();
 
+export const TrajectoryTurnUsageSchema = z.object({
+  inputTokens: z.number().nonnegative().optional(),
+  outputTokens: z.number().nonnegative().optional(),
+  totalTokens: z.number().nonnegative().optional(),
+  totalNanoAiu: z.number().nonnegative().optional(),
+  totalPremiumRequestCost: z.number().nonnegative().optional(),
+  modelMetrics: z.record(z.string(), z.object({
+    usage: z.object({
+      inputTokens: z.number().nonnegative().optional(),
+      outputTokens: z.number().nonnegative().optional(),
+    }).strict().optional(),
+    totalNanoAiu: z.number().nonnegative().optional(),
+  }).strict()).optional(),
+}).strict();
+
+export const TrajectoryModelCallDetailsSchema = z.object({
+  cachedInputTokens: z.number().nonnegative().optional(),
+  newInputTokens: z.number().nonnegative().optional(),
+  cacheWriteTokens: z.number().nonnegative().optional(),
+  reasoningTokens: z.number().nonnegative().optional(),
+  availableToolCount: z.number().int().nonnegative().optional(),
+  finishReason: z.string().optional(),
+  reasoningEffort: z.string().optional(),
+  timeToFirstTokenMs: z.number().nonnegative().optional(),
+  interTokenLatencyMs: z.number().nonnegative().optional(),
+  apiEndpoint: z.string().optional(),
+  apiCallId: z.string().optional(),
+  providerCallId: z.string().optional(),
+  serviceRequestId: z.string().optional(),
+  initiator: z.string().optional(),
+  contextTokensAtCall: z.number().nonnegative().optional(),
+  contextTokenLimitAtCall: z.number().int().nonnegative().optional(),
+  contextPercentAtCall: z.number().min(0).max(100).optional(),
+  contextMessagesAtCall: z.number().int().nonnegative().optional(),
+}).strict();
+
 export const TrajectoryToolCallDetailsSchema = z.object({
   toolCallId: z.string().min(1),
   startedAt: z.string().datetime(),
@@ -293,12 +329,12 @@ export const TrajectoryToolCallDetailsSchema = z.object({
   parentToolCallId: z.string().optional(),
   agentId: z.string().optional(),
   arguments: z.unknown().optional(),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryToolProgressDetailsSchema = z.object({
   toolCallId: z.string().min(1),
-  progressMessage: z.unknown(),
-}).catchall(z.unknown());
+  progressMessage: z.unknown().optional(),
+}).strict();
 
 export const TrajectoryToolResultDetailsSchema = z.object({
   toolCallId: z.string().min(1),
@@ -309,19 +345,21 @@ export const TrajectoryToolResultDetailsSchema = z.object({
   resultLength: z.number().int().nonnegative().optional(),
   detailedResultLength: z.number().int().nonnegative().optional(),
   error: z.unknown().optional(),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryUserInputRequestedDetailsSchema = z.object({
   requestId: z.string().min(1),
   question: z.string().min(1),
-}).catchall(z.unknown());
+  choices: z.array(z.string()).optional(),
+  allowFreeform: z.boolean().optional(),
+}).strict();
 
 export const TrajectoryUserInputCompletedDetailsSchema = z.object({
   requestId: z.string().min(1),
   question: z.string().optional(),
   answer: z.string().optional(),
   wasFreeform: z.boolean().optional(),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryPermissionDetailsSchema = z.object({
   requestId: z.string().min(1),
@@ -336,26 +374,104 @@ export const TrajectoryPermissionDetailsSchema = z.object({
   toolTitle: z.string().optional(),
   readOnly: z.boolean().optional(),
   managedApprovalRequired: z.boolean().optional(),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryPermissionCompletedDetailsSchema = z.object({
   requestId: z.string().min(1),
   kind: z.string().optional(),
   summary: z.string().optional(),
   resultKind: z.string().optional(),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryIntentDetailsSchema = z.object({
   intent: z.string().min(1),
   mappedStatus: z.string().min(1),
-}).catchall(z.unknown());
+}).strict();
 
 export const TrajectoryTurnEndDetailsSchema = z.object({
-  turnUsage: z.record(z.string(), z.unknown()).optional(),
+  turnUsage: TrajectoryTurnUsageSchema.optional(),
   elapsedMs: z.number().nonnegative().optional(),
   modelCallCount: z.number().int().nonnegative().optional(),
   sessionIdleObserved: z.boolean().optional(),
-}).catchall(z.unknown());
+}).strict();
+
+export const TrajectorySessionIdleDetailsSchema = z.object({
+  aborted: z.boolean(),
+  pendingTools: z.number().int().nonnegative(),
+  pendingPermissions: z.number().int().nonnegative(),
+  pendingUserInputs: z.number().int().nonnegative(),
+}).strict();
+
+export const TrajectorySessionErrorDetailsSchema = z.object({
+  errorType: z.string().optional(),
+  message: z.string().optional(),
+  statusCode: z.number().int().nonnegative().optional(),
+  providerCallId: z.string().optional(),
+}).strict();
+
+export const TrajectoryContextChangedDetailsSchema = z.object({
+  cwd: z.string(),
+  gitRoot: z.string().optional(),
+  repository: z.string().optional(),
+  branch: z.string().optional(),
+}).strict();
+
+export const TrajectoryCompactionDetailsSchema = z.object({
+  preCompactionTokens: z.number().nonnegative().optional(),
+  postCompactionTokens: z.number().nonnegative().optional(),
+  messagesRemoved: z.number().int().nonnegative().optional(),
+  tokensRemoved: z.number().nonnegative().optional(),
+  compactionTokensUsed: z.unknown().optional(),
+  requestId: z.string().optional(),
+  error: z.string().optional(),
+}).strict();
+
+export const TrajectoryErrorDetailsSchema = z.object({
+  error: z.string(),
+  elapsedMs: z.number().nonnegative().optional(),
+  timeoutMs: z.number().nonnegative().optional(),
+  permissionWaitTimeoutMs: z.number().nonnegative().optional(),
+  userInputWaitTimeoutMs: z.number().nonnegative().optional(),
+  timeoutKind: z.enum(['permission', 'user_input', 'session_idle', 'execution']).optional(),
+  lastActivityAt: z.string().optional(),
+  lastActivityType: z.string().optional(),
+  lastActivity: z.string().optional(),
+  pendingTools: z.number().int().nonnegative(),
+  pendingPermissions: z.number().int().nonnegative(),
+  pendingUserInputs: z.number().int().nonnegative(),
+  assistantTurnEnded: z.boolean(),
+  sessionIdleObserved: z.boolean(),
+  modelCallCount: z.number().int().nonnegative(),
+  permissions: z.array(z.object({
+    requestId: z.string().min(1),
+    kind: z.string().min(1),
+    requestedAt: z.string().datetime(),
+    summary: z.string(),
+  }).strict()).optional(),
+}).strict();
+
+export const TrajectoryStageGateDetailsSchema = z.object({
+  execution: z.number().int().nonnegative(),
+  passed: z.boolean(),
+  checks: z.array(z.object({
+    name: z.string().min(1),
+    passed: z.boolean(),
+    detail: z.string(),
+  }).strict()),
+  newEvidenceIds: z.array(z.string()),
+  newFindingIds: z.array(z.string()),
+  advancedDeliverables: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    from: z.string().min(1),
+    to: z.string().min(1),
+  }).strict()),
+  evidenceBackedClaimCount: z.number().int().nonnegative(),
+  shouldContinue: z.boolean(),
+  missionAlignment: z.unknown().optional(),
+  missionProgress: MissionProgressSchema.optional(),
+  input: z.unknown().optional(),
+}).strict();
 
 export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
@@ -379,6 +495,7 @@ export const TrajectoryEventSchema = z.object({
 }).strict().superRefine((value, ctx) => {
   const schemas: Partial<Record<TrajectoryEvent['type'], z.ZodType>> = {
     checkpoint: TrajectoryCheckpointDetailsSchema,
+    model_call: TrajectoryModelCallDetailsSchema,
     tool_call: TrajectoryToolCallDetailsSchema,
     tool_progress: TrajectoryToolProgressDetailsSchema,
     tool_result: TrajectoryToolResultDetailsSchema,
@@ -387,7 +504,13 @@ export const TrajectoryEventSchema = z.object({
     permission: TrajectoryPermissionDetailsSchema,
     permission_completed: TrajectoryPermissionCompletedDetailsSchema,
     intent: TrajectoryIntentDetailsSchema,
+    compaction: TrajectoryCompactionDetailsSchema,
+    session_idle: TrajectorySessionIdleDetailsSchema,
+    session_error: TrajectorySessionErrorDetailsSchema,
+    context_changed: TrajectoryContextChangedDetailsSchema,
     turn_end: TrajectoryTurnEndDetailsSchema,
+    error: TrajectoryErrorDetailsSchema,
+    stage_gate: TrajectoryStageGateDetailsSchema,
   };
   const schema = schemas[value.type];
   if (schema && !schema.safeParse(value.details).success) {
