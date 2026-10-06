@@ -1423,7 +1423,7 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     }
     const requested = requestAbort(name, turnId);
     const aborted = requested || await abortCopilotTurn(turnId) || await abortOpenCodeTurn(turnId);
-    res.json({ aborted });
+    res.json(z.object({ aborted: z.boolean() }).parse({ aborted }));
   });
 
   if (vite) {
