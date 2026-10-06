@@ -64,6 +64,8 @@ import {
   JourneyAiResponseSchema,
   AbortResponseSchema,
   type SseEvent,
+  type SessionSummary as SharedSessionSummary,
+  type WorkflowId as SharedWorkflowId,
 } from './api/contracts.js';
 import {
   buildJourneyAgentInstruction,
@@ -143,12 +145,7 @@ const webRoot = path.resolve(__dirname, '../web');
 const webDist = path.join(webRoot, 'dist');
 
 /** Session 列表给 UI 使用的轻量摘要，避免每次列表请求都返回完整 Investigation。 */
-interface SessionSummary {
-  key: string;
-  label: string;
-  userPrompt: string;
-  updatedAt: string;
-}
+type SessionSummary = SharedSessionSummary;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -227,7 +224,7 @@ async function listSessions(): Promise<SessionSummary[]> {
 async function createSession(
   name?: string,
   userPrompt?: string,
-  workflow?: 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment' | null,
+  workflow?: SharedWorkflowId | null,
 ) {
   const key = sessionKey(
     name?.trim() ||
