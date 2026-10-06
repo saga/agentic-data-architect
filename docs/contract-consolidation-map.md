@@ -45,7 +45,7 @@ WorkflowSnapshot 是唯一 workflow runtime resource；Trajectory 是历史 runt
 
 ### Result
 
-/ results 是 Result 页面唯一聚合 resource。它只读取已经生成的 artifact；生成使用显式 action endpoint。
+`/results` 是 Result 页面唯一聚合 resource。它只读取已经生成的 artifact；生成使用显式 action endpoint。
 
 ## 3. Artifact lifecycle
 
