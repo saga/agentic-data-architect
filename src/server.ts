@@ -439,12 +439,12 @@ app.post('/api/sessions', async (req, res) => {
       },
     });
 
-    res.json({
+    res.json(MissionUpdateResponseSchema.parse({
       context,
       mission,
       gate: evaluateMissionGate(mission),
       progress: await buildMissionProgress(name, mission),
-    });
+    }));
   });
 
   /**
