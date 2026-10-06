@@ -26,7 +26,7 @@ function allKnown(ids: string[], known: Set<string>): boolean {
 }
 
 export interface InvestigationReportGateInput {
-  mission: unknown;
+  mission?: unknown;
   goal: string;
   scope: string[];
   systems: string[];
@@ -45,7 +45,9 @@ export function evaluateInvestigationReportGate(
   const add = (name: string, passed: boolean, detail: string) => checks.push({ name, passed, detail });
   const evidenceIds = new Set(investigation.evidence.map((item) => item.id));
 
-  const missionGate = evaluateMissionGate(investigation.mission as Parameters<typeof evaluateMissionGate>[0]);
+  const missionGate = investigation.mission
+    ? evaluateMissionGate(investigation.mission as Parameters<typeof evaluateMissionGate>[0])
+    : { passed: false };
   add('任务已经确认', missionGate.passed, missionGate.passed ? '这次报告对应的任务已经确认。' : '还没有确认这次调查为什么做、最后要拿到什么。');
 
   const scopeGate = evaluateInvestigationScopeGate(
