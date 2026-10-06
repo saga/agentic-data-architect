@@ -177,11 +177,12 @@ Agent 自主调查
 继续调查
 ```
 
-当前提供三套可选的大阶段路线：
+当前提供四套可选的大阶段路线：
 
 - Legacy Modernization：已有系统改造、replatform、迁移和切换。
+- Current Data Architecture：只把当前数据来源、数据流、数据模型和关键转换查清楚。
 - Financial AI-Native Architecture：从零设计金融 AI / 数据平台，例如 Portfolio Research Agent。
-- Data Architecture Assessment：评估已有数据架构、主要问题、改进建议和实施顺序。
+- Data Architecture Assessment：在现状事实之上评价问题、给出改进建议并排出先后顺序。
 
 Workflow 是 playbook，不是 Investigation 类型。选择 Workflow 后，系统加载对应的 Workflow Skill，并把它作为“地图骨架”。工作方式不是首页上的普通筛选项；需要在“调查配置 → 工作方式”明确选择并输入确认语句后才会切换。Agent 的下一步候选只是调查辅助，点击后通过结构化 routeId 执行，不修改 Workflow，也不会创建第二套状态机。
 
@@ -330,7 +331,7 @@ npm run flow:lint
 Skill 统一以 skills/<name>/SKILL.md 打包，但运行语义只有两类：
 
 - capability：明确的一项能力，Agent 自己决定什么时候用、如何和其它能力组合。例如 search-confluence、search-github、financial-data-review。
-- workflow：完整的工作路线，存在固定的大阶段、顺序、Gate 和完成条件。例如 legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
+- workflow：完整的工作路线，存在固定的大阶段、顺序、Gate 和完成条件。例如 legacy-modernization、current-data-architecture、financial-ai-native-architecture、data-architecture-assessment。
 
 类型写在 Skill frontmatter 的 metadata.kind，而不是再创建另一套 Skill 目录格式。
 
