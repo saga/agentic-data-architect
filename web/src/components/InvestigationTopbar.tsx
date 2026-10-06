@@ -24,7 +24,7 @@ export function InvestigationTopbar(props: {
         <div className="topbar-title">
           <Text strong className="topbar-label">调查工作区</Text>
         </div>
-        <Space>
+        <Space className="topbar-actions">
           <Tag
             className={`workspace-status${running ? ' workspace-status-active' : ''}`}
             variant="filled"
