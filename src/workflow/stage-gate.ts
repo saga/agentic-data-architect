@@ -32,6 +32,8 @@ export interface StageGateInput {
   missionProgressBefore: MissionProgress;
   missionProgressAfter: MissionProgress;
   parsed: Pick<ParsedAnswer, 'answer' | 'claims' | 'unknowns' | 'followUpQuestions' | 'routeOptions'>;
+  /** 本阶段是否已经成功持久化结构化工作成果（例如 Legacy Modernization plan）。 */
+  persistedWorkProductChanged?: boolean;
   /** Smart Function 对本阶段成果与 Mission 的语义判断；null 表示语义判断暂时不可用。 */
   missionAlignment?: MissionAlignmentReview | null;
 }
@@ -141,10 +143,17 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.after.scopeValidatedAt
     && input.after.scopeValidatedAt !== input.before.scopeValidatedAt,
   );
+  const persistedWorkProductChanged = input.persistedWorkProductChanged === true;
   const advancedDeliverables = deliverableAdvanced(
     input.missionProgressBefore,
     input.missionProgressAfter,
   );
+  const hasRealStageWork =
+    newEvidenceIds.length > 0
+    || newFindingIds.length > 0
+    || newDiscoveryRuns > 0
+    || scopeValidated
+    || persistedWorkProductChanged;
 
   add(
     '阶段回答存在',
@@ -170,15 +179,13 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
 
   add(
     '本阶段存在真实调查成果',
-    newEvidenceIds.length > 0
-      || newFindingIds.length > 0
-      || newDiscoveryRuns > 0
-      || scopeValidated,
+    hasRealStageWork,
     [
       '新增 Evidence=' + String(newEvidenceIds.length),
       '新增 Finding=' + String(newFindingIds.length),
       '新增 Discovery=' + String(newDiscoveryRuns),
       '新增范围确认=' + (scopeValidated ? '1' : '0'),
+      '结构化成果更新=' + (persistedWorkProductChanged ? '1' : '0'),
       '有 Evidence 的 Claim=' + String(evidenceBackedClaims.length),
     ].join('，'),
   );
@@ -188,13 +195,15 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
   );
 
   add(
-    '本阶段推进了 Mission 交付物',
-    advancedDeliverables.length > 0 || allRequiredUntracked,
+    '本阶段仍然服务于 Mission',
+    advancedDeliverables.length > 0 || allRequiredUntracked || hasRealStageWork,
     advancedDeliverables.length
       ? advancedDeliverables.map((item) => item.title + '：' + item.from + ' → ' + item.to).join('，')
-      : allRequiredUntracked
-        ? '本次 Mission 没有可自动量化的交付物，本阶段有真实调查成果即可留下阶段小结。'
-        : '本阶段虽然产生了调查变化，但没有推动任何已定义的 Mission 交付物。',
+      : hasRealStageWork
+        ? '本阶段产生了新的可保存成果；是否值得继续由 Mission Completion 决定。'
+        : allRequiredUntracked
+          ? '本次 Mission 没有可自动量化的交付物，本阶段有真实调查成果即可留下阶段小结。'
+          : '本阶段没有新的 Mission 相关成果。',
   );
 
   const hasOpenRequiredDeliverables = input.missionProgressAfter.deliverables.some(
