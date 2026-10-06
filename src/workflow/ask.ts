@@ -234,6 +234,7 @@ export async function answerQuestion(
       companionNoteCount += 1;
       lastCompanionNoteAt = now;
       companionNoteTask = companionNoteTask.then(async () => {
+        if (abortRequestedTurns.has(turnId)) return;
         try {
           const note = await askCopilot({
             prompt: buildAssistantCompanionPrompt(control.agent.personality, activity, companionMemories),
@@ -243,7 +244,7 @@ export async function answerQuestion(
             purpose: 'review',
           });
           const value = note.trim();
-          if (value && value.length <= 120) options.onCompanionNote?.(value);
+          if (!abortRequestedTurns.has(turnId) && value && value.length <= 120) options.onCompanionNote?.(value);
         } catch (error) {
           await appendAuditEvent(investigationName, {
             actor: 'system',
