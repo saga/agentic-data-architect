@@ -13,7 +13,7 @@ export function workflowLabel(workflow: WorkflowId | null | undefined): string {
     case 'current-data-architecture': return '分析当前数据架构';
     case 'legacy-modernization': return '改造已有系统';
     case 'financial-ai-native-architecture': return '金融 AI / 数据架构设计';
-    case 'data-architecture-assessment': return '分析当前数据架构';
+    case 'data-architecture-assessment': return '评估数据架构';
     default: return '自主调查';
   }
 }
