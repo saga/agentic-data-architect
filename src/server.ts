@@ -607,7 +607,12 @@ app.post('/api/sessions', async (req, res) => {
       }
       return turn;
     });
-    res.json({ events, summary, turns: normalizedTurns, conversationTurns });
+    res.json(TrajectoryResponseSchema.parse({
+      events,
+      summary,
+      turns: normalizedTurns,
+      conversationTurns,
+    }));
   });
 
   /** 返回当前 Investigation 正在等待用户处理的 Agent 权限请求。 */
