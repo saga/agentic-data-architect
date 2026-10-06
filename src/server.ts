@@ -1292,8 +1292,9 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     let finished = false;
     const send = (event: SseEvent['event'], data: unknown) => {
       if (finished || res.writableEnded) return;
-      res.write(`event: ${event}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      const payload = SseEventSchema.parse({ event, data });
+      res.write(`event: ${payload.event}\n`);
+      res.write(`data: ${JSON.stringify(payload.data)}\n\n`);
     };
 
     send('started', { turnId });
