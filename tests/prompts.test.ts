@@ -63,5 +63,9 @@ test('Assistant Soul is isolated to final answer rendering', () => {
   assert.match(prompt, /Relationship Memory/);
   assert.match(prompt, /回答直接、少套话/);
   assert.match(prompt, /Global 配置作为默认值/);
+  assert.match(prompt, /最终文本直接展示给用户/);
+  assert.match(prompt, /不要加角色名或标题/);
   assert.doesNotMatch(LEAD_SYSTEM_PROMPT, /Assistant Soul|Relationship Memory|长期人格/);
+  assert.match(LEAD_SYSTEM_PROMPT, /answer 是直接显示给用户的自然语言/);
+  assert.match(LEAD_SYSTEM_PROMPT, /不要用“秘书”“助手”作为回答标题/);
 });
