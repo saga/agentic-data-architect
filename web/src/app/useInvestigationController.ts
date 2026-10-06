@@ -2,11 +2,25 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as AntApp } from 'antd';
 import type { UploadFile } from 'antd';
 import { consumeSse, getJson } from './api';
-import { AnswerSummarySchema, ExecutionStatusSchema, SseEventSchema } from '../../../src/api/contracts.js';
+import { workflowOptions } from './workflow-options';
+import {
+  AnswerSummarySchema,
+  CreateSessionResponseSchema,
+  ExecutionStatusSchema,
+  FileUploadResponseSchema,
+  MissionUpdateResponseSchema,
+  ModelsResponseSchema,
+  PermissionsResponseSchema,
+  SessionsResponseSchema,
+  SessionDataSchema,
+  SimpleOkResponseSchema,
+  UserInputsResponseSchema,
+  WorkflowCompatibilityResponseSchema,
+  WorkflowContextResponseSchema,
+} from '../../../src/api/contracts.js';
 import type { AnswerSummaryContract } from '../../../src/api/contracts.js';
 import { buildInvestigationPath, parseRoute, type PageId } from './routing';
 import {
-  workflowOptions,
   type AutoTier,
   type CopilotModelOption,
   type ExecutionStatus,
