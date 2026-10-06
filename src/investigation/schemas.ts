@@ -35,6 +35,16 @@ export const MissionContractSchema = z.object({
 }).strict();
 export type MissionContract = z.infer<typeof MissionContractSchema>;
 
+/** 正式 Artifact 的代际 provenance；没有它的旧 Artifact 只能视为 stale。 */
+export const ArtifactProvenanceSchema = z.object({
+  missionFingerprint: z.string().regex(/^[a-f0-9]{24}$/),
+  scopeFingerprint: z.string().regex(/^[a-f0-9]{24}$/),
+  sourceRevision: z.string().regex(/^[a-f0-9]{24}$/),
+  artifactVersion: z.number().int().positive(),
+  generatedAt: z.string().datetime(),
+}).strict();
+export type ArtifactProvenance = z.infer<typeof ArtifactProvenanceSchema>;
+
 /** UI / API 展示的 Mission 草稿；草稿没有确认资格，也不能解除 Mission Gate。 */
 export const MissionDraftSchema = z.object({
   purpose: z.string().trim().min(1).max(2000),
