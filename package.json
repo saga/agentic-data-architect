@@ -24,7 +24,9 @@
     "python:lock": "uv lock",
     "python:check": "uv run python scripts/check-python-deps.py",
     "gate:stage": "tsx scripts/investigation-stage-gate.ts",
-    "gate:mission": "tsx scripts/investigation-mission-gate.ts"
+    "gate:mission": "tsx scripts/investigation-mission-gate.ts",
+    "predev": "node scripts/ensure-opencode.mjs",
+    "prestart": "node scripts/ensure-opencode.mjs"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",

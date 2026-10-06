@@ -106,6 +106,18 @@ OPENCODE_ENABLED=true
 OPENCODE_BASE_URL=http://127.0.0.1:4096
 ~~~
 
+`npm run dev` / `npm run start` 会在启动前自动检查：该地址已有 serve 就直接复用，
+没有就按下面这套环境拉起一个新的（日志在 `.workspace/opencode-serve.log`）。
+Muse Spark 这类需要出站代理的模型，代理地址配在这里（默认值即本机 10809）：
+
+~~~bash
+OPENCODE_HTTP_PROXY=http://127.0.0.1:10809
+OPENCODE_HTTPS_PROXY=http://127.0.0.1:10809
+OPENCODE_ALL_PROXY=socks5://127.0.0.1:10809
+~~~
+
+完整排障手册（400 / 401 / 代理 / 白名单踩坑记录）：`docs/opencode.md`。
+
 模型太多时可以用白名单收敛下拉框（逗号分隔，大小写不敏感，匹配模型 id 或显示名；为空 = 全部列出）：
 
 ~~~bash

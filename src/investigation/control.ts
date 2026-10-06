@@ -10,6 +10,7 @@ import { config } from '../config.js';
 import { workspaceRoot, writeJsonAtomic } from './workspace.js';
 import {
   AuditEventSchema,
+  ControlAgentSchema,
   InvestigationControlSchema,
   McpServerSettingSchema,
   type AuditEvent,
@@ -169,12 +170,14 @@ function extractTaskAgentOverrides(agent: InvestigationControl['agent'], globalA
 }
 
 function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfiguration): InvestigationControl {
-  const agent = {
+  // task.agent 只是 partial override（缺的键由 global 补），合并后过一次完整
+  // schema：既拿到完整类型，缺失字段也按 schema 默认值补齐。
+  const agent = ControlAgentSchema.parse({
     ...clone(global.agent),
     ...clone(task.agent),
     // Platform capabilities are application/runtime controlled and never task-overridable.
     platformCapabilities: clone(global.agent.platformCapabilities),
-  };
+  });
   return {
     schemaVersion: 1,
     version: task.version,
@@ -440,21 +443,23 @@ export async function updateInvestigationControl(
       },
     };
 
+    const nextResearch = {
+      githubRepositories: normalizeStringList(next.research.githubRepositories),
+      githubSearchMode: next.research.githubSearchMode,
+      keywords: normalizeStringList(next.research.keywords),
+      importantDocuments: next.research.importantDocuments.map((item) => ({
+        id: item.id || randomUUID(),
+        title: item.title.trim(),
+        reference: item.reference.trim(),
+      })).filter((item) => item.title && item.reference),
+    };
+
     const task: TaskConfiguration = {
       schemaVersion: 2,
       version: current.version + 1,
       globalVersion: global.version,
       updatedAt: now,
-      research: {
-        githubRepositories: normalizeStringList(next.research.githubRepositories),
-        githubSearchMode: next.research.githubSearchMode,
-        keywords: normalizeStringList(next.research.keywords),
-        importantDocuments: next.research.importantDocuments.map((item) => ({
-          id: item.id || randomUUID(),
-          title: item.title.trim(),
-          reference: item.reference.trim(),
-        })).filter((item) => item.title && item.reference),
-      },
+      research: nextResearch,
       // Only task-specific deviations are persisted. Everything else follows Global.
       agent: extractTaskAgentOverrides(effectiveAgent, global.agent),
       history: [
@@ -470,7 +475,7 @@ export async function updateInvestigationControl(
           globalVersion: global.version,
           updatedAt: now,
           reason,
-          snapshot: { research: clone(task.research), agent: clone(effectiveAgent) },
+          snapshot: { research: clone(nextResearch), agent: clone(effectiveAgent) },
         },
       ].slice(-30),
     };

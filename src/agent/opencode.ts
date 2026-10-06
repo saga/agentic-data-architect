@@ -216,6 +216,8 @@ async function consumeOpenCodeEvents(
   response: Response,
   input: OpenCodeAskInput,
   sessionId: string,
+  /** 后台 reader 只记录、不抛错：抛错会变成 unhandled rejection 直接崩掉整个服务进程。 */
+  readerState: { sessionError?: string },
 ): Promise<void> {
   if (!response.body) return;
 
@@ -326,7 +328,18 @@ async function consumeOpenCodeEvents(
           const message = error && typeof error === 'object'
             ? String((error as Record<string, unknown>).message ?? (error as Record<string, unknown>).name ?? 'OpenCode 执行失败')
             : String(error ?? 'OpenCode 执行失败');
-          throw new Error(message);
+          // 只记录、不 throw：本轮成败以 message 接口的返回为准；
+          // 这里抛错只会变成后台任务的 unhandled rejection 崩掉服务进程。
+          readerState.sessionError = message;
+          input.onStatus?.('OpenCode 本轮遇到问题：' + message);
+          input.onTrajectory?.({
+            type: 'error',
+            name: 'OpenCode 会话错误',
+            status: 'failed',
+            model: input.model,
+            details: { sessionId, error: message },
+          });
+          continue;
         }
       }
     }
@@ -451,8 +464,23 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   });
 
   let eventReaderTask: Promise<void> | undefined;
+  // reader 抛错只记录、不外泄：.catch 必须在创建当时就挂上，等主流程跑完再挂，
+  // 中间任何一次事件失败都会先触发 unhandledRejection 崩进程。
+  const readerState: { sessionError?: string } = {};
+  const reportReaderCrash = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    readerState.sessionError = readerState.sessionError ?? message;
+    input.onTrajectory?.({
+      type: 'error',
+      name: 'OpenCode 事件流中断',
+      status: 'failed',
+      model: input.model,
+      details: { sessionId, error: message },
+    });
+  };
   try {
-    eventReaderTask = consumeOpenCodeEvents(eventResponse, input, sessionId);
+    eventReaderTask = consumeOpenCodeEvents(eventResponse, input, sessionId, readerState);
+    eventReaderTask.catch(reportReaderCrash);
 
     const maxAutomaticContinuations = Math.min(
       6,
@@ -509,6 +537,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       const result = await response.json() as unknown;
       const extracted = extractTextParts(result);
       if (!extracted.answer) {
+        if (readerState.sessionError) throw new Error(readerState.sessionError);
         const detail = JSON.stringify(result).slice(0, 1200);
         throw new Error('OpenCode 没有返回文本答案。' + (detail ? ' 返回内容：' + detail : ''));
       }
