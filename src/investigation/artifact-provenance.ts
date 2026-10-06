@@ -12,6 +12,41 @@ function digest(value: unknown): string {
  * Only deterministic, persisted inputs are included; timestamps that do not change facts
  * are intentionally excluded.
  */
+export function computeScopeFingerprint(
+  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
+): string {
+  return digest({
+    goal: investigation.goal,
+    scope: investigation.scope,
+    systems: investigation.systems,
+  });
+}
+
+export function isDiscoverySnapshotCompatible(
+  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
+  snapshot: DiscoverySnapshot | null | undefined,
+): boolean {
+  if (!snapshot) return true;
+  const scopeFingerprint = snapshot.run.scopeFingerprint;
+  return Boolean(scopeFingerprint && scopeFingerprint === computeScopeFingerprint(investigation));
+}
+
+export class DiscoverySnapshotMismatchError extends Error {
+  constructor() {
+    super('最近的 Discovery Snapshot 不属于当前 Scope generation，请重新执行 Discovery。');
+    this.name = 'DiscoverySnapshotMismatchError';
+  }
+}
+
+export function assertDiscoverySnapshotCompatible(
+  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
+  snapshot: DiscoverySnapshot | null | undefined,
+): void {
+  if (!isDiscoverySnapshotCompatible(investigation, snapshot)) {
+    throw new DiscoverySnapshotMismatchError();
+  }
+}
+
 export function computeArtifactProvenance(
   investigation: Pick<Investigation, 'mission' | 'goal' | 'scope' | 'systems' | 'discoveryRuns' | 'evidence' | 'claims' | 'findings'>,
   snapshot: DiscoverySnapshot | null | undefined,
@@ -28,11 +63,8 @@ export function computeArtifactProvenance(
     })) ?? [],
   });
 
-  const scopeFingerprint = digest({
-    goal: investigation.goal,
-    scope: investigation.scope,
-    systems: investigation.systems,
-  });
+  const scopeFingerprint = computeScopeFingerprint(investigation);
+  assertDiscoverySnapshotCompatible(investigation, snapshot);
 
   const sourceRevision = digest({
     snapshot: snapshot ?? null,
@@ -65,6 +97,8 @@ export function computeArtifactProvenance(
     scopeFingerprint,
     sourceRevision,
     artifactVersion,
+    ...(snapshot?.run.id ? { discoveryRunId: snapshot.run.id } : {}),
+    ...(snapshot?.run.scopeFingerprint ? { discoveryScopeFingerprint: snapshot.run.scopeFingerprint } : {}),
   };
 }
 
