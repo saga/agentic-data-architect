@@ -9,9 +9,10 @@
 > **Soul stable, relationship grows.**
 > **人格不变，关系变熟。**
 
-EMNLP 2025 的 *Principled Personas* 研究表明，模型对与任务无关的人格细节也可能敏感，实验中观察到明显的任务性能下降，因此不能假定把人格放进主 Agent prompt 是无害的。citeturn0search1
+EMNLP 2025 的 *Principled Personas* 研究表明，模型对与任务无关的人格细节也可能敏感，实验中观察到明显的任务性能下降，因此不能假定把人格放进主 Agent prompt 是无害的。https://aclanthology.org/2025.emnlp-main.1364/
 
-长期记忆研究支持另一条路径：保存长期信息、按当前上下文召回相关记忆、持续更新记忆，而不是不断修改人格本身。MemoryBank 将长期记忆拆成存储、相关记忆召回和记忆更新机制；MemGuide 进一步强调 goal-oriented agent 的 memory selection。citeturn0search0turn0search3
+长期记忆研究支持另一条路径：保存长期信息、按当前上下文召回相关记忆、持续更新记忆，而不是不断修改人格本身。MemoryBank 将长期记忆拆成存储、相关记忆召回和记忆更新机制；MemGuide 进一步强调 goal-oriented agent 的 memory selection。https://ojs.aaai.org/index.php/AAAI/article/view/29946
+https://ojs.aaai.org/index.php/AAAI/article/view/40313
 
 ## 架构边界
 
