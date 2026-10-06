@@ -124,7 +124,7 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   plan.journey = await buildAssessmentJourneyStateFromPlan(inv, current, plan);
   const persistedPlan = ArchitectureAssessmentPlanSchema.parse({
     ...plan,
-    provenance: await buildCurrentArtifactProvenance(name, plan.version),
+    provenance: await buildCurrentArtifactProvenance(name, plan.version, 'assessment'),
   });
   const outputPath = planFile(name);
   await fs.mkdir(reportsDir(name), { recursive: true });
@@ -137,7 +137,7 @@ export async function loadArchitectureAssessmentPlan(name: string): Promise<Arch
   try {
     const raw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
     const plan = ArchitectureAssessmentPlanSchema.parse(raw);
-    if (!(await isArtifactCurrent(name, plan.provenance))) return null;
+    if (!(await isArtifactCurrent(name, plan.provenance, 'assessment'))) return null;
     return plan;
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
