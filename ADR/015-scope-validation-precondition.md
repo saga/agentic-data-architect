@@ -36,9 +36,9 @@ Scope Validation 必须记录：
 
 ### 2.1 Discovery generation 必须绑定 Scope
 
-每一次正式 Discovery Run 都必须记录生成时的 `scopeFingerprint`，并由该 Run 标识其对应的 Discovery generation。
+每一次正式 Discovery Run 都必须记录生成时的 `scopeFingerprint`；Run 的 `id` 就是该次 Discovery generation 的稳定身份。当前 schema 对历史 Run 允许缺失该字段，但任何新生成并作为 current source 使用的 Run 都必须有它。
 
-Discovery Snapshot 不单独建立第二套 Scope identity；它继承并引用其 `run.scopeFingerprint` 和 `run.id`。因此：
+Discovery Snapshot 不单独建立第二套 Scope identity；它只能继承并引用其 `run.scopeFingerprint` 和 `run.id`。因此：
 
 - Snapshot 只能作为生成时 Scope 的事实来源；
 - 当前 Scope fingerprint 与 Snapshot 的 Scope fingerprint 不一致时，Snapshot 不能被复用为当前调查事实；
