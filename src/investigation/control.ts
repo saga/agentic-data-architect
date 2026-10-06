@@ -525,8 +525,7 @@ export async function updateInvestigationControl(
 
 /** 更新 Global 配置。已有任务不会被写入；未覆盖对应字段的任务下次读取时自动继承新版本。 */
 export async function updateGlobalConfiguration(
-  next: InvestigationControl['agent'],
-  reason = 'global configuration updated',
+  overrides: Partial<InvestigationControl['agent']>,
 ): Promise<GlobalConfiguration> {
   const previous = globalConfigLock;
   let release!: () => void;
@@ -535,7 +534,11 @@ export async function updateGlobalConfiguration(
   try {
     const current = await loadGlobalConfiguration();
     const now = new Date().toISOString();
-    const nextConfig = buildGlobalConfiguration(next, current.version + 1, now);
+    const nextConfig = buildGlobalConfiguration({
+      ...current.agent,
+      ...overrides,
+      platformCapabilities: current.agent.platformCapabilities.map((item) => ({ ...item })),
+    }, current.version + 1, now);
     await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
     await writeJsonAtomic(globalConfigFile(), nextConfig);
     return nextConfig;
