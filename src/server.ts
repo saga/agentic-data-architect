@@ -60,6 +60,8 @@ import {
   WorkflowSaveResponseSchema,
   WorkflowTransitionResponseSchema,
   WorkflowResetResponseSchema,
+  JourneyAiResponseSchema,
+  AbortResponseSchema,
   type SseEvent,
 } from './api/contracts.js';
 import {
@@ -1423,7 +1425,7 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     }
     const requested = requestAbort(name, turnId);
     const aborted = requested || await abortCopilotTurn(turnId) || await abortOpenCodeTurn(turnId);
-    res.json(z.object({ aborted: z.boolean() }).parse({ aborted }));
+    res.json(AbortResponseSchema.parse({ aborted }));
   });
 
   if (vite) {
