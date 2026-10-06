@@ -1120,19 +1120,29 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json(ArchitectureAssessmentResponseSchema.parse({ plan: null, path: null }));
       return;
     }
-    const rebuild = req.query.rebuild === 'true';
     const existing = await loadArchitectureAssessmentPlan(name);
-    if (existing && !rebuild) {
-      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: toArchitectureAssessmentView(existing), path: null }));
-      return;
-    }
-    if (!existing && !rebuild) {
-      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: null, path: null }));
+    res.json(ArchitectureAssessmentResponseSchema.parse({
+      plan: existing ? toArchitectureAssessmentView(existing) : null,
+      path: null,
+    }));
+  });
+
+  app.post('/api/sessions/:name/assessment/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (context.workflow !== 'data-architecture-assessment') {
+      res.status(409).json(ApiErrorSchema.parse({
+        code: 'PRECONDITION_FAILED',
+        error: '当前调查没有选择 Data Architecture Assessment 工作方式。',
+      }));
       return;
     }
     try {
       const result = await buildArchitectureAssessmentPlan(name);
-      res.json(ArchitectureAssessmentResponseSchema.parse({ plan: toArchitectureAssessmentView(result.plan), path: result.path }));
+      res.json(ArchitectureAssessmentResponseSchema.parse({
+        plan: toArchitectureAssessmentView(result.plan),
+        path: result.path,
+      }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json(ApiErrorSchema.parse({
@@ -1148,23 +1158,25 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
 
   app.get('/api/sessions/:name/modernization', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const rebuild = req.query.rebuild === 'true';
     const existing = await loadModernizationPlan(name);
-    if (existing && !rebuild) {
-      res.json(ModernizationResponseSchema.parse({ plan: toModernizationPlanView(existing), path: null }));
-      return;
-    }
-    if (!existing && !rebuild) {
-      res.json(ModernizationResponseSchema.parse({ plan: null, path: null }));
-      return;
-    }
+    res.json(ModernizationResponseSchema.parse({
+      plan: existing ? toModernizationPlanView(existing) : null,
+      path: null,
+    }));
+  });
+
+  app.post('/api/sessions/:name/modernization/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
     try {
       const result = await buildModernizationPlan(name);
-      res.json(ModernizationResponseSchema.parse({ plan: toModernizationPlanView(result.plan), path: result.path }));
+      res.json(ModernizationResponseSchema.parse({
+        plan: toModernizationPlanView(result.plan),
+        path: result.path,
+      }));
     } catch (error) {
-      if (error instanceof ScopeGateError) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json(ApiErrorSchema.parse({
-          code: 'SCOPE_REQUIRED',
+          code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : 'SCOPE_REQUIRED',
           error: error.message,
           details: { checks: error.result.checks },
         }));
