@@ -206,6 +206,17 @@ export async function runModernizationGate(
 
   // 先通过确定性检查，再让独立 Reviewer 检查内容是否真的可读、可用。
   if (!result.passed || !plan) return result;
+  if (!plan.provenance) {
+    return {
+      ...result,
+      passed: false,
+      checks: [...result.checks, {
+        name: 'Artifact provenance',
+        passed: false,
+        detail: '当前 Modernization Plan 没有 provenance，旧 Artifact 必须重新生成。',
+      }],
+    };
+  }
 
   const artifact = stage === 'target'
     ? JSON.stringify(plan.targetArchitecture, null, 2)
@@ -235,6 +246,8 @@ export async function runModernizationGate(
           ? 'mapping'
           : 'validation',
       artifact,
+      artifactVersion: plan.provenance.artifactVersion,
+      sourceRevision: plan.provenance.sourceRevision,
       facts,
     });
     await saveArtifactReview(name, review);
