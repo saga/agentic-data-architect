@@ -40,6 +40,7 @@ import {
 } from './workflow/journey-editor.js';
 import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { runReport } from './workflow/report.js';
+import { buildResultViewModel } from './workflow/results.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
@@ -1070,6 +1071,18 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     res.type('text/plain').send(
       await buildJourneyAgentInstruction(name, context.workflow),
     );
+  });
+
+  /**
+   * 调查结果的统一 View Model。
+   *
+   * 结果页面只依赖这个 endpoint；各结果 section 独立返回，避免 report /
+   * modernization / assessment 任一失败把整个“调查结果”页面一起打掉。
+   */
+  app.get('/api/sessions/:name/results', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const result = await buildResultViewModel(name);
+    res.json(result);
   });
 
   app.get('/api/sessions/:name/assessment', async (req, res) => {
