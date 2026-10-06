@@ -40,6 +40,17 @@ function reportMetadataFile(name: string): string {
   return path.join(reportsDir(name), 'report-meta.json');
 }
 
+async function countAnalysisArtifacts(name: string): Promise<number> {
+  const dir = path.join(path.dirname(reportsDir(name)), 'artifacts', 'analysis');
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    throw error;
+  }
+}
+
 async function readOptional(file: string): Promise<string | null> {
   try {
     return await fs.readFile(file, 'utf8');
@@ -142,7 +153,13 @@ export async function runReport(
   const snapshot = source.snapshot;
   assertMissionGate(investigation.mission);
   assertInvestigationArtifactSourceScope(source);
-  await assertInvestigationReportGate(name, { investigation: source.investigation, snapshot: source.snapshot });
+  await assertInvestigationReportGate(name, {
+    investigation: {
+      ...source.investigation,
+      resultArtifactCount: await countAnalysisArtifacts(name),
+    },
+    snapshot: source.snapshot,
+  });
   const modernizationResult = await readModernizationArtifact(name, source);
   const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
   const existingRaw = await readOptional(reportMetadataFile(name));
