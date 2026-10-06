@@ -413,7 +413,7 @@ capability
 
 workflow
   一条有明确阶段、顺序、Gate 和完成条件的工作路线。
-  例如：legacy-modernization、financial-ai-native-architecture、data-architecture-assessment。
+  例如：legacy-modernization、current-data-architecture、financial-ai-native-architecture、data-architecture-assessment。
 ~~~
 
 每个 Skill 的 frontmatter 都要声明 metadata.kind：
@@ -437,11 +437,15 @@ metadata:
 当前 Skill：
 
 ~~~text
-capability: investigation-session / financial-data-review / structural-analysis / search-github / search-confluence / search-leanix / working-directory
-workflow: legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
 workflow: current-data-architecture / legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
-capability: investigation-session / domain-modeling / research / grilling / structural-analysis / ...
+capability: investigation-session / financial-data-review / structural-analysis / search-github / search-confluence / search-leanix / working-directory / domain-modeling / research / grilling / ...
 ~~~
+## Investigation 输出
+
+每次完整 Investigation 至少形成一份 `reports/report.md`。报告先讲结论和已经查清楚的事实，再写不能确认的地方和下一步；调查过程中形成的分析记录、研究文件和数据分析结果可以保留为多个 `artifacts/` 文件，不要求全部塞进一份结果 JSON。
+
+Skill 的 `SKILL.md` 还必须明确写出输入校验、输出、输出验证、Gate 和期望结果示例；`npm run flow:lint` 会检查这些基础结构，具体业务 Gate 仍由对应 Workflow、Skill、脚本或工具负责。
+
 ## 进一步说明
 
 详细运行、API、Workspace、Skill、CLI、环境变量和实现资料见：
