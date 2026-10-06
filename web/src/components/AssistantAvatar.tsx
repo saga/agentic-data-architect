@@ -27,7 +27,6 @@ export function AssistantAvatar(props: {
   const height = Math.max(40, props.control.agent.avatarHeight || 240);
   const source = props.avatarPath
     ?? props.control.agent.avatarSources?.[0]?.src
-    ?? props.control.agent.avatarPath
     ?? props.control.agent.avatarPaths?.[0];
 
   const [loadFailed, setLoadFailed] = useState(false);
@@ -38,7 +37,6 @@ export function AssistantAvatar(props: {
   const localUrl = localId
     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${encodeURIComponent(localId)}?v=${props.control.version}`
     : `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`;
-  const defaultLocalUrl = `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`;
   const url = source
     ? isRemote
       ? source
@@ -53,20 +51,7 @@ export function AssistantAvatar(props: {
     return <Avatar shape="square" icon={<RobotOutlined />} style={{ width, height, flex: '0 0 auto' }} />;
   }
 
-  // 本地头像的主 URL 使用头像池中的稳定 ID；如果历史配置、迁移或旧数据导致
-  // ID 路径无法解析，回退到服务端维护的默认头像，而不是直接显示破图。
   if (loadFailed) {
-    if (!isRemote && !isVideo) {
-      return (
-        <img
-          src={defaultLocalUrl}
-          alt={props.control.agent.displayName || '助手头像'}
-          onError={() => undefined}
-          style={{ width, height, objectFit: 'cover', flex: '0 0 auto', borderRadius: 8, display: 'block' }}
-        />
-      );
-    }
-
     return (
       <Avatar
         shape="square"
