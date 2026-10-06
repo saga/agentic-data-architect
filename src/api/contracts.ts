@@ -667,6 +667,7 @@ export const OpenCodeStatusSchema = z.object({
   modelCount: z.number().int().nonnegative(),
   error: z.string().optional(),
 }).strict();
+export type OpenCodeStatus = z.infer<typeof OpenCodeStatusSchema>;
 
 export const CopilotModelOptionSchema = z.object({
   id: z.string().min(1),
@@ -676,6 +677,8 @@ export const CopilotModelOptionSchema = z.object({
   policyState: z.string().nullable(),
   runtime: z.enum(['copilot', 'opencode']).optional(),
 }).strict();
+
+export type CopilotModelOption = z.infer<typeof CopilotModelOptionSchema>;
 
 export const ModelsResponseSchema = z.object({
   models: z.array(CopilotModelOptionSchema),
