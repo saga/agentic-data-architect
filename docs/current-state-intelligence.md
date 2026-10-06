@@ -125,6 +125,8 @@ Business Meaning
 - `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
 - `current-data-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状，并作为可直接选择的工作方式。
 
+`data-architecture-assessment` 在这些现状事实之上继续回答“现在怎么样、哪里有问题、先改什么”。
+
 `data-architecture-assessment` 在这些现状事实之上继续回答“现在怎么样、哪里有问题、先改什么”，不重新建立一套当前架构事实。
 
 这些 Skill 不增加 Workflow DSL 的复杂度，也不替代权限、Policy 或业务审批。
