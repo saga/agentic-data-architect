@@ -276,6 +276,44 @@ export const ControlAgentSchema = z.object({
 }).strict();
 export type ControlAgent = z.infer<typeof ControlAgentSchema>;
 
+/** Global Agent 配置：所有 Investigation 默认继承；不随单个任务迁移。 */
+export const GlobalAgentConfigSchema = ControlAgentSchema;
+export type GlobalAgentConfig = z.infer<typeof GlobalAgentConfigSchema>;
+
+/** Task Agent override：只保存任务明确覆盖 Global 的字段。 */
+export const TaskAgentOverrideSchema = ControlAgentSchema.partial();
+export type TaskAgentOverride = z.infer<typeof TaskAgentOverrideSchema>;
+
+/** 全局配置文件；版本独立于任何 Investigation。 */
+export const GlobalConfigurationSchema = z.object({
+  schemaVersion: z.literal(1),
+  version: z.number().int().positive(),
+  updatedAt: z.string().min(1),
+  agent: GlobalAgentConfigSchema,
+}).strict();
+export type GlobalConfiguration = z.infer<typeof GlobalConfigurationSchema>;
+
+/** Task workspace 内持久化的配置：research 属于任务，agent 只保存 override。 */
+export const TaskConfigurationSchema = z.object({
+  schemaVersion: z.literal(2),
+  version: z.number().int().positive(),
+  globalVersion: z.number().int().positive(),
+  updatedAt: z.string().min(1),
+  research: ControlResearchSchema,
+  agent: TaskAgentOverrideSchema,
+  history: z.array(z.object({
+    version: z.number().int().positive(),
+    globalVersion: z.number().int().positive(),
+    updatedAt: z.string().min(1),
+    reason: z.string(),
+    snapshot: z.object({
+      research: ControlResearchSchema,
+      agent: ControlAgentSchema,
+    }).strict(),
+  }).strict()),
+}).strict();
+export type TaskConfiguration = z.infer<typeof TaskConfigurationSchema>;
+
 /** 不包含 history 的当前 Control 配置 Schema。 */
 export const InvestigationControlBaseSchema = z.object({
   schemaVersion: z.literal(1),
