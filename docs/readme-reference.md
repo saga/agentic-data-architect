@@ -131,7 +131,7 @@ task 不是第三种 Skill 类型。复杂程度也不是分类标准。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
 `knowledge/` 负责可跨 Investigation 复用的架构经验；每条知识记录来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不能替代当前 Investigation 的 Evidence。
-三条 Data Architect Workflow 都以 kind: workflow 的 Markdown Skill 定义。只有被当前 Investigation 选择时才进入 Journey；Workflow 负责大阶段、顺序和 Gate，kind: capability 的 Skill 提供可自由组合的具体能力。
+四条 Data Architect Workflow 都以 kind: workflow 的 Markdown Skill 定义。只有被当前 Investigation 选择时才进入 Journey；Workflow 负责大阶段、顺序和 Gate，kind: capability 的 Skill 提供可自由组合的具体能力。
 
 ## CLI
 
