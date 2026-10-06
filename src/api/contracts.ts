@@ -962,6 +962,35 @@ export const WorkspaceInputViewSchema = z.object({
 }).strict();
 export type WorkspaceInputView = z.infer<typeof WorkspaceInputViewSchema>;
 
+export const CurrentStateSummarySchema = z.object({
+  coverage: z.object({
+    datasets: z.number().int().nonnegative(),
+    connectedDatasets: z.number().int().nonnegative(),
+    datasetLineageConnectionRate: z.number().min(0).max(1).nullable(),
+    sqlParseFailures: z.number().int().nonnegative(),
+    semanticAssets: z.number().int().nonnegative(),
+    profiledDatasets: z.number().int().nonnegative(),
+  }).strict(),
+  sourceOfTruthCandidates: z.array(z.object({
+    key: z.string().min(1),
+    candidateDatasetIds: z.array(z.string()),
+    candidateDatasets: z.array(z.string()),
+    priorityScore: z.number(),
+    reasons: z.array(z.string()),
+    evidenceIds: z.array(z.string()),
+  }).strict()),
+  semanticCandidates: z.array(z.object({
+    key: z.string().min(1),
+    kind: z.enum(['business_concept', 'entity', 'identifier', 'metric', 'temporal_dimension']),
+    names: z.array(z.string()),
+    physicalAssets: z.array(z.string()),
+    semanticAssets: z.array(z.string()),
+    evidenceIds: z.array(z.string()),
+  }).strict()),
+  highValueAssets: z.array(z.string()),
+}).strict();
+export type CurrentStateSummary = z.infer<typeof CurrentStateSummarySchema>;
+
 export const CurrentStateViewSchema = CurrentStateSummarySchema;
 
 export const SessionContextViewSchema = z.object({
@@ -1014,7 +1043,6 @@ export const MissionResponseSchema = z.object({
   draft: MissionDraftSchema.optional(),
 }).strict();
 
-export type CopilotModelOption = z.infer<typeof CopilotModelOptionSchema>;
 export const OpenCodeStatusSchema = z.object({
   enabled: z.boolean(),
   reachable: z.boolean(),
