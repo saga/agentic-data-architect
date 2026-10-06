@@ -3,6 +3,17 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod';
 import { workspaceRoot } from './workspace.js';
+import {
+  TrajectoryEventSchema,
+  TrajectorySummarySchema,
+  TrajectoryTurnSummarySchema,
+  TrajectoryCheckpointSchema,
+  TrajectoryCheckpointDetailsSchema,
+  type TrajectoryEvent,
+  type TrajectorySummary,
+  type TrajectoryTurnSummary,
+  type TrajectoryCheckpoint,
+} from '../api/contracts.js';
 
 export {
   TrajectoryEventSchema,
@@ -10,13 +21,13 @@ export {
   TrajectoryTurnSummarySchema,
   TrajectoryCheckpointSchema,
   TrajectoryCheckpointDetailsSchema,
-} from '../api/contracts.js';
+};
 export type {
   TrajectoryEvent,
   TrajectorySummary,
   TrajectoryTurnSummary,
   TrajectoryCheckpoint,
-} from '../api/contracts.js';
+};
 
 export function summarizeTrajectoryTurns(events: TrajectoryEvent[]): TrajectoryTurnSummary[] {
   const groups = new Map<string, TrajectoryEvent[]>();
