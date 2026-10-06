@@ -146,6 +146,8 @@ async function runReviewerOnce(
     goal: string;
     artifactType: ReviewArtifactType;
     artifact: string;
+    artifactVersion: number;
+    sourceRevision: string;
     facts?: string;
   },
   structured: boolean,
