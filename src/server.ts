@@ -39,7 +39,7 @@ import {
   validateJourneyEdit,
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
-import { listTrajectoryCheckpoints, readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
+import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
 import { loadReportArtifact, runReport } from './workflow/report.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
@@ -307,7 +307,6 @@ app.post('/api/sessions', async (req, res) => {
     const context = await loadWorkspaceContext(name);
     const snapshot = await loadLatestSnapshot<any>(name);
     const conversation = getConversationSummary(name);
-    const trajectory = await readTrajectory(name, { limit: 5000 });
     const missionProgress = await buildMissionProgress(name, context.mission);
     res.json({
       context,
