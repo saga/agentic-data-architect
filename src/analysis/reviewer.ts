@@ -8,7 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { askCopilot } from '../agent/copilot.js';
+import { askAgentWithFallback } from '../agent/runtime.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
@@ -137,7 +137,7 @@ async function runReviewerOnce(
     : buildReviewPrompt(input)
       + '\\n\\n再次提醒：只返回 JSON 对象，不要 Markdown、不要解释、不要前后加任何文字。';
 
-  const raw = await askCopilot({
+  const raw = await askAgentWithFallback({
     prompt,
     systemPrompt: REVIEWER_SYSTEM_PROMPT,
     purpose: 'review',
