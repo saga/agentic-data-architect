@@ -175,14 +175,6 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             modelSaving={modelSaving}
             executionStatus={executionStatus}
             error={error}
-            missionOpen={missionOpen}
-            missionDraft={missionDraft}
-            missionSaving={missionSaving}
-            missionError={missionError}
-            onOpenMission={editMission}
-            onCloseMission={() => setMissionOpen(false)}
-            onChangeMission={setMissionDraft}
-            onConfirmMission={confirmMission}
             setValue={setValue}
             setAttachmentsOpen={setAttachmentsOpen}
             setUserInputDrafts={setUserInputDrafts}
@@ -206,6 +198,14 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             onOpenJourney={() => navigatePage('journey')}
             onOpenUnknowns={() => setUnknownsOpen(true)}
             onResizeStart={() => setResizing('right')}
+            missionDraft={missionDraft}
+            missionOpen={missionOpen}
+            missionSaving={missionSaving}
+            missionError={missionError}
+            onOpenMission={editMission}
+            onCloseMission={() => setMissionOpen(false)}
+            onChangeMission={setMissionDraft}
+            onConfirmMission={confirmMission}
           />
         </Content>
       </Layout>
