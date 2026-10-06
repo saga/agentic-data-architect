@@ -779,7 +779,7 @@ app.post('/api/sessions', async (req, res) => {
       currentDefinition,
       body.selectedNodeId,
     );
-    res.json(result);
+    res.json(JourneyAiResponseSchema.parse(result));
   });
 
   /** 人工完成 waiting 节点；与 Agent transition 共用 Workflow version 检查。 */
