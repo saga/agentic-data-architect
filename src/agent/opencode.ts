@@ -94,6 +94,7 @@ export interface OpenCodeAskInput {
   responseSchema?: z.ZodTypeAny;
   onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
   workflowSkill?: WorkflowId;
+  purpose?: 'investigation' | 'journey-map' | 'review';
   investigationName?: string;
 }
 
@@ -458,9 +459,11 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
     );
     let currentPrompt = input.prompt;
-    let currentWorkflowInstruction = input.workflowSkill && input.investigationName
-      ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
-      : '';
+    let currentWorkflowInstruction = input.purpose === 'review'
+      ? ''
+      : input.workflowSkill && input.investigationName
+        ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
+        : '';
     let finalAnswer = '';
 
     for (let execution = 0; execution <= maxAutomaticContinuations; execution += 1) {
