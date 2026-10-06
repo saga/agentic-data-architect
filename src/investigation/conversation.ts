@@ -10,6 +10,15 @@ import path from 'node:path';
 import { config } from '../config.js';
 
 /** 对话消息角色；与 Copilot/LLM 的常见角色保持简单一致。 */
+function dbOrThrow(): Database.Database {
+  if (!conversationDb) throw new Error('Conversation store is not initialized.');
+  return conversationDb;
+}
+
+function extractSearchTerms(query: string): string[] {
+  return [...new Set(query.toLowerCase().split(/[^a-z0-9_\u4e00-\u9fff]+/i).map((term) => term.trim()).filter((term) => term.length >= 2))];
+}
+
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
 /** 持久化后的单条对话消息。 */
