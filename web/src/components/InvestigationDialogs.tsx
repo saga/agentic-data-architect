@@ -35,7 +35,14 @@ export function InvestigationDialogs(props: {
         open={props.newSessionOpen}
         onCancel={() => props.setNewSessionOpen(false)}
         onOk={props.onCreateSession}
-        okButtonProps={{ disabled: !props.newSessionName.trim() }}
+        okButtonProps={{
+          disabled:
+            !props.newSessionName.trim() ||
+            !props.newSessionGoal.trim() ||
+            !props.newSessionExpectedResult.trim() ||
+            props.newSessionGoal.trim() === '研究现有项目的数据架构设计，调查data model，data source，vendor input方式，重要的数据转换逻辑' ||
+            props.newSessionExpectedResult.trim() === '生成一份深入浅出，详细的分析报告，分析报告应该包含mermaid形式的架构图、数据流图等等',
+        }}
       >
         <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <Input
@@ -49,7 +56,7 @@ export function InvestigationDialogs(props: {
             <Input.TextArea
               value={props.newSessionGoal}
               onChange={(event) => props.setNewSessionGoal(event.target.value)}
-              placeholder="为什么要做这次调查，例如：弄清老系统的数据架构，为 replatform 提供依据。"
+              placeholder="请填写这次调查要解决的问题。"
               autoSize={{ minRows: 3, maxRows: 6 }}
               style={{ marginTop: 6 }}
             />
@@ -59,7 +66,7 @@ export function InvestigationDialogs(props: {
             <Input.TextArea
               value={props.newSessionExpectedResult}
               onChange={(event) => props.setNewSessionExpectedResult(event.target.value)}
-              placeholder="最后希望拿到什么，例如：当前 Data Source、Data Flow、Data Model，以及 replatform 方案。"
+              placeholder="请填写这次调查最终需要得到的结果。"
               autoSize={{ minRows: 3, maxRows: 6 }}
               style={{ marginTop: 6 }}
             />
