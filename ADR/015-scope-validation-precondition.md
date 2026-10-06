@@ -34,6 +34,19 @@ Scope Validation 必须记录：
 
 不能仅因为用户写了一段范围描述，就把 Scope 当成 validated。
 
+### 2.1 Discovery generation 必须绑定 Scope
+
+每一次正式 Discovery Run 都必须记录生成时的 `scopeFingerprint`，并由该 Run 标识其对应的 Discovery generation。
+
+Discovery Snapshot 不单独建立第二套 Scope identity；它继承并引用其 `run.scopeFingerprint` 和 `run.id`。因此：
+
+- Snapshot 只能作为生成时 Scope 的事实来源；
+- 当前 Scope fingerprint 与 Snapshot 的 Scope fingerprint 不一致时，Snapshot 不能被复用为当前调查事实；
+- legacy Snapshot 若没有 Scope fingerprint，可以读取和审计，但不能被新一代 Artifact 当作 current source；
+- Scope 不变时，原始 Evidence / Discovery 可以复用，不要求因为 Mission 文案变化而重新扫描来源。
+
+这样可以区分“原始来源仍然可复用”和“旧任务结论不能继续作为当前结论”两种不同的失效语义。
+
 ### 3. Scope 未验证时不得正式推进
 
 在 Scope 未通过 validation 时：
