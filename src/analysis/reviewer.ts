@@ -51,6 +51,15 @@ export const ArtifactReviewSchema = z.object({
 }).strict();
 export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
 
+const ReviewerOutputSchema = z.object({
+  artifactType: ReviewArtifactTypeSchema,
+  status: z.enum(['pass', 'fail']),
+  score: z.number().int().min(0).max(100),
+  summary: z.string().trim().min(1),
+  issues: z.array(ReviewIssueSchema),
+  reviewedAt: z.string().datetime(),
+}).strict();
+
 const REVIEWER_SYSTEM_PROMPT = [
   '你是一个独立的 Data Architect 工作成果 Reviewer。',
   '你的职责只有一个：判断别人刚生成的工作成果是否已经达到可以交给架构师/分析师阅读和继续决策的质量。',
@@ -164,7 +173,7 @@ async function runReviewerOnce(
     model: config.model,
     workingDirectory: workspaceRoot(input.investigationName),
     autoContinuationTurns: 0,
-    ...(structured ? { responseSchema: ArtifactReviewSchema } : {}),
+    ...(structured ? { responseSchema: ReviewerOutputSchema } : {}),
   });
 
   const candidate = extractJson(raw);
@@ -172,7 +181,7 @@ async function runReviewerOnce(
     throw new Error('Reviewer 没有返回可解析的审核结果。');
   }
 
-  const parsed = ArtifactReviewSchema.parse(candidate);
+  const parsed = ReviewerOutputSchema.parse(candidate);
   if (parsed.artifactType !== input.artifactType) {
     throw new Error('Reviewer 返回的成果类型与当前审核对象不一致。');
   }
@@ -181,6 +190,7 @@ async function runReviewerOnce(
   const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
+    availability: 'completed',
     artifactVersion: input.artifactVersion,
     artifactHash: createHash('sha256').update(input.artifact).digest('hex'),
     sourceRevision: input.sourceRevision,
