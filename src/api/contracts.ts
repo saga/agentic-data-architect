@@ -71,6 +71,11 @@ export const MissionProgressSchema = z.object({
 }).strict();
 export type MissionProgress = z.infer<typeof MissionProgressSchema>;
 
+export const JourneyNodeTypeSchema = z.enum(['task', 'review', 'end']);
+export type JourneyNodeType = z.infer<typeof JourneyNodeTypeSchema>;
+export const JourneyActorSchema = z.enum(['agent', 'human']);
+export type JourneyActor = z.infer<typeof JourneyActorSchema>;
+
 export const JourneyRouteOptionSchema = z.object({
   id: z.string().trim().min(1).max(80),
   title: z.string().trim().min(1).max(120),
