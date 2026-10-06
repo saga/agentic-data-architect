@@ -119,8 +119,6 @@ export const JourneyNodeSchema = z.object({
   routes: z.array(JourneyRouteSchema),
   line: z.number().int().positive().optional(),
 }).strict();
-export type JourneyActor = z.infer<typeof JourneyActorSchema>;
-export type JourneyNodeType = z.infer<typeof JourneyNodeTypeSchema>;
 export type JourneyNode = z.infer<typeof JourneyNodeSchema>;
 
 export const JourneyDefinitionSchema = z.object({
