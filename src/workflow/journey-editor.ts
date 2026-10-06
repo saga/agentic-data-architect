@@ -40,6 +40,7 @@ import {
   describeJourneyCurrentNode,
   initialJourneyExecution,
   JourneyDefinitionSchema,
+  JourneyRunEventSchema,
   loadWorkflowJourney,
   parseJourneyMarkdown,
   validateJourneyDefinition,
@@ -131,8 +132,9 @@ async function readTextOrNull(file: string): Promise<string | null> {
  * 运行事件用 JSONL 追加保存：简单、可检查，不让 execution.json 无限增长。
  */
 export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
+  const validated = JourneyRunEventSchema.parse(event);
   await fs.mkdir(journeyDir(name), { recursive: true });
-  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(event) + '\n', 'utf8');
+  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(validated) + '\n', 'utf8');
 }
 
 /** 只读取最近事件供 UI/诊断使用；完整历史文件仍留在 workspace，不塞进当前快照。 */
@@ -143,7 +145,7 @@ export async function loadJourneyRunEvents(name: string, limit = 80): Promise<Jo
   const selected = lines.slice(-limit);
   return selected.map((line, index) => {
     try {
-      return JSON.parse(line) as JourneyRunEvent;
+      return JourneyRunEventSchema.parse(JSON.parse(line));
     } catch (error) {
       throw new Error(
         'Workflow run event 数据损坏：第 ' + String(lines.length - selected.length + index + 1)
