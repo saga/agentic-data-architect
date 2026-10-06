@@ -287,7 +287,7 @@ export function InvestigationConfigPage(props:{
              </Flex>
            </Card>
            <Card title='Soul / 人格' className='settings-card'>
-              <Paragraph type='secondary'>只影响秘书的说话方式和相处感，不改变调查目标、Evidence 规则、权限或 Workflow。可以写得更温柔、俏皮或更正式。</Paragraph>
+              <Paragraph type='secondary'>影响秘书的相处方式、判断风格和表达方式，但不改变调查目标、Evidence 规则、权限或 Workflow。可以写你希望秘书长期保持的做事方式，例如“主动推进、发现问题直接指出、不要为了讨好而附和”。</Paragraph>
               <Input.TextArea
                 autoSize={{minRows:4,maxRows:10}}
                 maxLength={4000}
