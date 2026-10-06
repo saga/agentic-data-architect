@@ -381,6 +381,7 @@ export const TrajectoryToolResultDetailsSchema = z.object({
   resultLength: z.number().int().nonnegative().optional(),
   detailedResultLength: z.number().int().nonnegative().optional(),
   error: z.unknown().optional(),
+  toolTelemetry: z.unknown().optional(),
 }).strict();
 
 export const TrajectoryUserInputRequestedDetailsSchema = z.object({
@@ -633,6 +634,7 @@ export const TrajectoryResponseSchema = z.object({
   summary: TrajectorySummarySchema.nullable(),
   turns: z.array(TrajectoryTurnSummarySchema),
   conversationTurns: z.array(ConversationTurnSummarySchema),
+  error: z.string().optional(),
 }).strict();
 export type TrajectoryResponse = z.infer<typeof TrajectoryResponseSchema>;
 
