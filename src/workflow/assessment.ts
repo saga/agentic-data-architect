@@ -3,6 +3,8 @@ import path from 'node:path';
 import * as z from 'zod';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
+import { ArtifactProvenanceSchema } from '../investigation/schemas.js';
+import { buildCurrentArtifactProvenance, isArtifactCurrent } from '../investigation/artifact.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -18,6 +20,7 @@ export const ArchitectureAssessmentPlanSchema = z.object({
   title: z.string().min(1),
   status: z.enum(['draft', 'reviewed']),
   version: z.number().int().positive(),
+  provenance: ArtifactProvenanceSchema.optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   goal: z.string(),
@@ -119,17 +122,23 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
     findings, recommendations, roadmap, evidenceIds: dedupe(findings.flatMap((finding) => finding.evidenceIds)),
   });
   plan.journey = await buildAssessmentJourneyStateFromPlan(inv, current, plan);
+  const persistedPlan = ArchitectureAssessmentPlanSchema.parse({
+    ...plan,
+    provenance: await buildCurrentArtifactProvenance(name, plan.version),
+  });
   const outputPath = planFile(name);
   await fs.mkdir(reportsDir(name), { recursive: true });
-  await writeJsonAtomic(outputPath, plan);
-  return { plan, path: outputPath };
+  await writeJsonAtomic(outputPath, persistedPlan);
+  return { plan: persistedPlan, path: outputPath };
 }
 
 /** 读取已经生成的评估结果；读取后仍经过 Zod，不信任磁盘里的 JSON。 */
 export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
   try {
     const raw = JSON.parse(await fs.readFile(planFile(name), 'utf8')) as unknown;
-    return ArchitectureAssessmentPlanSchema.parse(raw);
+    const plan = ArchitectureAssessmentPlanSchema.parse(raw);
+    if (!(await isArtifactCurrent(name, plan.provenance))) return null;
+    return plan;
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
