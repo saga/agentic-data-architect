@@ -50,6 +50,7 @@ import {
   AnswerSummarySchema,
   ReportRegenerateResponseSchema,
   ControlResponseSchema,
+  toControlView,
   HealthResponseSchema,
   CreateSessionResponseSchema,
   MissionUpdateResponseSchema,
@@ -366,7 +367,7 @@ app.post('/api/sessions', async (req, res) => {
     res.json(SessionDataSchema.parse({
       context: toSessionContextView(context),
       missionProgress,
-      control: await loadInvestigationControl(name),
+      control: toControlView(await loadInvestigationControl(name)),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
       messages: listConversationMessages(name, 200).map((message) => ({
@@ -871,7 +872,7 @@ app.post('/api/sessions', async (req, res) => {
       },
       'model settings changed from main chat',
     );
-    res.json(ControlResponseSchema.parse({ control }));
+    res.json(ControlResponseSchema.parse({ control: toControlView(control) }));
   });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
@@ -881,7 +882,7 @@ app.post('/api/sessions', async (req, res) => {
       research: body.research,
       agent: body.agent,
     });
-    res.json(ControlResponseSchema.parse({ control }));
+    res.json(ControlResponseSchema.parse({ control: toControlView(control) }));
   });
 
   // 文件上传 API：把文件存入当前 Investigation workspace，并记录 sha256/Evidence 输入。
@@ -1056,7 +1057,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       },
     });
 
-    res.json(ControlResponseSchema.parse({ control }));
+    res.json(ControlResponseSchema.parse({ control: toControlView(control) }));
   });
 
   /** 返回指定秘书头像；只允许访问当前 Control 中登记过的头像文件。 */

@@ -40,9 +40,9 @@ test('Mission Gate preserves the user message it blocks', async () => {
   });
   assert.equal(messageResponse.status, 409);
 
-  const body = await messageResponse.json() as { code?: string; turnId?: string };
+  const body = await messageResponse.json() as { code?: string; details?: { turnId?: string } };
   assert.equal(body.code, 'MISSION_REQUIRED');
-  assert.equal(body.turnId, turnId);
+  assert.equal(body.details?.turnId, turnId);
 
   const sessionResponse = await fetch(baseUrl + '/api/sessions/' + encodeURIComponent(sessionName));
   assert.equal(sessionResponse.status, 200);

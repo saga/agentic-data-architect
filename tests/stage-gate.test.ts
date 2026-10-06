@@ -252,6 +252,19 @@ test('a later real stage can still leave a checkpoint after earlier deliverables
         detail: '已覆盖',
       })),
     },
+    parsed: {
+      answer: '本轮补齐了最后的 Flow 证据。',
+      claims: [
+        {
+          claim: 'Flow 的主要走向已确认。',
+          status: 'inferred',
+          evidenceIds: ['ev-next'],
+        },
+      ],
+      unknowns: [],
+      followUpQuestions: [],
+      routeOptions: [],
+    },
   });
   const result = evaluateInvestigationStageGate(base);
   assert.equal(result.passed, true);
@@ -308,7 +321,7 @@ test('checkpoint can only be built after the gate passes', () => {
 });
 
 
-test('unrelated investigation changes do not create a stage summary', () => {
+test('real evidence without deliverable progress still leaves a stage summary', () => {
   const base = input();
   const result = evaluateInvestigationStageGate({
     ...base,
@@ -328,6 +341,7 @@ test('unrelated investigation changes do not create a stage summary', () => {
     },
   });
 
-  assert.equal(result.passed, false);
-  assert.ok(result.checks.some((item) => item.name === '本阶段推进了 Mission 交付物' && !item.passed));
+  assert.equal(result.passed, true);
+  assert.ok(result.checks.some((item) => item.name === '本阶段仍然服务于 Mission' && item.passed));
+  assert.equal(result.shouldContinue, true);
 });

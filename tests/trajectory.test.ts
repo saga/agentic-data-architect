@@ -177,7 +177,7 @@ test('malformed checkpoint details are rejected instead of silently disappearing
 
   assert.throws(
     () => listTrajectoryCheckpoints(events),
-    /Stage Checkpoint contract/,
+    /Runtime Contract/,
   );
 });
 

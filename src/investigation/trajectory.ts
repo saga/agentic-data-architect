@@ -110,12 +110,21 @@ export function listTrajectoryCheckpoints(events: TrajectoryEvent[], limit = 20)
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
   return events
     .filter((event) => event.type === 'checkpoint')
-    .map((event) => ({
-      id: event.id,
-      turnId: event.turnId,
-      timestamp: event.timestamp,
-      ...TrajectoryCheckpointDetailsSchema.parse(event.details),
-    }))
+    .map((event) => {
+      const parsed = TrajectoryCheckpointDetailsSchema.safeParse(event.details);
+      if (!parsed.success) {
+        throw new Error(
+          'checkpoint 事件的 details 不符合 Runtime Contract，已拒绝而不是静默丢弃：' +
+          parsed.error.issues.map((issue) => issue.path.join('.') + ' ' + issue.message).join('；'),
+        );
+      }
+      return {
+        id: event.id,
+        turnId: event.turnId,
+        timestamp: event.timestamp,
+        ...parsed.data,
+      };
+    })
     .slice(-safeLimit);
 }
 

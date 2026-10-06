@@ -4,6 +4,23 @@
  * This module must not import domain, filesystem, Node runtime, or server-only code.
  */
 import * as z from 'zod';
+import type { InvestigationControl as InvestigationControlDomain } from '../investigation/schemas.js';
+
+/**
+ * domain control → API view：history 快照只用于内部审计/回滚，不进 API。
+ * 直接拿 domain 对象去 parse view schema 会因为多余的 snapshot 键 500，
+ * 所有出参必须先过这个函数。
+ */
+export function toControlView(control: InvestigationControlDomain): InvestigationControl {
+  return {
+    ...control,
+    history: control.history.map((entry) => ({
+      version: entry.version,
+      updatedAt: entry.updatedAt,
+      reason: entry.reason,
+    })),
+  };
+}
 
 export const WorkflowIdSchema = z.enum([
   'legacy-modernization',
