@@ -98,7 +98,6 @@ export interface JourneySnapshot {
   version: number;
   definition: JourneyDefinition;
   layout: JourneyLayout;
-  execution: JourneyExecution;
   state: JourneyState;
    events: JourneyRunEvent[];
 }
@@ -500,7 +499,6 @@ export async function getJourneySnapshot(
     version: active.version,
     definition: active.definition,
     layout: active.layout,
-    execution: state.execution,
     state,
      events,
   };
