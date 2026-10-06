@@ -16,7 +16,7 @@ import {
   SessionDataSchema,
   SimpleOkResponseSchema,
   UserInputsResponseSchema,
-  WorkflowCompatibilityResponseSchema,
+  WorkflowSnapshotSchema,
   WorkflowContextResponseSchema,
 } from '../../../src/api/contracts.js';
 import type { AnswerSummaryContract } from '../../../src/api/contracts.js';
@@ -227,13 +227,20 @@ export function useInvestigationController() {
       setJourney(undefined);
       setAttachmentsOpen(false);
     }
-    const [result, journeyResult] = await Promise.all([
-      getJson(`/api/sessions/${encodeURIComponent(key)}`, SessionDataSchema),
-      getJson(`/api/sessions/${encodeURIComponent(key)}/journey`, WorkflowCompatibilityResponseSchema),
-    ]);
+    const result = await getJson(`/api/sessions/${encodeURIComponent(key)}`, SessionDataSchema);
+    const workflowSnapshot = result.context.workflow
+      ? await getJson(
+          `/api/sessions/${encodeURIComponent(key)}/workflow`,
+          WorkflowSnapshotSchema,
+        )
+      : undefined;
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
-    setJourney(journeyResult.journey ?? undefined);
+    setJourney(
+      workflowSnapshot
+        ? { ...workflowSnapshot.state, execution: workflowSnapshot.execution }
+        : undefined,
+    );
 
     // Mission 是正式调查的前置条件。旧 Session 如果还没有 Mission，
     // 首次打开就直接让用户确认，而不是先允许 Agent 自己猜目标。
