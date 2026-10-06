@@ -9,16 +9,20 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | ADR | 决定 | 状态 |
 |---|---|---|
 | [ADR-001](./001-data-estate-as-canonical-graph.md) | DataEstate 是唯一 canonical graph；重复图查询统一到轻量 query helpers，不建立第二套 Catalog 模型 | Accepted |
-| [ADR-002](./002-evidence-first-deterministic-analysis.md) | 确定性事实由代码/工具计算，Agent 负责推理；事实结果必须可追溯到 Evidence | Accepted |
-| [ADR-003](./003-personal-local-agent-runtime.md) | 默认运行模型是个人本机 Agent，不按多人共享 Agent Server 设计 | Accepted |
-| [ADR-004](./004-local-data-storage-boundaries.md) | SQLite、DuckDB、Parquet、Filesystem 各自承担明确职责 | Accepted |
-| [ADR-005](./005-workflow-and-skill-separation.md) | Workflow、Skill、Tool、Agent、Human 分工明确；Workflow DSL 保持最小 | Accepted |
+| [ADR-002](./002-evidence-first-deterministic-analysis.md) | 确定性事实由代码/工具计算，Agent 负责推理；当前 Investigation 的事实结论必须可追溯到 Evidence | Accepted |
+| [ADR-003](./003-personal-local-agent-runtime.md) | 默认运行模型是个人本机 Agent；runtime 通过统一边界支持 Copilot / OpenCode，不把 provider execution 变成 domain state | Accepted |
+| [ADR-004](./004-local-data-storage-boundaries.md) | SQLite、DuckDB、Parquet、Filesystem 各自承担明确职责；Conversation History 属于 SQLite application state | Accepted |
+| [ADR-005](./005-workflow-and-skill-separation.md) | Workflow、Skill、Tool、Agent、Human 分工明确；Workflow 保存/transition 由服务端验证，DSL 保持最小 | Accepted |
 | [ADR-006](./006-provider-neutral-semantic-context.md) | Semantic Context 采用 provider-neutral 核心模型 | Accepted |
 | [ADR-007](./007-structural-analysis-boundary.md) | Graphify 用于 structural navigation，不直接作为业务事实来源 | Accepted |
-| [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量，不引入重量级 Workflow Engine | Accepted |
-| [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配，Investigation 状态和页面 UI 按职责拆分 | Accepted |
-| [ADR-010](./010-independent-artifact-review.md) | AI 工作成果增加独立语义质量审核；不替代 Evidence Gate 或人工批准 | Accepted |
-| [ADR-011](./011-mission-contract-as-investigation-boundary.md) | Mission Contract 作为 Investigation 的最高优先级任务边界；正式调查必须经过用户确认 | Accepted |
+| [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量；artifact validation、semantic review 和 human approval 分层 | Accepted |
+| [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配；Journey/Workflow runtime state 由服务端拥有 | Accepted |
+| [ADR-010](./010-independent-artifact-review.md) | AI 工作成果增加独立语义质量审核；Reviewer 不替代 Evidence Gate 或人工批准 | Accepted |
+| [ADR-011](./011-mission-contract-as-investigation-boundary.md) | Mission Contract 作为 Investigation 的最高优先级任务边界；正式调查必须经过用户确认，并与 Scope Validation 分离 | Accepted |
+| [ADR-012](./012-soul-and-relationship-memory-isolation.md) | Soul / Relationship Memory 只影响最终 Persona Rendering，不进入 Task Agent reasoning | Accepted |
+| [ADR-013](./013-global-task-configuration-layering.md) | Global Config 与 Task Override 分层；Task 只保存 sparse override，不能修改 Global 或 runtime-owned capability | Accepted |
+| [ADR-014](./014-probabilistic-agent-deterministic-gates.md) | Agent 提议、Smart Function advisory、Deterministic Gate 控制关键状态转换、Human 承担最终业务批准 | Accepted |
+| [ADR-015](./015-scope-validation-precondition.md) | Scope Validation 是正式调查和依赖范围完整性的最终交付的前置条件 | Accepted |
 
 ## 如何使用 ADR
 
@@ -30,7 +34,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 2. 新方案是否违反现有 ADR？
 3. 如果违反，是应该修改原 ADR，还是形成一个新的 ADR？
 
-已经不再适用的决定不要删除。把原 ADR 标记为 `Superseded`，并在其中指向替代它的新 ADR。
+已经不再适用的决定不要删除。把原 ADR 标记为 Superseded，并在其中指向替代它的新 ADR。
 
 实现、README、普通设计文档和代码注释可以补充 ADR，但不能悄悄改变 ADR 已经明确的架构边界。
 

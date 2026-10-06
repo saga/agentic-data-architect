@@ -32,6 +32,7 @@
 8. Mission Gate 负责确定性检查“有没有明确且用户确认的任务契约”；不让模型替用户确认。
 9. deliverables 是导航和覆盖检查依据，不是事实证明，也不替代 Evidence Gate。
 10. “当前系统的数据架构 / Data Source / Data Flow / Data Model”属于常见能力场景，不新增独立 Workflow；使用 capability Skill current-state-architecture。
+11. Scope Validation 独立回答“本次任务究竟调查哪些对象”，通过 Mission Gate 不代表 Scope 已验证；正式调查和依赖 scope completeness 的最终交付还需满足 ADR-015 的 Scope Validation。
 
 ## Consequences
 

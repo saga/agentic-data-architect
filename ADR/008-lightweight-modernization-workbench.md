@@ -23,37 +23,25 @@ Modernization work products 作为轻量、可验证的结构化对象保存。
 
 不自动填充未经调查的 target component、mapping 或 architecture decision。
 
+Artifact 生命周期保持简单：可以处于 draft / proposed / validated / approved 等明确状态，但“结构有效”“语义审核通过”和“业务批准”不是同一个条件。
+
 Workflow/Journey 只负责编排高层路线和人工确认，不实现通用 BPM/ETL workflow engine。
+
+### Gate 与 Reviewer 的关系
+
+Evidence / deterministic validation 证明 artifact 满足机器可验证的结构和证据要求。
+
+Independent Reviewer 检查语义质量和目标匹配。
+
+两者都不能替代涉及业务权威或不可逆动作的 Human approval。
 
 ## Consequences
 
-项目能保持本机、单用户和可恢复的简单架构，同时仍然能逐步生成企业架构工作产物。
+项目能保持本机、单用户和可恢复的简单架构，同时仍能逐步生成企业架构工作产物。
 
 代价是复杂 migration orchestration、migration waves、dual run、cutover 等能力暂不属于核心 runtime，需要未来单独设计。
-## Appendix A：形成决定时的分析记录（仅供参考）
 
-项目逐步从 Current-State Discovery 扩展到 Modernization Workbench 后，讨论过是否需要引入完整 Workflow、BPM 或 ETL orchestration。
+## Related
 
-当时确认真正需要的是几个可恢复、可验证的工作产物：
-
-```text
-Current-State
-   ↓
-Target Architecture
-   ↓
-Source-to-Target Mapping
-   ↓
-Architecture Decision
-   ↓
-Gap Analysis
-   ↓
-Modernization Plan
-```
-
-这些对象有状态，但它们不是通用流程引擎的任务实例。
-
-另一个讨论重点是“不确定内容不能提前填满”。例如没有真实 target component、source/target relation 或业务决定时，系统应该留下 draft / unknown，而不是自动生成一套“看起来合理”的架构。
-
-因此项目保持轻量 Workflow/Journey，只负责高层导航和确认；具体的 migration waves、dual run、cutover、reconciliation orchestration 等复杂能力以后分别设计。
-
-本附录记录的是从 Current-State 工具向 Modernization Workbench 演进时的讨论，不新增额外架构约束。
+- ADR-010：Independent Artifact Review
+- ADR-014：概率 Agent 与确定性 Gate

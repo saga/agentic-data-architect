@@ -22,6 +22,8 @@ Reviewer：
 - 输出结构化 pass/fail、分数和具体问题；
 - 只把 Reviewer 作为语义质量检查，不取代 Evidence Gate 或实际验证结果。
 
+Reviewer 是 ADR-014 控制模型中的 advisory semantic signal。它不能单独授权 Workflow transition，也不能替代 deterministic Gate。
+
 当前接入：
 
 - Current-State Report：作为最终报告发布前的质量审核；
