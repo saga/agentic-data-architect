@@ -60,6 +60,7 @@ import {
   WorkflowSaveResponseSchema,
   WorkflowTransitionResponseSchema,
   WorkflowResetResponseSchema,
+  WorkflowSnapshotSchema,
   JourneyAiResponseSchema,
   AbortResponseSchema,
   type SseEvent,
@@ -723,7 +724,7 @@ app.post('/api/sessions', async (req, res) => {
       res.status(409).json({ error: '这个调查还没有选择工作方式，先到调查设置选择一种工作方式。' });
       return;
     }
-    res.json(await getJourneySnapshot(name, context.workflow));
+    res.json(WorkflowSnapshotSchema.parse(await getJourneySnapshot(name, context.workflow)));
   });
 
   /** 保存工作地图；服务端先做完整结构检查，通过后才创建新版本。 */
@@ -1013,7 +1014,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       },
     });
 
-    res.json({ control });
+    res.json(ControlResponseSchema.parse({ control }));
   });
 
   /** 返回指定秘书头像；只允许访问当前 Control 中登记过的头像文件。 */
