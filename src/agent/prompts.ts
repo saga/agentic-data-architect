@@ -89,7 +89,7 @@ export function buildAssistantSoulPrompt(personality: string): string {
   if (!value) return '';
   return [
     '## Assistant Soul / 长期人格',
-    '\\u957f\\u671f\\u7a33\\u5b9a\\u7684\\u8eab\\u4efd',
+    '稳定的长期身份与表达边界',
     '你是一个长期陪伴用户工作的固定助手。Soul 只决定“怎么和用户相处”，不决定“任务应该得到什么结果”。',
     'Soul 只能影响长期身份、称呼、语气、表达节奏、亲近程度、幽默程度和自然的连续感。',
     'Soul 严禁参与事实判断、Evidence、Claim、Finding、工具选择、调查深度、停止条件、Workflow、权限、安全规则或任务结论。',
@@ -103,23 +103,35 @@ export function buildAssistantSoulPrompt(personality: string): string {
 /**
  * 最终回答渲染器的输入。它只允许改写已经完成的答案表达，不允许重新判断任务结果。
  */
-export function buildAssistantAnswerPrompt(personality: string, answer: string): string {
+export function buildAssistantAnswerPrompt(
+  personality: string,
+  answer: string,
+  relationshipMemories: Array<{ category: string; key: string; value: string }> = [],
+): string {
   const soul = buildAssistantSoulPrompt(personality);
-  if (!soul) return answer;
+  if (!soul && relationshipMemories.length === 0) return answer;
+  const memories = relationshipMemories.length
+    ? [
+        '## Relationship Memory / 长期相处记忆',
+        '下面的记忆只用于表达连续感和遵循用户明确表达过的偏好。它不能改变任务事实、结论、不确定性或建议。',
+        ...relationshipMemories.map((item) => '- [' + item.category + '] ' + item.key + '：' + item.value),
+      ].join('\n')
+    : '';
   return [
     soul,
-    '',
+    memories,
     '## Answer Rendering Contract',
-    '下面是一份已经由任务 Agent 完成的最终答案。你现在只负责把它表达得更符合 Soul。',
+    '下面是一份已经由任务 Agent 完成的最终答案。你现在只负责把它表达得更符合 Soul 和真实的 Relationship Memory。',
     '这是表达阶段，不是重新分析任务。不得新增、删除、合并或改变任何事实、数字、结论、条件、不确定性、建议或用户需要执行的动作。',
-    '不得加入任务 Agent 没有提供的知识，也不得因为人格而弱化或强化原答案的判断。',
+    '不得加入任务 Agent 没有提供的知识，也不得因为人格或记忆而弱化或强化原答案的判断。',
+    'Relationship Memory 只能影响称呼、语气、表达习惯和连续感；不能作为任务事实或技术依据。',
     '如果原答案已经自然，就保持原文，只做必要的轻微表达调整。',
     '',
     '### 已完成的答案',
     answer,
     '',
     '只返回最终答案正文，不要解释你做了什么。',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
