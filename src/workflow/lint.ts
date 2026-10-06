@@ -7,6 +7,18 @@ import { parseJourneyMarkdown } from './journey.js';
 const explicitFiles = process.argv.slice(2);
 const requiredSections = ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例'] as const;
 
+function hasSectionContent(markdown: string, title: string): boolean {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === '## ' + title);
+  if (start < 0) return false;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line.startsWith('## ')) return false;
+    if (line) return true;
+  }
+  return false;
+}
+
 async function skillFiles(): Promise<string[]> {
   if (explicitFiles.length) return explicitFiles;
   const entries = await fs.readdir(config.skillsDir, { withFileTypes: true });
@@ -32,7 +44,7 @@ try {
         continue;
       }
       for (const section of requiredSections) {
-        if (!markdown.includes('## ' + section)) {
+        if (!hasSectionContent(markdown, section)) {
           failed = true;
           console.error('ERROR ' + file + ': 缺少 Skill Contract 章节：## ' + section);
         }
