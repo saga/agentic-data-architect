@@ -807,3 +807,25 @@ export const WorkflowInstructionResponseSchema = z.string();
 export const SimpleOkResponseSchema = z.object({
   ok: z.literal(true),
 }).strict();
+
+export const WorkflowSaveResponseSchema = z.object({
+  version: z.number().int().nonnegative(),
+  snapshot: WorkflowSnapshotSchema,
+}).strict();
+
+export const WorkflowTransitionResponseSchema = z.object({
+  applied: z.boolean(),
+  error: z.string().optional(),
+  execution: JourneyExecutionSchema.optional(),
+  snapshot: WorkflowSnapshotSchema.optional(),
+}).strict();
+
+export const WorkflowResetResponseSchema = WorkflowSnapshotSchema;
+
+export const JourneyAiResponseSchema = z.unknown();
+
+export const ReportErrorResponseSchema = z.object({
+  code: z.string().min(1),
+  error: z.string().min(1),
+}).strict();
+
