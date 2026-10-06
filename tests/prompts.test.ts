@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildAssistantAnswerPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
+import { buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
 
 const mission = {
   purpose: '理解老系统当前的数据架构，为后续迁移判断提供依据。',
