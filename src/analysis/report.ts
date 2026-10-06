@@ -178,7 +178,11 @@ function buildReplatformImplications(
  */
 export async function buildReport(
   name: string,
-  source?: { investigation: Investigation; snapshot: DiscoverySnapshot | null },
+  source?: {
+    investigation: Investigation;
+    snapshot: DiscoverySnapshot | null;
+    modernization?: Awaited<ReturnType<typeof loadModernizationPlan>> | null;
+  },
 ): Promise<{ markdown: string; path: string }> {
   if (!source) {
     await assertInvestigationScopeGate(name);
@@ -187,7 +191,9 @@ export async function buildReport(
 
   const inv = source?.investigation ?? await loadInvestigation(name);
   const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
-  const modernization = await loadModernizationPlan(name);
+  const modernization = source
+    ? source.modernization ?? null
+    : await loadModernizationPlan(name);
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
   const coverage = current?.coverage;
