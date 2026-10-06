@@ -3,8 +3,10 @@
  *
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { buildReport } from '../analysis/report.js';
-import { reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
+import { ArtifactReviewSchema, reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 import { loadInvestigation, reportsDir } from '../investigation/store.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import * as z from 'zod';
@@ -105,9 +107,7 @@ export async function loadReportArtifact(name: string): Promise<ReportArtifactSt
 
   let review: Awaited<ReturnType<typeof reviewArtifact>>;
   try {
-    review = (await import('../analysis/reviewer.js')).ArtifactReviewSchema.parse(
-      JSON.parse(await fs.readFile(reviewPath, 'utf8')),
-    );
+    review = ArtifactReviewSchema.parse(JSON.parse(await fs.readFile(reviewPath, 'utf8')));
   } catch {
     return { status: 'blocked', reason: '报告缺少可验证的独立质量审核结果。' };
   }
