@@ -23,6 +23,12 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-013](./013-global-task-configuration-layering.md) | Global Config 与 Task Override 分层；Task 只保存 sparse override，不能修改 Global 或 runtime-owned capability | Accepted |
 | [ADR-014](./014-probabilistic-agent-deterministic-gates.md) | Agent 提议、Smart Function advisory、Deterministic Gate 控制关键状态转换、Human 承担最终业务批准 | Accepted |
 | [ADR-015](./015-scope-validation-precondition.md) | Scope Validation 是正式调查和依赖范围完整性的最终交付的前置条件 | Accepted |
+| [ADR-016](./016-api-contract-ownership-and-view-models.md) | 跨 server/web 的数据对象只有一个 authoritative API Contract，UI 使用明确的 View/Projection | Accepted |
+| [ADR-017](./017-investigation-artifact-lifecycle-and-revision.md) | Artifact 绑定 Mission/Scope/Source revision，读取与生成分离 | Accepted |
+| [ADR-018](./018-canonical-workflow-runtime-contract.md) | WorkflowSnapshot 是唯一 canonical Workflow runtime resource，/journey 仅兼容 | Accepted |
+| [ADR-019](./019-derived-state-semantic-consistency.md) | Mission、Workflow、Result 的 derived state 使用统一 deterministic semantics | Accepted |
+| [ADR-020](./020-runtime-events-error-and-persistence-contracts.md) | SSE、HTTP error、Trajectory 和 durable data 使用统一 runtime contract | Accepted |
+| [ADR-021](./021-stage-checkpoint-semantics.md) | Stage Checkpoint 表示真实执行阶段，不等同 Deliverable completion | Accepted |
 
 ## 如何使用 ADR
 
