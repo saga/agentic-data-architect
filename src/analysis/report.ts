@@ -8,10 +8,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import type { Investigation } from '../investigation/store.js';
-import { assertInvestigationScopeGate, isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import { assertInvestigationReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
-import { loadArchitectureAssessmentPlan } from '../workflow/assessment.js';
 import {
   datasetLineageRelations,
   edgesFrom,
@@ -180,24 +178,10 @@ function claimStatusText(status: string): string {
   }
 }
 
-function buildReplatformImplications(
-  findings: Array<{ type: string }>,
-  modernization: Awaited<ReturnType<typeof loadModernizationPlan>>,
-  modernizationGoal: boolean,
-): string[] {
-  const implications = unique(findings.map((finding) => impactForFinding(finding.type)));
-  if (modernization?.targetArchitecture.components.length) {
-    implications.push('已经开始形成目标架构，可以在这些已确认的问题边界内继续细化目标组件。');
-  } else if (modernizationGoal) {
-    implications.push('当前还没有形成可供批准的目标架构，因此这份报告不能把 replatform 方案说成已经确定。');
-  }
-  return implications.slice(0, 5);
-}
-
 /**
- * Current-State Report（用户阅读版）。
+ * Investigation Report（用户阅读版）。
  *
- * 正式报告只展示少量关键事实；完整 Evidence、原始 lineage 和内部指标继续保存在工作区。
+ * 正式报告先讲清结果；完整 Evidence、原始 lineage 和分析文件继续保存在工作区。
  */
 export async function buildReport(
   name: string,
@@ -239,9 +223,6 @@ export async function buildReport(
     questions: finding.questions,
   }));
   const openQuestions = buildOpenQuestions(inv.unknowns, findingInput);
-  const currentStateOnly = isCurrentStateOnlyScope(inv.goal, inv.scope);
-  const modernizationGoal = !currentStateOnly && /replatform|迁移|现代化|改造/i.test((inv.userPrompt + ' ' + inv.goal).trim());
-  const implications = buildReplatformImplications(findingInput, modernization, modernizationGoal);
   const datasetFlows = estate ? summarizeDatasetFlows(estate) : [];
   const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
 
@@ -346,50 +327,16 @@ export async function buildReport(
     );
   }
 
-  if (inv.workflow === 'data-architecture-assessment') {
-    try {
-      const assessment = await loadArchitectureAssessmentPlan(name);
-      if (assessment) {
-        lines.push(
-          '## 架构评估',
-          '',
-          '这部分回答“现在怎么样、哪里最值得先改”，不是重新描述当前系统。',
-          '',
-        );
-        if (assessment.findings.length) {
-          lines.push(...assessment.findings.slice(0, 8).flatMap((finding) => [
-            '### ' + finding.title,
-            '',
-            finding.description,
-            '',
-            '建议：' + finding.recommendation,
-            '',
-          ]));
-        } else {
-          lines.push('目前没有保存的评估问题。', '');
-        }
-        lines.push(
-          assessment.roadmap.length
-            ? '建议先做：' + assessment.roadmap.map((item) => item.title).slice(0, 5).join('、') + '。'
-            : '目前还没有形成实施顺序。',
-          '',
-        );
-      }
-    } catch {
-      lines.push('评估结果暂时无法读取；这不影响已经保存的调查内容。', '');
-    }
+  lines.push('## 调查过程中留下的资料', '');
+  if (analysisArtifacts.length) {
+    lines.push(...analysisArtifacts.slice(0, 30).map((item) => '- ' + item));
+  } else {
+    lines.push('- 目前没有额外的分析文件。');
   }
-
   lines.push(
-    '## 调查过程中留下的资料',
-    '',
-    analysisArtifacts.length
-      ? ...analysisArtifacts.slice(0, 30).map((item) => '- ' + item)
-      : '- 目前没有额外的分析文件。',
     '',
     '## 下一步',
-    '',
-    currentStateOnly
+    inv.workflow === 'current-data-architecture'
       ? '如果还要继续调查，就优先补齐那些会影响当前架构理解的未确认事项。'
       : '如果还要继续工作，就优先处理上面已经明确会影响结果的问题；不要为了把所有未知项清零而无限调查。',
     '',
