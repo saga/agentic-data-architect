@@ -54,6 +54,7 @@ export interface InvestigationControl {
       version: number;
       content: string;
     };
+    platformCapabilities: Array<{ name: string; version: number; enabled: boolean }>;
     mcpServers: Array<{
       name: string;
       version: number;
