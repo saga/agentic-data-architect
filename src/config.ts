@@ -28,6 +28,8 @@ const EnvSchema = z.object({
    * 为空 = 不过滤，全部列出；填了就只列出命中的，下拉框不再是一大堆。
    */
   OPENCODE_MODEL_ALLOWLIST: z.string().default(''),
+  /** Copilot quota 用尽时的自动 fallback 模型；为空时使用 OpenCode 当前首个已连接模型。 */
+  OPENCODE_FALLBACK_MODEL: z.string().default(''),
   TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(360_000),
   // Agent 真正执行的默认上限仍为 6 分钟；进入 ask_user 后改用单独的等待上限。
   USER_INPUT_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
@@ -58,6 +60,7 @@ export const config = {
   openCodeModelAllowlist: envConfig.OPENCODE_MODEL_ALLOWLIST.split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter((entry) => entry.length > 0),
+  openCodeFallbackModel: envConfig.OPENCODE_FALLBACK_MODEL.trim() || undefined,
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   userInputWaitTimeoutMs: envConfig.USER_INPUT_WAIT_TIMEOUT_MS,
   permissionWaitTimeoutMs: envConfig.PERMISSION_WAIT_TIMEOUT_MS,
