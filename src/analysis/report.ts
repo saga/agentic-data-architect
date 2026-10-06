@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import { isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import type { Investigation } from '../investigation/store.js';
 import { assertInvestigationReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
@@ -30,7 +31,7 @@ function preview(values: string[], limit: number): string {
 }
 
 function evidenceText(ids: string[]): string {
-  return ids.length ? '证据：' + unique(ids).slice(0, 3).join('、') : '证据未记录';
+  return ids.length ? '资料编号：' + unique(ids).slice(0, 3).join('、') : '资料编号未记录';
 }
 
 function impactForFinding(type: string): string {
@@ -210,7 +211,7 @@ export async function buildReport(
     : String(parsedFiles.size) + '/' + String(sqlFiles.length) + ' 个 SQL 文件有解析结果';
   const connectedDatasets = coverage
     ? String(coverage.connectedDatasets) + '/' + String(coverage.datasets)
-    : '没有 Current-State coverage';
+    : '目前没有形成完整的数据检查结果';
   const columnEdges = coverage?.columnLineageEdges ?? snapshot?.lineage?.columns.length ?? 0;
   const findingInput = inv.findings.map((finding) => ({
     type: finding.type,
@@ -223,6 +224,7 @@ export async function buildReport(
     questions: finding.questions,
   }));
   const openQuestions = buildOpenQuestions(inv.unknowns, findingInput);
+  const currentStateOnly = isCurrentStateOnlyScope(inv.goal, inv.scope);
   const datasetFlows = estate ? summarizeDatasetFlows(estate) : [];
   const sqlTransforms = estate ? summarizeSqlTransforms(estate) : [];
 
