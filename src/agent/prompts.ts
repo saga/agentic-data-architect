@@ -81,20 +81,43 @@ export function buildMissionContractPrompt(
 }
 
 /**
- * 组装秘书的稳定人格。Soul 可以影响相处方式和判断风格，但不能改变任务、证据和权限边界。
- * 保持这一层短而稳定，避免被本轮业务上下文稀释。
+ * 组装长期稳定的 Soul。Soul 不进入任务 Agent 的推理、工具调用或证据判断上下文，
+ * 只提供给最终回答渲染器，用于保持长期一致的身份、相处方式和表达风格。
  */
 export function buildAssistantSoulPrompt(personality: string): string {
   const value = personality.trim();
   if (!value) return '';
   return [
-    '## Assistant Soul / 秘书人格',
-    '这是秘书长期稳定的身份和相处方式。它不是一次性的语气要求，而是回答用户时应持续保持的工作风格。',
-    '它可以影响：说话方式、主动程度、是否直接指出问题、如何表达不同意见、如何处理不确定性，以及如何保持与用户的连续感。',
-    '它不能覆盖 Mission、Evidence 规则、用户已经确认的任务范围、权限、安全规则或 Workflow；发生冲突时以上规则优先。',
-    '不要为了表现人格而故意卖萌、重复口头禅或增加无关内容；人格应该体现在判断和相处方式里，而不只是词汇。',
+    '## Assistant Soul / 长期人格',
+    '你是一个长期陪伴用户工作的固定助手。Soul 只决定“怎么和用户相处”，不决定“任务应该得到什么结果”。',
+    'Soul 只能影响长期身份、称呼、语气、表达节奏、亲近程度、幽默程度和自然的连续感。',
+    'Soul 严禁参与事实判断、Evidence、Claim、Finding、工具选择、调查深度、停止条件、Workflow、权限、安全规则或任务结论。',
+    '不要为了表现人格而添加事实、改变结论、改变不确定性、改变建议，或虚构记忆、经历和关系。',
+    '人格稳定；长期熟悉感来自真实的用户偏好和共同历史，而不是让 Soul 自行漂移。',
     '',
     value,
+  ].join('\n');
+}
+
+/**
+ * 最终回答渲染器的输入。它只允许改写已经完成的答案表达，不允许重新判断任务结果。
+ */
+export function buildAssistantAnswerPrompt(personality: string, answer: string): string {
+  const soul = buildAssistantSoulPrompt(personality);
+  if (!soul) return answer;
+  return [
+    soul,
+    '',
+    '## Answer Rendering Contract',
+    '下面是一份已经由任务 Agent 完成的最终答案。你现在只负责把它表达得更符合 Soul。',
+    '这是表达阶段，不是重新分析任务。不得新增、删除、合并或改变任何事实、数字、结论、条件、不确定性、建议或用户需要执行的动作。',
+    '不得加入任务 Agent 没有提供的知识，也不得因为人格而弱化或强化原答案的判断。',
+    '如果原答案已经自然，就保持原文，只做必要的轻微表达调整。',
+    '',
+    '### 已完成的答案',
+    answer,
+    '',
+    '只返回最终答案正文，不要解释你做了什么。',
   ].join('\n');
 }
 
