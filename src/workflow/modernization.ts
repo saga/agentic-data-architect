@@ -558,6 +558,10 @@ export async function persistModernizationAgentResult(
 /** 读取改造 Artifact，并明确区分 missing / stale / current / error。 */
 export async function readModernizationArtifact(
   name: string,
+  source?: {
+    investigation: Awaited<ReturnType<typeof loadInvestigation>>;
+    snapshot: DiscoverySnapshot | null;
+  },
 ): Promise<{ status: import('../api/contracts.js').ArtifactLifecycleStatus; plan: ModernizationPlan | null }> {
   let plan: ModernizationPlan;
   try {
@@ -570,8 +574,8 @@ export async function readModernizationArtifact(
     return { status: 'error', plan: null };
   }
 
-  const inv = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const inv = source?.investigation ?? await loadInvestigation(name);
+  const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
   const current = snapshot?.currentState ?? null;
   if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
     return { status: 'stale', plan: null };
