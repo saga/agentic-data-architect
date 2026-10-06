@@ -1,0 +1,143 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  ApiErrorSchema,
+  ArtifactReviewContractSchema,
+  ConversationTurnSummarySchema,
+  JourneyPlanSchema,
+  JourneyWorkflowChangeSchema,
+  SessionContextViewSchema,
+  SseEventSchema,
+  WorkflowCompatibilityResponseSchema,
+} from '../src/api/contracts.js';
+
+test('SSE contract rejects malformed status payloads', () => {
+  assert.throws(
+    () => SseEventSchema.parse({ event: 'status', data: { status: { state: 'running' } } }),
+  );
+});
+
+test('SSE contract validates checkpoint payloads at the transport boundary', () => {
+  assert.throws(
+    () => SseEventSchema.parse({
+      event: 'checkpoint',
+      data: {
+        id: 'checkpoint-1',
+        turnId: 'turn-1',
+        timestamp: '2026-10-06T08:00:00.000Z',
+        execution: 0,
+        title: '阶段',
+        summary: '完成',
+        confirmed: [],
+        evidenceIds: [],
+      },
+    }),
+    /unknowns|checkpoint/,
+  );
+});
+
+test('SSE completed event must use the canonical answer summary shape', () => {
+  assert.throws(
+    () => SseEventSchema.parse({ event: 'completed', data: { answer: 'ok' } }),
+  );
+});
+
+test('Session context is an explicit API projection, not the persistence object', () => {
+  assert.throws(
+    () => SessionContextViewSchema.parse({
+      name: 'session-1',
+      workflow: null,
+      userPrompt: '',
+      goal: '',
+      scope: [],
+      systems: [],
+      evidence: [],
+      findings: [],
+      unknowns: [],
+      claims: [],
+      inputs: [],
+      updatedAt: '2026-10-06T08:00:00.000Z',
+      discoveryRuns: [],
+    }),
+    /discoveryRuns/,
+  );
+});
+
+test('JourneyPlan and workflow edit changes are runtime validated', () => {
+  assert.equal(JourneyPlanSchema.parse({
+    version: 1,
+    source: 'agent',
+    generatedAt: '2026-10-06T08:00:00.000Z',
+    routes: [{
+      id: 'r1',
+      title: '继续调查',
+      reason: '还有一项直接影响交付的未知。',
+      steps: ['检查来源'],
+    }],
+  }).version, 1);
+
+  assert.equal(JourneyWorkflowChangeSchema.parse({
+    type: 'remove-node',
+    nodeId: 'target',
+  }).type, 'remove-node');
+});
+
+test('legacy journey compatibility response has one canonical execution owner', () => {
+  const value = WorkflowCompatibilityResponseSchema.parse({
+    journey: {
+      workflowId: 'legacy-modernization',
+      stages: [{
+        id: 'target',
+        title: '目标',
+        objective: '设计目标',
+        status: 'current',
+        nodeType: 'task',
+      }],
+      execution: {
+        workflowId: 'legacy-modernization',
+        workflowVersion: 1,
+        runId: 'run-1',
+        currentNodeId: 'target',
+        completedNodeIds: [],
+        status: 'active',
+      },
+    },
+  });
+  assert.equal(value.journey?.execution.currentNodeId, 'target');
+});
+
+test('error contract always carries a stable code and human-readable message', () => {
+  assert.deepEqual(
+    ApiErrorSchema.parse({ code: 'SCOPE_REQUIRED', error: 'scope is required' }),
+    { code: 'SCOPE_REQUIRED', error: 'scope is required' },
+  );
+});
+
+test('artifact review is revision-aware when metadata is present', () => {
+  const review = ArtifactReviewContractSchema.parse({
+    artifactType: 'report',
+    status: 'pass',
+    availability: 'completed',
+    score: 90,
+    summary: '通过。',
+    issues: [],
+    reviewedAt: '2026-10-06T08:00:00.000Z',
+    artifactHash: 'hash',
+    sourceRevision: 'revision',
+    artifactVersion: 2,
+  });
+  assert.equal(review.artifactVersion, 2);
+});
+
+test('conversation turn summary is a shared transport contract', () => {
+  const turn = ConversationTurnSummarySchema.parse({
+    turnId: 'turn-1',
+    sessionName: 'session-1',
+    status: 'completed',
+    createdAt: '2026-10-06T08:00:00.000Z',
+    updatedAt: '2026-10-06T08:00:01.000Z',
+    question: '检查数据来源',
+  });
+  assert.equal(turn.status, 'completed');
+});
