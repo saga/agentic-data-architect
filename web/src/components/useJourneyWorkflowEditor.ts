@@ -8,7 +8,7 @@ import {
   WorkflowSaveResponseSchema,
   WorkflowSnapshotSchema,
   WorkflowTransitionResponseSchema,
-} from '../../src/api/contracts.js';
+} from '../../../src/api/contracts.js';
 
 import {
   applyWorkflowChanges,
