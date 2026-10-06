@@ -39,9 +39,9 @@ export const MissionContractSchema = z.object({
 export type MissionContract = z.infer<typeof MissionContractSchema>;
 
 export const MissionDraftSchema = z.object({
-  purpose: z.string().min(10),
-  expectedResult: z.string().min(10),
-  deliverableIds: z.array(z.string().min(1)).min(1).max(12),
+  purpose: z.string().trim().min(1).max(2000),
+  expectedResult: z.string().trim().min(1).max(4000),
+  deliverableIds: z.array(z.string().trim().min(1).max(80)).max(12),
 }).strict();
 export type MissionDraft = z.infer<typeof MissionDraftSchema>;
 
