@@ -140,12 +140,12 @@ export function InvestigationConfigPage(props:{
 
   return <div className='config-page-shell'>
     <header className='subpage-header'>
-      <Flex align='center' gap={10}>
+      <Flex align='center' gap={10} className='subpage-header-left'>
+        <Button type='text' onClick={props.onBack} disabled={saving}>退出</Button>
         <SettingOutlined/> <Title level={4} style={{margin:0}}>调查配置</Title>
         <Tag>v{props.control.version}</Tag>
       </Flex>
-      <Space>
-        <Button onClick={props.onBack} disabled={saving}>退出</Button>
+      <Space className='subpage-header-actions'>
         <Button icon={<SaveOutlined/>} type='primary' loading={saving} onClick={()=>void save()}>保存配置</Button>
       </Space>
     </header>
