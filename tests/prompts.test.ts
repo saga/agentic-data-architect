@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
+import { buildAssistantAnswerPrompt, buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../src/agent/prompts.js';
 
 const mission = {
   purpose: '理解老系统当前的数据架构，为后续迁移判断提供依据。',
@@ -50,10 +50,18 @@ test('question prompt starts from Mission and treats the user question as execut
 });
 
 test('Assistant Soul is isolated to final answer rendering', () => {
-  const prompt = buildAssistantAnswerPrompt('自然、直接、长期合作感。', 'Global 配置作为默认值，Task 只保存显式 override。');
+  const soul = buildAssistantSoulPrompt('自然、直接、长期合作感。');
+  const prompt = buildAssistantAnswerPrompt(
+    '自然、直接、长期合作感。',
+    'Global 配置作为默认值，Task 只保存显式 override。',
+    [{ category: 'working_style', key: 'response_style', value: '回答直接、少套话。' }],
+  );
 
-  assert.match(prompt, /怎么和用户相处/);
-  assert.match(prompt, /严禁参与事实判断/);
+  assert.match(soul, /怎么和用户相处/);
+  assert.match(soul, /严禁参与事实判断/);
   assert.match(prompt, /不得新增、删除、合并或改变任何事实/);
+  assert.match(prompt, /Relationship Memory/);
+  assert.match(prompt, /回答直接、少套话/);
   assert.match(prompt, /Global 配置作为默认值/);
+  assert.doesNotMatch(LEAD_SYSTEM_PROMPT, /Assistant Soul|Relationship Memory|长期人格/);
 });
