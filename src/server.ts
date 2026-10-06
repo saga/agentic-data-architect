@@ -321,7 +321,6 @@ app.post('/api/sessions', async (req, res) => {
         content: message.content,
         capturedAt: message.createdAt,
       })),
-      checkpoints: listTrajectoryCheckpoints(trajectory, 20),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
       currentState: snapshot?.currentState ?? null,
