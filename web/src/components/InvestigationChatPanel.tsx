@@ -7,7 +7,6 @@ import { XMarkdown } from '@ant-design/x-markdown';
 import { AssistantActionBar } from './AssistantActionBar';
 import { AssistantAvatar } from './AssistantAvatar';
 import { ChatMarkdown, ChatMessageMeta, displayAssistantContent } from './ChatContent';
-import { MissionContractPanel } from './MissionContractPanel';
 import type {
   AutoTier,
   ExecutionStatus,
@@ -42,14 +41,6 @@ export function InvestigationChatPanel(props: {
   executionStatus: ExecutionStatus;
   turnStatus: string;
   error?: string;
-  missionOpen: boolean;
-  missionDraft: MissionDraft;
-  missionSaving: boolean;
-  missionError?: string;
-  onOpenMission: () => void;
-  onCloseMission: () => void;
-  onChangeMission: (draft: MissionDraft) => void;
-  onConfirmMission: () => void;
   setValue: (value: string) => void;
   setAttachmentsOpen: (open: boolean) => void;
   setUserInputDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -205,19 +196,6 @@ export function InvestigationChatPanel(props: {
 
   return (
     <div className="chat-main">
-      <MissionContractPanel
-        mission={props.current.context.mission}
-        progress={props.current.missionProgress}
-        draft={props.missionDraft}
-        open={props.missionOpen}
-        saving={props.missionSaving}
-        loading={props.loading}
-        error={props.missionError}
-        onOpen={props.onOpenMission}
-        onClose={props.onCloseMission}
-        onChange={props.onChangeMission}
-        onConfirm={props.onConfirmMission}
-      />
       {bubbleItems.length ? (
         <Bubble.List
           role={{
