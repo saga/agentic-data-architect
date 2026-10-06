@@ -8,6 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
+import { createHash } from 'node:crypto';
 import { askCopilot } from '../agent/copilot.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
@@ -44,6 +45,9 @@ export const ArtifactReviewSchema = z.object({
   summary: z.string().trim().min(1),
   issues: z.array(ReviewIssueSchema),
   reviewedAt: z.string().datetime(),
+  artifactVersion: z.number().int().positive(),
+  artifactHash: z.string().regex(/^[a-f0-9]{64}$/),
+  sourceRevision: z.string().regex(/^[a-f0-9]{24}$/),
 }).strict();
 export type ArtifactReview = z.infer<typeof ArtifactReviewSchema>;
 
@@ -175,6 +179,9 @@ async function runReviewerOnce(
   const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
   return {
     ...parsed,
+    artifactVersion: input.artifactVersion,
+    artifactHash: createHash('sha256').update(input.artifact).digest('hex'),
+    sourceRevision: input.sourceRevision,
     availability: 'completed',
     status: normalizedStatus,
     reviewedAt: new Date().toISOString(),
@@ -186,6 +193,8 @@ export async function reviewArtifact(input: {
   goal: string;
   artifactType: ReviewArtifactType;
   artifact: string;
+  artifactVersion: number;
+  sourceRevision: string;
   facts?: string;
 }): Promise<ArtifactReview> {
   try {
@@ -207,6 +216,9 @@ export async function reviewArtifact(input: {
           suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
         }],
         reviewedAt: new Date().toISOString(),
+        artifactVersion: input.artifactVersion,
+        artifactHash: createHash('sha256').update(input.artifact).digest('hex'),
+        sourceRevision: input.sourceRevision,
       };
     }
   }
