@@ -151,7 +151,7 @@ export function useInvestigationController() {
   const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [leftWidth, setLeftWidth] = useState(270);
-  const [rightWidth, setRightWidth] = useState(330);
+  const [rightWidth, setRightWidth] = useState(350);
   const [resizing, setResizing] = useState<'left' | 'right' | null>(null);
   const [showLeftTip, setShowLeftTip] = useState(() => {
     try { return localStorage.getItem('ada.tip.left') !== 'dismissed'; } catch { return true; }
