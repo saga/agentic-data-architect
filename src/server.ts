@@ -702,7 +702,7 @@ app.post('/api/sessions', async (req, res) => {
         },
       });
     }
-    res.json({ context });
+    res.json(WorkflowContextResponseSchema.parse({ context: toSessionContextView(context) }));
   });
 
   /** 返回当前 Workflow 给工作地图页面；页面打开后直接进入可编辑状态。 */
