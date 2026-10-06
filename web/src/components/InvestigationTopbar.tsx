@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Flex, Space, Tag, Typography } from 'antd';
+import { Button, Space, Tag, Typography } from 'antd';
 import { CopyOutlined, FileTextOutlined, LoadingOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import type { ExecutionStatus, SessionData } from '../app/types';
 
@@ -20,11 +20,10 @@ export function InvestigationTopbar(props: {
   const running = props.loading || props.executionStatus.running;
   return (
     <div className="topbar-inner">
-      <Flex justify="space-between" align="center" style={{ width: '100%' }}>
-        <div className="topbar-title">
-          <Text strong className="topbar-label">调查工作区</Text>
-        </div>
-        <Space className="topbar-actions">
+      <div className="topbar-title">
+        <Text strong className="topbar-label">调查工作区</Text>
+      </div>
+      <Space className="topbar-actions">
           <Tag
             className={`workspace-status${running ? ' workspace-status-active' : ''}`}
             variant="filled"
@@ -68,8 +67,7 @@ export function InvestigationTopbar(props: {
               待查内容 {props.current.context.unknowns.length}
             </Tag>
           ) : null}
-        </Space>
-      </Flex>
+      </Space>
     </div>
   );
 }
