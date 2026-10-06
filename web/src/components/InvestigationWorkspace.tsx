@@ -26,6 +26,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     nextGuidance,
     streamingAnswer,
     streamingReasoning,
+    assistantCompanionNote,
     reasoningByMessage,
     assistantAvatarByMessage,
     pendingPermissions,
