@@ -353,21 +353,24 @@ export async function buildReport(
         lines.push(
           '## 架构评估',
           '',
-          '这部分不是在重新描述现状，而是在回答“现在怎么样、哪里最值得先改”。',
+          '这部分回答“现在怎么样、哪里最值得先改”，不是重新描述当前系统。',
           '',
-          assessment.findings.length
-            ? ...assessment.findings.slice(0, 8).flatMap((finding) => [
-                '### ' + finding.title,
-                '',
-                finding.description,
-                '',
-                '建议：' + finding.recommendation,
-                '',
-              ])
-            : '目前没有保存的评估问题。',
-          '',
+        );
+        if (assessment.findings.length) {
+          lines.push(...assessment.findings.slice(0, 8).flatMap((finding) => [
+            '### ' + finding.title,
+            '',
+            finding.description,
+            '',
+            '建议：' + finding.recommendation,
+            '',
+          ]));
+        } else {
+          lines.push('目前没有保存的评估问题。', '');
+        }
+        lines.push(
           assessment.roadmap.length
-            ? '建议先做：' + assessment.roadmap.map((item) => item.title).slice(0, 5).join('、') + '。',
+            ? '建议先做：' + assessment.roadmap.map((item) => item.title).slice(0, 5).join('、') + '。'
             : '目前还没有形成实施顺序。',
           '',
         );
