@@ -19,6 +19,12 @@ test('new investigations default to autonomous mode', () => {
   assert.equal(investigation.workflow, null);
 });
 
+test('current data architecture workflow can be selected', async () => {
+  const investigation = newInvestigation('current-data', '分析当前数据架构');
+  await saveInvestigation(investigation);
+  const selected = await updateInvestigationWorkflow('current-data', 'current-data-architecture');
+  assert.equal(selected.workflow, 'current-data-architecture');
+});
 test('workflow can be changed without replacing investigation state', async () => {
   const investigation = newInvestigation('switchable', 'Trace Position');
   investigation.goal = 'Find the source of Position';
