@@ -813,7 +813,7 @@ app.post('/api/sessions', async (req, res) => {
       res.status(409).json({ error: '这个调查还没有选择工作方式，无法恢复工作地图。' });
       return;
     }
-    res.json(await resetJourneyCustomization(name, context.workflow));
+    res.json(WorkflowResetResponseSchema.parse(await resetJourneyCustomization(name, context.workflow)));
   });
 
 
