@@ -105,3 +105,24 @@ GitHub 检索是整个架构研究的一部分，不是独立问答任务。
 `Current State → Data Flow → Data Model → Data Source → Transformation → Gap → Target Architecture`
 
 不要因为一个局部文件、一个 branch、一个工具调用失败，就回到“请用户选择下一步”。
+
+## 输入校验
+
+必须有明确 repository、organization 或代码对象。Repository 一旦确定，先确认默认分支或明确 ref，不猜路径。
+
+单个文件路径找不到时，应先发现真实路径并继续其它调查，不能因为局部检索失败就结束整个任务。
+## 输出
+
+纳入 Investigation 的仓库和重要研究结论必须可追溯。需要复用的研究资料保存到 .workspace/shared/github/，关键代码关系还必须登记正式 Evidence。
+## 输出与验证
+
+- repository、branch / commit SHA 和查看过的文件必须可追溯。
+- 关键代码结论必须回到实际源码，不得只引用搜索结果。
+- Issue / PR 必须记录状态和时间。
+- 代码证据不能直接升级成业务事实。
+## Gate
+
+Gate 是“仓库来源确定、关键代码已读取、结论有具体文件/提交依据”。局部 path 错误不是整个任务的 Gate 失败；只有无法获得任何可复核来源时，才把研究结果标记为不可验证。
+## 期望结果示例
+
+> 在 commit abc123 中，PositionService 调用了 PositionRepository，后者读取 position_snapshot。这能证明当前代码路径，不足以单独证明 position_snapshot 是业务上唯一的权威来源。
