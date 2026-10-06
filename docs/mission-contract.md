@@ -96,13 +96,7 @@ Evidence / Tool / Skill
 
 ## 当前系统数据架构分析
 
-“看懂当前系统的数据架构”“给我 Data Source / Data Flow / Data Model”是常见能力，不应该成为新的固定 Workflow。
-
-对应能力是：
-
-`skills/current-state-architecture/SKILL.md`
-
-它可以被 Legacy Modernization、Architecture Assessment 或自主调查自由组合。
+“分析当前数据架构”现在是独立可选的 `current-data-architecture` Workflow，专门回答“这套系统现在是怎么工作的”。“评估数据架构”使用 `data-architecture-assessment`，在现状事实基础上回答“现在怎么样、哪里有问题、先改什么”。两者共享已有 Evidence、Discovery 和 Current-State Intelligence，不建立两套事实模型。
 
 ## 实现位置
 
