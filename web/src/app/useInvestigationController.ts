@@ -87,12 +87,10 @@ export function useInvestigationController() {
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
     const sessionName = current?.context.name;
-    // avatarSources 为空数组时不能屏蔽旧版 avatarPaths；只有真正有来源时才优先使用 avatarSources。
     const configuredSources = current?.control.agent.avatarSources?.map((item) => item.src).filter(Boolean) ?? [];
     const avatarPaths = configuredSources.length > 0
       ? configuredSources
-      : current?.control.agent.avatarPaths?.filter(Boolean)
-        ?? (current?.control.agent.avatarPath ? [current.control.agent.avatarPath] : []);
+      : current?.control.agent.avatarPaths?.filter(Boolean) ?? [];
     if (!sessionName || !avatarPaths.length) {
       setAssistantAvatarByMessage({});
       return;
