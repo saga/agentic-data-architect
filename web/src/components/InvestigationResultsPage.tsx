@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import { TrajectoryResponseSchema, ModernizationResponseSchema, type TrajectoryEvent, type ModernizationPlanView } from '../../../src/api/contracts.js';
