@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calibrateStatus, type EvidenceRef } from '../src/evidence/types.js';
+import { calibrateStatus, DiscoveryRunSchema, type EvidenceRef } from '../src/evidence/types.js';
 import { parseAgentAnswer, toClaims } from '../src/agent/result.js';
 
 describe('calibrateStatus: 模型自报 status 只做输入', () => {
@@ -29,6 +29,23 @@ describe('calibrateStatus: 模型自报 status 只做输入', () => {
   });
   it('contradicted passes through', () => {
     assert.equal(calibrateStatus(2, 'contradicted'), 'contradicted');
+  });
+});
+
+describe('DiscoveryRun scope generation', () => {
+  it('accepts the scope fingerprint on new discovery runs', () => {
+    const run = DiscoveryRunSchema.parse({
+      id: 'run-1',
+      root: '/tmp/source',
+      startedAt: '2026-10-06T08:00:00.000Z',
+      completedAt: '2026-10-06T08:01:00.000Z',
+      parserVersion: '1',
+      scopeFingerprint: 'scope-1',
+      filesScanned: 2,
+      datasetsFound: 1,
+      lineageEdgesFound: 1,
+    });
+    assert.equal(run.scopeFingerprint, 'scope-1');
   });
 });
 
