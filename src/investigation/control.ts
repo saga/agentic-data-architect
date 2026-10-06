@@ -18,7 +18,6 @@ import {
   type McpServerSetting,
   type GlobalConfiguration,
   type TaskConfiguration,
-  type TaskAgentOverride,
   GlobalConfigurationSchema,
   TaskConfigurationSchema,
 } from './schemas.js';
@@ -34,7 +33,6 @@ function globalConfigFile(): string {
 }
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
-const controlInitLocks = new Map<string, Promise<void>>();
 let globalConfigLock: Promise<void> = Promise.resolve();
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
@@ -56,13 +54,6 @@ async function withControlUpdateLock<T>(name: string, operation: () => Promise<T
 /** 返回当前 Investigation 的审计日志路径。 */
 function auditFile(name: string): string {
   return path.join(workspaceRoot(name), 'audit.jsonl');
-}
-
-/** 清理字符串数组：去空格、去空值、去重复，为配置保存提供稳定输入。 */
-function normalizeAvatarDimension(value: unknown, fallback: number, min: number, max: number): number {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(numeric)));
 }
 
 function normalizeStringList(value: unknown): string[] {
