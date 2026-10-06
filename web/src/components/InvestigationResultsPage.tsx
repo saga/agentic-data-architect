@@ -129,7 +129,7 @@ export function InvestigationResultsPage(props: {
           : Promise.resolve({ plan: null }),
       ]);
 
-      if (resultResponse.ok) {
+      if ('report' in resultPayload) {
         setReportStatus('available');
         setReport(resultPayload.report);
       } else {
