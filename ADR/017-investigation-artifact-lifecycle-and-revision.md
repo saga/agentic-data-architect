@@ -13,12 +13,12 @@ Mission、Scope 和 Investigation facts 会持续变化，而 Report、Assessmen
 
 1. 正式 artifact 必须保存 missionFingerprint、scopeFingerprint、sourceRevision 和自身 version。
 2. 如果 Artifact 使用 Discovery Snapshot，还必须保存 `discoveryRunId` 和 `discoveryScopeFingerprint`；二者共同绑定本次 Artifact 使用的 Discovery generation。
-3. provenance 由服务端根据 Investigation 当前状态和所捕获的 Discovery Snapshot 确定性计算。
+3. provenance 由服务端根据 Investigation 当前状态和所捕获的 Discovery Snapshot 确定性计算；当 Artifact 使用 Discovery Snapshot 时，`discoveryRunId` 与 `discoveryScopeFingerprint` 也必须参与 freshness 判断。
 4. artifact provenance 与当前 Mission、Scope、Discovery generation 或 source revision 不一致时，状态为 stale，不能当成当前结果。
 5. GET 只读取现有 artifact；生成 / regenerate 是显式动作。
 6. Reviewer result 必须绑定 artifact hash 和 source revision。
 7. Report、Assessment、Modernization 使用同一套 `missing / stale / current / blocked / error` lifecycle 语义；某一类 Artifact 当前不适用的状态仍然保留 contract compatibility。
-8. Artifact generation 必须先捕获一份 immutable source snapshot，再由同一份 source snapshot 生成内容和 provenance；生成期间的新状态不应混入本次 Artifact。
+8. Artifact generation 必须先捕获一份 immutable source snapshot，再由同一份 source snapshot 生成内容、provenance 和 Reviewer input；生成期间的新状态不应混入本次 Artifact。对已有下游 Artifact 的引用也必须基于同一份 captured Investigation/Discovery source 判断是否 current，不得在生成过程中重新读取 latest state 后混入。
 9. 没有 provenance 的旧 artifact 视为 stale。
 
 Artifact 只允许复用与当前 Scope 兼容的 Discovery Snapshot。原始 Evidence 可以跨 Mission change 保留并复用，但 Claims、Findings 和正式 Artifact 必须针对当前 Mission generation 重新计算或验证。
