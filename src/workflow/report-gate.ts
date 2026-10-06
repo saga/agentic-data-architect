@@ -19,6 +19,18 @@ export interface ReportGateResult {
   checks: ReportGateCheck[];
 }
 
+export class ReportGateError extends Error {
+  readonly code = 'REPORT_PRECONDITION';
+  constructor(readonly result: ReportGateResult) {
+    const failed = result.checks
+      .filter((item) => !item.passed)
+      .map((item) => item.name + '：' + item.detail)
+      .join('；');
+    super('Current-State Report 还不能生成。' + (failed ? ' ' + failed : ''));
+    this.name = 'ReportGateError';
+  }
+}
+
 function allKnown(ids: string[], known: Set<string>): boolean {
   return ids.every((id) => known.has(id));
 }
@@ -102,13 +114,7 @@ export async function runCurrentStateReportGate(name: string): Promise<ReportGat
 export async function assertCurrentStateReportGate(name: string): Promise<ReportGateResult> {
   const result = await runCurrentStateReportGate(name);
   if (!result.passed) {
-    const failed = result.checks
-      .filter((item) => !item.passed)
-      .map((item) => item.name + '：' + item.detail)
-      .join('；');
-    throw new Error(
-      'Current-State Report 还不能生成。' + (failed ? ' ' + failed : ''),
-    );
+    throw new ReportGateError(result);
   }
   return result;
 }
