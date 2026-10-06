@@ -99,6 +99,11 @@ export async function captureExplicitRelationshipMemories(text: string): Promise
   const source = text.trim();
   if (!source) return [];
   const candidates: Array<Pick<RelationshipMemory, 'category' | 'key' | 'value'>> = [];
+  const forgetMatch = source.match(/(?:请)?忘记(?:我)?[：:\s]+(.{2,300})/i);
+  if (forgetMatch?.[1]) {
+    await forgetRelationshipMemory(forgetMatch[1].trim());
+    return [];
+  }
   const rememberMatch = source.match(/(?:请)?记住(?:我)?[：:\s]+(.{2,500})/i);
   if (rememberMatch?.[1]) candidates.push({ category: 'explicit_instruction', key: 'user_explicit_memory', value: rememberMatch[1].trim() });
   const avoidMatch = source.match(/以后(?:请)?(?:不要|别)[：:\s]*(.{2,300})/i);
