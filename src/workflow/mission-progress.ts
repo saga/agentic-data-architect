@@ -13,6 +13,7 @@ import type { DiscoverySnapshot } from './discover.js';
 import { loadArchitectureAssessmentPlan } from './assessment.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
+import { targetArchitectureComponentCount, reviewedMappingCount, blockingValidationPassedCount, blockingValidationCount } from './derived-state.js';
 
 export type MissionDeliverableStatus =
   | 'covered'
@@ -253,11 +254,11 @@ export async function buildMissionProgress(
     const plan = await loadModernizationPlan(name);
     if (plan) {
       signals.modernization = {
-        targetComponentCount: plan.targetArchitecture.components.length,
-        mappingCount: plan.mappings.length,
+        targetComponentCount: targetArchitectureComponentCount(plan.targetArchitecture),
+        mappingCount: reviewedMappingCount(plan.mappings),
         validationCount: plan.validationPlan.checks.length,
-        blockingValidationReady: plan.validationPlan.checks.filter((item) => item.blocking && item.status === 'passed').length,
-        blockingValidationTotal: plan.validationPlan.checks.filter((item) => item.blocking).length,
+        blockingValidationReady: blockingValidationPassedCount(plan.validationPlan.checks),
+        blockingValidationTotal: blockingValidationCount(plan.validationPlan.checks),
       };
     }
   }
