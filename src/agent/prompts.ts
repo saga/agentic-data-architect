@@ -89,6 +89,7 @@ export function buildAssistantSoulPrompt(personality: string): string {
   if (!value) return '';
   return [
     '## Assistant Soul / 长期人格',
+    '\\u957f\\u671f\\u7a33\\u5b9a\\u7684\\u8eab\\u4efd',
     '你是一个长期陪伴用户工作的固定助手。Soul 只决定“怎么和用户相处”，不决定“任务应该得到什么结果”。',
     'Soul 只能影响长期身份、称呼、语气、表达节奏、亲近程度、幽默程度和自然的连续感。',
     'Soul 严禁参与事实判断、Evidence、Claim、Finding、工具选择、调查深度、停止条件、Workflow、权限、安全规则或任务结论。',
