@@ -28,7 +28,7 @@ function base() {
       version: 1 as const,
       purpose: '理解系统当前数据架构。',
       expectedResult: '形成可以直接阅读的调查报告。',
-      deliverables: [{ id: 'report', title: '调查报告', description: '说明调查结果。', required: true }],
+      deliverables: [{ id: 'custom-result', title: '其他结果', description: '按照用户明确说明的期望结果形成最终交付物。', required: true }],
       status: 'confirmed' as const,
       confirmedAt: new Date().toISOString(),
       confirmedBy: 'user' as const,
