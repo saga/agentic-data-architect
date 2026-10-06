@@ -287,6 +287,8 @@ export const KNOWN_COMPLETION_CONDITIONS = [
   'mapping',
   'validation',
   'cutover',
+  'current-data-architecture',
+  'current-data-architecture-ready',
   'assessment-current-state',
   'assessment-findings',
   'assessment-recommendation',
