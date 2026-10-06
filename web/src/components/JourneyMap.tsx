@@ -128,12 +128,12 @@ export function JourneyMap(props: JourneyMapProps) {
                   {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
                   <Tag
                     color={
-                      snapshot.execution.status === 'waiting' ? 'blue' : undefined
+                      snapshot.state.execution.status === 'waiting' ? 'blue' : undefined
                     }
                   >
-                    {snapshot.execution.status === 'waiting'
+                    {snapshot.state.execution.status === 'waiting'
                       ? '等待人工'
-                      : snapshot.execution.status === 'completed'
+                      : snapshot.state.execution.status === 'completed'
                         ? '已完成'
                         : false
                           ? '已停止'
@@ -257,8 +257,8 @@ export function JourneyMap(props: JourneyMapProps) {
               applyAiChanges={applyAiChanges}
               discardAiChanges={discardAiChanges}
               humanWaiting={
-                snapshot.execution.status === 'waiting'
-                && snapshot.execution.currentNodeId === selectedNode?.id
+                snapshot.state.execution.status === 'waiting'
+                && snapshot.state.execution.currentNodeId === selectedNode?.id
               }
               applyHumanWorkflowTransition={applyHumanWorkflowTransition}
             />
@@ -276,13 +276,13 @@ export function JourneyMap(props: JourneyMapProps) {
                 已完成
               </Tag>
               <Text type="secondary">
-                当前执行位置：{snapshot.execution.currentNodeId}
+                当前执行位置：{snapshot.state.execution.currentNodeId}
               </Text>
             </Flex>
 
             <Space size={12}>
               <Text type="secondary">Cmd/Ctrl + S 保存</Text>
-              {snapshot.execution.status === 'completed' ? (
+              {snapshot.state.execution.status === 'completed' ? (
                 <Tag color="green" variant="filled">
                   这条路线已经走完
                 </Tag>
