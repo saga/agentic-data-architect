@@ -1192,7 +1192,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const name = sessionKey(req.params.name);
     const context = await loadWorkspaceContext(name);
     res.type('text/plain').send(
-      await buildJourneyAgentInstruction(name, context.workflow),
+      WorkflowInstructionResponseSchema.parse(await buildJourneyAgentInstruction(name, context.workflow)),
     );
   });
 
