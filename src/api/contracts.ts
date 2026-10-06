@@ -1,7 +1,7 @@
+import * as z from 'zod';
+
 export const WorkflowIdSchema = z.enum(['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment']);
 export type WorkflowId = z.infer<typeof WorkflowIdSchema>;
-
-import * as z from 'zod';
 
 export const ApiErrorSchema = z.object({
   code: z.string().min(1),
