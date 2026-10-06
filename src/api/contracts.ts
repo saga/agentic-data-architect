@@ -307,9 +307,9 @@ export const SseEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('delta'), data: z.object({ delta: z.string() }).strict() }).strict(),
   z.object({ event: z.literal('reasoning'), data: z.object({ delta: z.string() }).strict() }).strict(),
   z.object({ event: z.literal('companion_note'), data: z.object({ note: z.string() }).strict() }).strict(),
-  z.object({ event: z.literal('status'), data: z.object({ status: z.unknown() }).strict() }).strict(),
-  z.object({ event: z.literal('checkpoint'), data: z.unknown() }),
-  z.object({ event: z.literal('completed'), data: z.unknown() }),
+  z.object({ event: z.literal('status'), data: z.object({ status: z.string().min(1) }).strict() }).strict(),
+  z.object({ event: z.literal('checkpoint'), data: TrajectoryCheckpointSchema }),
+  z.object({ event: z.literal('completed'), data: AnswerSummarySchema }),
   z.object({ event: z.literal('error'), data: z.object({ error: z.string() }).strict() }).strict(),
 ]);
 export type SseEvent = z.infer<typeof SseEventSchema>;
