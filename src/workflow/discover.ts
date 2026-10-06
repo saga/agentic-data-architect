@@ -19,6 +19,7 @@ import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { assertMissionGate } from './mission-gate.js';
+import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 
 /**
  * runDiscovery：瘦 CLI 背后的真实逻辑（§三十四），以后 UI / API 直接复用。
@@ -177,6 +178,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     startedAt,
     completedAt: new Date().toISOString(),
     parserVersion: PARSER_VERSION,
+    scopeFingerprint: computeScopeFingerprint(inv),
     filesScanned: inventory?.files.length ?? 0,
     datasetsFound: tables.length,
     lineageEdgesFound: lineage?.edges.length ?? 0,
@@ -248,7 +250,9 @@ async function findReusablePathDiscoveryRun(
   inventory: Inventory,
 ): Promise<Awaited<ReturnType<typeof loadInvestigation>>['discoveryRuns'][number] | null> {
   const normalizedRoot = path.resolve(root);
+  const currentScopeFingerprint = computeScopeFingerprint(investigation);
   for (const run of [...investigation.discoveryRuns].reverse()) {
+    if (run.scopeFingerprint !== currentScopeFingerprint) continue;
     if (run.parserVersion !== PARSER_VERSION || path.resolve(run.root) !== normalizedRoot) continue;
 
     const sourceEvidence = investigation.evidence.filter(
