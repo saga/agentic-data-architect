@@ -59,6 +59,15 @@ export function evaluateInvestigationReportGate(
     || (investigation.resultArtifactCount ?? 0) > 0;
   add('已经形成真实调查成果', hasResult, hasResult ? '已经保存了可以写入报告的调查成果。' : '目前只有任务说明，还没有形成可交付的调查成果。');
 
+  const hasAnalysisArtifact = (investigation.resultArtifactCount ?? 0) > 0;
+  add(
+    '已经留下中间分析记录',
+    hasAnalysisArtifact,
+    hasAnalysisArtifact
+      ? '调查过程已经留下可以继续复看的分析记录。'
+      : '还没有留下中间分析记录，最终报告不能作为完整调查结果。',
+  );
+
   const invalidClaims = investigation.claims.filter((claim) => {
     if (claim.status === 'unknown') return false;
     if (!allKnown(claim.evidenceIds, evidenceIds)) return true;
