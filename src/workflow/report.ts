@@ -41,7 +41,7 @@ export async function runReport(
   } catch {
     // 首次生成或旧版本没有 provenance 时从 v1 开始。
   }
-  const provenance = await buildCurrentArtifactProvenance(name, artifactVersion);
+  const provenance = await buildCurrentArtifactProvenance(name, artifactVersion, 'report');
   const artifactHash = createHash('sha256').update(report.markdown).digest('hex');
 
   await writeJsonAtomic(metaPath, { provenance, artifactHash });
@@ -96,7 +96,7 @@ export async function loadReportArtifact(name: string): Promise<ReportArtifactSt
   } catch {
     return { status: 'stale', reason: '报告没有完整的 provenance，不能作为当前结果使用。' };
   }
-  if (!(await isArtifactCurrent(name, meta.provenance))) {
+  if (!(await isArtifactCurrent(name, meta.provenance, 'report'))) {
     return { status: 'stale', reason: '报告对应的 Mission、Scope 或调查事实已经发生变化，需要重新生成。' };
   }
 
