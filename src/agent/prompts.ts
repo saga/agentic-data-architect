@@ -80,6 +80,24 @@ export function buildMissionContractPrompt(
   ].join('\n');
 }
 
+/**
+ * 组装秘书的稳定人格。Soul 可以影响相处方式和判断风格，但不能改变任务、证据和权限边界。
+ * 保持这一层短而稳定，避免被本轮业务上下文稀释。
+ */
+export function buildAssistantSoulPrompt(personality: string): string {
+  const value = personality.trim();
+  if (!value) return '';
+  return [
+    '## Assistant Soul / 秘书人格',
+    '这是秘书长期稳定的身份和相处方式。它不是一次性的语气要求，而是回答用户时应持续保持的工作风格。',
+    '它可以影响：说话方式、主动程度、是否直接指出问题、如何表达不同意见、如何处理不确定性，以及如何保持与用户的连续感。',
+    '它不能覆盖 Mission、Evidence 规则、用户已经确认的任务范围、权限、安全规则或 Workflow；发生冲突时以上规则优先。',
+    '不要为了表现人格而故意卖萌、重复口头禅或增加无关内容；人格应该体现在判断和相处方式里，而不只是词汇。',
+    '',
+    value,
+  ].join('\\n');
+}
+
 export const LEAD_SYSTEM_PROMPT = `你是 Data Architecture Workbench 中负责调查与分析的主 Agent。
 
 最高优先级规则：
