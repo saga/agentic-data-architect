@@ -6,8 +6,7 @@ import { ArtifactReviewSchema, reviewArtifact, saveArtifactReview, summarizeRevi
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { assertMissionGate } from './mission-gate.js';
-import { assertInvestigationScopeGate } from './scope-gate.js';
-import { assertCurrentStateReportGate } from './report-gate.js';
+import { assertInvestigationReportGate } from './report-gate.js';
 import { readModernizationArtifact } from './modernization.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
@@ -143,7 +142,7 @@ export async function runReport(
   const snapshot = source.snapshot;
   assertMissionGate(investigation.mission);
   assertInvestigationArtifactSourceScope(source);
-  await assertCurrentStateReportGate(name, source);
+  await assertInvestigationReportGate(name, { investigation: source.investigation, snapshot: source.snapshot });
   const modernizationResult = await readModernizationArtifact(name, source);
   const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
   const existingRaw = await readOptional(reportMetadataFile(name));
