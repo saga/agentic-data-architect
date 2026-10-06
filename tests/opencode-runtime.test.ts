@@ -30,12 +30,16 @@ test('OpenCode model discovery maps provider catalog to selectable model IDs', a
   })) as typeof fetch;
 
   try {
-    const models = await listOpenCodeModels();
+    // 白名单显式传空：不断言本机 .env，测试只验证 catalog 映射逻辑。
+    const models = await listOpenCodeModels([]);
     assert.deepEqual(models.map((model) => model.id), [
       'opencode:ollama/llama',
       'opencode:ollama/qwen3-coder',
     ]);
     assert.match(models[1]?.name ?? '', /OpenCode/);
+
+    const filtered = await listOpenCodeModels(['qwen3-coder']);
+    assert.deepEqual(filtered.map((model) => model.id), ['opencode:ollama/qwen3-coder']);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -148,8 +148,8 @@ async function openCodeFetch(
   });
 }
 
-/** 查询 OpenCode 当前已经配置并连通的 provider/model。 */
-export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
+/** 查询 OpenCode 当前已经配置并连通的 provider/model。allowlist 可显式传入，方便测试；默认读全局配置。 */
+export async function listOpenCodeModels(allowlist: readonly string[] = config.openCodeModelAllowlist): Promise<OpenCodeModelOption[]> {
   if (!config.openCodeEnabled) return [];
 
   const response = await openCodeFetch('/provider');
@@ -159,7 +159,6 @@ export async function listOpenCodeModels(): Promise<OpenCodeModelOption[]> {
 
   const payload = await response.json() as { all?: OpenCodeProvider[]; connected?: string[] };
   const connected = new Set(payload.connected ?? []);
-  const allowlist = config.openCodeModelAllowlist;
   const result: OpenCodeModelOption[] = [];
 
   for (const provider of payload.all ?? []) {

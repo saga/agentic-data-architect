@@ -428,14 +428,24 @@ export function migrateLegacyConversationInputs(
   );
   if (legacyMessages.length === 0) return inputs;
 
+  const db = getDatabase();
   for (const input of legacyMessages) {
-    saveConversationMessage({
-      id: sessionName + ':' + input.id,
-      sessionName,
-      role: input.kind === 'assistant_message' ? 'assistant' : 'user',
-      content: input.content ?? '',
-      createdAt: input.capturedAt,
-    });
+    const role = input.kind === 'assistant_message' ? 'assistant' : 'user';
+    const content = input.content ?? '';
+    // 新链路写消息时同时写表和 input（preserve/answerQuestion），下次加载不能再按
+    // input 导入一次——内容已在表里就跳过，否则同一句话出现两次（id 不同，去重拦不住）。
+    const exists = db.prepare(
+      'SELECT 1 FROM conversation_messages WHERE session_name = ? AND role = ? AND content = ? LIMIT 1',
+    ).get(sessionName, role, content);
+    if (!exists) {
+      saveConversationMessage({
+        id: sessionName + ':' + input.id,
+        sessionName,
+        role,
+        content,
+        createdAt: input.capturedAt,
+      });
+    }
   }
 
   return inputs.filter(
