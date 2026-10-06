@@ -1,7 +1,8 @@
 import React from 'react';
 import { Button, Flex, Space, Tag, Tooltip, Typography } from 'antd';
 import { FullscreenOutlined, SettingOutlined } from '@ant-design/icons';
-import type { JourneyState, SessionData } from '../app/types';
+import { MissionContractPanel } from './MissionContractPanel';
+import type { JourneyState, MissionDraft, SessionData } from '../app/types';
 
 const { Text } = Typography;
 
@@ -14,6 +15,14 @@ export function InvestigationContextPanel(props: {
   onOpenJourney: () => void;
   onOpenUnknowns: () => void;
   onResizeStart: () => void;
+  missionDraft: MissionDraft;
+  missionOpen: boolean;
+  missionSaving: boolean;
+  missionError?: string;
+  onOpenMission: () => void;
+  onCloseMission: () => void;
+  onChangeMission: (draft: MissionDraft) => void;
+  onConfirmMission: () => void;
 }) {
   return (
     <div
@@ -39,6 +48,20 @@ export function InvestigationContextPanel(props: {
             <Button type="text" icon={<SettingOutlined />} aria-label="调查设置" onClick={props.onOpenConfig} />
           </Tooltip>
         </div>
+
+        <MissionContractPanel
+          mission={props.current.context.mission}
+          progress={props.current.missionProgress}
+          draft={props.missionDraft}
+          open={props.missionOpen}
+          saving={props.missionSaving}
+          loading={props.loading}
+          error={props.missionError}
+          onOpen={props.onOpenMission}
+          onClose={props.onCloseMission}
+          onChange={props.onChangeMission}
+          onConfirm={props.onConfirmMission}
+        />
 
         {props.journey?.stages.length ? (
           <section className="right-section right-journey">
