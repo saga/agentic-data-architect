@@ -45,7 +45,7 @@ WorkflowSnapshot 是唯一 workflow runtime resource；Trajectory 是历史 runt
 
 ### Result
 
-/ results 是 Result 页面唯一聚合 resource。它只读取已经生成的 artifact；生成使用显式 action endpoint。
+`/results` 是 Result 页面唯一聚合 resource。它只读取已经生成的 artifact；生成使用显式 action endpoint。
 
 ## 3. Artifact lifecycle
 
@@ -98,3 +98,14 @@ flowchart LR
 - Result、Workflow、Runtime Event、Artifact provenance、Derived State、Stage Checkpoint 的 canonical ownership 已明确。
 - 既有架构不一致已经被记录为正式 ADR，而不是只存在于代码注释或讨论中。
 - 第一阶段不改变业务代码；第二阶段才按这些 ADR 执行 Align。
+
+## 7. Phase-2 implementation status
+
+第二阶段已按 ADR-016 ～ ADR-021 执行 Align，原则是最小改动、保持现有业务流程，不进行无关重构。
+
+- ADR-016：核心 HTTP / SSE response contract 已建立并在关键边界执行 runtime validation；前端重复的 Mission / Workflow / Configuration contract 已收敛到 shared contract 或明确 UI projection。
+- ADR-017：Modernization / Assessment / Report artifact 已绑定 Mission、Scope、source revision；Result read 与 generation 已分离。
+- ADR-018：WorkflowSnapshot 的 execution 只由 WorkflowState.execution 持有，/workflow 成为 canonical runtime projection；旧 /journey 保留兼容。
+- ADR-019：Target Architecture、Mapping、Validation 的 derived-state 语义统一，并补齐 Assessment findings / recommendation / roadmap facts。
+- ADR-020：SSE、Result、Mission Progress、WorkflowSnapshot 在关键 HTTP / browser boundary 做 runtime validation；Reviewer failure / unavailable 统一阻断正式 Result；损坏的 Trajectory / Workflow event 不再 silent drop。
+- ADR-021：阶段小结继续作为 trajectory checkpoint 的审计记录，不再把 checkpoint 与 deliverable coverage 混为一谈；Session API 不再重复携带 checkpoints。
