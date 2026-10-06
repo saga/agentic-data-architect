@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getJson } from '../app/api.js';
-import { ExecutionStatusSchema, TrajectoryResponseSchema, type TrajectoryEvent, type TrajectorySummary, type TrajectoryTurnSummary, type ExecutionStatus } from '../../../src/api/contracts.js';
+import { ConversationTurnSummarySchema, ExecutionStatusSchema, TrajectoryResponseSchema, type TrajectoryEvent, type TrajectorySummary, type TrajectoryTurnSummary, type ExecutionStatus, type ConversationTurnSummary } from '../../../src/api/contracts.js';
 
 import {
   Alert,
@@ -39,14 +39,6 @@ const RECENT_TURN_COUNT = 5;
 /** 每轮默认只展示最新事件；更早事件按需展开。 */
 const RECENT_EVENT_COUNT = 60;
 
-interface ConversationTurnSummary {
-  turnId: string;
-  sessionName: string;
-  status: 'running' | 'completed' | 'failed' | 'aborted';
-  createdAt: string;
-  updatedAt: string;
-  question?: string;
-}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -566,7 +558,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
       setEvents(data.events);
       setSummary(data.summary);
       setTurns(data.turns);
-      setConversationTurns(data.conversationTurns as ConversationTurnSummary[]);
+      setConversationTurns(data.conversationTurns.map((turn) => ConversationTurnSummarySchema.parse(turn)));
     } finally {
       setLoading(false);
     }
