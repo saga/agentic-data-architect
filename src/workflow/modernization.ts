@@ -24,6 +24,7 @@ import { buildModernizationGaps } from '../analysis/gap.js';
 import { buildJourneyState, loadModernizationJourney } from './journey.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
 import { buildCurrentArtifactProvenance, isArtifactCurrent } from '../investigation/artifact.js';
+import { targetArchitectureComponentCount, reviewedMappingCount, blockingValidationPassedCount, blockingValidationCount } from './derived-state.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate } from './mission-gate.js';
 
@@ -499,14 +500,10 @@ export async function loadModernizationPlan(name: string): Promise<Modernization
       } : null,
       unknowns: inv.unknowns,
       highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-      targetComponentCount: plan.targetArchitecture.status === 'draft'
-        ? 0
-        : plan.targetArchitecture.components.length,
-      mappingCount: plan.mappings.filter((mapping) => ['reviewed', 'approved'].includes(mapping.status)).length,
-      blockingValidationReady: plan.validationPlan.checks.filter(
-        (check) => check.blocking && ['ready', 'passed'].includes(check.status),
-      ).length,
-      blockingValidationTotal: plan.validationPlan.checks.filter((check) => check.blocking).length,
+      targetComponentCount: targetArchitectureComponentCount(plan.targetArchitecture),
+      mappingCount: reviewedMappingCount(plan.mappings),
+      blockingValidationReady: blockingValidationPassedCount(plan.validationPlan.checks),
+      blockingValidationTotal: blockingValidationCount(plan.validationPlan.checks),
     });
 
     return { ...plan, journey };
