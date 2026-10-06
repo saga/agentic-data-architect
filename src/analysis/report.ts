@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
+import type { Investigation } from '../investigation/store.js';
 import { assertInvestigationScopeGate, isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import { assertCurrentStateReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
@@ -175,12 +176,17 @@ function buildReplatformImplications(
  *
  * 正式报告只展示少量关键事实；完整 Evidence、原始 lineage 和内部指标继续保存在工作区。
  */
-export async function buildReport(name: string): Promise<{ markdown: string; path: string }> {
-  await assertInvestigationScopeGate(name);
-  await assertCurrentStateReportGate(name);
+export async function buildReport(
+  name: string,
+  source?: { investigation: Investigation; snapshot: DiscoverySnapshot | null },
+): Promise<{ markdown: string; path: string }> {
+  if (!source) {
+    await assertInvestigationScopeGate(name);
+    await assertCurrentStateReportGate(name);
+  }
 
-  const inv = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const inv = source?.investigation ?? await loadInvestigation(name);
+  const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = await loadModernizationPlan(name);
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
