@@ -19,6 +19,8 @@ import {
   type GlobalConfiguration,
   type TaskConfiguration,
   type TaskAgentOverride,
+  GlobalConfigurationSchema,
+  TaskConfigurationSchema,
 } from './schemas.js';
 
 /** 返回当前 Investigation 的 control.json 路径。 */
@@ -144,7 +146,7 @@ function buildGlobalConfiguration(agent: InvestigationControl['agent'], version 
 
 async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
   try {
-    return JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')) as GlobalConfiguration;
+    return GlobalConfigurationSchema.parse(JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')));
   } catch (error) {
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
@@ -193,13 +195,6 @@ function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfigu
     })),
   };
 }
-
-async function writeTaskConfiguration(task: TaskConfiguration): Promise<void> {
-  await writeJsonAtomic(controlFile(taskNameForWrite), task);
-}
-
-// Set only during update/migration; keeps helper signatures small without exposing filesystem paths.
-let taskNameForWrite = '';
 
 /** 复制当前配置到 history 快照，避免后续对象修改影响历史记录。 */
 function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, 'history'> {
@@ -377,8 +372,7 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
         snapshot: { research: clone(entry.snapshot.research), agent: clone(entry.snapshot.agent) },
       })),
     };
-    taskNameForWrite = name;
-    try { await writeJsonAtomic(controlFile(name), migrated); } finally { taskNameForWrite = ''; }
+    await writeJsonAtomic(controlFile(name), migrated);
     return resolveTaskConfiguration(migrated, global);
   } catch (error) {
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
