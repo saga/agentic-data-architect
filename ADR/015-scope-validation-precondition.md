@@ -63,6 +63,8 @@ Mission 真正改变后，原 Scope 可能不再适用。
 
 因此 Mission change 必须使关联的 Scope Validation 进入 invalid / needs revalidation 状态，并阻止沿用旧 Scope 作为已验证边界。
 
+Mission change 本身不要求删除原始 Evidence 或历史 Discovery。历史来源可以保留并在新的 Scope 下复用；只有 Scope / Discovery generation 不再兼容时，才禁止把旧 Snapshot 当作当前事实源。
+
 ### 5. Scope Validation 与 Evidence Gate 分工不同
 
 Scope Validation 回答“调查哪些对象属于本次任务范围”。
