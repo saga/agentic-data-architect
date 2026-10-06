@@ -72,6 +72,13 @@ let database: DatabaseSync | undefined;
 let databasePath: string | undefined;
 
 /** 返回整个应用共享的 SQLite conversation 数据库路径。 */
+/** 关闭应用共享的 Conversation SQLite store。 */
+export function closeConversationStore(): void {
+  database?.close();
+  database = undefined;
+  databasePath = undefined;
+}
+
 export function conversationDbFile(): string {
   return path.join(config.workspaceDir, 'conversations.db');
 }
