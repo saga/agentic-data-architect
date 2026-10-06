@@ -767,9 +767,14 @@ export const WorkflowContextResponseSchema = z.object({
 }).strict();
 
 export const FileUploadResponseSchema = z.object({
+  input: WorkspaceInputViewSchema,
   file: z.object({
     id: z.string().min(1),
     name: z.string().min(1),
+    path: z.string().min(1),
+    size: z.number().int().nonnegative(),
+    mimeType: z.string().min(1),
+    dataset: z.unknown().optional(),
   }).strict(),
 }).strict();
 
