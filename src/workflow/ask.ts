@@ -18,6 +18,7 @@ import {
 import { reviewMissionCompletion } from './mission-completion.js';
 import type { AgentCheckpoint } from '../investigation/schemas.js';
 import { buildQuestionContext } from '../analysis/context.js';
+import { captureExplicitRelationshipMemories, getRelevantRelationshipMemories } from '../relationship/memory.js';
 import { nextId } from '../evidence/types.js';
 import { abortStaleConversationTurn, beginConversationTurn, finishConversationTurn, getRunningConversationTurn, listConversationMessages, saveConversationMessage, searchConversation } from '../investigation/conversation.js';
 import {
@@ -158,6 +159,9 @@ export async function answerQuestion(
     await appendTranscript(investigationName, 'user', userVisibleQuestion);
     let inv = await loadInvestigation(investigationName);
     const control = await loadInvestigationControl(investigationName);
+    // Relationship Memory is updated only from explicit user instructions. It is deliberately
+    // not added to the Task Agent prompt; it is presentation/continuity state only.
+    await captureExplicitRelationshipMemories(userVisibleQuestion);
     const mission = inv.mission!;
 
     const githubRepositories = [...new Set([
@@ -686,8 +690,9 @@ export async function answerQuestion(
     let answer = taskAnswer;
     if (control.agent.personality.trim()) {
       try {
+        const relationshipMemories = await getRelevantRelationshipMemories(effectiveQuestion + '\n' + taskAnswer);
         const rendered = await askCopilot({
-          prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer),
+          prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer, relationshipMemories),
           systemPrompt: '你是最终回答渲染器，不是任务 Agent。只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
