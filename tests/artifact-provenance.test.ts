@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   artifactProvenanceMatches,
   computeArtifactProvenance,
+  computeScopeFingerprint,
+  isDiscoverySnapshotCompatible,
 } from '../src/investigation/artifact-provenance.js';
 
 const investigation = {
@@ -31,7 +33,7 @@ const investigation = {
 
 function snapshot(estateName: string) {
   return {
-    run: { id: 'run-1' },
+    run: { id: 'run-1', scopeFingerprint: computeScopeFingerprint(investigation) },
     currentState: {
       coverage: { datasets: 2 },
       estate: estateName,
@@ -65,4 +67,15 @@ test('artifact freshness requires the same source and artifact version', () => {
   const first = computeArtifactProvenance(investigation, snapshot('legacy-a'), 3);
   assert.equal(artifactProvenanceMatches(first, first), true);
   assert.equal(artifactProvenanceMatches(first, { ...first, artifactVersion: 4 }), false);
+  assert.equal(
+    artifactProvenanceMatches(first, { ...first, discoveryRunId: 'run-2' }),
+    false,
+  );
+});
+
+test('discovery snapshot compatibility is bound to the current scope generation', () => {
+  const currentSnapshot = snapshot('legacy-a');
+  assert.equal(isDiscoverySnapshotCompatible(investigation, currentSnapshot), true);
+  const changedScope = { ...investigation, scope: ['positions', 'trades'] };
+  assert.equal(isDiscoverySnapshotCompatible(changedScope, currentSnapshot), false);
 });
