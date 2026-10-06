@@ -33,7 +33,11 @@ test('每个 Skill 都有完整的输入、输出、验证、Gate 和期望结�
     if (!entry.isDirectory()) continue;
     const markdown = await readFile(`skills/${entry.name}/SKILL.md`, 'utf8');
     for (const section of requiredSections) {
-      assert.equal(markdown.includes('## ' + section), true, entry.name + ' 缺少 ' + section);
+      const lines = markdown.split(/\\r?\\n/);
+      const start = lines.findIndex((line) => line.trim() === '## ' + section);
+      const end = lines.slice(start + 1).findIndex((line) => line.trim().startsWith('## '));
+      const body = lines.slice(start + 1, end < 0 ? undefined : start + 1 + end);
+      assert.equal(start >= 0 && body.some((line) => line.trim()), true, entry.name + ' 缺少有效的 ' + section + ' 内容');
     }
   }
 });
