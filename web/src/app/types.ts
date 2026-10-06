@@ -106,6 +106,9 @@ export interface ExecutionStatus {
   running: boolean;
   turnId: string | null;
   phase: 'executing' | 'committing' | null;
+  startedAt: string | null;
+  lastActivityAt: string | null;
+  lastActivity: string | null;
   pendingPermissionCount: number;
   pendingUserInputCount: number;
 }

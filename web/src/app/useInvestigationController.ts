@@ -26,6 +26,15 @@ function formatTime(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function formatDuration(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes === 0
+    ? `${seconds} 秒`
+    : `${minutes} 分 ${String(seconds).padStart(2, '0')} 秒`;
+}
+
 export function useInvestigationController() {
   const routeSession = () => parseRoute()?.session;
   const [page, setPage] = useState<PageId>(() => parseRoute()?.page ?? 'chat');
@@ -110,7 +119,7 @@ export function useInvestigationController() {
 
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
+  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>({ state: 'idle', running: false, turnId: null, phase: null, startedAt: null, lastActivityAt: null, lastActivity: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
   const [turnStatus, setTurnStatus] = useState('助手正在处理你的问题，请稍候…');
   const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
   const [pendingUserInputs, setPendingUserInputs] = useState<PendingUserInput[]>([]);
@@ -158,6 +167,17 @@ export function useInvestigationController() {
   /** 新建调查 Mission 清晰度校验失败时，等 Session 加载完成再展示具体原因。 */
   const pendingInitialMissionErrorRef = useRef<string | undefined>(undefined);
   const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController } | undefined>(undefined);
+  const executionStatusRef = useRef<ExecutionStatus>({
+    state: 'idle',
+    running: false,
+    turnId: null,
+    phase: null,
+    startedAt: null,
+    lastActivityAt: null,
+    lastActivity: null,
+    pendingPermissionCount: 0,
+    pendingUserInputCount: 0,
+  });
 
   useEffect(() => {
     activeRef.current = active;
@@ -245,26 +265,63 @@ export function useInvestigationController() {
       const status = await getJson<ExecutionStatus>(
         `/api/sessions/${encodeURIComponent(key)}/execution`,
       );
-      if (key === activeRef.current) setExecutionStatus(status);
+      const previous = executionStatusRef.current;
+      executionStatusRef.current = status;
+
+      if (key === activeRef.current) {
+        setExecutionStatus(status);
+        if (status.running) {
+          setStreamingAnswer((currentAnswer) =>
+            currentAnswer?.key === key ? currentAnswer : { key, content: '' },
+          );
+          setTurnStatus(executionStatusText(status));
+        } else if (previous.running && previous.turnId && previous.turnId === status.turnId) {
+          setStreamingAnswer((currentAnswer) =>
+            currentAnswer?.key === key ? undefined : currentAnswer,
+          );
+          setTurnStatus('正在更新最新对话…');
+          await loadSession(key);
+          setTurnStatus('可以继续提问');
+        }
+      }
+
       return status;
     } catch {
-      const idle: ExecutionStatus = { state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 };
-      if (key === activeRef.current) setExecutionStatus(idle);
+      const idle: ExecutionStatus = {
+        state: 'idle',
+        running: false,
+        turnId: null,
+        phase: null,
+        startedAt: null,
+        lastActivityAt: null,
+        lastActivity: null,
+        pendingPermissionCount: 0,
+        pendingUserInputCount: 0,
+      };
+      if (key === activeRef.current) {
+        executionStatusRef.current = idle;
+        setExecutionStatus(idle);
+      }
       return idle;
     }
   };
-
   /** 用统一的 live execution state 生成顶部状态文字。 */
   const executionStatusText = (status: ExecutionStatus): string => {
     switch (status.state) {
-      case 'running': return '上一轮任务仍在执行';
+      case 'running': {
+        const activity = status.lastActivity?.trim() || '助手正在执行调查';
+        const startedAt = status.startedAt ? new Date(status.startedAt).getTime() : NaN;
+        const elapsed = Number.isFinite(startedAt)
+          ? ` · 已运行 ${formatDuration(Date.now() - startedAt)}`
+          : '';
+        return activity + elapsed;
+      }
       case 'waiting_permission': return '等待你的授权';
       case 'waiting_user_input': return '等待你的回答';
       case 'committing': return '正在保存分析结果';
       default: return '可以继续提问';
     }
   };
-
   /** 刷新后如果服务端仍有真实 active turn，新问题先排队，避免第二个 turn 抢占当前 Investigation。 */
   const waitForExecutionIdle = async (key: string) => {
     for (;;) {
@@ -341,7 +398,19 @@ export function useInvestigationController() {
     setPendingMissionMessage(undefined);
     setPendingMissionTurnId(undefined);
     setMissionDraft({ purpose: '', expectedResult: '', deliverableIds: [] });
-    setExecutionStatus({ state: 'idle', running: false, turnId: null, phase: null, pendingPermissionCount: 0, pendingUserInputCount: 0 });
+    const idleExecutionStatus: ExecutionStatus = {
+      state: 'idle',
+      running: false,
+      turnId: null,
+      phase: null,
+      startedAt: null,
+      lastActivityAt: null,
+      lastActivity: null,
+      pendingPermissionCount: 0,
+      pendingUserInputCount: 0,
+    };
+    executionStatusRef.current = idleExecutionStatus;
+    setExecutionStatus(idleExecutionStatus);
     if (active) {
       loadSession(active, true).catch((e) => setError(e.message));
     } else {
@@ -627,7 +696,6 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'delta') {
-          setTurnStatus('助手正在整理答案，请稍候…');
           const delta = (data as { delta?: unknown }).delta;
           if (typeof delta === 'string') setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
             ? { ...currentAnswer, content: currentAnswer.content + delta }
@@ -681,7 +749,7 @@ export function useInvestigationController() {
       setStreamingReasoning('');
       setTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
-        : '助手正在处理你的问题，请稍候…');
+        : '可以继续提问');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }

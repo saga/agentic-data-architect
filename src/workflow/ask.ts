@@ -43,15 +43,20 @@ import {
 import { buildMissionProgress, missionHasOpenDeliverables } from './mission-progress.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
-const activeInvestigationTurns = new Map<string, { turnId: string; phase: 'executing' | 'committing' }>();
+interface ActiveInvestigationTurn {
+  turnId: string;
+  phase: 'executing' | 'committing';
+  startedAt: string;
+  lastActivityAt: string;
+  lastActivity: string;
+}
+
+const activeInvestigationTurns = new Map<string, ActiveInvestigationTurn>();
 // 用户已经发出 Stop 的 turn 集合；只用于执行阶段的协作式取消检查。
 const abortRequestedTurns = new Set<string>();
 
 /** 返回当前进程真正持有的 active turn；不要用持久化 trajectory 状态代替这个 live 状态。 */
-export function getActiveInvestigationTurn(investigationName: string): {
-  turnId: string;
-  phase: 'executing' | 'committing';
-} | null {
+export function getActiveInvestigationTurn(investigationName: string): ActiveInvestigationTurn | null {
   return activeInvestigationTurns.get(investigationName) ?? null;
 }
 
@@ -135,7 +140,48 @@ export async function answerQuestion(
     throw new Error('这次请求已经结束，不能重复执行，请重新发送问题。');
   }
 
-  activeInvestigationTurns.set(investigationName, { turnId, phase: 'executing' });
+  const turnStartedAt = new Date().toISOString();
+    activeInvestigationTurns.set(investigationName, {
+      turnId,
+      phase: 'executing',
+      startedAt: turnStartedAt,
+      lastActivityAt: turnStartedAt,
+      lastActivity: '正在准备调查上下文',
+    });
+
+    const updateLiveActivity = (activity: string): void => {
+      const active = activeInvestigationTurns.get(investigationName);
+      if (!active || active.turnId !== turnId) return;
+      active.lastActivityAt = new Date().toISOString();
+      active.lastActivity = activity;
+    };
+    const emitStatus = (status: string): void => {
+      updateLiveActivity(status);
+      onStatus?.(status);
+    };
+    const emitDelta = (delta: string): void => {
+      updateLiveActivity('正在生成回答');
+      onDelta?.(delta);
+    };
+    const emitReasoning = (delta: string): void => {
+      updateLiveActivity('正在分析问题');
+      onReasoningDelta?.(delta);
+      emitStatus('助手正在分析你的问题，请稍候…');
+    };
+
+    const liveHeartbeat = setInterval(() => {
+      const active = activeInvestigationTurns.get(investigationName);
+      if (!active || active.turnId !== turnId) return;
+      const elapsedMs = Date.now() - new Date(active.startedAt).getTime();
+      const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      const elapsed = minutes > 0
+        ? `${minutes} 分 ${String(seconds).padStart(2, '0')} 秒`
+        : `${seconds} 秒`;
+      emitStatus(`${active.lastActivity} · 已运行 ${elapsed}`);
+    }, 15_000);
+    liveHeartbeat.unref?.();
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
@@ -175,7 +221,7 @@ export async function answerQuestion(
       ].filter(Boolean).join('\n')),
     ])].slice(0, 5);
     if (githubRepositories.length) {
-      onStatus?.('正在准备代码仓库并建立初始调查资料，请稍候…');
+      emitStatus('正在准备代码仓库并建立初始调查资料，请稍候…');
       for (const repository of githubRepositories) {
         try {
           await researchGitHubRepository(investigationName, repository);
@@ -413,7 +459,7 @@ export async function answerQuestion(
 
         return review;
       },
-      ...(onDelta ? { onDelta } : {}),
+      onDelta: emitDelta,
       ...(onStatus ? { onStatus } : {}),
       onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
@@ -563,7 +609,7 @@ export async function answerQuestion(
             execution,
             createdAt,
           });
-          onStatus?.('阶段小结：' + checkpoint.title);
+          emitStatus('阶段小结：' + checkpoint.title);
         }
 
         stageGateBaseline = stageAfter;
@@ -590,7 +636,7 @@ export async function answerQuestion(
           await persistModernizationAgentResult(investigationName, stageParsed.modernization);
         }
       },
-      ...(options?.onReasoningDelta ? { onReasoningDelta: options.onReasoningDelta } : {}),
+      onReasoningDelta: emitReasoning,
       missionPrompt,
       refreshMissionPrompt: async () => {
         const latest = await loadInvestigation(investigationName);
@@ -659,7 +705,11 @@ export async function answerQuestion(
     });
 
     const activeAfterExecution = activeInvestigationTurns.get(investigationName);
-    if (activeAfterExecution?.turnId === turnId) activeAfterExecution.phase = 'committing';
+    if (activeAfterExecution?.turnId === turnId) {
+      activeAfterExecution.phase = 'committing';
+      activeAfterExecution.lastActivityAt = new Date().toISOString();
+      activeAfterExecution.lastActivity = '正在保存分析结果';
+    }
     abortRequestedTurns.delete(turnId);
 
     // Agent 在 Gate 前可能刚刚确认了 Scope；重新加载最新 Investigation，避免旧内存快照把新范围覆盖回去。
@@ -744,6 +794,7 @@ export async function answerQuestion(
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
+    clearInterval(liveHeartbeat);
     if (activeInvestigationTurns.get(investigationName)?.turnId === turnId) activeInvestigationTurns.delete(investigationName);
     abortRequestedTurns.delete(turnId);
   }

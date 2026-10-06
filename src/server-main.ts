@@ -44,10 +44,28 @@ async function main(): Promise<void> {
   app.get('/api/sessions/:name/execution', (req, res) => {
     const name = path.basename(String(req.params.name));
     const active = getActiveInvestigationTurn(name);
+    const pendingPermissions = active ? listPendingCopilotPermissions(name) : [];
+    const pendingUserInputs = active ? listPendingCopilotUserInputs(name) : [];
+    const state = !active
+      ? 'idle'
+      : active.phase === 'committing'
+        ? 'committing'
+        : pendingUserInputs.length > 0
+          ? 'waiting_user_input'
+          : pendingPermissions.length > 0
+            ? 'waiting_permission'
+            : 'running';
+
     res.json({
+      state,
       running: Boolean(active),
       turnId: active?.turnId ?? null,
       phase: active?.phase ?? null,
+      startedAt: active?.startedAt ?? null,
+      lastActivityAt: active?.lastActivityAt ?? null,
+      lastActivity: active?.lastActivity ?? null,
+      pendingPermissionCount: pendingPermissions.length,
+      pendingUserInputCount: pendingUserInputs.length,
     });
   });
 
