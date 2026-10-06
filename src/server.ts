@@ -652,7 +652,7 @@ app.post('/api/sessions', async (req, res) => {
         scope: body.scope,
       },
     });
-    res.json({ ok: true });
+    res.json(SimpleOkResponseSchema.parse({ ok: true }));
   });
 
   /** 返回当前 Investigation 的 Agent 待回答问题。 */
