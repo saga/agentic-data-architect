@@ -1,6 +1,6 @@
 # agentic-data-architect
 
-面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前提供三条正式工作路线：改造已有系统、从零设计金融 AI / 数据架构、评估现有数据架构；另外提供可自由组合的能力，例如现状架构分析、数据模型、血缘和 SQL 分析，不要求用户为常见的分析任务切换工作模式。
+面向 **Data Analyst + Data Architect 的 AI 数据架构工作台**。当前提供四条正式工作路线：改造已有系统、分析当前数据架构、从零设计金融 AI / 数据架构、评估数据架构；另外提供可自由组合的数据分析能力。
 
 它不是一个单纯的 Chat，而是围绕 Data Architect 工作产物运行：理解现状、做数据分析、确认业务语义、设计 Target Architecture、完成 Source-to-Target Mapping / Architecture Assessment，并为后续验证留下 Evidence。
 
@@ -189,16 +189,19 @@ New Investigation
 如果目标里直接给了 GitHub repository，工作台会先把仓库放进当前 Investigation 的研究目录并自动运行一次 Discovery。后续 Agent 可以继续用 GitHub、grep、view 和 Graphify 深入检查；关键源码关系可以登记为 code Evidence。
 ~~~
 
-当前提供三套可选的工作路线：
+当前提供四套可选的工作路线：
 
 ~~~text
 改造已有系统
   → Legacy Modernization Workflow
 
+分析当前数据架构
+  → Current Data Architecture Workflow
+
 从零设计金融 AI / 数据架构
   → Financial AI-Native Architecture Workflow
 
-评估现有数据架构
+评估数据架构
   → Data Architecture Assessment Workflow
 ~~~
 
@@ -259,7 +262,11 @@ Workflow DSL 保持最小语义：有 `completeWhen` 的步骤由已有事实自
 
 [docs/journey-workflow-editor.md](docs/journey-workflow-editor.md)
 
-## Data Architecture Assessment Workflow
+## Current Data Architecture 与 Data Architecture Assessment
+
+“分析当前数据架构”只负责把现状讲清楚；“评估数据架构”是在现状基础上判断问题、提出改进建议并排出先后顺序。
+
+### Data Architecture Assessment Workflow
 
 路线定义在：
 
@@ -432,7 +439,8 @@ metadata:
 ~~~text
 capability: investigation-session / financial-data-review / structural-analysis / search-github / search-confluence / search-leanix / working-directory
 workflow: legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
-capability: current-state-architecture / investigation-session / domain-modeling / research / grilling / structural-analysis / ...
+workflow: current-data-architecture / legacy-modernization / financial-ai-native-architecture / data-architecture-assessment
+capability: investigation-session / domain-modeling / research / grilling / structural-analysis / ...
 ~~~
 ## 进一步说明
 
