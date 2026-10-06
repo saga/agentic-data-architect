@@ -6,6 +6,7 @@
  * 和最终的 Modernization Plan。它们都保留 Evidence 引用，但不把 Evidence 嵌进来。
  */
 import * as z from 'zod';
+import { ArtifactProvenanceSchema } from '../investigation/schemas.js';
 export const JourneyStateSchema = z.object({
   workflowId: z.string().min(1),
   stages: z.array(z.object({
@@ -239,6 +240,7 @@ export const ModernizationPlanSchema = z.object({
   status: WorkProductStatusSchema,
   version: z.number().int().positive(),
   generatedAt: z.string().min(1),
+  provenance: ArtifactProvenanceSchema.optional(),
   goal: z.string(),
   scope: z.array(z.string()),
   currentState: z.object({
