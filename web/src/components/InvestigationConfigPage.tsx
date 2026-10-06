@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ImgCrop from 'antd-img-crop';
+import { getJson } from '../app/api.js';
 import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
 import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 
@@ -7,6 +8,10 @@ const { Title, Text, Paragraph } = Typography;
 
 import type { InvestigationControl, WorkflowId } from '../app/types.js';
 import { workflowOptions } from '../app/workflow-options';
+import {
+  ControlResponseSchema,
+  OpenCodeStatusSchema,
+} from '../../../src/api/contracts.js';
 
 export type ConfigPageControl = InvestigationControl;
 export type ConfigWorkflow = '' | WorkflowId;
@@ -33,14 +38,13 @@ export function InvestigationConfigPage(props:{
   const [confirmText,setConfirmText]=useState('');
   const [avatarUploading,setAvatarUploading]=useState(false);
   const [avatarError,setAvatarError]=useState<string>();
-  const [openCodeStatus,setOpenCodeStatus]=useState<{enabled:boolean;reachable:boolean;baseUrl:string;modelCount:number;error?:string}>();
+  const [openCodeStatus,setOpenCodeStatus]=useState<import('../../../src/api/contracts.js').OpenCodeStatus | undefined>();
 
   useEffect(()=>setDraft(clone(props.control)),[props.control]);
   useEffect(()=>{
     let cancelled=false;
-    void fetch('/api/opencode/status')
-      .then(async response=>response.ok ? await response.json() as typeof openCodeStatus : undefined)
-      .then(result=>{if(!cancelled&&result)setOpenCodeStatus(result);})
+    void getJson('/api/opencode/status', OpenCodeStatusSchema)
+      .then(result=>{if(!cancelled)setOpenCodeStatus(result);})
       .catch(()=>{if(!cancelled)setOpenCodeStatus(undefined);});
     return ()=>{cancelled=true;};
   },[]);
@@ -54,7 +58,7 @@ export function InvestigationConfigPage(props:{
         body:JSON.stringify({research:draft.research,agent:draft.agent}),
       });
       if(!response.ok) throw new Error((await response.text())||response.statusText);
-      const data=await response.json() as {control:ConfigPageControl};
+      const data=ControlResponseSchema.parse(await response.json());
       setDraft(data.control);
       await props.onSaved(data.control);
     }finally{setSaving(false);}
@@ -113,7 +117,7 @@ export function InvestigationConfigPage(props:{
         throw new Error(error || response.statusText);
       }
 
-      const data = await response.json() as { control: ConfigPageControl };
+      const data = ControlResponseSchema.parse(await response.json());
       setDraft(clone(data.control));
       await props.onSaved(data.control);
     } catch (error) {
