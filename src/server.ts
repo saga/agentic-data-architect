@@ -1181,7 +1181,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json(ResultViewModelSchema.parse({ status: 'available', report: report.markdown, review: report.review }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError || error instanceof ReportReviewGateError) {
-        res.status(409).json({ code: error instanceof ReportGateError ? error.code : error instanceof ReportReviewGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+        const checks = error instanceof ReportReviewGateError ? undefined : error.result.checks;
+        res.status(409).json({
+          code: error instanceof ReportGateError || error instanceof ReportReviewGateError ? error.code : 'RESULT_PRECONDITION',
+          error: error.message,
+          ...(checks ? { checks } : {}),
+        });
         return;
       }
       throw error;
@@ -1209,8 +1214,13 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       const report = await runReport(name);
       res.type('text/markdown').send(report.markdown);
     } catch (error) {
-      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
-        res.status(409).json({ code: error instanceof ReportGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError || error instanceof ReportReviewGateError) {
+        const checks = error instanceof ReportReviewGateError ? undefined : error.result.checks;
+        res.status(409).json({
+          code: error instanceof ReportGateError || error instanceof ReportReviewGateError ? error.code : 'RESULT_PRECONDITION',
+          error: error.message,
+          ...(checks ? { checks } : {}),
+        });
         return;
       }
       throw error;
