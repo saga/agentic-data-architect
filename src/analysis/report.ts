@@ -352,6 +352,6 @@ export async function buildReport(
   const dir = reportsDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, 'report.md');
-  await fs.writeFile(fp, markdown + '\\n', 'utf8');
+  await fs.writeFile(fp, markdown + '\n', 'utf8');
   return { markdown, path: fp };
 }
