@@ -554,6 +554,35 @@ export const ArchitectureAssessmentResponseSchema = z.object({
 }).strict();
 export type ArchitectureAssessmentResponse = z.infer<typeof ArchitectureAssessmentResponseSchema>;
 
+export const ReviewIssueSchema = z.object({
+  category: z.enum([
+    'goal_alignment',
+    'readability',
+    'conclusion',
+    'signal_noise',
+    'consistency',
+    'decision_usefulness',
+  ]),
+  severity: z.enum(['high', 'medium', 'low']),
+  description: z.string().trim().min(1),
+  suggestion: z.string().trim().min(1),
+}).strict();
+export type ReviewIssue = z.infer<typeof ReviewIssueSchema>;
+
+export const ArtifactReviewContractSchema = z.object({
+  artifactType: z.enum(['report', 'target_architecture', 'mapping', 'validation']),
+  status: z.enum(['pass', 'fail']),
+  availability: z.enum(['completed', 'unavailable']),
+  score: z.number().int().min(0).max(100),
+  summary: z.string().trim().min(1),
+  issues: z.array(ReviewIssueSchema),
+  reviewedAt: z.string().datetime(),
+  artifactHash: z.string().min(1).optional(),
+  sourceRevision: z.string().min(1).optional(),
+  artifactVersion: z.number().int().positive().optional(),
+}).strict();
+export type ArtifactReviewContract = z.infer<typeof ArtifactReviewContractSchema>;
+
 export const ReportArtifactStateSchema = z.object({
   status: z.enum(['missing', 'stale', 'current', 'blocked', 'error']),
   generatedAt: z.string().datetime().optional(),
@@ -768,7 +797,7 @@ export const WorkflowCompatibilityResponseSchema = z.object({
 export const ReportRegenerateResponseSchema = z.object({
   markdown: z.string(),
   path: z.string().min(1),
-  review: z.unknown(),
+  review: ArtifactReviewContractSchema,
 }).strict();
 
 export const ControlResponseSchema = z.object({
@@ -812,6 +841,10 @@ export const WorkflowInstructionResponseSchema = z.string();
 
 export const SimpleOkResponseSchema = z.object({
   ok: z.literal(true),
+}).strict();
+
+export const AbortResponseSchema = z.object({
+  aborted: z.boolean(),
 }).strict();
 
 export const WorkflowSaveResponseSchema = z.object({
