@@ -87,7 +87,11 @@ async function countAnalysisArtifacts(name: string): Promise<number> {
   }
 }
 
-export async function runInvestigationReportGate(name: string): Promise<ReportGateResult> {
+export async function runInvestigationReportGate(
+  name: string,
+  source?: { investigation: InvestigationReportGateInput; snapshot: DiscoverySnapshot | null },
+): Promise<ReportGateResult> {
+  if (source) return evaluateInvestigationReportGate(source.investigation, source.snapshot);
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   return evaluateInvestigationReportGate(
@@ -96,8 +100,11 @@ export async function runInvestigationReportGate(name: string): Promise<ReportGa
   );
 }
 
-export async function assertInvestigationReportGate(name: string): Promise<ReportGateResult> {
-  const result = await runInvestigationReportGate(name);
+export async function assertInvestigationReportGate(
+  name: string,
+  source?: { investigation: InvestigationReportGateInput; snapshot: DiscoverySnapshot | null },
+): Promise<ReportGateResult> {
+  const result = await runInvestigationReportGate(name, source);
   if (!result.passed) throw new ReportGateError(result);
   return result;
 }
