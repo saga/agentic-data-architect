@@ -9,7 +9,6 @@ import path from 'node:path';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import type { Investigation } from '../investigation/store.js';
-import { assertInvestigationReportGate } from '../workflow/report-gate.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
 import {
   datasetLineageRelations,
