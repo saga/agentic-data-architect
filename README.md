@@ -264,7 +264,19 @@ Workflow DSL 保持最小语义：有 `completeWhen` 的步骤由已有事实自
 
 ## Current Data Architecture 与 Data Architecture Assessment
 
-“分析当前数据架构”只负责把现状讲清楚；“评估数据架构”是在现状基础上判断问题、提出改进建议并排出先后顺序。
+“分析当前数据架构”只负责把现状讲清楚：数据从哪里来、经过什么处理、最后到哪里。它不负责打分或提出改造方案。
+
+“评估数据架构”是在这些现状事实之上判断哪里有问题、为什么有问题、先改什么。
+
+### Current Data Architecture Workflow
+
+路线定义在：
+
+~~~text
+skills/current-data-architecture/SKILL.md
+~~~
+
+这条路线只关注当前事实：数据来源、数据流、核心数据对象、关键转换和未确认事项。
 
 ### Data Architecture Assessment Workflow
 
