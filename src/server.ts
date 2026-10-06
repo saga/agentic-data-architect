@@ -318,7 +318,7 @@ export function createApp(vite?: ViteDevServer) {
 
   // 健康检查：只验证 Web service 能正常响应，不触发模型或数据库连接。
 app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'agentic-data-architect' });
+    res.json(HealthResponseSchema.parse({ ok: true, service: 'agentic-data-architect' }));
   });
 
   // Session 列表 API：返回 UI 左侧历史 Investigation。
