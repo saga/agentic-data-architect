@@ -1,9 +1,7 @@
 /** 浏览器 API 与 SSE 的最小封装。 */
+import { SseEventSchema, type SseEvent } from '../../../src/api/contracts';
 
-export interface StreamEvent {
-  event: string;
-  data: unknown;
-}
+export type StreamEvent = SseEvent;
 
 export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
@@ -33,7 +31,9 @@ export async function consumeSse(
       else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
     }
     if (!data.length) return;
-    onEvent({ event, data: JSON.parse(data.join('\n')) });
+    const parsed = SseEventSchema.safeParse({ event, data: JSON.parse(data.join('\n')) });
+    if (!parsed.success) throw new Error('收到无法验证的 SSE 事件：' + event);
+    onEvent(parsed.data);
   };
 
   while (true) {
