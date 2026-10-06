@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { App as AntApp, Modal } from 'antd';
+import { getJson } from '../app/api.js';
+import {
+  ApiErrorSchema,
+  JourneyAiResponseSchema,
+  WorkflowResetResponseSchema,
+  WorkflowSaveResponseSchema,
+  WorkflowSnapshotSchema,
+  WorkflowTransitionResponseSchema,
+} from '../../src/api/contracts.js';
 
 import {
   applyWorkflowChanges,
@@ -148,19 +157,25 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     setFetching(true);
 
     try {
-      const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow',
-      );
-
-      if (!response.ok) {
-        if (response.status === 409) {
-          setSnapshot(undefined);
-          return;
+      try {
+        const snapshot = await getJson(
+          '/api/sessions/' + encodeURIComponent(name) + '/workflow',
+          WorkflowSnapshotSchema,
+        );
+        setSnapshot(snapshot);
+      } catch (error) {
+        const messageText = error instanceof Error ? error.message : String(error);
+        try {
+          const payload = ApiErrorSchema.parse(JSON.parse(messageText));
+          if (payload.code === 'WORKFLOW_REQUIRED') {
+            setSnapshot(undefined);
+            return;
+          }
+        } catch {
+          // fall through to common error handling below
         }
-        throw new Error(await response.text());
+        throw error;
       }
-
-      setSnapshot(await response.json() as WorkflowSnapshot);
       setDirty(false);
       setValidationIssues([]);
       newNodeIdsRef.current = new Set();
@@ -853,35 +868,40 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     if (!name || !currentDefinition) return;
 
     try {
-      const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow',
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            definition: currentDefinition,
-            layout: layoutFromNodes(nodes),
-          }),
-        },
-      );
-
-      const body = await response.json() as {
-        snapshot?: WorkflowSnapshot;
-        issues?: string[];
-        error?: string;
-      };
-
-      if (!response.ok) {
-        const issues = body.issues ?? [];
-        setValidationIssues(issues);
-        throw new Error(
-          issues.length
-            ? '工作地图还不能保存，请先修正：' + issues.join('；')
-            : body.error || response.statusText,
+      try {
+        const body = await getJson(
+          '/api/sessions/' + encodeURIComponent(name) + '/workflow',
+          WorkflowSaveResponseSchema,
+          {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              definition: currentDefinition,
+              layout: layoutFromNodes(nodes),
+            }),
+          },
         );
+        setSnapshot(body.snapshot);
+      } catch (error) {
+        try {
+          const payload = ApiErrorSchema.parse(JSON.parse(error instanceof Error ? error.message : String(error)));
+          const details = payload.details;
+          const issues = details && typeof details === 'object' && Array.isArray((details as Record<string, unknown>).issues)
+            ? (details as Record<string, unknown>).issues.filter((item): item is string => typeof item === 'string')
+            : [];
+          setValidationIssues(issues);
+          throw new Error(
+            issues.length
+              ? '工作地图还不能保存，请先修正：' + issues.join('；')
+              : payload.error,
+          );
+        } catch (parseError) {
+          if (parseError instanceof Error && parseError.message !== (error instanceof Error ? error.message : String(error))) {
+            throw parseError;
+          }
+          throw error;
+        }
       }
-
-      if (body.snapshot) setSnapshot(body.snapshot);
 
       setDirty(false);
       setValidationIssues([]);
@@ -910,40 +930,40 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     );
 
     try {
-      const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow/ai',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            prompt: prompt.trim(),
-            messages: history.slice(-12),
-            definition: currentCanvasDefinition,
-            ...(selectedNodeId ? { selectedNodeId } : {}),
-          }),
-        },
-      );
-
-      const body = await response.json() as {
-        definition?: WorkflowDefinition;
-        message?: string;
-        changes?: WorkflowChange[];
-        error?: string;
-      };
-
-      if (!response.ok || !body.definition || !body.changes?.length) {
-        throw new Error(body.error || response.statusText || 'AI 没有返回 Workflow 修改。');
+      let body;
+      try {
+        body = await getJson(
+          '/api/sessions/' + encodeURIComponent(name) + '/workflow/ai',
+          JourneyAiResponseSchema,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              prompt: prompt.trim(),
+              messages: history.slice(-12),
+              definition: currentCanvasDefinition,
+              ...(selectedNodeId ? { selectedNodeId } : {}),
+            }),
+          },
+        );
+      } catch (error) {
+        try {
+          const payload = ApiErrorSchema.parse(JSON.parse(error instanceof Error ? error.message : String(error)));
+          throw new Error(payload.error);
+        } catch (parseError) {
+          throw parseError instanceof Error ? parseError : error;
+        }
       }
 
       setPendingAiChange({
-        message: body.message?.trim() || 'AI 已提出一版修改。',
+        message: body.message,
         changes: body.changes,
         definition: body.definition,
         baseDefinition: currentCanvasDefinition,
       });
 
       return {
-        message: body.message?.trim() || 'AI 已提出修改，请检查预览。',
+        message: body.message,
         changes: body.changes,
       };
     } catch (error) {
@@ -1019,21 +1039,26 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
     }
 
     try {
-      const response = await fetch(
-        '/api/sessions/' + encodeURIComponent(name) + '/workflow/transition',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            nodeId: currentSnapshot.execution.currentNodeId,
-            outcome,
-          }),
-        },
-      );
-
-      const body = await response.json() as { error?: string };
-      if (!response.ok) {
-        throw new Error(body.error || response.statusText || '人工 Workflow transition 失败。');
+      try {
+        await getJson(
+          '/api/sessions/' + encodeURIComponent(name) + '/workflow/transition',
+          WorkflowTransitionResponseSchema,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              nodeId: currentSnapshot.execution.currentNodeId,
+              outcome,
+            }),
+          },
+        );
+      } catch (error) {
+        try {
+          const payload = ApiErrorSchema.parse(JSON.parse(error instanceof Error ? error.message : String(error)));
+          throw new Error(payload.error);
+        } catch (parseError) {
+          throw parseError instanceof Error ? parseError : error;
+        }
       }
 
       await loadWorkflow();
@@ -1052,14 +1077,19 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
       okText: '恢复',
       cancelText: '取消',
       onOk: async () => {
-        const response = await fetch(
-          '/api/sessions/' + encodeURIComponent(name) + '/workflow/reset',
-          { method: 'POST' },
-        );
-
-        const body = await response.json().catch(() => ({})) as { error?: string };
-        if (!response.ok) {
-          message.error(body.error || '恢复工作地图失败，请重试。');
+        try {
+          await getJson(
+            '/api/sessions/' + encodeURIComponent(name) + '/workflow/reset',
+            WorkflowResetResponseSchema,
+            { method: 'POST' },
+          );
+        } catch (error) {
+          try {
+            const payload = ApiErrorSchema.parse(JSON.parse(error instanceof Error ? error.message : String(error)));
+            message.error(payload.error);
+          } catch {
+            message.error(error instanceof Error ? error.message : '恢复工作地图失败，请重试。');
+          }
           return;
         }
 
