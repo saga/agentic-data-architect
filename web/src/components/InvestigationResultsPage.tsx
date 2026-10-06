@@ -97,6 +97,8 @@ export function InvestigationResultsPage(props: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [reportGateError, setReportGateError] = useState<string>();
+  const [reportStatus, setReportStatus] = useState<'missing' | 'stale' | 'blocked' | 'available'>('missing');
+  const [regenerating, setRegenerating] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -104,23 +106,21 @@ export function InvestigationResultsPage(props: {
     setReportGateError(undefined);
     try {
       const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
-      const [reportResponse, trajectoryResponse, sessionResponse, modernizationResponse] = await Promise.all([
-        fetch(sessionPath + '/report'),
+      const [resultResponse, trajectoryResponse, sessionResponse, modernizationResponse] = await Promise.all([
+        fetch(sessionPath + '/results'),
         fetch(sessionPath + '/trajectory?limit=5000'),
         fetch(sessionPath),
         fetch(sessionPath + '/modernization'),
       ]);
-      if (!reportResponse.ok && reportResponse.status !== 409) {
-        throw new Error((await reportResponse.text()) || reportResponse.statusText);
+      if (!resultResponse.ok && resultResponse.status !== 404 && resultResponse.status !== 409) {
+        throw new Error((await resultResponse.text()) || resultResponse.statusText);
       }
       if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
       if (!sessionResponse.ok) throw new Error((await sessionResponse.text()) || sessionResponse.statusText);
       if (!modernizationResponse.ok && modernizationResponse.status !== 409) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
 
-      const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        reportResponse.ok
-          ? reportResponse.text()
-          : reportResponse.json() as Promise<{error?: string}>,
+      const [resultPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
+        resultResponse.ok ? resultResponse.json() as Promise<{status: 'available'; report: string}> : resultResponse.json() as Promise<{code?: string; error?: string}>,
         trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
         sessionResponse.json() as Promise<SessionSnapshot>,
         modernizationResponse.ok
@@ -128,20 +128,25 @@ export function InvestigationResultsPage(props: {
           : Promise.resolve({ plan: null }),
       ]);
 
+      if (resultResponse.ok && resultPayload.status === 'available') {
+        setReportStatus('available');
+        setReport(resultPayload.report);
+      } else {
+        const code = typeof resultPayload === 'object' && resultPayload ? resultPayload.code : undefined;
+        const status = code === 'RESULT_STALE' ? 'stale' : code === 'RESULT_BLOCKED' ? 'blocked' : 'missing';
+        setReportStatus(status);
+        setReport('');
+        setReportGateError(
+          typeof resultPayload === 'object' && resultPayload && typeof resultPayload.error === 'string'
+            ? resultPayload.error
+            : '结果报告尚未生成。',
+        );
+      }
+
       const unique = new Map<string, Checkpoint>();
       for (const event of trajectoryData.events ?? []) {
         const checkpoint = asCheckpoint(event);
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
-      }
-      if (reportResponse.ok) {
-        setReport(reportPayload as string);
-      } else {
-        setReport('');
-        setReportGateError(
-          typeof reportPayload === 'object' && reportPayload && typeof reportPayload.error === 'string'
-            ? reportPayload.error
-            : '范围还没有确认完整，正式报告暂时不能生成。',
-        );
       }
       setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
       setSession(sessionData);
@@ -152,6 +157,28 @@ export function InvestigationResultsPage(props: {
       setLoading(false);
     }
   };
+
+  const regenerate = async () => {
+    setRegenerating(true);
+    setError(undefined);
+    setReportGateError(undefined);
+    try {
+      const response = await fetch('/api/sessions/' + encodeURIComponent(props.sessionName) + '/results/regenerate', {
+        method: 'POST',
+      });
+      const payload = await response.json() as { status?: string; report?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || response.statusText);
+      if (payload.status !== 'available' || typeof payload.report !== 'string') throw new Error('结果生成完成，但返回内容无法验证。');
+      setReportStatus('available');
+      setReport(payload.report);
+    } catch (cause) {
+      setReportStatus('blocked');
+      setReportGateError(cause instanceof Error ? cause.message : '无法生成结果报告');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   useEffect(() => {
     void load();
   }, [props.sessionName]);
@@ -328,6 +355,9 @@ export function InvestigationResultsPage(props: {
               <Text type='secondary'>根据当前调查资料生成的完整报告。</Text>
             </div>
             <Flex gap={8}>
+              <Button type='primary' onClick={() => void regenerate()} loading={regenerating}>
+                {reportStatus === 'available' ? '重新生成报告' : '生成结果报告'}
+              </Button>
               <Tag>{session ? `配置 v${session.control.version}` : '配置'}</Tag>
               <Tag>{session?.control.agent.displayName ?? '秘书'}</Tag>
             </Flex>
@@ -343,12 +373,12 @@ export function InvestigationResultsPage(props: {
             />
           ) : null}
           <Card className='results-report-card'>
-            {loading ? <Text type='secondary'>正在读取结果…</Text> : report ? (
+            {loading ? <Text type='secondary'>正在读取结果…</Text> : reportStatus === 'available' && report ? (
               <XMarkdown content={report} className='result-report-markdown x-markdown-light' />
             ) : reportGateError ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='完成范围确认后再生成正式报告。' />
             ) : (
-              <Empty description='还没有可展示的结果报告。' />
+              <Empty description={reportStatus === 'stale' ? '当前调查事实已经变化，请重新生成报告。' : '还没有可展示的结果报告。'} />
             )}
           </Card>
         </section>
