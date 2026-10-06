@@ -33,7 +33,7 @@ test('每个 Skill 都有完整的输入、输出、验证、Gate 和期望结�
     if (!entry.isDirectory()) continue;
     const markdown = await readFile(`skills/${entry.name}/SKILL.md`, 'utf8');
     for (const section of requiredSections) {
-      const lines = markdown.split(/\\r?\\n/);
+      const lines = markdown.split(/\r?\n/);
       const start = lines.findIndex((line) => line.trim() === '## ' + section);
       const end = lines.slice(start + 1).findIndex((line) => line.trim().startsWith('## '));
       const body = lines.slice(start + 1, end < 0 ? undefined : start + 1 + end);
