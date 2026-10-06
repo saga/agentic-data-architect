@@ -895,7 +895,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       },
     });
 
-    res.status(201).json({
+    res.status(201).json(FileUploadResponseSchema.parse({
       input,
       file: {
         id: input.id,
@@ -905,7 +905,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
         mimeType: req.file.mimetype || 'application/octet-stream',
         ...(dataset ? { dataset } : {}),
       },
-    });
+    }));
   });
 
   /** 上传当前 Investigation 的秘书头像；每次上传生成独立文件，不覆盖已有头像。 */
