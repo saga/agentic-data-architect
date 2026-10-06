@@ -830,7 +830,7 @@ app.post('/api/sessions', async (req, res) => {
       },
       'model settings changed from main chat',
     );
-    res.json({ control });
+    res.json(ControlResponseSchema.parse({ control }));
   });
 
   app.put('/api/sessions/:name/config', async (req, res) => {
