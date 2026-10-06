@@ -111,7 +111,9 @@ export function artifactProvenanceMatches(
     && provenance.missionFingerprint === current.missionFingerprint
     && provenance.scopeFingerprint === current.scopeFingerprint
     && provenance.sourceRevision === current.sourceRevision
-    && provenance.artifactVersion === current.artifactVersion,
+    && provenance.artifactVersion === current.artifactVersion
+    && provenance.discoveryRunId === current.discoveryRunId
+    && provenance.discoveryScopeFingerprint === current.discoveryScopeFingerprint,
   );
 }
 
