@@ -130,6 +130,12 @@ body {
   overflow: hidden;
 }
 
+.topbar-actions {
+  margin-inline-start: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
 .topbar-title .ant-typography {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -831,8 +837,8 @@ body {
 
 /* 主调查右栏：只保留当前阶段和当前事实，不做第二套控制台。 */
 .right-panel-shell {
-  min-width: 320px;
-  width: min(390px, 31vw);
+  min-width: 340px;
+  width: min(410px, 31vw);
 }
 
 .context-panel {
