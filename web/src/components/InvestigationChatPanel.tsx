@@ -10,7 +10,6 @@ import { ChatMarkdown, ChatMessageMeta, displayAssistantContent } from './ChatCo
 import type {
   AutoTier,
   ExecutionStatus,
-  MissionDraft,
   PendingPermission,
   PendingUserInput,
   SessionData,
