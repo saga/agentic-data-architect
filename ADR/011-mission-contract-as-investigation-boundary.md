@@ -41,7 +41,7 @@
 - Agent 每一轮都有明确的“为什么做、最后要什么”；
 - 长时间运行的 Copilot Session 不容易被局部上下文淹没；
 - 是否继续调查可以从“还缺什么交付物”出发，而不是从“还有多少 unknown”出发；
-- 常见的当前架构分析可以与其它能力自由组合，不会继续膨胀 Workflow；
+- 当前数据架构分析已经有明确入口，但仍复用已有 Evidence、Discovery 和 Current-State Intelligence，不建立新的事实模型；
 - Mission 可以被 UI、Script Gate、Workflow 和 Agent Runtime 共同消费。
 
 ### 代价
