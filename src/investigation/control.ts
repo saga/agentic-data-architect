@@ -149,6 +149,20 @@ async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
 }
 
 /** 只把与 Global 不同的 Agent 字段保存到任务 workspace，避免任务复制出一份全局配置。 */
+function extractTaskAgentOverrides(
+  agent: InvestigationControl['agent'],
+  globalAgent: InvestigationControl['agent'],
+): TaskConfiguration['agent'] {
+  const overrides: TaskConfiguration['agent'] = {};
+  for (const key of Object.keys(agent) as Array<keyof InvestigationControl['agent']>) {
+    if (key === 'platformCapabilities') continue;
+    if (!sameValue(agent[key], globalAgent[key])) {
+      (overrides as Record<string, unknown>)[key] = clone(agent[key]);
+    }
+  }
+  return overrides;
+}
+
 function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfiguration): InvestigationControl {
   // task.agent 只是 partial override（缺的键由 global 补），合并后过一次完整
   // schema：既拿到完整类型，缺失字段也按 schema 默认值补齐。
