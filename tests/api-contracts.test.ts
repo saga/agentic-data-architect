@@ -4,11 +4,13 @@ import test from 'node:test';
 import {
   ApiErrorSchema,
   ArtifactReviewContractSchema,
+  ArtifactLifecycleStatusSchema,
   ConversationTurnSummarySchema,
   JourneyPlanSchema,
   JourneyWorkflowChangeSchema,
   SessionContextViewSchema,
   SseEventSchema,
+  TrajectoryEventSchema,
   WorkflowCompatibilityResponseSchema,
 } from '../src/api/contracts.js';
 
@@ -140,4 +142,40 @@ test('conversation turn summary is a shared transport contract', () => {
     question: '检查数据来源',
   });
   assert.equal(turn.status, 'completed');
+});
+
+
+test('artifact lifecycle exposes missing, stale and current states', () => {
+  assert.equal(ArtifactLifecycleStatusSchema.parse('missing'), 'missing');
+  assert.equal(ArtifactLifecycleStatusSchema.parse('stale'), 'stale');
+  assert.equal(ArtifactLifecycleStatusSchema.parse('current'), 'current');
+});
+
+test('known trajectory nested payloads reject undeclared fields', () => {
+  assert.throws(
+    () => TrajectoryEventSchema.parse({
+      id: 'tool-1',
+      turnId: 'turn-1',
+      timestamp: '2026-10-06T08:00:00.000Z',
+      type: 'tool_call',
+      name: '调用工具',
+      details: {
+        toolCallId: 'tool-1',
+        startedAt: '2026-10-06T08:00:00.000Z',
+        unexpectedField: true,
+      },
+    }),
+  );
+
+  assert.doesNotThrow(() => TrajectoryEventSchema.parse({
+    id: 'model-1',
+    turnId: 'turn-1',
+    timestamp: '2026-10-06T08:00:00.000Z',
+    type: 'model_call',
+    name: '模型调用',
+    details: {
+      cachedInputTokens: 10,
+      contextPercentAtCall: 42,
+    },
+  }));
 });
