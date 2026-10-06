@@ -50,6 +50,13 @@ import {
   AnswerSummarySchema,
   ReportRegenerateResponseSchema,
   ControlResponseSchema,
+  HealthResponseSchema,
+  CreateSessionResponseSchema,
+  MissionUpdateResponseSchema,
+  WorkflowContextResponseSchema,
+  FileUploadResponseSchema,
+  WorkflowInstructionResponseSchema,
+  SimpleOkResponseSchema,
   type SseEvent,
 } from './api/contracts.js';
 import {
