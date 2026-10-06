@@ -41,6 +41,8 @@ import {
   snapshotInvestigationForStageGate,
 } from './stage-gate.js';
 import { buildMissionProgress, missionHasOpenDeliverables } from './mission-progress.js';
+import { runReport } from './report.js';
+import { saveInvestigationAnalysisArtifact } from '../investigation/analysis-artifact.js';
 
 // 进程内的 Investigation 执行保留。phase=executing 时允许 Stop，进入 committing 后保护整个提交事务。
 interface ActiveInvestigationTurn {
@@ -821,6 +823,70 @@ export async function answerQuestion(
       }
     }
     await saveInvestigation(inv);
+
+    await saveInvestigationAnalysisArtifact(investigationName, {
+      turnId,
+      execution,
+      question: effectiveQuestion,
+      purpose: mission.purpose,
+      expectedResult: mission.expectedResult,
+      answer: taskAnswer,
+      evidenceIds: [...new Set(claims.flatMap((claim) => claim.evidenceIds))],
+      claimSummaries: claims.map((claim) => claim.claim.split('\n')[0].trim()).filter(Boolean),
+      unknowns: currentUnknowns,
+      nextSteps: [
+        ...parsed.followUpQuestions.slice(0, 3),
+        ...parsed.routeOptions.slice(0, 2).map((route) => route.title + '：' + route.steps[0]),
+      ],
+    });
+
+    const missionProgressAtEnd = await buildMissionProgress(investigationName, mission);
+    if (missionProgressAtEnd && !missionHasOpenDeliverables(missionProgressAtEnd)) {
+      try {
+        const completion = await reviewMissionCompletion({
+          mission,
+          progress: missionProgressAtEnd,
+          resultSummary: {
+            evidenceCount: inv.evidence.length,
+            findingCount: inv.findings.length,
+            claimCount: inv.claims.length,
+            unknowns: inv.unknowns,
+          },
+          unknownReviews: unknownReviewsForTurn,
+          model: control.agent.model,
+          workingDirectory: workspaceRoot(inv.name),
+        });
+        if (completion.completed) {
+          try {
+            await runReport(investigationName);
+            await appendAuditEvent(investigationName, {
+              actor: 'system',
+              action: 'investigation.report.generated',
+              summary: '调查完成后已生成最终阅读报告。',
+              configurationVersion: control.version,
+              details: { turnId },
+            });
+          } catch (error) {
+            await appendAuditEvent(investigationName, {
+              actor: 'system',
+              action: 'investigation.report.generation_failed',
+              summary: '调查结果已经保存，但最终阅读报告暂时没有通过生成或审核。',
+              configurationVersion: control.version,
+              details: { turnId, error: error instanceof Error ? error.message : String(error) },
+            });
+          }
+        }
+      } catch (error) {
+        await appendAuditEvent(investigationName, {
+          actor: 'system',
+          action: 'investigation.report.completion_check_failed',
+          summary: '调查结果已经保存，但暂时无法确认是否应该生成最终阅读报告。',
+          configurationVersion: control.version,
+          details: { turnId, error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
+
     const journeyPlan = { version: 1 as const, source: 'agent' as const, generatedAt: new Date().toISOString(), turnId, routes: parsed.routeOptions };
     await updateInvestigationJourneyPlan(investigationName, journeyPlan, inv.workflow);
     await appendAuditEvent(investigationName, {
