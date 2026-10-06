@@ -139,11 +139,17 @@ export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent
 export async function loadJourneyRunEvents(name: string, limit = 80): Promise<JourneyRunEvent[]> {
   const raw = await readTextOrNull(journeyFile(name, EVENTS_FILE));
   if (!raw) return [];
-  return raw.split(/\r?\n/).filter(Boolean).slice(-limit).flatMap((line) => {
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const selected = lines.slice(-limit);
+  return selected.map((line, index) => {
     try {
-      return [JSON.parse(line) as JourneyRunEvent];
-    } catch {
-      return [];
+      return JSON.parse(line) as JourneyRunEvent;
+    } catch (error) {
+      throw new Error(
+        'Workflow run event 数据损坏：第 ' + String(lines.length - selected.length + index + 1)
+        + ' 条事件无法解析。'
+        + (error instanceof Error ? ' ' + error.message : ''),
+      );
     }
   });
 }
