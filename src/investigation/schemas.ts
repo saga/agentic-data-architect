@@ -281,7 +281,19 @@ export const GlobalAgentConfigSchema = ControlAgentSchema;
 export type GlobalAgentConfig = z.infer<typeof GlobalAgentConfigSchema>;
 
 /** Task Agent override：只保存任务明确覆盖 Global 的字段。 */
-export const TaskAgentOverrideSchema = ControlAgentSchema.partial();
+type StripZodDefault<T> = T extends z.ZodDefault<infer Inner> ? Inner : T;
+const taskAgentOverrideShape = Object.fromEntries(
+  Object.entries(ControlAgentSchema.shape).map(([key, field]) => [
+    key,
+    (field instanceof z.ZodDefault ? field.removeDefault() : field).optional(),
+  ]),
+) as {
+  [K in keyof typeof ControlAgentSchema.shape]: z.ZodOptional<StripZodDefault<(typeof ControlAgentSchema.shape)[K]>>;
+};
+// 注意：不能直接用 ControlAgentSchema.partial()——zod 会保留 .default()，
+// 稀疏 override 一 parse 就会长出 model:'auto' 之类的幽灵默认值，反过来压住
+// Global 传下来的值（2026-10 实测）。这里逐字段去掉 default 才是真正的 sparse。
+export const TaskAgentOverrideSchema = z.object(taskAgentOverrideShape).strict();
 export type TaskAgentOverride = z.infer<typeof TaskAgentOverrideSchema>;
 
 /** 全局配置文件；版本独立于任何 Investigation。 */

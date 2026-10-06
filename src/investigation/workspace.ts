@@ -43,6 +43,7 @@ export function contextFile(name: string): string {
 /** 使用临时文件+rename 原子替换 JSON，避免读取者看到半写入文件。 */
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   const directory = path.dirname(file);
+  await fs.mkdir(directory, { recursive: true });
   const temporary = path.join(directory, '.tmp-' + randomUUID() + '-' + path.basename(file));
   await fs.writeFile(temporary, JSON.stringify(value, null, 2), 'utf8');
   await fs.rename(temporary, file);

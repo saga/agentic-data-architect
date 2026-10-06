@@ -165,7 +165,7 @@ test('Mission Action requires both direct Mission alignment and current necessit
     },
     context: { progress: '1/3' },
   });
-  assert.match(prompt, /现在做它是否有必要/);
+  assert.match(prompt, /现在不做这个动作/);
   assert.match(prompt, /Data Source/);
 
   const allowed = normalizeMissionAction({

@@ -33,7 +33,7 @@ test('mission gate rejects vague confirmed text instead of trusting confirmation
   });
 
   assert.equal(result.passed, false);
-  assert.match(formatMissionGateFailure(result), /任务目的/);
+  assert.match(formatMissionGateFailure(result), /为什么要做这次调查/);
 });
 
 test('mission gate rejects a persisted contract whose deliverables no longer match its text', () => {

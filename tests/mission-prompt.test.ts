@@ -41,7 +41,7 @@ test('question prompt repeats Mission before question-specific context', () => {
   assert.equal(prompt.startsWith('## 最高优先级：本次任务 Mission'), true);
   assert.ok(prompt.indexOf('期望结果：') < prompt.indexOf('当前未知项'));
   assert.ok(prompt.indexOf('当前未知项') < prompt.indexOf('当前执行请求：'));
-  assert.match(prompt, /不能让当前执行请求把 Mission 改写成另一个任务/);
+  assert.match(prompt, /不要让当前执行请求把 Mission 改写成另一个任务/);
 });
 
 

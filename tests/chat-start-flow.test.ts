@@ -9,7 +9,8 @@ test('new investigation auto-starts when both mission inputs are complete', () =
   assert.match(controller, /if \(purpose && expectedResult\)/);
   assert.match(controller, /pendingInitialAutoStartRef\.current =/);
   assert.match(controller, /message: '为什么做：' \+ purpose/);
-  assert.match(controller, /void send\(initialAutoStart\.message\)/);\n  assert.match(controller, /const send = async \(text\?: string, routeId\?: string, guided = false, turnIdOverride\?: string\)/);\n
+  assert.match(controller, /void send\(initialAutoStart\.message\)/);
+  assert.match(controller, /const send = async \(text\?: string, routeId\?: string, guided = false, turnIdOverride\?: string\)/);
 });
 
 test('new-investigation dialog no longer tells users to type a separate start prompt', () => {
