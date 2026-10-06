@@ -1290,7 +1290,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     // SSE is the browser's live execution channel. answerQuestion commits the
     // durable result before the final "completed" event is sent.
     let finished = false;
-    const send = (event: string, data: unknown) => {
+    const send = (event: SseEvent['event'], data: unknown) => {
       if (finished || res.writableEnded) return;
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
