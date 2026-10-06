@@ -20,6 +20,7 @@ function fingerprint(value: unknown): string {
 export async function buildCurrentArtifactProvenance(
   name: string,
   artifactVersion: number,
+  artifactKind?: 'modernization' | 'assessment' | 'report',
 ): Promise<ArtifactProvenance> {
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<{
@@ -36,8 +37,8 @@ export async function buildCurrentArtifactProvenance(
       return null;
     }
   };
-  const modernizationVersion = await readArtifactVersion('modernization-plan.json');
-  const assessmentVersion = await readArtifactVersion('architecture-assessment.json');
+  const modernizationVersion = artifactKind === 'modernization' ? null : await readArtifactVersion('modernization-plan.json');
+  const assessmentVersion = artifactKind === 'assessment' ? null : await readArtifactVersion('architecture-assessment.json');
   const sourceRevision = fingerprint({
     discoveryRuns: investigation.discoveryRuns.map((run) => run.id),
     evidence: investigation.evidence.map((item) => ({
@@ -72,9 +73,10 @@ export async function buildCurrentArtifactProvenance(
 export async function isArtifactCurrent(
   name: string,
   provenance: ArtifactProvenance | undefined,
+  artifactKind?: 'modernization' | 'assessment' | 'report',
 ): Promise<boolean> {
   if (!provenance) return false;
-  const current = await buildCurrentArtifactProvenance(name, provenance.artifactVersion);
+  const current = await buildCurrentArtifactProvenance(name, provenance.artifactVersion, artifactKind);
   return provenance.missionFingerprint === current.missionFingerprint
     && provenance.scopeFingerprint === current.scopeFingerprint
     && provenance.sourceRevision === current.sourceRevision;
