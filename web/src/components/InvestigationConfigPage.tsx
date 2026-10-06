@@ -1,4 +1,4 @@
-import type { InvestigationControl, WorkflowId } from '../app/types';
+import { workflowOptions, type InvestigationControl, type WorkflowId } from '../app/types';
 import React, { useEffect, useState } from 'react';
 import ImgCrop from 'antd-img-crop';
 import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
