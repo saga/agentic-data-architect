@@ -100,3 +100,23 @@ Graphify 主要回答：
 ~~~
 
 复杂问题先 Graphify 缩小调查范围，再做 metadata / lineage / profiling / semantic investigation。
+
+## 输入校验
+
+开始前必须确认工作目录是当前 Investigation 的研究目录，并检查 Graphify 是否可用。
+
+Graphify 只用于结构导航；需要业务结论时必须再查源码、SQL、数据或正式资料。
+## 输出
+
+Graphify 生成的图和查询结果属于中间分析产物。继续分析时保留在当前 workspace，并把关键关系回写到正式 Evidence。
+## 输出与验证
+
+- graph.json 必须能生成并有稳定 hash。
+- 重要关系必须可以追溯到原始代码、SQL 或配置。
+- Graphify 输出不能直接变成 supported / verified 业务结论。
+## Gate
+
+Gate 是“结构图生成成功 + 关键路径能回到原始来源”。如果只能得到 Graphify 路径、找不到原始依据，就只能把它当作待验证线索。
+## 期望结果示例
+
+> Graphify 找到 A → B → C 的代码依赖。进一步查看源码后，确认 A 确实调用 B；C 只是结构上可达，目前还没有证据证明它参与这个业务流程。
