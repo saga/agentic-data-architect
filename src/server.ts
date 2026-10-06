@@ -1182,8 +1182,8 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       const report = await runReport(name);
       res.type('text/markdown').send(report.markdown);
     } catch (error) {
-      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
-        res.status(409).json({ code: 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
+        res.status(409).json({ code: error instanceof ReportGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
         return;
       }
       throw error;
