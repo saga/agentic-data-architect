@@ -12,14 +12,20 @@ import { askCopilot } from '../agent/copilot.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
-
-export {
+import {
   ArtifactReviewContractSchema as ArtifactReviewSchema,
   ReviewArtifactTypeSchema,
   ReviewIssueSchema,
   type ArtifactReviewContract as ArtifactReview,
   type ReviewArtifactType,
 } from '../api/contracts.js';
+
+export {
+  ArtifactReviewSchema,
+  ReviewArtifactTypeSchema,
+  ReviewIssueSchema,
+};
+export type { ArtifactReview, ReviewArtifactType };
 
 const REVIEWER_SYSTEM_PROMPT = [
   '你是一个独立的 Data Architect 工作成果 Reviewer。',
