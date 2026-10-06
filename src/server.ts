@@ -1314,11 +1314,11 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       }));
     } catch (error) {
       if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
-        res.status(409).json({
+        res.status(409).json(ApiErrorSchema.parse({
           code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : error instanceof ReportGateError ? 'REPORT_PRECONDITION_FAILED' : 'SCOPE_REQUIRED',
           error: error.message,
-          details: error.result.checks,
-        });
+          details: { checks: error.result.checks },
+        }));
         return;
       }
       if (error instanceof ReportQualityGateError) {
@@ -1416,12 +1416,14 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     if (!missionGate.passed) {
       const blockedTurnId = body.turnId ?? randomUUID();
       await preserveBlockedUserMessage(name, blockedTurnId, message);
-      res.status(409).json({
+      res.status(409).json(ApiErrorSchema.parse({
         code: 'MISSION_REQUIRED',
         error: formatMissionGateFailure(missionGate),
-        draft: buildMissionDraft(context.goal || context.userPrompt),
-        turnId: blockedTurnId,
-      });
+        details: {
+          draft: buildMissionDraft(context.goal || context.userPrompt),
+          turnId: blockedTurnId,
+        },
+      }));
       return;
     }
 
