@@ -1,4 +1,4 @@
-import type { MissionProgressContract, WorkflowId as ApiWorkflowId } from '../../../src/api/contracts';
+import type { MissionContractApi, MissionProgressContract, WorkflowId as ApiWorkflowId } from '../../../src/api/contracts';
 /** 首页与调查页共用的数据结构。把类型从 App.tsx 移出来，页面文件只负责 UI 与交互。 */
 export interface SessionSummary {
   key: string;
@@ -126,22 +126,8 @@ export interface PendingUserInput {
   requestedAt: string;
 }
 
-export interface MissionDeliverable {
-  id: string;
-  title: string;
-  description: string;
-  required: boolean;
-}
-
-export interface MissionContract {
-  version: 1;
-  purpose: string;
-  expectedResult: string;
-  deliverables: MissionDeliverable[];
-  status: 'confirmed';
-  confirmedAt: string;
-  confirmedBy: 'user';
-}
+export type MissionContract = MissionContractApi;
+export type MissionDeliverable = MissionContractApi['deliverables'][number];
 
 export interface MissionDraft {
   purpose: string;
