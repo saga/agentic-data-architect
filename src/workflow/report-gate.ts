@@ -30,7 +30,7 @@ export interface InvestigationReportGateInput {
   goal: string;
   scope: string[];
   systems: string[];
-  scopeValidation?: { status: string; goal: string; scope: string[]; systems: string[]; source: 'user' | 'materials' | 'mixed'; userConfirmed: boolean; evidenceIds: string[]; validatedAt: string; };
+  scopeValidation?: { status: string; goal: string; scope: string[]; systems: string[]; source: 'user' | 'materials' | 'mixed'; userConfirmed: boolean; evidenceIds: string[]; validatedAt: string; } | undefined;
   evidence: EvidenceRef[];
   claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
   findings: Array<{ evidenceIds: string[] }>;
