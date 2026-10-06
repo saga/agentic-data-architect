@@ -500,15 +500,15 @@ export async function askCopilot(input: AskInput): Promise<string> {
          * 阶段结束后再由 Stage Gate 检查实际产物，避免额外成本变成另一种循环。
          */
         onPreToolUse: async (toolInput: PreToolUseParam) => {
-          if (!shouldCheckMissionAction(toolInput.toolName)) return null;
-          if (missionActionReviewedExecution === currentExecution) return null;
+          if (!shouldCheckMissionAction(toolInput.toolName)) return;
+          if (missionActionReviewedExecution === currentExecution) return;
 
           const decision = await input.missionActionGate?.({
             execution: currentExecution,
             toolName: toolInput.toolName,
             toolArgs: toolInput.toolArgs,
           });
-          if (!decision) return null;
+          if (!decision) return;
 
           if (decision.allowed) {
             missionActionReviewedExecution = currentExecution;
