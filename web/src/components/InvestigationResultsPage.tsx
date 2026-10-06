@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
-import { TrajectoryResponseSchema, ModernizationResponseSchema, type TrajectoryEvent, type ModernizationPlanView } from '../../../src/api/contracts.js';
+import { TrajectoryCheckpointDetailsSchema, TrajectoryResponseSchema, ModernizationResponseSchema, type TrajectoryEvent, type ModernizationPlanView } from '../../../src/api/contracts.js';
 import type { InvestigationCheckpoint } from '../app/types.js';
 import { XMarkdown } from '@ant-design/x-markdown';
 
@@ -17,20 +17,14 @@ interface SessionSnapshot {
 const { Title, Text, Paragraph } = Typography;
 
 function asCheckpoint(event: TrajectoryEvent): InvestigationCheckpoint | undefined {
-  if (event.type !== 'checkpoint' || !event.details || typeof event.details !== 'object') return undefined;
-  const value = event.details as Record<string, unknown>;
-  if (typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.summary !== 'string') return undefined;
+  if (event.type !== 'checkpoint') return undefined;
+  const details = TrajectoryCheckpointDetailsSchema.safeParse(event.details);
+  if (!details.success) return undefined;
   return {
-    id: value.id,
+    id: event.id,
     turnId: event.turnId,
     timestamp: event.timestamp,
-    execution: typeof value.execution === 'number' ? value.execution : 0,
-    title: value.title,
-    summary: value.summary,
-    confirmed: Array.isArray(value.confirmed) ? value.confirmed.filter((item): item is string => typeof item === 'string') : [],
-    evidenceIds: Array.isArray(value.evidenceIds) ? value.evidenceIds.filter((item): item is string => typeof item === 'string') : [],
-    unknowns: Array.isArray(value.unknowns) ? value.unknowns.filter((item): item is string => typeof item === 'string') : [],
-    ...(typeof value.nextStep === 'string' ? { nextStep: value.nextStep } : {}),
+    ...details.data,
   };
 }
 
