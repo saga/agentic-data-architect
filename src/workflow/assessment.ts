@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
-import { computeArtifactProvenance, artifactProvenanceMatches } from '../investigation/artifact-provenance.js';
+import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
@@ -173,6 +173,9 @@ export async function readArchitectureAssessmentArtifact(
 
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
+    return { status: ArtifactLifecycleStatusSchema.parse('stale'), plan: null };
+  }
   if (!artifactProvenanceMatches(
     plan.provenance,
     computeArtifactProvenance(inv, snapshot, plan.version),
