@@ -546,6 +546,7 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
     pendingUserInputCount: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [trajectoryError, setTrajectoryError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -555,10 +556,13 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
         getJson(`/api/sessions/${encodeURIComponent(props.sessionName)}/execution`, ExecutionStatusSchema),
       ]);
       setExecutionStatus(execution);
+      setTrajectoryError(data.error ?? null);
       setEvents(data.events);
       setSummary(data.summary);
       setTurns(data.turns);
       setConversationTurns(data.conversationTurns.map((turn) => ConversationTurnSummarySchema.parse(turn)));
+    } catch (error) {
+      setTrajectoryError(error instanceof Error ? error.message : '执行轨迹暂时无法读取。');
     } finally {
       setLoading(false);
     }
@@ -642,6 +646,15 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
       </header>
 
       <div className="trajectory-page-body">
+        {trajectoryError ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="秘书提醒"
+            description={trajectoryError}
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
         {!events.length ? (
           <Empty description="还没有执行轨迹。下一轮 Agent 执行后，这里会记录模型调用、工具调用、上下文整理和用量。" />
         ) : (
