@@ -25,7 +25,7 @@ export class ReportQualityGateError extends Error {
   readonly review: Awaited<ReturnType<typeof reviewArtifact>>;
   constructor(review: Awaited<ReturnType<typeof reviewArtifact>>) {
     super(review.availability === 'unavailable'
-      ? '报告已经生成，但独立 Reviewer 暂时不可用。'
+      ? '报告已经生成，但独立质量检查暂时无法完成。'
       : '报告已经生成，但独立质量检查没有通过：' + summarizeReviewFailure(review));
     this.name = 'ReportQualityGateError';
     this.review = review;
