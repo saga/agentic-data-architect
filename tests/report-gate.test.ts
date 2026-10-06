@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { evaluateCurrentStateReportGate } from '../src/workflow/report-gate.js';
+import { evaluateInvestigationReportGate } from '../src/workflow/report-gate.js';
 
 const evidence = [
   {
@@ -22,8 +22,40 @@ const evidence = [
   },
 ] as never[];
 
+function base() {
+  return {
+    mission: {
+      version: 1 as const,
+      purpose: '理解系统当前数据架构。',
+      expectedResult: '形成可以直接阅读的调查报告。',
+      deliverables: [{ id: 'report', title: '调查报告', description: '说明调查结果。', required: true }],
+      status: 'confirmed' as const,
+      confirmedAt: new Date().toISOString(),
+      confirmedBy: 'user' as const,
+    },
+    goal: '理解系统当前数据架构。',
+    scope: ['Position'],
+    systems: ['Portfolio System'],
+    scopeValidation: {
+      status: 'validated',
+      goal: '理解系统当前数据架构。',
+      scope: ['Position'],
+      systems: ['Portfolio System'],
+      source: 'user' as const,
+      userConfirmed: true,
+      evidenceIds: [],
+      validatedAt: new Date().toISOString(),
+    },
+    evidence,
+    claims: [],
+    findings: [],
+    resultArtifactCount: 1,
+  };
+}
+
 function snapshot() {
   return {
+    run: { id: 'run-1', scopeFingerprint: 'not-used-by-test' },
     currentState: {
       generatedAt: new Date().toISOString(),
       coverage: {
@@ -46,47 +78,37 @@ function snapshot() {
   } as never;
 }
 
-test('report gate rejects a report without Discovery', () => {
-  const result = evaluateCurrentStateReportGate(
-    { discoveryRuns: [], evidence, claims: [], findings: [] },
-    snapshot(),
-  );
+test('report gate rejects an investigation without a confirmed mission', () => {
+  const input = base();
+  input.mission = undefined;
+  const result = evaluateInvestigationReportGate(input, snapshot());
   assert.equal(result.passed, false);
 });
 
-test('report gate rejects claims whose status exceeds their evidence', () => {
-  const result = evaluateCurrentStateReportGate(
-    {
-      discoveryRuns: [{ id: 'run-1' }],
-      evidence,
-      claims: [
-        {
-          status: 'supported',
-          evidenceIds: ['ev-1'],
-        },
-      ],
-      findings: [],
-    },
-    snapshot(),
-  );
+test('report gate rejects an investigation without scope validation', () => {
+  const input = base();
+  input.scopeValidation = undefined;
+  const result = evaluateInvestigationReportGate(input, snapshot());
   assert.equal(result.passed, false);
-  assert.ok(result.checks.some((check) => check.name.includes('Claim') && !check.passed));
 });
 
-test('report gate passes a discovered report with evidence-backed claims', () => {
-  const result = evaluateCurrentStateReportGate(
-    {
-      discoveryRuns: [{ id: 'run-1' }],
-      evidence,
-      claims: [
-        {
-          status: 'supported',
-          evidenceIds: ['ev-1', 'ev-2'],
-        },
-      ],
-      findings: [{ evidenceIds: ['ev-1'] }],
-    },
-    snapshot(),
-  );
+test('report gate rejects a result with unsupported claims', () => {
+  const input = base();
+  input.claims = [{
+    status: 'supported',
+    evidenceIds: ['ev-1'],
+  }];
+  const result = evaluateInvestigationReportGate(input, snapshot());
+  assert.equal(result.passed, false);
+});
+
+test('report gate passes a valid non-empty investigation result', () => {
+  const input = base();
+  input.claims = [{
+    status: 'supported',
+    evidenceIds: ['ev-1', 'ev-2'],
+  }];
+  input.findings = [{ evidenceIds: ['ev-1'] }];
+  const result = evaluateInvestigationReportGate(input, snapshot());
   assert.equal(result.passed, true);
 });
