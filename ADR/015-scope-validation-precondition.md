@@ -30,11 +30,10 @@ Scope Validation 必须记录：
 - validation status；
 - provenance / validation evidence；
 - snapshot 或等价版本信息；
-- validation time。
+- validation time;
+- `scopeFingerprint`，由服务端根据 canonicalized 的 confirmed Scope 确定性计算。
 
 不能仅因为用户写了一段范围描述，就把 Scope 当成 validated。
-
-- `scopeFingerprint`，由服务端根据 canonicalized 的 confirmed Scope 确定性计算。
 
 ### 2.1 Discovery generation 必须绑定 Scope
 
@@ -100,7 +99,7 @@ Evidence Gate 回答“某个事实是否有足够的来源证据”。
 - Mission 改变后的 stale scope 可以被确定性识别；
 - Scope provenance 可以被审计。
 
-代价是需要保存 scope snapshot / version，并在 Mission 改变时显式 invalidation。
+代价是需要保存 Scope snapshot / version 与 `scopeFingerprint`，并在 Mission 改变时显式 invalidation；不需要为 Scope 本身引入新的 storage subsystem。
 
 ## Rejected Alternatives
 
