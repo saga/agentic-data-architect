@@ -29,6 +29,8 @@ import { runModernizationGate, type ModernizationGateStage } from './modernizati
 import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate.js';
 import { assertMissionGate, isMissionWorkflowTargetAllowed } from './mission-gate.js';
 import { buildMissionProgress } from './mission-progress.js';
+import { loadArchitectureAssessmentPlan } from './assessment.js';
+import { targetArchitectureComponentCount, reviewedMappingCount, blockingValidationPassedCount, blockingValidationCount } from './derived-state.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { isJourneyCompletionConditionSatisfied } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -344,6 +346,9 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const modernization = context.workflow === 'legacy-modernization'
     ? await loadModernizationPlan(name)
     : null;
+  const assessment = context.workflow === 'data-architecture-assessment'
+    ? await loadArchitectureAssessmentPlan(name)
+    : null;
 
   return {
     goal: context.goal || context.userPrompt,
@@ -361,17 +366,13 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
       estate: snapshot?.estate ?? null,
       findings: context.findings,
     }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    targetComponentCount: modernization?.targetArchitecture.status !== 'draft'
-      ? modernization?.targetArchitecture.components.length ?? 0
-      : 0,
-    mappingCount: modernization?.mappings.filter((mapping) => mapping.status !== 'rejected').length ?? 0,
-    // “ready”只是准备好了，不能算验证已经通过；地图上的 validation 事实只统计 passed。
-    blockingValidationReady: modernization?.validationPlan.checks.filter(
-      (check) => check.blocking && check.status === 'passed',
-    ).length ?? 0,
-    blockingValidationTotal: modernization?.validationPlan.checks.filter(
-      (check) => check.blocking,
-    ).length ?? 0,
+    findingCount: assessment?.findings.length,
+    recommendationCount: assessment?.recommendations.length,
+    roadmapItemCount: assessment?.roadmap.length,
+    targetComponentCount: targetArchitectureComponentCount(modernization?.targetArchitecture),
+    mappingCount: reviewedMappingCount(modernization?.mappings),
+    blockingValidationReady: blockingValidationPassedCount(modernization?.validationPlan.checks),
+    blockingValidationTotal: blockingValidationCount(modernization?.validationPlan.checks),
   };
 }
 
