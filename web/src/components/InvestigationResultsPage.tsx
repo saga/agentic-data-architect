@@ -18,13 +18,12 @@ const { Title, Text, Paragraph } = Typography;
 
 function asCheckpoint(event: TrajectoryEvent): InvestigationCheckpoint | undefined {
   if (event.type !== 'checkpoint') return undefined;
-  const details = TrajectoryCheckpointDetailsSchema.safeParse(event.details);
-  if (!details.success) return undefined;
+  const details = TrajectoryCheckpointDetailsSchema.parse(event.details);
   return {
     id: event.id,
     turnId: event.turnId,
     timestamp: event.timestamp,
-    ...details.data,
+    ...details,
   };
 }
 
