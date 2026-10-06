@@ -521,3 +521,221 @@ export const ReportArtifactStateSchema = z.object({
   markdown: z.string().optional(),
 }).strict();
 export type ReportArtifactState = z.infer<typeof ReportArtifactStateSchema>;
+
+
+/** Session / workspace API projections. Domain internals remain server-owned. */
+export const SessionSummarySchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  userPrompt: z.string(),
+  updatedAt: z.string().min(1),
+}).strict();
+export const SessionsResponseSchema = z.object({
+  sessions: z.array(SessionSummarySchema),
+}).strict();
+
+export const AuditEventSchema = z.object({
+  id: z.string().min(1),
+  timestamp: z.string().datetime(),
+  actor: z.enum(['user', 'system']),
+  action: z.string().min(1),
+  summary: z.string().min(1),
+  configurationVersion: z.number().int().positive().optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
+export const MessageSchema = z.object({
+  id: z.string().min(1),
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  capturedAt: z.string().datetime(),
+}).strict();
+
+export const WorkspaceInputViewSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  capturedAt: z.string().min(1),
+  title: z.string().min(1),
+  content: z.string().optional(),
+  source: z.string().optional(),
+  uri: z.string().optional(),
+  artifactPath: z.string().optional(),
+  important: z.boolean().optional(),
+  mimeType: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  sha256: z.string().optional(),
+}).strict();
+
+export const CurrentStateViewSchema = CurrentStateSummarySchema;
+
+export const SessionContextViewSchema = z.object({
+  name: z.string().min(1),
+  mission: MissionContractSchema.optional(),
+  workflow: WorkflowIdSchema.nullable(),
+  userPrompt: z.string(),
+  goal: z.string(),
+  scope: z.array(z.string()),
+  systems: z.array(z.string()),
+  evidence: z.array(z.unknown()),
+  findings: z.array(z.unknown()),
+  unknowns: z.array(z.string()),
+  claims: z.array(z.unknown()),
+  inputs: z.array(WorkspaceInputViewSchema),
+  journeyPlan: z.object({
+    version: z.literal(1),
+    source: z.literal('agent'),
+    generatedAt: z.string().min(1),
+    turnId: z.string().min(1).optional(),
+    routes: z.array(z.object({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      reason: z.string().min(1),
+      steps: z.array(z.string().min(1)),
+    }).strict()).max(3),
+  }).strict().optional(),
+  updatedAt: z.string().min(1),
+}).strict();
+
+export const SessionDataSchema = z.object({
+  context: SessionContextViewSchema,
+  missionProgress: MissionProgressSchema.nullable(),
+  control: InvestigationControlSchema,
+  localDatasets: z.array(z.unknown()),
+  recentAudit: z.array(AuditEventSchema),
+  messages: z.array(MessageSchema),
+  conversationCount: z.number().int().nonnegative(),
+  conversationLastMessageAt: z.string().datetime().nullable(),
+  currentState: CurrentStateViewSchema.nullable(),
+  semanticAssets: z.array(z.unknown()),
+}).strict();
+export type SessionDataContract = z.infer<typeof SessionDataSchema>;
+
+export const MissionGateCheckSchema = z.object({
+  name: z.string().min(1),
+  passed: z.boolean(),
+  detail: z.string().min(1),
+}).strict();
+export const MissionGateResultSchema = z.object({
+  passed: z.boolean(),
+  checks: z.array(MissionGateCheckSchema),
+  draft: MissionDraftSchema,
+}).strict();
+
+export const MissionResponseSchema = z.object({
+  mission: MissionContractSchema.nullable(),
+  gate: MissionGateResultSchema,
+  progress: MissionProgressSchema.nullable(),
+  draft: MissionDraftSchema.optional(),
+}).strict();
+
+export const OpenCodeStatusSchema = z.object({
+  enabled: z.boolean(),
+  reachable: z.boolean(),
+  baseUrl: z.string().min(1),
+  modelCount: z.number().int().nonnegative(),
+  error: z.string().optional(),
+}).strict();
+
+export const CopilotModelOptionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  supportedReasoningEfforts: z.array(z.string()),
+  defaultReasoningEffort: z.string().nullable(),
+  policyState: z.string().nullable(),
+  runtime: z.enum(['copilot', 'opencode']).optional(),
+}).strict();
+
+export const ModelsResponseSchema = z.object({
+  models: z.array(CopilotModelOptionSchema),
+}).strict();
+
+export const PendingPermissionSchema = z.object({
+  sessionName: z.string().min(1),
+  turnId: z.string().min(1),
+  sessionId: z.string().min(1),
+  requestId: z.string().min(1),
+  kind: z.string().min(1),
+  requestedAt: z.string().datetime(),
+  intention: z.string().optional(),
+  fullCommandText: z.string().optional(),
+  fileName: z.string().optional(),
+  path: z.string().optional(),
+  serverName: z.string().optional(),
+  toolName: z.string().optional(),
+  toolTitle: z.string().optional(),
+  readOnly: z.boolean().optional(),
+  managedApprovalRequired: z.boolean().optional(),
+}).strict();
+
+export const PermissionsResponseSchema = z.object({
+  permissions: z.array(PendingPermissionSchema),
+}).strict();
+
+export const PendingUserInputSchema = z.object({
+  sessionName: z.string().min(1),
+  turnId: z.string().min(1),
+  sessionId: z.string().min(1),
+  requestId: z.string().min(1),
+  question: z.string().min(1),
+  choices: z.array(z.string()),
+  allowFreeform: z.boolean(),
+  requestedAt: z.string().datetime(),
+}).strict();
+
+export const UserInputsResponseSchema = z.object({
+  requests: z.array(PendingUserInputSchema),
+}).strict();
+
+export const AuditResponseSchema = z.object({
+  events: z.array(AuditEventSchema),
+}).strict();
+
+export const MessagesResponseSchema = z.object({
+  messages: z.array(MessageSchema),
+  search: z.string().nullable(),
+}).strict();
+
+export const DatasetsResponseSchema = z.object({
+  datasets: z.array(z.unknown()),
+  engine: z.object({
+    type: z.literal('duckdb'),
+    databaseFile: z.string().min(1),
+  }).strict(),
+}).strict();
+
+export const WorkflowCompatibilityResponseSchema = z.object({
+  journey: JourneyDerivedStateSchema.nullable(),
+  routePlan: z.unknown().nullable().optional(),
+  workflow: z.object({
+    source: z.enum(['base', 'custom']),
+    baseWorkflowId: WorkflowIdSchema,
+    version: z.number().int().nonnegative(),
+  }).strict().optional(),
+  error: z.string().optional(),
+}).strict();
+
+export const AnswerSummarySchema = z.object({
+  answer: z.string(),
+  claimIds: z.array(z.string()),
+  warnings: z.array(z.string()),
+  unknowns: z.array(z.string()),
+  followUpQuestions: z.array(z.string()),
+  routeOptions: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    reason: z.string().min(1),
+    steps: z.array(z.string().min(1)),
+  }).strict()),
+}).strict();
+export type AnswerSummaryContract = z.infer<typeof AnswerSummarySchema>;
+
+export const ReportRegenerateResponseSchema = z.object({
+  markdown: z.string(),
+  path: z.string().min(1),
+  review: z.unknown(),
+}).strict();
+
+export const ControlResponseSchema = z.object({
+  control: InvestigationControlSchema,
+}).strict();
+
