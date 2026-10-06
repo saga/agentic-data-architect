@@ -460,7 +460,7 @@ app.post('/api/sessions', async (req, res) => {
     });
 
     res.json(MissionUpdateResponseSchema.parse({
-      context,
+      context: toSessionContextView(context),
       mission,
       gate: evaluateMissionGate(mission),
       progress: await buildMissionProgress(name, mission),
