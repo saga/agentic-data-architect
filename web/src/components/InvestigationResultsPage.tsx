@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import { XMarkdown } from '@ant-design/x-markdown';
+import { ResultViewModelSchema } from '../../../src/api/contracts';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -120,7 +121,7 @@ export function InvestigationResultsPage(props: {
       if (!modernizationResponse.ok && modernizationResponse.status !== 409) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
 
       const [resultPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        resultResponse.ok ? resultResponse.json() as Promise<{status: 'available'; report: string}> : resultResponse.json() as Promise<{code?: string; error?: string}>,
+        resultResponse.ok ? resultResponse.json().then((value) => ResultViewModelSchema.parse(value)) : resultResponse.json() as Promise<{code?: string; error?: string}>,
         trajectoryResponse.json() as Promise<{events?: TrajectoryEvent[]}>,
         sessionResponse.json() as Promise<SessionSnapshot>,
         modernizationResponse.ok
@@ -128,7 +129,7 @@ export function InvestigationResultsPage(props: {
           : Promise.resolve({ plan: null }),
       ]);
 
-      if (resultResponse.ok && resultPayload.status === 'available') {
+      if (resultResponse.ok && ResultViewModelSchema.safeParse(resultPayload).success) {
         setReportStatus('available');
         setReport(resultPayload.report);
       } else {
