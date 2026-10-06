@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
+import { buildAssistantSoulPrompt, buildMissionContractPrompt, buildQuestionPrompt } from '../src/agent/prompts.js';
 
 const mission = {
   purpose: '理解老系统当前的数据架构，为后续迁移判断提供依据。',
@@ -47,4 +47,13 @@ test('question prompt starts from Mission and treats the user question as execut
   assert.equal(prompt.indexOf('## 最高优先级：本次任务 Mission'), 0);
   assert.ok(prompt.indexOf('当前执行请求：继续看看某张表') > prompt.indexOf('## 最高优先级：本次任务 Mission'));
   assert.match(prompt, /当前执行请求把 Mission 改写/);
+});
+
+test('Assistant Soul is an identity layer, not only a tone hint', () => {
+  const prompt = buildAssistantSoulPrompt('主动推进、发现问题直接指出，不为了讨好而附和。');
+
+  assert.match(prompt, /长期稳定的身份/);
+  assert.match(prompt, /直接指出/);
+  assert.match(prompt, /Mission、Evidence/);
+  assert.ok(prompt.indexOf('长期稳定的身份') < prompt.indexOf('主动推进'));
 });
