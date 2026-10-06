@@ -1,3 +1,4 @@
+import type { WorkflowId as ApiWorkflowId } from '../../../src/api/contracts';
 /** 首页与调查页共用的数据结构。把类型从 App.tsx 移出来，页面文件只负责 UI 与交互。 */
 export interface SessionSummary {
   key: string;
@@ -170,7 +171,7 @@ export interface MissionProgress {
   deliverables: MissionDeliverableProgress[];
 }
 
-export type WorkflowId = 'legacy-modernization' | 'financial-ai-native-architecture' | 'data-architecture-assessment';
+export type WorkflowId = ApiWorkflowId;
 
 export const workflowOptions = [
   { value: '', label: '自主调查' },
