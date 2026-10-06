@@ -57,6 +57,9 @@ import {
   FileUploadResponseSchema,
   WorkflowInstructionResponseSchema,
   SimpleOkResponseSchema,
+  WorkflowSaveResponseSchema,
+  WorkflowTransitionResponseSchema,
+  WorkflowResetResponseSchema,
   type SseEvent,
 } from './api/contracts.js';
 import {
