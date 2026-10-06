@@ -23,7 +23,7 @@ import {
 } from '../investigation/workspace.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadArchitectureAssessmentPlan } from './assessment.js';
-import { JourneyLayoutSchema, WorkflowSnapshotSchema, JourneyRunEventSchema } from '../api/contracts.js';
+import { JourneyLayoutSchema, WorkflowSnapshotSchema, JourneyRunEventSchema, JourneyExecutionSchema } from '../api/contracts.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
 import { loadModernizationPlan, persistModernizationAgentResult } from './modernization.js';
@@ -60,6 +60,7 @@ const EXECUTION_FILE = 'journey-execution.json';
 const EVENTS_FILE = 'journey-run-events.jsonl';
 
 export type JourneyLayout = z.infer<typeof JourneyLayoutSchema>;
+export { JourneyLayoutNodeSchema, JourneyLayoutSchema } from '../api/contracts.js';
 
 export const JourneyEditBodySchema = z.object({
   definition: JourneyDefinitionSchema,
@@ -409,20 +410,7 @@ export async function loadJourneyExecution(
   version: number,
 ): Promise<JourneyExecution> {
   const raw = await readJson<unknown>(journeyFile(name, EXECUTION_FILE));
-  const parsed = z.object({
-    workflowId: z.string(),
-    workflowVersion: z.number().int().nonnegative(),
-    runId: z.string().optional(),
-    currentNodeId: z.string(),
-    completedNodeIds: z.array(z.string()),
-    status: z.enum(['active', 'waiting', 'completed']),
-    pendingInteraction: z.object({
-      id: z.string(),
-      nodeId: z.string(),
-      reason: z.string(),
-      requestedAt: z.string().datetime(),
-    }).optional(),
-  }).safeParse(raw);
+  const parsed = JourneyExecutionSchema.safeParse(raw);
 
   return normalizeExecution(definition, version, parsed.success ? parsed.data : null);
 }
