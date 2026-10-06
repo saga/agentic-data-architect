@@ -330,7 +330,7 @@ app.get('/api/sessions', async (_req, res) => {
 app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(CreateSessionBodySchema, req.body);
     const context = await createSession(body.name, body.userPrompt, body.workflow);
-    res.status(201).json({ context });
+    res.status(201).json(CreateSessionResponseSchema.parse({ context }));
   });
 
   app.get('/api/sessions/:name', async (req, res) => {
