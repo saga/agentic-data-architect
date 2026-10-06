@@ -113,7 +113,7 @@ Transformation
 Business Meaning
 ~~~
 
-少量 unknown 可以保留；只有会影响用户期望结果时才继续调查。具体能力由 skills/current-state-architecture/SKILL.md 提供，不需要新增固定 Workflow。
+少量 unknown 可以保留；只有会影响用户期望结果时才继续调查。当前数据架构分析使用 `skills/current-data-architecture/SKILL.md`；这是一个可直接选择的工作方式，不再使用旧的 current-state-architecture Skill。
 
 ## Investigation Skills
 
@@ -124,5 +124,7 @@ Business Meaning
 - `research`：调查外部事实和第三方能力，优先使用第一方资料并留下可复核的 Research Artifact。
 - `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
 - `current-data-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状，并作为可直接选择的工作方式。
+
+`data-architecture-assessment` 在这些现状事实之上继续回答“现在怎么样、哪里有问题、先改什么”，不重新建立一套当前架构事实。
 
 这些 Skill 不增加 Workflow DSL 的复杂度，也不替代权限、Policy 或业务审批。
