@@ -6,13 +6,18 @@ import {
   type JourneyNode,
   type JourneyRoute,
 } from './journey.js';
+import {
+  JourneyWorkflowChangeSchema,
+  JourneyWorkflowChangesSchema,
+  type JourneyWorkflowChange,
+} from '../api/contracts.js';
 
 /** Workflow 编辑器和 Workflow AI 共用的语义修改操作；只描述业务结构变化，不描述画布实现。 */
 export {
   JourneyWorkflowChangeSchema,
   JourneyWorkflowChangesSchema,
-  type JourneyWorkflowChange,
-} from '../api/contracts.js';
+};
+export type { JourneyWorkflowChange };
 
 /** 深拷贝 Definition，避免编辑操作直接修改当前快照。Workflow 很小，不需要引入 immutable 框架。 */
 function cloneDefinition(definition: JourneyDefinition): JourneyDefinition {
