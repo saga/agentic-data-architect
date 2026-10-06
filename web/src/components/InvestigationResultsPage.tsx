@@ -19,6 +19,7 @@ interface Checkpoint {
 }
 
 interface TrajectoryEvent {
+  id: string;
   type: string;
   timestamp: string;
   details?: unknown;
@@ -69,9 +70,11 @@ interface ModernizationPlan {
 function asCheckpoint(event: TrajectoryEvent): Checkpoint | undefined {
   if (event.type !== 'checkpoint' || !event.details || typeof event.details !== 'object') return undefined;
   const value = event.details as Record<string, unknown>;
-  if (typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.summary !== 'string') return undefined;
+  if (typeof value.title !== 'string' || typeof value.summary !== 'string') return undefined;
   return {
-    id: value.id,
+    // checkpoint 的稳定 ID 是 trajectory event 的 ID；details 本身保存的是 AgentCheckpoint，
+    // 不包含单独的 id 字段。此前这里错误要求 details.id，导致所有阶段小结被静默丢弃。
+    id: event.id,
     turnId: typeof value.turnId === 'string' ? value.turnId : '',
     timestamp: event.timestamp,
     execution: typeof value.execution === 'number' ? value.execution : 0,
