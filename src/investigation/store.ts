@@ -330,6 +330,7 @@ export async function investigationExists(name: string): Promise<boolean> {
 export async function saveDiscoverySnapshot(name: string, runId: string, snapshot: unknown): Promise<string> {
   const parsed = DiscoverySnapshotSchema.parse(snapshot);
   if (parsed.run.id !== runId) throw new Error('Discovery Snapshot runId 与文件 runId 不一致。');
+  if (!parsed.run.scopeFingerprint) throw new Error('Discovery Snapshot 缺少 Scope fingerprint，不能作为新的 current source。');
   const dir = discoveryDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, runId + '.json');
