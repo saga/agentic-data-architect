@@ -9,6 +9,7 @@ export {
   TrajectorySummarySchema,
   TrajectoryTurnSummarySchema,
   TrajectoryCheckpointSchema,
+  TrajectoryCheckpointDetailsSchema,
 } from '../api/contracts.js';
 export type {
   TrajectoryEvent,
@@ -87,31 +88,16 @@ export async function readTrajectory(name: string, options: { turnId?: string; l
 }
 
 /** 读取最近的阶段性调查小结；checkpoint 本身作为 trajectory 的可追溯事件保存。 */
-const trajectoryCheckpointDetails = z.object({
-  execution: z.number().int().nonnegative(),
-  title: z.string().min(1),
-  summary: z.string().min(1),
-  confirmed: z.array(z.string()).default([]),
-  evidenceIds: z.array(z.string()).default([]),
-  unknowns: z.array(z.string()).default([]),
-  nextStep: z.string().optional(),
-}).strict();
-
 export function listTrajectoryCheckpoints(events: TrajectoryEvent[], limit = 20): TrajectoryCheckpoint[] {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
   return events
     .filter((event) => event.type === 'checkpoint')
-    .map((event) => {
-      const parsed = trajectoryCheckpointDetails.safeParse(event.details);
-      if (!parsed.success) return null;
-      return {
-        id: event.id,
-        turnId: event.turnId,
-        timestamp: event.timestamp,
-        ...parsed.data,
-      };
-    })
-    .filter((item): item is TrajectoryCheckpoint => Boolean(item))
+    .map((event) => ({
+      id: event.id,
+      turnId: event.turnId,
+      timestamp: event.timestamp,
+      ...TrajectoryCheckpointDetailsSchema.parse(event.details),
+    }))
     .slice(-safeLimit);
 }
 
