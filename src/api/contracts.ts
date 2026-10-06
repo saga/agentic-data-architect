@@ -558,6 +558,7 @@ export const SessionSummarySchema = z.object({
 export const SessionsResponseSchema = z.object({
   sessions: z.array(SessionSummarySchema),
 }).strict();
+export type SessionSummary = z.infer<typeof SessionSummarySchema>;
 
 export const AuditEventSchema = z.object({
   id: z.string().min(1),
@@ -568,6 +569,7 @@ export const AuditEventSchema = z.object({
   configurationVersion: z.number().int().positive().optional(),
   details: z.record(z.string(), z.unknown()).optional(),
 }).strict();
+export type AuditEvent = z.infer<typeof AuditEventSchema>;
 
 export const MessageSchema = z.object({
   id: z.string().min(1),
@@ -575,6 +577,8 @@ export const MessageSchema = z.object({
   content: z.string(),
   capturedAt: z.string().datetime(),
 }).strict();
+
+export type Message = z.infer<typeof MessageSchema>;
 
 export const WorkspaceInputViewSchema = z.object({
   id: z.string().min(1),
@@ -590,6 +594,7 @@ export const WorkspaceInputViewSchema = z.object({
   sizeBytes: z.number().int().nonnegative().optional(),
   sha256: z.string().optional(),
 }).strict();
+export type WorkspaceInputView = z.infer<typeof WorkspaceInputViewSchema>;
 
 export const CurrentStateViewSchema = CurrentStateSummarySchema;
 
@@ -620,6 +625,7 @@ export const SessionContextViewSchema = z.object({
   }).strict().optional(),
   updatedAt: z.string().min(1),
 }).strict();
+export type SessionContextView = z.infer<typeof SessionContextViewSchema>;
 
 export const SessionDataSchema = z.object({
   context: SessionContextViewSchema,
@@ -653,6 +659,7 @@ export const MissionResponseSchema = z.object({
   draft: MissionDraftSchema.optional(),
 }).strict();
 
+export type CopilotModelOption = z.infer<typeof CopilotModelOptionSchema>;
 export const OpenCodeStatusSchema = z.object({
   enabled: z.boolean(),
   reachable: z.boolean(),
@@ -692,6 +699,8 @@ export const PendingPermissionSchema = z.object({
   managedApprovalRequired: z.boolean().optional(),
 }).strict();
 
+export type PendingPermission = z.infer<typeof PendingPermissionSchema>;
+
 export const PermissionsResponseSchema = z.object({
   permissions: z.array(PendingPermissionSchema),
 }).strict();
@@ -706,6 +715,8 @@ export const PendingUserInputSchema = z.object({
   allowFreeform: z.boolean(),
   requestedAt: z.string().datetime(),
 }).strict();
+
+export type PendingUserInput = z.infer<typeof PendingUserInputSchema>;
 
 export const UserInputsResponseSchema = z.object({
   requests: z.array(PendingUserInputSchema),
