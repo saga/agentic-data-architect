@@ -16,6 +16,9 @@ import {
   type ImportantDocumentRef,
   type InvestigationControl,
   type McpServerSetting,
+  type GlobalConfiguration,
+  type TaskConfiguration,
+  type TaskAgentOverride,
 } from './schemas.js';
 
 /** 返回当前 Investigation 的 control.json 路径。 */
@@ -23,8 +26,14 @@ function controlFile(name: string): string {
   return path.join(workspaceRoot(name), 'control.json');
 }
 
+/** Global configuration lives outside any Investigation, so it follows the installation rather than a task. */
+function globalConfigFile(): string {
+  return path.join(config.legacyDataDir, 'global-config.json');
+}
+
 const controlUpdateLocks = new Map<string, Promise<void>>();
 const controlInitLocks = new Map<string, Promise<void>>();
+let globalConfigLock: Promise<void> = Promise.resolve();
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
@@ -115,6 +124,82 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
     },
   };
 }
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function buildGlobalConfiguration(agent: InvestigationControl['agent'], version = 1, updatedAt = new Date().toISOString()): GlobalConfiguration {
+  return {
+    schemaVersion: 1,
+    version,
+    updatedAt,
+    agent: clone(agent),
+  };
+}
+
+async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
+  try {
+    return JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')) as GlobalConfiguration;
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  const base = defaultControl();
+  const global = buildGlobalConfiguration(base.agent);
+  await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
+  await writeJsonAtomic(globalConfigFile(), global);
+  return global;
+}
+
+/** 只把与 Global 不同的 Agent 字段保存到任务 workspace，避免任务复制出一份全局配置。 */
+function extractTaskAgentOverrides(agent: InvestigationControl['agent'], globalAgent: InvestigationControl['agent']): TaskAgentOverride {
+  const override: Record<string, unknown> = {};
+  for (const key of Object.keys(agent) as Array<keyof InvestigationControl['agent']>) {
+    if (key === 'platformCapabilities') continue;
+    if (!sameValue(agent[key], globalAgent[key])) override[key] = clone(agent[key]);
+  }
+  return override as TaskAgentOverride;
+}
+
+function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfiguration): InvestigationControl {
+  const agent = {
+    ...clone(global.agent),
+    ...clone(task.agent),
+    // Platform capabilities are application/runtime controlled and never task-overridable.
+    platformCapabilities: clone(global.agent.platformCapabilities),
+  };
+  return {
+    schemaVersion: 1,
+    version: task.version,
+    updatedAt: task.updatedAt,
+    research: clone(task.research),
+    agent,
+    history: task.history.map((entry) => ({
+      version: entry.version,
+      updatedAt: entry.updatedAt,
+      reason: entry.reason,
+      snapshot: {
+        schemaVersion: 1,
+        version: entry.version,
+        updatedAt: entry.updatedAt,
+        research: clone(entry.snapshot.research),
+        agent: clone(entry.snapshot.agent),
+      },
+    })),
+  };
+}
+
+async function writeTaskConfiguration(task: TaskConfiguration): Promise<void> {
+  await writeJsonAtomic(controlFile(taskNameForWrite), task);
+}
+
+// Set only during update/migration; keeps helper signatures small without exposing filesystem paths.
+let taskNameForWrite = '';
 
 /** 复制当前配置到 history 快照，避免后续对象修改影响历史记录。 */
 function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, 'history'> {
@@ -267,54 +352,63 @@ export function normalizeControl(raw: Partial<InvestigationControl>): Investigat
 
 /** 读取 Control；首次访问时负责创建 v1 默认配置，并用初始化锁避免并发重复创建。 */
 export async function loadInvestigationControl(name: string): Promise<InvestigationControl> {
+  const global = await loadGlobalConfiguration();
   try {
-    return normalizeControl(JSON.parse(await fs.readFile(controlFile(name), 'utf8')) as Partial<InvestigationControl>);
-  } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
-    }
-  }
-
-  // First access can race with another request. Re-check after serialization so
-  // both requests observe the same version-1 control file and audit event.
-  const previous = controlInitLocks.get(name) ?? Promise.resolve();
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
-  const queued = previous.catch(() => undefined).then(() => gate);
-  controlInitLocks.set(name, queued);
-  await previous.catch(() => undefined);
-
-  try {
-    try {
-      return normalizeControl(JSON.parse(await fs.readFile(controlFile(name), 'utf8')) as Partial<InvestigationControl>);
-    } catch (error) {
-      if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
+    const raw = JSON.parse(await fs.readFile(controlFile(name), 'utf8')) as Record<string, unknown>;
+    if (raw.schemaVersion === 2) {
+      return resolveTaskConfiguration(TaskConfigurationSchema.parse(raw), global);
     }
 
-    const base = defaultControl();
-    const control: InvestigationControl = {
-      ...base,
-      history: [{
-        version: 1,
-        updatedAt: base.updatedAt,
-        reason: 'initial',
-        snapshot: base,
-      }],
+    // Migrate the old v1 full snapshot: preserve explicit task customizations,
+    // while allowing unchanged fields to inherit future Global changes.
+    const legacy = normalizeControl(raw as Partial<InvestigationControl>);
+    const migrated: TaskConfiguration = {
+      schemaVersion: 2,
+      version: legacy.version,
+      globalVersion: global.version,
+      updatedAt: legacy.updatedAt,
+      research: clone(legacy.research),
+      agent: extractTaskAgentOverrides(legacy.agent, global.agent),
+      history: legacy.history.map((entry) => ({
+        version: entry.version,
+        globalVersion: global.version,
+        updatedAt: entry.updatedAt,
+        reason: entry.reason,
+        snapshot: { research: clone(entry.snapshot.research), agent: clone(entry.snapshot.agent) },
+      })),
     };
-    await writeJsonAtomic(controlFile(name), control);
-    await appendAuditEvent(name, {
-      actor: 'system',
-      action: 'configuration.created',
-      summary: 'Created default investigation configuration.',
-      configurationVersion: 1,
-    });
-    return control;
-  } finally {
-    release();
-    if (controlInitLocks.get(name) === queued) controlInitLocks.delete(name);
+    taskNameForWrite = name;
+    try { await writeJsonAtomic(controlFile(name), migrated); } finally { taskNameForWrite = ''; }
+    return resolveTaskConfiguration(migrated, global);
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
+
+  const base = defaultControl();
+  const task: TaskConfiguration = {
+    schemaVersion: 2,
+    version: 1,
+    globalVersion: global.version,
+    updatedAt: base.updatedAt,
+    research: clone(base.research),
+    agent: {},
+    history: [{
+      version: 1,
+      globalVersion: global.version,
+      updatedAt: base.updatedAt,
+      reason: 'initial',
+      snapshot: { research: clone(base.research), agent: clone(global.agent) },
+    }],
+  };
+  await writeJsonAtomic(controlFile(name), task);
+  await appendAuditEvent(name, {
+    actor: 'system',
+    action: 'configuration.created',
+    summary: 'Created task configuration inheriting global defaults.',
+    configurationVersion: 1,
+    details: { globalVersion: global.version },
+  });
+  return resolveTaskConfiguration(task, global);
 }
 
 /** 串行更新 Research/Agent 配置、递增版本、记录调查说明和 MCP 变化并写审计。 */
