@@ -201,7 +201,7 @@ export function useInvestigationController() {
   }, [active]);
 
   const reloadSessions = async (selectLatest = true) => {
-    const result = await getJson<{ sessions: SessionSummary[] }>('/api/sessions');
+    const result = await getJson('/api/sessions', SessionsResponseSchema);
     setSessions(result.sessions);
     const routed = routeSession();
     const routedExists = routed && result.sessions.some((session) => session.key === routed);
@@ -227,8 +227,8 @@ export function useInvestigationController() {
       setAttachmentsOpen(false);
     }
     const [result, journeyResult] = await Promise.all([
-      getJson<SessionData>(`/api/sessions/${encodeURIComponent(key)}`),
-      getJson<{ journey: JourneyState | null }>(`/api/sessions/${encodeURIComponent(key)}/journey`),
+      getJson(`/api/sessions/${encodeURIComponent(key)}`, SessionDataSchema),
+      getJson(`/api/sessions/${encodeURIComponent(key)}/journey`, WorkflowCompatibilityResponseSchema),
     ]);
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
     setCurrent(result);
@@ -279,8 +279,9 @@ export function useInvestigationController() {
   /** 查询当前 Node.js 进程的真实执行状态；不使用 trajectory 推断 live state。 */
   const loadExecutionStatus = async (key: string): Promise<ExecutionStatus> => {
     try {
-      const status = await getJson<ExecutionStatus>(
+      const status = await getJson(
         `/api/sessions/${encodeURIComponent(key)}/execution`,
+        ExecutionStatusSchema,
       );
       const previous = executionStatusRef.current;
       executionStatusRef.current = status;
@@ -353,11 +354,13 @@ export function useInvestigationController() {
   const loadPendingInteractions = async (key: string) => {
     try {
       const [permissionResult, inputResult] = await Promise.all([
-        getJson<{ permissions: PendingPermission[] }>(
+        getJson(
           `/api/sessions/${encodeURIComponent(key)}/permissions`,
+          PermissionsResponseSchema,
         ),
-        getJson<{ requests: PendingUserInput[] }>(
+        getJson(
           `/api/sessions/${encodeURIComponent(key)}/user-inputs`,
+          UserInputsResponseSchema,
         ),
       ]);
       if (key === activeRef.current) {
@@ -370,7 +373,7 @@ export function useInvestigationController() {
   };
 
   useEffect(() => {
-    void getJson<{ models: CopilotModelOption[] }>('/api/copilot/models')
+    void getJson('/api/copilot/models', ModelsResponseSchema)
       .then((result) => setAvailableModels(result.models ?? []))
       .catch(() => setAvailableModels([]));
   }, []);
@@ -476,8 +479,9 @@ export function useInvestigationController() {
     setModelSaving(true);
     setError(undefined);
     try {
-      const result = await getJson<{ control: InvestigationControl }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/agent/model`,
+        ControlResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -541,8 +545,9 @@ export function useInvestigationController() {
   ) => {
     if (permission.sessionName !== active) return;
     try {
-      await getJson<{ ok: true }>(
+      await getJson(
         `/api/sessions/${encodeURIComponent(permission.sessionName)}/permissions/respond`,
+        SimpleOkResponseSchema,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -575,8 +580,9 @@ export function useInvestigationController() {
   ) => {
     if (request.sessionName !== active || !answer.trim()) return;
     try {
-      await getJson<{ ok: true }>(
+      await getJson(
         `/api/sessions/${encodeURIComponent(request.sessionName)}/user-inputs/respond`,
+        SimpleOkResponseSchema,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -625,7 +631,7 @@ export function useInvestigationController() {
     try {
       let key = active;
       if (!key) {
-        const created = await getJson<{ context: SessionContext }>('/api/sessions', {
+        const created = await getJson('/api/sessions', CreateSessionResponseSchema, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userPrompt: message }),
@@ -808,8 +814,9 @@ export function useInvestigationController() {
     setError(undefined);
     setMissionError(undefined);
     try {
-      const result = await getJson<{ context: SessionContext; mission: MissionContract }>(
+      const result = await getJson(
         '/api/sessions/' + encodeURIComponent(active) + '/mission',
+        MissionUpdateResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -868,8 +875,9 @@ export function useInvestigationController() {
     setWorkflowSaving(true);
     setError(undefined);
     try {
-      const result = await getJson<{ context: SessionContext }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/workflow`,
+        WorkflowContextResponseSchema,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -920,7 +928,7 @@ export function useInvestigationController() {
         deliverableIds: [],
       };
 
-      const created = await getJson<{ context: SessionContext }>('/api/sessions', {
+      const created = await getJson('/api/sessions', CreateSessionResponseSchema, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -991,8 +999,9 @@ export function useInvestigationController() {
     try {
       const form = new FormData();
       form.append('file', source as Blob, file.name);
-      const result = await getJson<{ file: { id: string; name: string } }>(
+      const result = await getJson(
         `/api/sessions/${encodeURIComponent(active)}/files`,
+        FileUploadResponseSchema,
         { method: 'POST', body: form },
       );
       setAttachments((items) => items.map((item) => item.uid === file.uid
