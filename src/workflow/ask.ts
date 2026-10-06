@@ -184,6 +184,7 @@ export async function answerQuestion(
     emitStatus(`${active.lastActivity} · 已运行 ${elapsed}`);
   }, 15_000);
   liveHeartbeat.unref?.();
+  let companionTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
@@ -222,7 +223,6 @@ export async function answerQuestion(
     let companionNoteCount = 0;
     let lastCompanionNoteAt = 0;
     let companionNoteTask: Promise<void> = Promise.resolve();
-    let companionTimer: ReturnType<typeof setTimeout> | undefined;
     const requestCompanionNote = (activity: string, force = false): void => {
       const now = Date.now();
       const minimumFirstDelay = 12_000;
