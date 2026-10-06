@@ -36,7 +36,7 @@ export function AssistantAvatar(props: {
   const localId = source && !isRemote ? getLocalAvatarId(source) : undefined;
   const localUrl = localId
     ? `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar/${encodeURIComponent(localId)}?v=${props.control.version}`
-    : `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar?v=${props.control.version}`;
+    : undefined;
   const url = source
     ? isRemote
       ? source
