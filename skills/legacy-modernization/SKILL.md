@@ -202,3 +202,19 @@ objective: 验证已经完成后，由负责人确认切换条件、回退方案
 
 title: 完成
 objective: Modernization Journey 正常结束。
+
+## 输入校验
+正式开始前必须有用户确认的 Mission 和已通过的 Scope Validation。改造范围、涉及系统和最终交付物必须能够说清楚。
+进入目标架构、Mapping 和 Validation 前，必须先有足够的当前系统事实；不能用模型猜测补齐缺失信息。
+## 输出
+本路线至少留下当前状态、目标架构、新旧对应、验证结果和最终阅读报告。结构化改造结果保存到 reports/modernization-plan.json。
+调查中的代码、SQL、研究资料和阶段分析继续保存到 artifacts/；不同结果可以有多个文件。
+## 输出与验证
+目标架构、Mapping、Validation 都必须先通过确定性 Gate，再进入下一关。
+每条正式 Claim / Finding 的资料编号必须有效；不允许把草案写成已确认结果。
+最终 reports/report.md 必须通过通用 Report Gate，并经过独立 Reviewer。
+## Gate
+Mission / Scope 是所有正式工作的前置条件；Stage Gate 判断本阶段是否形成真实成果；Modernization Gate 判断结构化工作成果是否够完整；最终 Report Gate 判断用户可读结果是否可以交付。
+Reviewer 不可用时，报告仍可保留，但不能标成审核通过。
+## 期望结果示例
+> 现在已经确认旧系统的主要数据来源和关键转换；目标架构只对已经有依据的部分做设计；还没有确定的 Mapping 会明确标出来，而不是猜一个对应关系。
