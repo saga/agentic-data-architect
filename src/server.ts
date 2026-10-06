@@ -1081,13 +1081,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       res.json({ plan: null, path: null });
       return;
     }
-    const rebuild = req.query.rebuild === 'true';
     const existing = await loadArchitectureAssessmentPlan(name);
-    if (existing && !rebuild) {
+    if (existing) {
       res.json({ plan: existing, path: null });
       return;
     }
-    if (!existing && !rebuild) {
+    if (!existing) {
       res.json({ plan: null, path: null });
       return;
     }
@@ -1103,15 +1102,32 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }
   });
 
+  app.post('/api/sessions/:name/assessment/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    const context = await loadWorkspaceContext(name);
+    if (context.workflow !== 'data-architecture-assessment') {
+      res.status(409).json({ code: 'WORKFLOW_PRECONDITION', error: '当前调查不是数据架构评估 Workflow。' });
+      return;
+    }
+    try {
+      res.json(await buildArchitectureAssessmentPlan(name));
+    } catch (error) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
+        res.status(409).json({ code: 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+        return;
+      }
+      throw error;
+    }
+  });
+
   app.get('/api/sessions/:name/modernization', async (req, res) => {
     const name = sessionKey(req.params.name);
-    const rebuild = req.query.rebuild === 'true';
     const existing = await loadModernizationPlan(name);
-    if (existing && !rebuild) {
+    if (existing) {
       res.json({ plan: existing, path: null });
       return;
     }
-    if (!existing && !rebuild) {
+    if (!existing) {
       res.json({ plan: null, path: null });
       return;
     }
@@ -1121,6 +1137,19 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     } catch (error) {
       if (error instanceof ScopeGateError) {
         res.status(409).json({ error: error.message, checks: error.result.checks });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  app.post('/api/sessions/:name/modernization/regenerate', async (req, res) => {
+    const name = sessionKey(req.params.name);
+    try {
+      res.json(await buildModernizationPlan(name));
+    } catch (error) {
+      if (error instanceof ScopeGateError || error instanceof MissionGateError) {
+        res.status(409).json({ code: 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
         return;
       }
       throw error;
