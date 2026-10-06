@@ -194,7 +194,6 @@ async function runReviewerOnce(
     artifactVersion: input.artifactVersion,
     artifactHash: createHash('sha256').update(input.artifact).digest('hex'),
     sourceRevision: input.sourceRevision,
-    availability: 'completed',
     status: normalizedStatus,
     reviewedAt: new Date().toISOString(),
   };
