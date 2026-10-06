@@ -73,7 +73,7 @@ export async function runReport(
       })),
     }, null, 2),
   });
-  const reviewPath = await saveArtifactReview(name, review);
+  await saveArtifactReview(name, review);
   if (review.status !== 'pass') {
     throw new ReportReviewGateError(review);
   }
