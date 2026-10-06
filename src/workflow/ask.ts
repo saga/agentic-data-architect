@@ -582,6 +582,9 @@ export async function answerQuestion(
           execution,
           mission,
           before: stageGateBaseline,
+          // legacy-modernization 的结构化工作成果由 onBeforeWorkflowTransition 刚刚持久化；
+          // 它本身就是本阶段真实成果，即使没有新增 Evidence/Finding 也不能被 Gate 忽略。
+          persistedWorkProductChanged: Boolean(stageParsed.modernization),
           after: stageAfter,
           missionProgressBefore: stageMissionProgressBaseline,
           missionProgressAfter: missionProgressAfterStage,
