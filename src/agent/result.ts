@@ -5,7 +5,7 @@
  */
 import * as z from 'zod';
 import { calibrateStatus, ClaimStatusSchema, type Claim, type ClaimStatus, type EvidenceRef } from '../evidence/types.js';
-import { AgentCheckpointSchema, AgentIntakeSchema, JourneyRouteOptionSchema, type AgentCheckpoint, type AgentIntake } from '../investigation/schemas.js';
+import { AgentIntakeSchema, JourneyRouteOptionSchema, type AgentIntake } from '../investigation/schemas.js';
 import {
   AgentModernizationResultSchema,
   type AgentModernizationResult,
@@ -29,8 +29,6 @@ export const AgentAnswerSchema = z.object({
   answer: z.string().max(8000).catch(''),
   /** Agent 从用户问题、仓库、文档和 Discovery 中整理出的调查范围候选。 */
   intake: AgentIntakeSchema.optional().catch(undefined),
-  /** 兼容旧版本 Agent 输出；服务器不会使用它判断阶段是否完成。 */
-  checkpoint: AgentCheckpointSchema.optional().catch(undefined),
   claims: z.array(AgentClaimDraftSchema.nullable().catch(null))
     .catch([])
     .transform((items) => items.filter((item): item is AgentClaimDraft => item !== null && item.claim.length > 0)),
@@ -150,7 +148,6 @@ export function parseAgentAnswer(raw: string, existingEvidence: Set<string> | Ma
     routeOptions: parsed.data.routeOptions,
     ...(intake ? { intake } : {}),
     ...(parsed.data.modernization ? { modernization } : {}),
-    ...(parsed.data.checkpoint ? { checkpoint: parsed.data.checkpoint } : {}),
     warnings,
     droppedEvidenceRefs,
   };
@@ -245,18 +242,6 @@ function sanitizeModernizationEvidence(
   }
 
   return sanitized;
-}
-
-/** 从完整 Agent JSON 中只提取模型明确返回的阶段性 checkpoint。 */
-export function extractAgentCheckpoint(raw: string): AgentCheckpoint | undefined {
-  try {
-    const data = JSON.parse(extractJson(raw)) as unknown;
-    if (!data || typeof data !== 'object' || !('checkpoint' in data)) return undefined;
-    const parsed = AgentCheckpointSchema.safeParse((data as Record<string, unknown>).checkpoint);
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /** 把模型层 ParsedAnswer 转成可持久化的业务 Claim，并由调用方生成唯一 ID。 */
