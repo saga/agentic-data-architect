@@ -191,11 +191,11 @@ export async function reviewArtifact(input: {
         status: 'fail',
         availability: 'unavailable',
         score: 0,
-        summary: '独立 Reviewer 暂时没有返回可验证的审核结果。',
+        summary: '独立质量检查暂时没有返回可验证的结果。',
         issues: [{
           category: 'consistency',
           severity: 'high',
-          description: 'Reviewer 没有返回可验证的结构化审核结果。',
+          description: '独立质量检查没有返回可验证的结构化结果。',
           suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
         }],
         reviewedAt: new Date().toISOString(),
