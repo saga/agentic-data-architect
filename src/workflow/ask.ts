@@ -239,7 +239,7 @@ export async function answerQuestion(
       companionNoteTask = companionNoteTask.then(async () => {
         if (abortRequestedTurns.has(turnId)) return;
         try {
-          const note = await askCopilot({
+          const note = await askAgentWithFallback({
             prompt: buildAssistantCompanionPrompt(control.agent.personality, activity, companionMemories),
             systemPrompt: '这是人格陪伴层。只生成一句自然、克制的陪伴性话语，不做任务分析，不调用工具，不汇报顶部状态，也不输出角色名或标题。',
             model: control.agent.model,
@@ -803,7 +803,7 @@ export async function answerQuestion(
     const relationshipMemories = await getRelevantRelationshipMemories(effectiveQuestion + '\n' + taskAnswer);
     if (control.agent.personality.trim() || relationshipMemories.length > 0) {
       try {
-        const rendered = await askCopilot({
+        const rendered = await askAgentWithFallback({
           prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer, relationshipMemories),
           systemPrompt: [
             '你是最终回答渲染器，不是任务 Agent。',
