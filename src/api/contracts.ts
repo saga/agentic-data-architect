@@ -212,6 +212,28 @@ export const JourneyLayoutSchema = z.object({
 }).strict();
 export type JourneyLayout = z.infer<typeof JourneyLayoutSchema>;
 
+export const JourneyRunDeterministicDataSchema = z.object({
+  deterministic: z.literal(true),
+}).strict();
+
+export const JourneyRunNodeCompletedDataSchema = z.object({
+  nextNodeId: z.string().min(1),
+}).strict();
+
+export const JourneyRunNodeWaitingDataSchema = z.object({
+  id: z.string().min(1),
+  nodeId: z.string().min(1),
+  reason: z.string().min(1),
+  requestedAt: z.string().datetime(),
+  deterministic: z.literal(true).optional(),
+}).strict();
+
+export const JourneyRunEventDataSchema = z.union([
+  JourneyRunDeterministicDataSchema,
+  JourneyRunNodeCompletedDataSchema,
+  JourneyRunNodeWaitingDataSchema,
+]);
+
 export const JourneyRunEventSchema = z.object({
   id: z.string().min(1),
   runId: z.string().min(1),
@@ -230,7 +252,7 @@ export const JourneyRunEventSchema = z.object({
   nodeId: z.string().optional(),
   outcome: z.string().optional(),
   error: z.string().optional(),
-  data: z.unknown().optional(),
+  data: JourneyRunEventDataSchema.optional(),
   usage: z.object({
     inputTokens: z.number().nonnegative().optional(),
     outputTokens: z.number().nonnegative().optional(),
@@ -263,6 +285,78 @@ export const TrajectoryCheckpointDetailsSchema = z.object({
   nextStep: z.string().optional(),
 }).strict();
 
+export const TrajectoryToolCallDetailsSchema = z.object({
+  toolCallId: z.string().min(1),
+  startedAt: z.string().datetime(),
+  mcpServerName: z.string().optional(),
+  mcpToolName: z.string().optional(),
+  parentToolCallId: z.string().optional(),
+  agentId: z.string().optional(),
+  arguments: z.unknown().optional(),
+}).catchall(z.unknown());
+
+export const TrajectoryToolProgressDetailsSchema = z.object({
+  toolCallId: z.string().min(1),
+  progressMessage: z.unknown(),
+}).catchall(z.unknown());
+
+export const TrajectoryToolResultDetailsSchema = z.object({
+  toolCallId: z.string().min(1),
+  model: z.string().optional(),
+  isUserRequested: z.boolean().optional(),
+  parentToolCallId: z.string().optional(),
+  resultPreview: z.string().optional(),
+  resultLength: z.number().int().nonnegative().optional(),
+  detailedResultLength: z.number().int().nonnegative().optional(),
+  error: z.unknown().optional(),
+}).catchall(z.unknown());
+
+export const TrajectoryUserInputRequestedDetailsSchema = z.object({
+  requestId: z.string().min(1),
+  question: z.string().min(1),
+}).catchall(z.unknown());
+
+export const TrajectoryUserInputCompletedDetailsSchema = z.object({
+  requestId: z.string().min(1),
+  question: z.string().optional(),
+  answer: z.string().optional(),
+  wasFreeform: z.boolean().optional(),
+}).catchall(z.unknown());
+
+export const TrajectoryPermissionDetailsSchema = z.object({
+  requestId: z.string().min(1),
+  kind: z.string().min(1),
+  toolCallId: z.string().optional(),
+  intention: z.string().optional(),
+  fullCommandText: z.string().optional(),
+  fileName: z.string().optional(),
+  path: z.string().optional(),
+  serverName: z.string().optional(),
+  toolName: z.string().optional(),
+  toolTitle: z.string().optional(),
+  readOnly: z.boolean().optional(),
+  managedApprovalRequired: z.boolean().optional(),
+}).catchall(z.unknown());
+
+export const TrajectoryPermissionCompletedDetailsSchema = z.object({
+  requestId: z.string().min(1),
+  kind: z.string().optional(),
+  summary: z.string().optional(),
+  resultKind: z.string().optional(),
+}).catchall(z.unknown());
+
+export const TrajectoryIntentDetailsSchema = z.object({
+  intent: z.string().min(1),
+  mappedStatus: z.string().min(1),
+}).catchall(z.unknown());
+
+export const TrajectoryTurnEndDetailsSchema = z.object({
+  turnUsage: z.record(z.string(), z.unknown()).optional(),
+  elapsedMs: z.number().nonnegative().optional(),
+  modelCallCount: z.number().int().nonnegative().optional(),
+  sessionIdleObserved: z.boolean().optional(),
+}).catchall(z.unknown());
+
 export const TrajectoryEventSchema = z.object({
   id: z.string().min(1),
   turnId: z.string().min(1),
@@ -283,11 +377,24 @@ export const TrajectoryEventSchema = z.object({
   premiumRequestCost: z.number().nonnegative().optional(),
   details: z.record(z.string(), z.unknown()).default({}),
 }).strict().superRefine((value, ctx) => {
-  if (value.type === 'checkpoint' && !TrajectoryCheckpointDetailsSchema.safeParse(value.details).success) {
+  const schemas: Partial<Record<TrajectoryEvent['type'], z.ZodType>> = {
+    checkpoint: TrajectoryCheckpointDetailsSchema,
+    tool_call: TrajectoryToolCallDetailsSchema,
+    tool_progress: TrajectoryToolProgressDetailsSchema,
+    tool_result: TrajectoryToolResultDetailsSchema,
+    user_input_requested: TrajectoryUserInputRequestedDetailsSchema,
+    user_input_completed: TrajectoryUserInputCompletedDetailsSchema,
+    permission: TrajectoryPermissionDetailsSchema,
+    permission_completed: TrajectoryPermissionCompletedDetailsSchema,
+    intent: TrajectoryIntentDetailsSchema,
+    turn_end: TrajectoryTurnEndDetailsSchema,
+  };
+  const schema = schemas[value.type];
+  if (schema && !schema.safeParse(value.details).success) {
     ctx.addIssue({
       code: 'custom',
       path: ['details'],
-      message: 'checkpoint event 的 details 不符合 Stage Checkpoint contract。',
+      message: value.type + ' event 的 nested details 不符合 Runtime Contract。',
     });
   }
 });
@@ -471,11 +578,16 @@ export const InvestigationControlSchema = z.object({
 }).strict();
 export type InvestigationControl = z.infer<typeof InvestigationControlSchema>;
 
+export const ArtifactLifecycleStatusSchema = z.enum(['missing', 'stale', 'current', 'blocked', 'error']);
+export type ArtifactLifecycleStatus = z.infer<typeof ArtifactLifecycleStatusSchema>;
+
 export const ArtifactProvenanceSchema = z.object({
   missionFingerprint: z.string().min(1),
   scopeFingerprint: z.string().min(1),
   sourceRevision: z.string().min(1),
   artifactVersion: z.number().int().positive(),
+  discoveryRunId: z.string().min(1).optional(),
+  discoveryScopeFingerprint: z.string().min(1).optional(),
 }).strict();
 export type ArtifactProvenance = z.infer<typeof ArtifactProvenanceSchema>;
 
@@ -565,6 +677,7 @@ export const ModernizationPlanViewSchema = z.object({
 export type ModernizationPlanView = z.infer<typeof ModernizationPlanViewSchema>;
 
 export const ModernizationResponseSchema = z.object({
+  status: ArtifactLifecycleStatusSchema,
   plan: ModernizationPlanViewSchema.nullable(),
   path: z.string().nullable(),
 }).strict();
@@ -607,6 +720,7 @@ export const ArchitectureAssessmentViewSchema = z.object({
 export type ArchitectureAssessmentView = z.infer<typeof ArchitectureAssessmentViewSchema>;
 
 export const ArchitectureAssessmentResponseSchema = z.object({
+  status: ArtifactLifecycleStatusSchema,
   plan: ArchitectureAssessmentViewSchema.nullable(),
   path: z.string().nullable(),
 }).strict();
@@ -645,7 +759,7 @@ export const ArtifactReviewContractSchema = z.object({
 export type ArtifactReviewContract = z.infer<typeof ArtifactReviewContractSchema>;
 
 export const ReportArtifactStateSchema = z.object({
-  status: z.enum(['missing', 'stale', 'current', 'blocked', 'error']),
+  status: ArtifactLifecycleStatusSchema,
   generatedAt: z.string().datetime().optional(),
   sourceRevision: z.string().optional(),
   reviewedAt: z.string().datetime().optional(),
