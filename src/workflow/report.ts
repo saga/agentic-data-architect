@@ -7,6 +7,7 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import { assertMissionGate } from './mission-gate.js';
 import { assertInvestigationScopeGate } from './scope-gate.js';
 import { assertCurrentStateReportGate } from './report-gate.js';
+import { readModernizationArtifact } from './modernization.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -139,11 +140,13 @@ export async function runReport(
   const investigation = await loadInvestigation(name);
   assertMissionGate(investigation.mission);
   await assertInvestigationScopeGate(name);
-  await assertCurrentStateReportGate(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   if (!isDiscoverySnapshotCompatible(investigation, snapshot)) {
     throw new Error('最近的 Discovery Snapshot 不属于当前 Scope generation，请重新执行 Discovery。');
   }
+  await assertCurrentStateReportGate(name, { investigation, snapshot });
+  const modernizationResult = await readModernizationArtifact(name, { investigation, snapshot });
+  const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
   const existingRaw = await readOptional(reportMetadataFile(name));
   let nextVersion = 1;
   if (existingRaw) {
@@ -155,7 +158,7 @@ export async function runReport(
     }
   }
 
-  const report = await buildReport(name, { investigation, snapshot });
+  const report = await buildReport(name, { investigation, snapshot, modernization });
   const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
   const artifactHash = hashArtifact(report.markdown);
   const review = await reviewArtifact({
