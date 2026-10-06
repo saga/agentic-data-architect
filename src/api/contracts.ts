@@ -745,3 +745,36 @@ export const ControlResponseSchema = z.object({
   control: InvestigationControlSchema,
 }).strict();
 
+
+export const HealthResponseSchema = z.object({
+  ok: z.literal(true),
+  service: z.string().min(1),
+}).strict();
+
+export const CreateSessionResponseSchema = z.object({
+  context: SessionContextViewSchema,
+}).strict();
+
+export const MissionUpdateResponseSchema = z.object({
+  context: SessionContextViewSchema,
+  mission: MissionContractSchema,
+  gate: MissionGateResultSchema,
+  progress: MissionProgressSchema.nullable(),
+}).strict();
+
+export const WorkflowContextResponseSchema = z.object({
+  context: SessionContextViewSchema,
+}).strict();
+
+export const FileUploadResponseSchema = z.object({
+  file: z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+  }).strict(),
+}).strict();
+
+export const WorkflowInstructionResponseSchema = z.string();
+
+export const SimpleOkResponseSchema = z.object({
+  ok: z.literal(true),
+}).strict();
