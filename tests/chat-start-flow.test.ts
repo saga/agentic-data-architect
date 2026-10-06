@@ -8,7 +8,8 @@ const dialog = await fs.readFile(new URL('../web/src/components/InvestigationDia
 test('new investigation auto-starts when both mission inputs are complete', () => {
   assert.match(controller, /if \(purpose && expectedResult\)/);
   assert.match(controller, /pendingInitialAutoStartRef\.current =/);
-  assert.match(controller, /message: '为什么做：' \+ purpose/);
+  assert.match(controller, /message: '请按照已经确认的任务目的和期望结果直接开始调查。'/);
+  assert.match(controller, /const hasInitialStartRepository = result\.control\.research\.githubRepositories/);
   assert.match(controller, /void send\(initialAutoStart\.message\)/);
   assert.match(controller, /const send = async \(text\?: string, routeId\?: string, guided = false, turnIdOverride\?: string\)/);
 });
