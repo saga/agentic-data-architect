@@ -15,7 +15,13 @@ function dbOrThrow(): DatabaseSync {
 }
 
 function extractSearchTerms(query: string): string[] {
-  return [...new Set(query.toLowerCase().split(/[^a-z0-9_\u4e00-\u9fff]+/i).map((term) => term.trim()).filter((term) => term.length >= 2))];
+  return [...new Set(
+    query
+      .toLowerCase()
+      .split(/[^a-z0-9_\u4e00-\u9fff]+/i)
+      .map((term: string) => term.trim())
+      .filter((term: string) => term.length >= 2),
+  )];
 }
 
 export type ConversationRole = 'user' | 'assistant' | 'system';
