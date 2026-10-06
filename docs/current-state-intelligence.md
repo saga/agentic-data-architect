@@ -117,15 +117,13 @@ Business Meaning
 
 ## Investigation Skills
 
-当前 capability Skill 进一步分成五类：
+当前可组合的 capability Skill 主要包括：
 
 - `investigation-session`：维护多轮调查状态，区分事实、Evidence、推断和未知。
 - `domain-modeling`：当业务术语影响模型、Mapping 或架构决定时统一 canonical language，并关联 Evidence。
 - `research`：调查外部事实和第三方能力，优先使用第一方资料并留下可复核的 Research Artifact。
 - `grilling`：针对真正需要人决定的业务/架构分叉维护 decision frontier；事实先调查，决定由用户确认。
-- `current-data-architecture`：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 梳理现状，并作为可直接选择的工作方式。
-
-`data-architecture-assessment` 在这些现状事实之上继续回答“现在怎么样、哪里有问题、先改什么”。
+`current-data-architecture` 不是 capability，而是一条可直接选择的 Workflow：围绕 Data Source、Data Flow、Data Model 和关键 Transformation 把现状讲清楚。
 
 `data-architecture-assessment` 在这些现状事实之上继续回答“现在怎么样、哪里有问题、先改什么”，不重新建立一套当前架构事实。
 
