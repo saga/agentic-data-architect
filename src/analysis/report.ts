@@ -181,7 +181,9 @@ export async function buildReport(name: string): Promise<{ markdown: string; pat
 
   const inv = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
-  const modernization = await loadModernizationPlan(name);
+  const modernization = inv.workflow === 'legacy-modernization'
+    ? await loadModernizationPlan(name)
+    : null;
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
   const coverage = current?.coverage;
