@@ -115,3 +115,21 @@ export const MissionProgressSchema = z.object({
   deliverables: z.array(MissionDeliverableProgressSchema),
 }).strict();
 export type MissionProgressContract = z.infer<typeof MissionProgressSchema>;
+
+export const MissionDeliverableContractSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(500),
+  required: z.boolean(),
+}).strict();
+
+export const MissionContractApiSchema = z.object({
+  version: z.literal(1),
+  purpose: z.string().trim().min(10).max(2000),
+  expectedResult: z.string().trim().min(10).max(4000),
+  deliverables: z.array(MissionDeliverableContractSchema).min(1).max(12),
+  status: z.literal('confirmed'),
+  confirmedAt: z.string().datetime(),
+  confirmedBy: z.literal('user'),
+}).strict();
+export type MissionContractApi = z.infer<typeof MissionContractApiSchema>;
