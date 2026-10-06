@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
-import { TrajectoryCheckpointDetailsSchema, TrajectoryResponseSchema, ModernizationResponseSchema, type TrajectoryEvent, type ModernizationPlanView } from '../../../src/api/contracts.js';
+import { getJson } from '../app/api.js';
+import {
+  ApiErrorSchema,
+  ReportRegenerateResponseSchema,
+  TrajectoryCheckpointDetailsSchema,
+  TrajectoryResponseSchema,
+  ModernizationResponseSchema,
+  SessionDataSchema,
+  type TrajectoryEvent,
+  type ModernizationPlanView,
+} from '../../../src/api/contracts.js';
 import type { InvestigationCheckpoint } from '../app/types.js';
 import { XMarkdown } from '@ant-design/x-markdown';
 
 type Checkpoint = InvestigationCheckpoint;
 type ModernizationPlan = ModernizationPlanView;
-
-interface SessionSnapshot {
-  context: { workflow: string | null };
-  control: { version: number; agent: { model: string; displayName: string } };
-}
-
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -47,29 +51,25 @@ export function InvestigationResultsPage(props: {
     setReportGateError(undefined);
     try {
       const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
-      const [reportResponse, trajectoryResponse, sessionResponse, modernizationResponse] = await Promise.all([
+      const [reportResponse, trajectoryData, sessionData, modernizationData] = await Promise.all([
         fetch(sessionPath + '/report'),
-        fetch(sessionPath + '/trajectory?limit=5000'),
-        fetch(sessionPath),
-        fetch(sessionPath + '/modernization'),
+        getJson(sessionPath + '/trajectory?limit=5000', TrajectoryResponseSchema),
+        getJson(sessionPath, SessionDataSchema),
+        getJson(sessionPath + '/modernization', ModernizationResponseSchema),
       ]);
       if (!reportResponse.ok && reportResponse.status !== 404 && reportResponse.status !== 409) {
         throw new Error((await reportResponse.text()) || reportResponse.statusText);
       }
-      if (!trajectoryResponse.ok) throw new Error((await trajectoryResponse.text()) || trajectoryResponse.statusText);
-      if (!sessionResponse.ok) throw new Error((await sessionResponse.text()) || sessionResponse.statusText);
-      if (!modernizationResponse.ok && modernizationResponse.status !== 409) throw new Error((await modernizationResponse.text()) || modernizationResponse.statusText);
+      if (!reportResponse.ok) {
+        const payload = ApiErrorSchema.parse(await reportResponse.json());
+        if (reportResponse.status !== 404 && reportResponse.status !== 409) {
+          throw new Error(payload.error);
+        }
+      }
 
-      const [reportPayload, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        reportResponse.ok
-          ? reportResponse.text()
-          : reportResponse.json() as Promise<{error?: string; code?: string}>,
-        trajectoryResponse.json().then((payload: unknown) => TrajectoryResponseSchema.parse(payload)),
-        sessionResponse.json() as Promise<SessionSnapshot>,
-        modernizationResponse.ok
-          ? modernizationResponse.json().then((payload: unknown) => ModernizationResponseSchema.parse(payload))
-          : Promise.resolve({ plan: null }),
-      ]);
+      const reportPayload = reportResponse.ok
+        ? await reportResponse.text()
+        : undefined;
 
       const unique = new Map<string, Checkpoint>();
       for (const event of trajectoryData.events) {
@@ -77,13 +77,12 @@ export function InvestigationResultsPage(props: {
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
       }
       if (reportResponse.ok) {
-        setReport(reportPayload as string);
+        setReport(reportPayload ?? '');
+        setReportGateError(undefined);
       } else {
         setReport('');
         setReportGateError(
-          typeof reportPayload === 'object' && reportPayload && typeof reportPayload.error === 'string'
-            ? reportPayload.error
-            : '范围还没有确认完整，正式报告暂时不能生成。',
+          '正式报告当前不可用；请根据最新调查状态重新生成。',
         );
       }
       setCheckpoints([...unique.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
@@ -128,10 +127,12 @@ export function InvestigationResultsPage(props: {
               setError(undefined);
               setReportGateError(undefined);
               try {
-                const response = await fetch('/api/sessions/' + encodeURIComponent(props.sessionName) + '/report/regenerate', { method: 'POST' });
-                if (!response.ok) throw new Error((await response.text()) || response.statusText);
-                const payload = await response.json() as { markdown?: string };
-                setReport(payload.markdown ?? '');
+                const payload = await getJson(
+                  '/api/sessions/' + encodeURIComponent(props.sessionName) + '/report/regenerate',
+                  ReportRegenerateResponseSchema,
+                  { method: 'POST' },
+                );
+                setReport(payload.markdown);
                 await load();
               } catch (cause) {
                 setReportGateError(cause instanceof Error ? cause.message : '报告重新生成失败');
