@@ -65,3 +65,25 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel)" && node "$PROJECT_ROOT/skills/fi
 回答时把内容分成：已确认的事实、基于 Evidence 的推断、未知 / 冲突、下一步最有价值的问题或确定性检查。
 
 不要为了完整而编造金融业务规则。
+## 输入校验
+
+只在调查真正涉及金融数据语义时使用。至少需要一个明确的金融对象或时间语义，例如 Position、Security、Price、Portfolio、Transaction、point-in-time。
+
+如果没有真实数据、代码或文档依据，不要把 Skill 内的领域常识当成当前项目事实。
+## 输出
+
+如果执行脚本形成正式的检查结果，保存到 .workspace/<session>/artifacts/financial-data-review.json。
+
+回答至少区分：已经确认的事实、基于资料的推断、未知或冲突，以及下一步最值得查什么。
+## 输出与验证
+
+- 脚本结果必须成功生成并通过其自身的数据结构检查。
+- Evidence 编号必须真实存在。
+- point-in-time、valuation date、identifier 等关键语义不能只靠模型判断。
+- 需要进入最终报告的结论必须回到当前 Investigation 的资料依据。
+## Gate
+
+这个 Skill 不负责整个 Investigation 的 Workflow transition；它的 Gate 是“检查结果可复核”。脚本失败、资料不完整或关键语义未确认时，只能输出明确的未知/冲突，不能输出确定结论。
+## 期望结果示例
+
+> 已确认 Position 使用结算持仓快照，查询日期是 valuation date；价格来自另一个数据集，两者不是同一个时间口径。这个时间差会影响历史回放，需要在后续分析中保留。
