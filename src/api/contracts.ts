@@ -23,7 +23,7 @@ export const MissionDeliverableSchema = z.object({
   id: z.string().min(1).max(80),
   title: z.string().min(1).max(120),
   description: z.string().min(1).max(500),
-  required: z.boolean(),
+  required: z.boolean().default(true),
 }).strict();
 export type MissionDeliverable = z.infer<typeof MissionDeliverableSchema>;
 
@@ -619,7 +619,7 @@ export type ReviewArtifactType = z.infer<typeof ReviewArtifactTypeSchema>;
 export const ArtifactReviewContractSchema = z.object({
   artifactType: ReviewArtifactTypeSchema,
   status: z.enum(['pass', 'fail']),
-  availability: z.enum(['completed', 'unavailable']),
+  availability: z.enum(['completed', 'unavailable']).default('completed'),
   score: z.number().int().min(0).max(100),
   summary: z.string().trim().min(1),
   issues: z.array(ReviewIssueSchema),
