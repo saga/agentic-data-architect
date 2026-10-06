@@ -40,7 +40,7 @@ import {
   applyHumanWorkflowTransition,
 } from './workflow/journey-editor.js';
 import { readTrajectory, summarizeTrajectory, summarizeTrajectoryTurns } from './investigation/trajectory.js';
-import { loadReportArtifact, runReport } from './workflow/report.js';
+import { loadReportArtifact, ReportReviewGateError, runReport } from './workflow/report.js';
 import { buildModernizationPlan, loadModernizationPlan } from './workflow/modernization.js';
 import {
   buildArchitectureAssessmentPlan,
@@ -1180,8 +1180,8 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       const report = await runReport(name);
       res.json(ResultViewModelSchema.parse({ status: 'available', report: report.markdown, review: report.review }));
     } catch (error) {
-      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
-        res.status(409).json({ code: error instanceof ReportGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
+      if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError || error instanceof ReportReviewGateError) {
+        res.status(409).json({ code: error instanceof ReportGateError ? error.code : error instanceof ReportReviewGateError ? error.code : 'RESULT_PRECONDITION', error: error.message, checks: error.result.checks });
         return;
       }
       throw error;
