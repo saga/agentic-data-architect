@@ -313,7 +313,12 @@ app.post('/api/sessions', async (req, res) => {
       control: await loadInvestigationControl(name),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
-      messages: listConversationMessages(name, 200),
+      messages: listConversationMessages(name, 200).map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        capturedAt: message.createdAt,
+      })),
       checkpoints: listTrajectoryCheckpoints(trajectory, 20),
       conversationCount: conversation.count,
       conversationLastMessageAt: conversation.lastMessageAt ?? null,
@@ -1016,7 +1021,12 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       ? searchConversation(name, query, { limit: Number.isFinite(limit) ? limit : 50 })
       : listConversationMessages(name, Number.isFinite(limit) ? limit : 100);
     res.json({
-      messages,
+      messages: messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        capturedAt: message.createdAt,
+      })),
       search: query || null,
     });
   });
@@ -1253,6 +1263,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
           ...(body.guided && !selectedRoute ? { selectedGuidance: message } : {}),
           onReasoningDelta: (delta) => send('reasoning', { delta }),
           onCheckpoint: (checkpoint) => send('checkpoint', checkpoint),
+          onCompanionNote: (note) => send('companion_note', { note }),
         },
       );
       send('completed', result);
