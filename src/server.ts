@@ -677,7 +677,7 @@ app.post('/api/sessions', async (req, res) => {
         wasFreeform: body.wasFreeform,
       },
     });
-    res.json({ ok: true });
+    res.json(SimpleOkResponseSchema.parse({ ok: true }));
   });
 
   app.get('/api/sessions/:name/audit', async (req, res) => {
