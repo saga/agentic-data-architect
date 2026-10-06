@@ -272,11 +272,21 @@ export const TrajectoryTurnSummarySchema = z.object({
   compactions: z.number().int().nonnegative(),
 }).strict();
 
+export const ConversationTurnSummarySchema = z.object({
+  turnId: z.string().min(1),
+  sessionName: z.string().min(1),
+  status: z.enum(['running', 'completed', 'failed', 'aborted']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  question: z.string().optional(),
+}).strict();
+export type ConversationTurnSummary = z.infer<typeof ConversationTurnSummarySchema>;
+
 export const TrajectoryResponseSchema = z.object({
   events: z.array(TrajectoryEventSchema),
   summary: TrajectorySummarySchema.nullable(),
   turns: z.array(TrajectoryTurnSummarySchema),
-  conversationTurns: z.array(z.unknown()),
+  conversationTurns: z.array(ConversationTurnSummarySchema),
 }).strict();
 export type TrajectoryResponse = z.infer<typeof TrajectoryResponseSchema>;
 
