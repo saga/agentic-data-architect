@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
-import type { WorkspaceInput } from './workspace.js';
 
 /** 对话消息角色；与 Copilot/LLM 的常见角色保持简单一致。 */
 export type ConversationRole = 'user' | 'assistant' | 'system';
@@ -417,69 +416,3 @@ export function getConversationSummary(sessionName: string): ConversationSummary
 }
 
 /** 把旧 context.json 中的 conversation inputs 一次性迁入 SQLite，并从 context 中删除副本。 */
-export function migrateLegacyConversationInputs(
-  sessionName: string,
-  inputs: WorkspaceInput[],
-): WorkspaceInput[] {
-  const legacyMessages = inputs.filter(
-    (input) =>
-      (input.kind === 'question' || input.kind === 'user_message' || input.kind === 'assistant_message') &&
-      Boolean(input.content?.trim()),
-  );
-  if (legacyMessages.length === 0) return inputs;
-
-  const db = getDatabase();
-  for (const input of legacyMessages) {
-    const role = input.kind === 'assistant_message' ? 'assistant' : 'user';
-    const content = input.content ?? '';
-    // 新链路写消息时同时写表和 input（preserve/answerQuestion），下次加载不能再按
-    // input 导入一次——内容已在表里就跳过，否则同一句话出现两次（id 不同，去重拦不住）。
-    const exists = db.prepare(
-      'SELECT 1 FROM conversation_messages WHERE session_name = ? AND role = ? AND content = ? LIMIT 1',
-    ).get(sessionName, role, content);
-    if (!exists) {
-      saveConversationMessage({
-        id: sessionName + ':' + input.id,
-        sessionName,
-        role,
-        content,
-        createdAt: input.capturedAt,
-      });
-    }
-  }
-
-  return inputs.filter(
-    (input) => input.kind !== 'question' && input.kind !== 'user_message' && input.kind !== 'assistant_message',
-  );
-}
-
-/** 关闭当前 SQLite 连接，供服务 shutdown 和测试 teardown 使用。 */
-export function closeConversationStore(): void {
-  database?.close();
-  database = undefined;
-  databasePath = undefined;
-}
-
-/** 获取可用数据库连接；所有查询都通过统一入口建立。 */
-function dbOrThrow(): DatabaseSync {
-  return getDatabase();
-}
-
-/** 把中英文查询拆成适合 FTS5 trigram 检索的词片，降低中文搜索对空格的依赖。 */
-function extractSearchTerms(value: string): string[] {
-  const segments = value.match(/[\u3400-\u9fff]{2,}|[\p{L}\p{N}_]{3,}/gu) ?? [];
-  const terms: string[] = [];
-
-  for (const segment of segments) {
-    if (/^[\u3400-\u9fff]+$/.test(segment)) {
-      for (let i = 0; i + 3 <= segment.length; i += 2) {
-        terms.push(segment.slice(i, i + 3));
-      }
-      if (segment.length > 3) terms.push(segment.slice(-3));
-    } else {
-      terms.push(segment);
-    }
-  }
-
-  return [...new Set(terms.map((term) => term.trim()).filter(Boolean))];
-}
