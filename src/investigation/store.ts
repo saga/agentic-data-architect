@@ -5,7 +5,6 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { config } from '../config.js';
 import { DiscoverySnapshotSchema } from './discovery-snapshot-schema.js';
 import {
   contextFile,
@@ -17,7 +16,6 @@ import {
   writeJsonAtomic,
   type WorkspaceContext,
 } from './workspace.js';
-import { migrateLegacyConversationInputs } from './conversation.js';
 import { JourneyPlanSchema, WorkspaceContextSchema, type JourneyPlan } from './schemas.js';
 
 /** Investigation 是 WorkspaceContext 在业务层的别名，代表持久化的当前分析状态。 */
@@ -121,39 +119,11 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   });
 }
 
-/** 从当前 workspace 或旧版数据目录读取 Investigation，并执行必要的历史迁移。 */
+/** 读取当前 WorkspaceContext；新 Investigation 只接受当前 Runtime Schema。 */
 export async function loadInvestigation(name: string): Promise<Investigation> {
-  try {
-    const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as Partial<Investigation>;
-    const inv = normalizeInvestigation(name, raw);
-    const remainingInputs = migrateLegacyConversationInputs(name, inv.inputs);
-    if (remainingInputs.length !== inv.inputs.length) {
-      inv.inputs = remainingInputs;
-      await saveInvestigation(inv);
-    }
-    return inv;
-  } catch (e) {
-    if (!(e instanceof Error) || !('code' in e) || (e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
-  }
-
-  const legacyCandidates = [
-    path.join(config.legacyDataDir, 'investigations', name, 'investigation.json'),
-    path.join(config.legacyDataDir, 'investigations', name + '.json'),
-  ];
-  for (const legacy of legacyCandidates) {
-    try {
-      const raw = JSON.parse(await fs.readFile(legacy, 'utf-8')) as Partial<Investigation>;
-      const inv = normalizeInvestigation(name, raw);
-      inv.inputs = migrateLegacyConversationInputs(name, inv.inputs);
-      await saveInvestigation(inv);
-      return inv;
-    } catch (e) {
-      if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw e;
-    }
-  }
-
-  throw new Error('Investigation 不存在：' + name);
+  await ensureWorkspace(name);
+  const raw = JSON.parse(await fs.readFile(contextFile(name), 'utf-8')) as unknown;
+  return WorkspaceContextSchema.parse(raw);
 }
 
 /**
@@ -268,60 +238,12 @@ export async function updateInvestigationJourneyPlan(
   });
 }
 
-/** 把旧版/不完整 context 转成当前 schemaVersion=3 的可信 Investigation。 */
-
-function normalizeInvestigation(name: string, raw: Partial<Investigation>): Investigation {
-  return WorkspaceContextSchema.parse({
-    schemaVersion: 3,
-    name,
-    userPrompt: raw.userPrompt ?? raw.goal ?? '',
-    // 旧版本如果没有 workflow，继续按 Legacy Modernization 兼容读取；显式 null 表示自主调查。
-    workflow: raw.workflow === undefined ? 'legacy-modernization' : raw.workflow,
-    // 迁移旧 Investigation：如果只有 userPrompt，就把它恢复为真正的研究目标。
-    goal: raw.goal?.trim() || raw.userPrompt?.trim() || '',
-    scope: raw.scope ?? [],
-    systems: raw.systems ?? [],
-    ...(raw.mission ? { mission: raw.mission } : {}),
-    ...(raw.scopeValidation ? { scopeValidation: raw.scopeValidation } : {}),
-    questions: raw.questions ?? [],
-    discoveryRuns: raw.discoveryRuns ?? [],
-    evidence: raw.evidence ?? [],
-    claims: (raw.claims ?? []).map((c, i) => ({
-      id: c.id ?? ('legacy-' + i),
-      claim: c.claim,
-      status: c.status,
-      evidenceIds: c.evidenceIds ?? [],
-    })),
-    findings: raw.findings ?? [],
-    unknowns: raw.unknowns ?? [],
-    importantInformation: raw.importantInformation ?? [],
-    inputs: raw.inputs ?? [],
-    ...(raw.journeyPlan ? { journeyPlan: raw.journeyPlan } : {}),
-    ...(raw.copilotSessionId ? { copilotSessionId: raw.copilotSessionId } : {}),
-    ...(typeof raw.copilotConfigurationVersion === 'number'
-      ? { copilotConfigurationVersion: raw.copilotConfigurationVersion }
-      : {}),
-    updatedAt: raw.updatedAt ?? new Date().toISOString(),
-  });
-}
-
-/** 判断当前或旧版存储中是否存在指定 Investigation。 */
+/** 判断当前 Investigation 是否存在。 */
 export async function investigationExists(name: string): Promise<boolean> {
   try {
     await fs.access(contextFile(name));
     return true;
   } catch {
-    for (const legacy of [
-      path.join(config.legacyDataDir, 'investigations', name, 'investigation.json'),
-      path.join(config.legacyDataDir, 'investigations', name + '.json'),
-    ]) {
-      try {
-        await fs.access(legacy);
-        return true;
-      } catch {
-        // continue
-      }
-    }
     return false;
   }
 }
