@@ -6,6 +6,13 @@ import {
   summarizeReviewFailure,
 } from '../src/analysis/reviewer.js';
 
+
+const revisionFields = {
+  artifactVersion: 1,
+  artifactHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  sourceRevision: '0123456789abcdef01234567',
+};
+
 const review = {
   artifactType: 'report' as const,
   status: 'fail' as const,
@@ -27,6 +34,7 @@ const review = {
     },
   ],
   reviewedAt: new Date().toISOString(),
+  ...revisionFields,
 };
 
 test('artifact review schema accepts a valid review result', () => {
@@ -55,6 +63,7 @@ test('unavailable review can be persisted as a valid review record', () => {
       suggestion: '稍后重新生成并审核结果；原始调查内容没有因此被修改。',
     }],
     reviewedAt: new Date().toISOString(),
+    ...revisionFields,
   };
 
   assert.equal(ArtifactReviewSchema.parse(unavailable).availability, 'unavailable');
