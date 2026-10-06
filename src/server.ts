@@ -1103,30 +1103,6 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }
   });
 
-  /** 兼容旧版单头像 URL：旧 Control 中的 avatar.png 仍然可以显示。 */
-  app.get('/api/sessions/:name/assistant/avatar', async (req, res) => {
-    const name = sessionKey(req.params.name);
-    const control = await loadInvestigationControl(name);
-    const relativePath = control.agent.avatarPath;
-    if (!relativePath) {
-      res.status(404).end();
-      return;
-    }
-    try {
-      const buffer = await fs.readFile(path.join(workspaceRoot(name), relativePath));
-      res.setHeader('Content-Type', control.agent.avatarMimeType ?? 'image/png');
-      res.setHeader('Content-Length', buffer.byteLength);
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.end(buffer);
-    } catch (error) {
-      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        res.status(404).end();
-        return;
-      }
-      throw error;
-    }
-  });
-
   app.get('/api/sessions/:name/datasets', async (req, res) => {
     const name = sessionKey(req.params.name);
     const refresh = req.query.refresh === 'true';
