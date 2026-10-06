@@ -802,7 +802,7 @@ app.post('/api/sessions', async (req, res) => {
       res.status(409).json({ error: result.error || 'Workflow 没有推进。' });
       return;
     }
-    res.json(result);
+    res.json(WorkflowTransitionResponseSchema.parse(result));
   });
 
   /** 删除当前 Investigation 的自定义地图，恢复所选工作方式的内置路线。 */
