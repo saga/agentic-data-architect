@@ -53,3 +53,22 @@ Agent 自信地说了 X，但没有任何 evidence 支持 X → unsupported
 ## 依赖安全回归
 
 CI 对 Node 生产依赖执行 critical audit；Python 生产依赖从 `uv` 锁定项目导出后交给 `pip-audit` 做 strict audit。恢复 high blocking 的条件是 Snowflake SDK 发布使用已修复 `toml` 版本且不需要破坏性降级。
+
+
+## Skill Contract 回归
+
+所有 `skills/*/SKILL.md` 都必须写清：
+
+- 输入校验
+- 输出
+- 输出与验证
+- Gate
+- 期望结果示例
+
+`npm run flow:lint` 和 `tests/skill.test.ts` 会检查这五项是否缺失。这个检查只保证“写清楚了契约”，不会假装它已经证明业务结果正确；真正的结果正确性仍由对应的 Schema、脚本、确定性 Gate 和独立 Reviewer 负责。
+
+## Investigation Report 回归
+
+每次完整 Investigation 最终都应有 `reports/report.md`。报告生成前检查任务、范围、真实调查成果、中间分析记录和资料引用；生成后再由独立 Reviewer 检查是否真的回答了用户目标、是否容易读懂、是否存在明显越界或矛盾。
+
+Reviewer 不可用、报告过期或报告资料与当前任务不一致时，都不能把结果标成当前可交付结果。
