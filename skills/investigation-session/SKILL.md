@@ -67,3 +67,14 @@ metadata:
 - GitHub 研究遵循 `search-github` SKILL。
 - 大量代码扫描使用本地 `rg` / `find` / `git` 或对应脚本；不要用长篇自然语言描述代替脚本结果。
 - 不把大段内部源代码复制到研究文档；记录路径、函数、行号或最小必要片段。
+## 输入校验
+正式调查前必须通过 Mission Gate 和 Scope Validation。没有用户确认的任务目的、期望结果或范围时，只能整理候选内容，不能开始正式调查。
+## 输出
+每个有效调查 turn 至少留下一个中间分析记录到 artifacts/analysis/turn-*.md；Investigation 完成后还必须有 reports/report.md。
+## 输出与验证
+中间记录必须对应本次用户问题和实际产生的资料；最终报告只能来自已经保存的调查结果。
+Stage Gate、Scope Gate、Mission Completion 和 Report Gate 都不能被 Agent 的自然语言完成声明绕过。
+## Gate
+Gate 分为 Mission / Scope、Stage、Mission Completion、Report 四层。每一层都由确定性代码判断自己的职责；模型只提供候选结果或语义辅助判断。
+## 期望结果示例
+> 这轮已经把 Position 的主要来源查清，并保存了关键资料；历史回补还没有证据，我会保留为未确认事项，不把它写成结论。
