@@ -53,12 +53,14 @@ export function InvestigationConfigPage(props:{
   const save=async()=>{
     setSaving(true);
     try{
-      const response=await fetch(`/api/sessions/${encodeURIComponent(props.sessionName)}/config`,{
-        method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({research:draft.research,agent:draft.agent}),
-      });
-      if(!response.ok) throw new Error((await response.text())||response.statusText);
-      const data=ControlResponseSchema.parse(await response.json());
+      const data=await getJson(
+        `/api/sessions/${encodeURIComponent(props.sessionName)}/config`,
+        ControlResponseSchema,
+        {
+          method:'PUT',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({research:draft.research,agent:draft.agent}),
+        },
+      );
       setDraft(data.control);
       await props.onSaved(data.control);
     }finally{setSaving(false);}
@@ -108,16 +110,11 @@ export function InvestigationConfigPage(props:{
       body.append('width', String(draft.agent.avatarWidth));
       body.append('height', String(draft.agent.avatarHeight));
 
-      const response = await fetch(
+      const data = await getJson(
         `/api/sessions/${encodeURIComponent(props.sessionName)}/assistant/avatar`,
+        ControlResponseSchema,
         { method: 'POST', body },
       );
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || response.statusText);
-      }
-
-      const data = ControlResponseSchema.parse(await response.json());
       setDraft(clone(data.control));
       await props.onSaved(data.control);
     } catch (error) {
