@@ -23,6 +23,7 @@ export function toControlView(control: InvestigationControlDomain): Investigatio
 }
 
 export const WorkflowIdSchema = z.enum([
+  'current-data-architecture',
   'legacy-modernization',
   'financial-ai-native-architecture',
   'data-architecture-assessment',
