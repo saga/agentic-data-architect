@@ -188,6 +188,76 @@ test('invalid evidence references block the stage gate', () => {
   assert.ok(result.checks.some((item) => item.name === 'Claim 的 Evidence 引用有效' && !item.passed));
 });
 
+test('persisted structured work product can form a checkpoint without new evidence', () => {
+  const base = input({
+    after: {
+      evidenceIds: ['ev-old'],
+      findingIds: ['finding-old'],
+      discoveryRunCount: 1,
+    },
+    missionProgressAfter: {
+      covered: 2,
+      total: 3,
+      percent: 67,
+      deliverables: input().missionProgressBefore.deliverables.map((item, index) => ({
+        ...item,
+        status: index < 2 ? 'covered' as const : 'not_started' as const,
+        detail: index < 2 ? '已覆盖' : '未开始',
+      })),
+    },
+    parsed: {
+      answer: '目标架构与新旧对应关系已经形成。',
+      claims: [],
+      unknowns: [],
+      followUpQuestions: [],
+      routeOptions: [],
+    },
+    persistedWorkProductChanged: true,
+  });
+  const result = evaluateInvestigationStageGate(base);
+  assert.equal(result.passed, true);
+  assert.equal(result.checks.some((item) => item.name === '本阶段存在真实调查成果' && item.passed), true);
+});
+
+test('a later real stage can still leave a checkpoint after earlier deliverables are already covered', () => {
+  const base = input({
+    execution: 1,
+    before: {
+      evidenceIds: ['ev-old'],
+      findingIds: ['finding-old'],
+      discoveryRunCount: 2,
+    },
+    after: {
+      evidenceIds: ['ev-old', 'ev-next'],
+      findingIds: ['finding-old'],
+      discoveryRunCount: 2,
+    },
+    missionProgressBefore: {
+      covered: 3,
+      total: 3,
+      percent: 100,
+      deliverables: input().missionProgressBefore.deliverables.map((item) => ({
+        ...item,
+        status: 'covered' as const,
+        detail: '已覆盖',
+      })),
+    },
+    missionProgressAfter: {
+      covered: 3,
+      total: 3,
+      percent: 100,
+      deliverables: input().missionProgressBefore.deliverables.map((item) => ({
+        ...item,
+        status: 'covered' as const,
+        detail: '已覆盖',
+      })),
+    },
+  });
+  const result = evaluateInvestigationStageGate(base);
+  assert.equal(result.passed, true);
+  assert.equal(result.shouldContinue, false);
+});
+
 test('checkpoint can only be built after the gate passes', () => {
   const gateInput = input({ execution: 2 });
   const gate = evaluateInvestigationStageGate(gateInput);
