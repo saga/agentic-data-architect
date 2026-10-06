@@ -172,9 +172,6 @@ export async function buildResultViewModel(name: string): Promise<ResultViewMode
     };
   }
 
-  // investigation 目前用于保证 session 确实可读取，并让这个聚合边界与核心 Investigation 对齐。
-  void investigation;
-
   return ResultViewModelSchema.parse({
     schemaVersion: 1,
     session: {
