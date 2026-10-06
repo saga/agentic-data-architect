@@ -957,8 +957,12 @@ export function useInvestigationController() {
       });
 
       // 新建调查时如果两个核心输入都已经填写，它们本身就是用户确认的 Mission。
-      // 直接保存 Mission，并在 Session 页面加载后自动启动第一轮，不再要求用户输入“开始”。
+      // 自动启动意图先登记；即使 Mission 清晰度检查要求用户补充，也不能丢掉首次启动。
       if (purpose && expectedResult) {
+        pendingInitialAutoStartRef.current = {
+          sessionName: created.context.name,
+          message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
+        };
         try {
           await getJson(
             '/api/sessions/' + encodeURIComponent(created.context.name) + '/mission',
@@ -971,10 +975,6 @@ export function useInvestigationController() {
           );
           pendingInitialMissionDraftRef.current = undefined;
           pendingInitialMissionErrorRef.current = undefined;
-          pendingInitialAutoStartRef.current = {
-            sessionName: created.context.name,
-            message: '为什么做：' + purpose + '\\n\\n期望结果：' + expectedResult,
-          };
         } catch (e) {
           if (e instanceof ApiRequestError && e.apiError.code === 'MISSION_CLARITY_REQUIRED') {
             pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
