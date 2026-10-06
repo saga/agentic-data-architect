@@ -434,6 +434,9 @@ export async function answerQuestion(
 
     let trajectoryWrite: Promise<void> = Promise.resolve();
     let sessionPersistence: Promise<void> = Promise.resolve();
+    // The execution number belongs to the current turn, while each stage callback receives it locally.
+    // Keep the last completed execution for the final analysis artifact.
+    let lastExecution = 0;
     type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
     const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
       trajectoryWrite = trajectoryWrite
@@ -516,6 +519,7 @@ export async function answerQuestion(
       onStatus: emitStatus,
       onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
+        lastExecution = execution;
         const latestStage = await loadInvestigation(investigationName);
         const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
@@ -826,7 +830,7 @@ export async function answerQuestion(
 
     await saveInvestigationAnalysisArtifact(investigationName, {
       turnId,
-      execution,
+      execution: lastExecution,
       question: effectiveQuestion,
       purpose: mission.purpose,
       expectedResult: mission.expectedResult,
