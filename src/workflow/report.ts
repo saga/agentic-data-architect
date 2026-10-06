@@ -25,6 +25,14 @@ export type ReportArtifactState =
   | { status: 'blocked'; reason: string }
   | { status: 'available'; markdown: string; review: Awaited<ReturnType<typeof reviewArtifact>> };
 
+export class ReportReviewGateError extends Error {
+  readonly code = 'RESULT_REVIEW_FAILED';
+  constructor(readonly review: Awaited<ReturnType<typeof reviewArtifact>>) {
+    super('报告的独立质量审核未通过：' + summarizeReviewFailure(review));
+    this.name = 'ReportReviewGateError';
+  }
+}
+
 
 /** report 的 workflow 入口（纯透传，保持 cli → workflow → analysis 分层）。 */
 export async function runReport(
@@ -67,11 +75,7 @@ export async function runReport(
   });
   const reviewPath = await saveArtifactReview(name, review);
   if (review.status !== 'pass') {
-    throw new Error(
-      '报告已经生成，但独立质量检查没有通过：'
-      + summarizeReviewFailure(review)
-      + '。完整检查结果保存在 ' + reviewPath + '。',
-    );
+    throw new ReportReviewGateError(review);
   }
   return { ...report, review };
 }
