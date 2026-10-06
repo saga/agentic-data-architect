@@ -598,6 +598,7 @@ export const TrajectoryTurnSummarySchema = z.object({
   failedEvents: z.number().int().nonnegative(),
   compactions: z.number().int().nonnegative(),
 }).strict();
+export type TrajectoryTurnSummary = z.infer<typeof TrajectoryTurnSummarySchema>;
 
 export const ConversationTurnSummarySchema = z.object({
   turnId: z.string().min(1),
