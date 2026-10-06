@@ -840,7 +840,7 @@ app.post('/api/sessions', async (req, res) => {
       research: body.research,
       agent: body.agent,
     });
-    res.json({ control });
+    res.json(ControlResponseSchema.parse({ control }));
   });
 
   // 文件上传 API：把文件存入当前 Investigation workspace，并记录 sha256/Evidence 输入。
