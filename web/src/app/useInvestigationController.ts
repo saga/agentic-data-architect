@@ -8,6 +8,7 @@ import {
   CreateSessionResponseSchema,
   ExecutionStatusSchema,
   FileUploadResponseSchema,
+  MissionDraftSchema,
   MissionUpdateResponseSchema,
   ModelsResponseSchema,
   PermissionsResponseSchema,
@@ -669,15 +670,22 @@ export function useInvestigationController() {
 
       if (!response.ok) {
         const body = await response.text();
-        let parsedBody: { code?: string; error?: string; draft?: MissionDraft } | undefined;
+        let parsedBody;
         try {
-          parsedBody = JSON.parse(body) as typeof parsedBody;
+          parsedBody = ApiErrorSchema.parse(JSON.parse(body));
         } catch {
           parsedBody = undefined;
         }
 
+        const errorDetails = parsedBody?.details;
+        const missionDraft = errorDetails
+          && typeof errorDetails === 'object'
+          && 'draft' in errorDetails
+          ? MissionDraftSchema.safeParse((errorDetails as { draft?: unknown }).draft).data
+          : undefined;
+
         if (response.status === 409 && parsedBody?.code === 'MISSION_REQUIRED') {
-          setMissionDraft(parsedBody.draft ?? {
+          setMissionDraft(missionDraft ?? {
             purpose: current?.context.mission?.purpose ?? '',
             expectedResult: current?.context.mission?.expectedResult ?? '',
             deliverableIds: current?.context.mission?.deliverables.map((item) => item.id) ?? [],
@@ -847,13 +855,13 @@ export function useInvestigationController() {
     } catch (e) {
       const raw = e instanceof Error ? e.message : '无法保存任务目标';
       try {
-        const body = JSON.parse(raw) as {
-          code?: string;
-          error?: string;
-          clarity?: { reason?: string };
-        };
+        const body = ApiErrorSchema.parse(JSON.parse(raw));
+        const details = body.details;
+        const clarity = details && typeof details === 'object' && 'clarity' in details
+          ? (details as { clarity?: { reason?: string } }).clarity
+          : undefined;
         if (body.code === 'MISSION_CLARITY_REQUIRED') {
-          setMissionError(body.error || body.clarity?.reason || '任务目的和期望结果还不够具体。');
+          setMissionError(body.error || clarity?.reason || '任务目的和期望结果还不够具体。');
           return;
         }
         if (body.code === 'MISSION_CHANGE_BLOCKED') {
@@ -961,7 +969,7 @@ export function useInvestigationController() {
           const raw = e instanceof Error ? e.message : '无法确认任务';
           let clarityHandled = false;
           try {
-            const body = JSON.parse(raw) as { code?: string; error?: string };
+            const body = ApiErrorSchema.parse(JSON.parse(raw));
             if (body.code === 'MISSION_CLARITY_REQUIRED') {
               pendingInitialMissionDraftRef.current = { purpose, expectedResult, deliverableIds: [] };
               pendingInitialMissionErrorRef.current = body.error || '任务目的和期望结果还不够具体。';
