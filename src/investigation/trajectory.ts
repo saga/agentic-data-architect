@@ -115,7 +115,15 @@ export async function readTrajectory(name: string, options: { turnId?: string; l
   let text = '';
   try { text = await fs.readFile(trajectoryFile(name), 'utf8'); } catch { return []; }
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 500), 5000));
-  const events = text.split('\n').filter(Boolean).map((line) => { try { return TrajectoryEventSchema.parse(JSON.parse(line)); } catch { return null; } }).filter((event): event is TrajectoryEvent => Boolean(event));
+  const lines = text.split('\n').filter(Boolean);
+  const events: TrajectoryEvent[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    try {
+      events.push(TrajectoryEventSchema.parse(JSON.parse(lines[index] as string)));
+    } catch (error) {
+      throw new Error('Trajectory 数据损坏：第 ' + String(index + 1) + ' 行无法通过 schema validation。' + (error instanceof Error ? ' ' + error.message : ''));
+    }
+  }
   const filtered = options.turnId ? events.filter((event) => event.turnId === options.turnId) : events;
   return filtered.slice(-limit);
 }
