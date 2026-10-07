@@ -156,7 +156,6 @@ import {
   abortCopilotTurn,
   getClient,
   listPendingCopilotPermissions,
-  listPendingCopilotUserInputs,
   respondToCopilotPermission,
   stopClient,
 } from './agent/copilot.js';
