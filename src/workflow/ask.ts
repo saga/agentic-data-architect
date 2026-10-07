@@ -32,6 +32,7 @@ import {
 } from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
 import { appendTrajectoryEvent } from '../investigation/trajectory.js';
+import { appendReasoningLog } from '../investigation/run-recorder.js';
 import { appendContextInput, appendTranscript, setAgentSessionId, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
@@ -162,6 +163,7 @@ export async function answerQuestion(
     active.lastActivityAt = new Date().toISOString();
     active.lastActivity = activity;
   };
+  let reasoningWrite: Promise<void> = Promise.resolve();
   const emitStatus = (status: string): void => {
     updateLiveActivity(status);
     onStatus?.(status);
@@ -172,6 +174,9 @@ export async function answerQuestion(
   };
   const emitReasoning = (delta: string): void => {
     updateLiveActivity('正在分析问题');
+    if (delta.trim()) {
+      reasoningWrite = reasoningWrite.then(() => appendReasoningLog(investigationName, turnId, delta));
+    }
     options?.onReasoningDelta?.(delta);
     emitStatus('助手正在分析你的问题，请稍候…');
   };
@@ -809,6 +814,7 @@ export async function answerQuestion(
       turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
+    await reasoningWrite;
     await sessionPersistence;
     await trajectoryWrite;
     if (sessionPersistenceError) {
