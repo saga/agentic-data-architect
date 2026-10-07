@@ -8,6 +8,7 @@ import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilo
 import { askAgentWithFallback } from '../agent/runtime.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
+import { computeMissionFingerprint, computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import { buildAssistantAnswerPrompt, buildAssistantCompanionPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
 import { persistModernizationAgentResult } from './modernization.js';
@@ -226,6 +227,24 @@ export async function answerQuestion(
     // not added to the Task Agent prompt; it is presentation/continuity state only.
     await captureExplicitRelationshipMemories(userVisibleQuestion);
     const mission = inv.mission!;
+    const turnMissionFingerprint = computeMissionFingerprint({
+      mission,
+      goal: mission.purpose,
+    });
+    let turnScopeFingerprint = computeScopeFingerprint(inv);
+
+    const assertTurnStillCurrent = async (): Promise<Awaited<ReturnType<typeof loadInvestigation>>> => {
+      const latest = await loadInvestigation(investigationName);
+      const currentMissionFingerprint = computeMissionFingerprint(latest);
+      const currentScopeFingerprint = computeScopeFingerprint(latest);
+      if (currentMissionFingerprint !== turnMissionFingerprint) {
+        throw new Error('任务在本轮调查期间发生了变化，当前结果不会覆盖新的任务。请重新开始这一轮调查。');
+      }
+      if (currentScopeFingerprint !== turnScopeFingerprint) {
+        throw new Error('调查范围在本轮调查期间发生了变化，当前结果不会覆盖新的范围。请重新开始这一轮调查。');
+      }
+      return latest;
+    };
 
     // Companion Note 是独立的人格层输出，不参与任务 Agent 的判断；只在长任务中偶尔出现。
     let companionMemories: Array<{ category: string; key: string; value: string }> = [];
@@ -522,7 +541,7 @@ export async function answerQuestion(
       onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
         lastExecution = execution;
-        const latestStage = await loadInvestigation(investigationName);
+        const latestStage = await assertTurnStillCurrent();
         const stageEvidenceMap = new Map(latestStage.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, stageEvidenceMap);
         const stageAfter = snapshotInvestigationForStageGate(latestStage);
@@ -696,12 +715,18 @@ export async function answerQuestion(
             };
       },
       onBeforeWorkflowTransition: async ({ content }) => {
-        // 每个阶段在 Gate 前先把本轮已经形成的、且通过 Evidence 校验的 intake 写入 context。
-        const latest = await loadInvestigation(investigationName);
+        // Gate 前先确认本轮仍属于同一个 Mission / Scope，避免旧 turn 把新任务的状态写回去。
+        let latest = await assertTurnStillCurrent();
         const evidenceMap = new Map(latest.evidence.map((item) => [item.id, item]));
         const stageParsed = parseAgentAnswer(content, evidenceMap);
         if (stageParsed.intake) {
           await persistAgentIntake(investigationName, stageParsed.intake);
+          latest = await loadInvestigation(investigationName);
+          turnScopeFingerprint = computeScopeFingerprint(latest);
+          // Scope 更新属于本轮自己完成的正式范围整理，更新本轮提交基线。
+          if (computeMissionFingerprint(latest) !== turnMissionFingerprint) {
+            throw new Error('调查任务在本轮范围整理期间发生了变化，当前结果不会继续写入。请重新开始这一轮调查。');
+          }
         }
         if (latest.workflow === 'legacy-modernization' && stageParsed.modernization) {
           // 先保存结构化 work product，Stage Gate 才能用真实状态判断交付物是否前进。
@@ -784,8 +809,8 @@ export async function answerQuestion(
     }
     abortRequestedTurns.delete(turnId);
 
-    // Agent 在 Gate 前可能刚刚确认了 Scope；重新加载最新 Investigation，避免旧内存快照把新范围覆盖回去。
-    inv = await loadInvestigation(investigationName);
+    // Agent 在 Gate 前可能刚刚确认了 Scope；但最终提交前仍必须再次确认 Mission / Scope 没有被其它操作改动。
+    inv = await assertTurnStillCurrent();
     const evidenceAfterTools = new Map(inv.evidence.map((e) => [e.id, e]));
     const parsed = parseAgentAnswer(raw, evidenceAfterTools);
     if (parsed.warnings.length) {
