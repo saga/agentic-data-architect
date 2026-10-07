@@ -14,6 +14,7 @@ import { loadArchitectureAssessmentPlan } from './assessment.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
 import { deriveModernizationFacts } from './journey.js';
+import { evaluateDerivedState } from './derived-state.js';
 
 export type MissionDeliverableStatus =
   | 'covered'
@@ -87,6 +88,7 @@ function covered(
 function evaluateDeliverable(
   item: MissionDeliverable,
   signals: ProgressSignals,
+  derived: ReturnType<typeof evaluateDerivedState>,
 ): MissionDeliverableProgress {
   const current = signals.currentState;
   const datasets = current?.coverage.datasets ?? 0;
@@ -101,7 +103,7 @@ function evaluateDeliverable(
       const coveredCount = Number(sourceReady) + Number(flowReady) + Number(modelReady) + Number(parsedSql > 0);
       return covered(
         item,
-        coveredCount >= 3 ? 'covered' : coveredCount > 0 ? 'in_progress' : 'not_started',
+        derived.currentDataArchitectureReady ? 'covered' : coveredCount > 0 ? 'in_progress' : 'not_started',
         '当前架构覆盖 Source=' + (sourceReady ? '是' : '否')
           + '、Flow=' + (flowReady ? '是' : '否')
           + '、Model=' + (modelReady ? '是' : '否')
@@ -114,7 +116,7 @@ function evaluateDeliverable(
       const sourceCandidate = signals.sourceOfTruthCount > 0;
       return covered(
         item,
-        sourceCandidate ? 'covered' : hasAssets ? 'in_progress' : 'not_started',
+        derived.dataSourceReady ? 'covered' : hasAssets ? 'in_progress' : 'not_started',
         sourceCandidate
           ? '已经形成数据来源候选，可以继续核对可信来源。'
           : hasAssets
@@ -127,7 +129,7 @@ function evaluateDeliverable(
       const flowReady = signals.lineageEdgeCount > 0 || connectedDatasets >= 2;
       return covered(
         item,
-        flowReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        derived.dataFlowReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
         flowReady
           ? '已经形成可追踪的数据流关系。'
           : datasets > 0
@@ -140,7 +142,7 @@ function evaluateDeliverable(
       const modelReady = datasets > 0 && signals.estateColumnCount > 0;
       return covered(
         item,
-        modelReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        derived.dataModelReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
         modelReady
           ? '已经发现数据集和列级结构，可以整理核心实体与关系。'
           : datasets > 0
@@ -152,7 +154,7 @@ function evaluateDeliverable(
     case 'transformation':
       return covered(
         item,
-        parsedSql > 0 ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
+        derived.transformationReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
         parsedSql > 0
           ? '已经解析到 ' + String(parsedSql) + ' 条 SQL statement。'
           : '还没有解析到可用于判断转换逻辑的 SQL。',
@@ -161,7 +163,7 @@ function evaluateDeliverable(
     case 'findings':
       return covered(
         item,
-        signals.findingsCount > 0 ? 'covered' : 'not_started',
+        derived.findingsReady ? 'covered' : 'not_started',
         signals.findingsCount > 0
           ? '已经形成 ' + String(signals.findingsCount) + ' 个 Finding。'
           : '还没有形成结构化 Finding。',
@@ -171,7 +173,7 @@ function evaluateDeliverable(
       const count = signals.modernization?.targetComponentCount ?? 0;
       return covered(
         item,
-        count > 0 ? 'covered' : signals.currentState ? 'in_progress' : 'not_started',
+        derived.targetArchitectureReady ? 'covered' : signals.currentState ? 'in_progress' : 'not_started',
         count > 0 ? '已经形成 ' + String(count) + ' 个目标架构组件。' : '目标架构还没有形成实际组件。',
       );
     }
@@ -180,7 +182,7 @@ function evaluateDeliverable(
       const count = signals.modernization?.mappingCount ?? 0;
       return covered(
         item,
-        count > 0 ? 'covered' : 'not_started',
+        derived.mappingReady ? 'covered' : 'not_started',
         count > 0 ? '已经形成 ' + String(count) + ' 条新旧对应关系。' : '还没有形成新旧对应关系。',
       );
     }
@@ -191,7 +193,7 @@ function evaluateDeliverable(
       const count = signals.modernization?.validationCount ?? 0;
       return covered(
         item,
-        total > 0 && ready >= total ? 'covered' : count > 0 || total > 0 ? 'in_progress' : 'not_started',
+        derived.validationReady ? 'covered' : count > 0 || total > 0 ? 'in_progress' : 'not_started',
         total > 0
           ? '已有 ' + String(ready) + '/' + String(total) + ' 个阻断性检查通过。'
           : count > 0
@@ -204,8 +206,10 @@ function evaluateDeliverable(
       const count = signals.assessment?.recommendationCount ?? 0;
       return covered(
         item,
-        count > 0 ? 'covered' : 'not_started',
-        count > 0 ? '已经形成 ' + String(count) + ' 条建议。' : '还没有形成结构化改进建议。',
+        derived.assessmentRecommendationReady ? 'covered' : 'not_started',
+        derived.assessmentRecommendationReady
+          ? '已经形成 ' + String(count) + ' 条可执行改进建议。'
+          : '还没有形成结构化改进建议。',
       );
     }
 
@@ -213,8 +217,10 @@ function evaluateDeliverable(
       const count = signals.assessment?.roadmapCount ?? 0;
       return covered(
         item,
-        count > 0 ? 'covered' : 'not_started',
-        count > 0 ? '已经形成 ' + String(count) + ' 个实施阶段。' : '还没有形成实施顺序。',
+        derived.assessmentRoadmapReady ? 'covered' : 'not_started',
+        derived.assessmentRoadmapReady
+          ? count > 0 ? '已经形成 ' + String(count) + ' 个实施阶段。' : '当前没有需要额外安排的实施阶段。'
+          : '还没有形成实施顺序。',
       );
     }
 
@@ -273,7 +279,25 @@ export async function buildMissionProgress(
     }
   }
 
-  const deliverables = mission.deliverables.map((item) => evaluateDeliverable(item, signals));
+  const derived = evaluateDerivedState({
+    currentState: signals.currentState,
+    estateColumnCount: signals.estateColumnCount,
+    sourceOfTruthCandidateCount: signals.sourceOfTruthCount,
+    lineageEdgeCount: signals.lineageEdgeCount,
+    findingsCount: signals.findingsCount,
+    scopeReady: Boolean(investigation.scopeValidation?.status === 'validated'),
+    highGapKinds: [],
+    modernization: signals.modernization,
+    assessment: signals.assessment
+      ? {
+          exists: true,
+          findingsCount: signals.assessment.findingsCount,
+          recommendationCount: signals.assessment.recommendationCount,
+          roadmapCount: signals.assessment.roadmapCount,
+        }
+      : null,
+  });
+  const deliverables = mission.deliverables.map((item) => evaluateDeliverable(item, signals, derived));
   const coveredCount = deliverables.filter((item) => item.status === 'covered').length;
 
   return {

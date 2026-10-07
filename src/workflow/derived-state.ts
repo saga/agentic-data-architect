@@ -1,0 +1,137 @@
+/**
+ * Canonical Derived State evaluator.
+ *
+ * 所有 Mission / Workflow / Gate / Result 消费者都通过这里解释“事实是否足够形成某种结果”。
+ * 这里只做纯函数计算，不做 I/O，不创建 Artifact，不推进 Workflow。
+ */
+export interface DerivedStateInput {
+  currentState: {
+    coverage: {
+      sqlFiles: number;
+      sqlParsedStatements: number;
+      sqlParseFailures: number;
+      datasets: number;
+      connectedDatasets: number;
+      semanticAssets: number;
+    };
+  } | null;
+  estateColumnCount: number;
+  sourceOfTruthCandidateCount: number;
+  lineageEdgeCount: number;
+  findingsCount: number;
+  scopeReady: boolean;
+  highGapKinds: readonly string[];
+  modernization?: {
+    targetComponentCount: number;
+    mappingCount: number;
+    validationCount: number;
+    blockingValidationReady: number;
+    blockingValidationTotal: number;
+  } | null;
+  assessment?: {
+    exists: boolean;
+    findingsCount: number;
+    recommendationCount: number;
+    roadmapCount: number;
+  } | null;
+}
+
+export interface DerivedStateSignals {
+  goalReady: boolean;
+  scopeReady: boolean;
+  currentStateAvailable: boolean;
+  dataSourceReady: boolean;
+  dataFlowReady: boolean;
+  dataModelReady: boolean;
+  transformationReady: boolean;
+  currentStateReady: boolean;
+  currentDataArchitectureReady: boolean;
+  dataTruthReady: boolean;
+  investigationReady: boolean;
+  targetArchitectureReady: boolean;
+  mappingReady: boolean;
+  validationReady: boolean;
+  findingsReady: boolean;
+  assessmentCurrentStateReady: boolean;
+  assessmentFindingsReady: boolean;
+  assessmentRecommendationReady: boolean;
+  assessmentRoadmapReady: boolean;
+}
+
+const hasAny = (values: readonly string[], targets: readonly string[]): boolean =>
+  targets.some((target) => values.includes(target));
+
+export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSignals {
+  const coverage = input.currentState?.coverage;
+  const currentStateAvailable = Boolean(coverage && coverage.datasets > 0);
+
+  // Source-of-Truth candidate 是“还需要判断”的信号，不是已确认事实。
+  const dataSourceReady = currentStateAvailable && input.sourceOfTruthCandidateCount === 0;
+
+  const dataFlowReady = currentStateAvailable
+    && (input.lineageEdgeCount > 0 || coverage!.connectedDatasets >= 2);
+
+  const dataModelReady = currentStateAvailable && input.estateColumnCount > 0;
+
+  // 没有 SQL 时，Transformation 对当前 Investigation 没有额外阻塞意义。
+  const transformationReady = currentStateAvailable
+    && (coverage!.sqlFiles === 0
+      || (coverage!.sqlParsedStatements > 0 && coverage!.sqlParseFailures === 0));
+
+  const currentStateReady = currentStateAvailable
+    && !hasAny(input.highGapKinds, ['discovery', 'lineage']);
+
+  // Current Data Architecture 可以明确保留 Source-of-Truth unknown；
+  // unknown 会进入报告，但不应让“现状已经讲清楚”永远无法完成。
+  const currentDataArchitectureReady = currentStateReady
+    && dataFlowReady
+    && dataModelReady
+    && transformationReady;
+
+  const dataTruthReady = currentStateReady
+    && coverage!.sqlParseFailures === 0
+    && !hasAny(input.highGapKinds, ['source-of-truth', 'data_quality']);
+
+  const modernization = input.modernization;
+  const targetArchitectureReady = Boolean(modernization && modernization.targetComponentCount > 0);
+  const mappingReady = Boolean(modernization && modernization.mappingCount > 0);
+  const validationReady = Boolean(
+    modernization
+    && modernization.blockingValidationTotal > 0
+    && modernization.blockingValidationReady >= modernization.blockingValidationTotal,
+  );
+
+  const findingsReady = input.findingsCount > 0 || Boolean(input.assessment?.exists);
+  const assessment = input.assessment;
+  const assessmentFindingsReady = Boolean(assessment?.exists);
+  const assessmentRecommendationReady = Boolean(
+    assessment
+    && (assessment.findingsCount === 0 || assessment.recommendationCount > 0),
+  );
+  const assessmentRoadmapReady = Boolean(
+    assessmentRecommendationReady
+    && (assessment!.recommendationCount === 0 || assessment!.roadmapCount > 0),
+  );
+
+  return {
+    goalReady: input.scopeReady,
+    scopeReady: input.scopeReady,
+    currentStateAvailable,
+    dataSourceReady,
+    dataFlowReady,
+    dataModelReady,
+    transformationReady,
+    currentStateReady,
+    currentDataArchitectureReady,
+    dataTruthReady,
+    investigationReady: currentStateReady,
+    targetArchitectureReady,
+    mappingReady,
+    validationReady,
+    findingsReady,
+    assessmentCurrentStateReady: currentDataArchitectureReady,
+    assessmentFindingsReady,
+    assessmentRecommendationReady,
+    assessmentRoadmapReady,
+  };
+}

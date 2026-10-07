@@ -25,6 +25,7 @@ import {
   type JourneyExecution as SharedJourneyExecution,
   type JourneyRunEvent as SharedJourneyRunEvent,
 } from '../api/contracts.js';
+import { evaluateDerivedState } from './derived-state.js';
 
 export { JourneyDefinitionSchema, JourneyNodeSchema, JourneyRouteSchema, JourneyExecutionSchema, JourneyRunEventSchema } from '../api/contracts.js';
 
@@ -90,6 +91,10 @@ export interface JourneyFacts {
   targetComponentCount: number;
   mappingCount: number;
   blockingValidationReady: number;
+  estateColumnCount?: number;
+  sourceOfTruthCandidateCount?: number;
+  lineageEdgeCount?: number;
+  assessmentPlanExists?: boolean;
   blockingValidationTotal: number;
 }
 
@@ -304,66 +309,49 @@ export function isJourneyCompletionConditionSatisfied(
 }
 
 function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
+  const derived = evaluateDerivedState({
+    currentState: facts.currentState,
+    estateColumnCount: facts.estateColumnCount ?? 0,
+    sourceOfTruthCandidateCount: facts.sourceOfTruthCandidateCount ?? 0,
+    lineageEdgeCount: facts.lineageEdgeCount ?? facts.currentState?.datasets ?? 0,
+    findingsCount: facts.findingCount ?? 0,
+    scopeReady: facts.scopeReady === true,
+    highGapKinds: facts.highGapKinds,
+    modernization: {
+      targetComponentCount: facts.targetComponentCount,
+      mappingCount: facts.mappingCount,
+      validationCount: facts.blockingValidationTotal,
+      blockingValidationReady: facts.blockingValidationReady,
+      blockingValidationTotal: facts.blockingValidationTotal,
+    },
+    assessment: facts.assessmentPlanExists || facts.findingCount !== undefined
+      ? {
+          exists: facts.assessmentPlanExists === true || facts.findingCount !== undefined,
+          findingsCount: facts.findingCount ?? 0,
+          recommendationCount: facts.recommendationCount ?? 0,
+          roadmapCount: facts.roadmapItemCount ?? 0,
+        }
+      : null,
+  });
+
   switch (condition) {
-    case 'goal':
-      return Boolean(facts.goal.trim());
-    case 'scope-ready':
-      return facts.scopeReady === true;
-    case 'current-state':
-      return Boolean(facts.currentState && facts.currentState.datasets > 0);
-    case 'data-truth':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0
-        && facts.currentState.parseFailures === 0
-        && !facts.highGapKinds.some((kind) =>
-          ['discovery'].includes(kind)),
-      );
-    case 'investigation':
-      return Boolean(
-        facts.currentState
-        && !facts.highGapKinds.some((kind) =>
-          ['discovery', 'lineage'].includes(kind)),
-      );
-    case 'current-state-ready':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0
-        && !facts.highGapKinds.some((kind) =>
-          ['discovery', 'lineage'].includes(kind)),
-      );
-    case 'target':
-      return facts.targetComponentCount > 0;
-    case 'mapping':
-      return facts.mappingCount > 0;
-    case 'validation':
-      return facts.blockingValidationTotal > 0
-        && facts.blockingValidationReady >= facts.blockingValidationTotal;
-    case 'current-data-architecture':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0,
-      );
-    case 'current-data-architecture-ready':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage'].includes(kind)),
-      );
-    case 'assessment-current-state':
-      return Boolean(
-        facts.currentState
-        && facts.currentState.datasets > 0
-        && !facts.highGapKinds.some((kind) => ['discovery', 'lineage'].includes(kind)),
-      );
-    case 'assessment-findings':
-      return (facts.findingCount ?? 0) > 0;
-    case 'assessment-recommendation':
-      return (facts.recommendationCount ?? 0) > 0;
-    case 'assessment-roadmap':
-      return (facts.roadmapItemCount ?? 0) > 0;
-    default:
-      return false;
+    case 'goal': return derived.goalReady;
+    case 'scope-ready': return derived.scopeReady;
+    case 'current-state': return derived.currentStateAvailable;
+    case 'data-truth': return derived.dataTruthReady;
+    case 'investigation': return derived.investigationReady;
+    case 'current-state-ready': return derived.currentStateReady;
+    case 'target': return derived.targetArchitectureReady;
+    case 'mapping': return derived.mappingReady;
+    case 'validation': return derived.validationReady;
+    case 'current-data-architecture': return derived.currentStateAvailable;
+    case 'current-data-architecture-ready': return derived.currentDataArchitectureReady;
+    case 'assessment-current-state': return derived.assessmentCurrentStateReady;
+    case 'assessment-findings': return derived.assessmentFindingsReady;
+    case 'assessment-recommendation': return derived.assessmentRecommendationReady;
+    case 'assessment-roadmap': return derived.assessmentRoadmapReady;
+    case 'cutover': return derived.validationReady;
+    default: return false;
   }
 }
 
