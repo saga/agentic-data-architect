@@ -58,8 +58,11 @@ V1.6 开始把本地轻量数据库真正作为 Agent 工作台的一部分，�
 职责固定为：
 
 ~~~text
+context.json
+  = 当前 Investigation 业务状态的 canonical source
+
 SQLite
-  = 应用状态 / 对话 / Dataset Registry / Analysis Run metadata
+  = 应用级持久化：对话 / Dataset Registry / Analysis Run metadata
 
 DuckDB
   = 每个 Investigation 的本地分析引擎
@@ -83,7 +86,7 @@ Filesystem
   └── artifacts/
 ~~~
 
-local.duckdb 只服务当前 Investigation。不会把所有 Investigation 共用一份 DuckDB 写库，也不会把 DuckDB 当作整个 App 的 system of record。
+local.duckdb 只服务当前 Investigation。不会把所有 Investigation 共用一份 DuckDB 写库，也不会把 DuckDB 当作整个 App 的 application-state source。Investigation 的业务状态仍以 context.json 为准。
 
 DuckDB 内部固定创建四个轻量 schema：
 
