@@ -139,6 +139,14 @@ interface PendingCopilotPermission {
 /** 当前进程中等待用户确认的权限请求；权限是临时运行态，不写入 Investigation 状态文件。 */
 const pendingCopilotPermissions = new Map<string, PendingCopilotPermission>();
 
+interface ActiveCopilotSession {
+  sessionId: string;
+  abort: () => Promise<void>;
+}
+
+/** 当前进程中正在执行的 Copilot turn；只保存取消所需的运行时句柄。 */
+const activeSessions = new Map<string, ActiveCopilotSession>();
+
 /** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
 export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
   return [...pendingCopilotPermissions.values()]
@@ -270,6 +278,10 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 }
 
 /** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/本地数据工具和执行白名单。 */
+export type { AskInput } from './ask-input.js';
+
+export { listPendingAgentUserInputs as listPendingCopilotUserInputs, respondToAgentUserInput as respondToCopilotUserInput } from './user-input-bridge.js';
+
 export async function askCopilot(input: AskInput): Promise<string> {
   const workingDirectory = input.workingDirectory ?? process.cwd();
   const journeyMapPurpose = input.purpose === 'journey-map';
