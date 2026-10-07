@@ -568,7 +568,7 @@ app.post('/api/sessions', async (req, res) => {
       supportedReasoningEfforts: string[];
       defaultReasoningEffort: string | null;
       policyState: string | null;
-      runtime: 'copilot' | 'opencode';
+      runtime: 'codebuddy' | 'copilot' | 'opencode';
     }> = [];
 
     try {
