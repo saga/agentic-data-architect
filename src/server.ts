@@ -107,7 +107,7 @@ function formatUserFacingError(error: unknown): string {
   if (/waiting for permission/i.test(raw) && /Timeout after/i.test(raw)) return '等待你确认操作时间过长，这次操作已停止。请重新提交。';
   if (/waiting for agent execution/i.test(raw) && /Timeout after/i.test(raw)) return '这次调查执行时间过长，已经停止。请重新开始，必要时缩小问题范围。';
   if (/waiting for .*session.*completion/i.test(raw) && /Timeout after/i.test(raw)) return '运行服务长时间没有返回结果，已经停止。请重试。';
-  const openCodeHttp = /OpenCode[^\\n]*HTTP\\s+(\\d+)/i.exec(raw);
+  const openCodeHttp = /OpenCode[^\n]*HTTP\s+(\d+)/i.exec(raw);
   if (openCodeHttp) return 'OpenCode 当前无法连接（HTTP ' + openCodeHttp[1] + '）。请确认 OpenCode 服务已经启动，并检查服务地址。';
   if (/CodeBuddy SDK 没有返回文本答案/.test(raw)) return '助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。';
   if (/OpenCode CLI 没有返回文本答案/.test(raw)) return 'OpenCode 这次没有返回可用结果。请查看执行轨迹中的最后一条错误，然后重试。';
