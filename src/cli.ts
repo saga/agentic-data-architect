@@ -18,7 +18,7 @@ async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
   if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow current-data-architecture|legacy-modernization|financial-ai-native-architecture|data-architecture-assessment]');
   let userPrompt = '';
-  let workflow: WorkflowId = null;
+  let workflow: WorkflowId | null = null;
   const inv = newInvestigation(name, userPrompt, workflow);
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--prompt') { userPrompt = rest[++i] ?? ''; inv.userPrompt = userPrompt; }
