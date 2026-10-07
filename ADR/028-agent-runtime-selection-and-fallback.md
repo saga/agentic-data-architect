@@ -29,7 +29,7 @@ Runtime 与 `agent.model` 分开。Model 不再隐含 Runtime；旧的 `codebudd
 
 全局 `AGENT_RUNTIME_FALLBACK_ORDER` 定义优先顺序，默认：
 
-`codebuddy-sdk,copilot-sdk,opencode-run`
+`copilot-sdk,codebuddy-sdk,opencode-run`
 
 一次执行从用户选择的 Runtime 开始，只向这个顺序的后方尝试，不回绕。
 
@@ -73,7 +73,7 @@ Session 必须与 Runtime 和 Control version 一致才能恢复；发生 Runtim
 ## Consequences
 
 - 新调查可以直接选择最适合的 Agent runtime。
-- CodeBuddy quota 用完后可以无感继续到 Copilot，再到 OpenCode。
+- 默认顺序下，Copilot quota 用完后自动进入 CodeBuddy，再进入 OpenCode；如果用户直接选择 CodeBuddy，则只向后 fallback 到 OpenCode。
 - Runtime implementation 可以独立演进，不污染 Investigation domain。
 - CodeBuddy SDK 与 CLI 的配置加载行为被明确隔离，避免“本机能跑但 SDK 环境偷偷加载另一套 Skills/MCP”。
 
