@@ -227,7 +227,7 @@ export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySetting
 
 export const ControlAgentSchema = z.object({
   /** 当前 Investigation 首选 Agent Runtime；quota 不足时由 runtime 层按配置顺序自动 fallback。 */
-  runtime: AgentRuntimeSchema.default('codebuddy-sdk'),
+  runtime: AgentRuntimeSchema.default('copilot-sdk'),
   /** 每个 Investigation 当前使用的模型；默认由 Auto 自动选择。 */
   model: z.string().trim().min(1).max(200).default('auto'),
   /** Auto 模式下的路由偏好；不设置时使用 Copilot 当前默认选择。 */
