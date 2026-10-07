@@ -45,6 +45,10 @@ function base() {
       source: 'user' as const,
       userConfirmed: true,
       evidenceIds: [],
+      scopeFingerprint: computeScopeFingerprint({
+        scope: ['Position'],
+        systems: ['Portfolio System'],
+      }),
       validatedAt: new Date().toISOString(),
     },
     evidence,
