@@ -2,11 +2,11 @@
 
 > **Enterprise Data Architecture + Semantic Layer + AI/Agent-ready Data Foundation**
 
-我查了 JPMorgan Chase 最近一批相关岗位，也对比了 Citi、McKesson、Carlyle、Scotiabank 等类似岗位。现在这个方向已经形成了比较清晰的岗位谱系。
+我查了 某大型企业 最近一批相关岗位，也对比了 另一家大型企业、一家大型企业、一家大型企业、一家大型企业 等类似岗位。现在这个方向已经形成了比较清晰的岗位谱系。
 
 ### 1. 你给的这个岗位到底在做什么
 
-[JPMorganChase — Senior Lead Data Architect: Information Architecture](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210793254?utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210793254?utm_source=chatgpt.com)
 
 这个岗位最值得注意的不是传统的 OLTP/OLAP 建模，而是 JD 明确写了：
 
@@ -29,7 +29,7 @@
 
 > **企业的数据到底应该怎样被定义、组织和暴露，才能让人、传统应用、分析系统以及 AI Agent 都“正确理解”。**
 
-这和你现在在考虑的 **Snowflake semantic layer / business ontology / AI Agent 使用企业业务定义**，基本是同一个方向。([JPMorgan Chase][1])
+这和你现在在考虑的 **Snowflake semantic layer / business ontology / AI Agent 使用企业业务定义**，基本是同一个方向。([某大型企业][1])
 
 ---
 
@@ -44,13 +44,13 @@
 | **AI Platform Architect**           | 建企业 Agent/AI 平台、SDK、evaluation、observability | Platform + Agent SDK + Evaluation + Governance |
 | **Applied AI / AI Transformation**  | 找业务流程，把 Agent 真正落地                           | AI + Business + Workflow + Governance          |
 
-你给的 JPMorgan 岗位属于第一类，但现在这些岗位之间正在明显融合。
+你给的 某大型企业 岗位属于第一类，但现在这些岗位之间正在明显融合。
 
 ---
 
 # 3. 最接近的一个：AI-ready Data Architect
 
-一个非常接近的例子是 McKesson 的 **Senior / Lead Data Architect**。
+一个非常接近的例子是 一家大型企业 的 **Senior / Lead Data Architect**。
 
 它直接要求：
 
@@ -72,9 +72,9 @@
 
 > **AI-ready "Intelligent Data Platform"**
 
-也就是说，数据架构师现在不只是把数据存好，而是要让 AI 能够**可靠地使用这些数据**。([McKesson Careers][2])
+也就是说，数据架构师现在不只是把数据存好，而是要让 AI 能够**可靠地使用这些数据**。([一家大型企业 Careers][2])
 
-另外 Carlyle 的 **AI & Data Architect** 更直接，把职责明确拆成：
+另外 一家大型企业 的 **AI & Data Architect** 更直接，把职责明确拆成：
 
 > AI-ready Data Foundations & Semantic Layer
 
@@ -99,11 +99,11 @@
 
 # 4. 第二类：Agentic AI Engineer / Architect
 
-JPMorgan 自己现在也有非常典型的岗位。
+某大型企业 自己现在也有非常典型的岗位。
 
 例如：
 
-[JPMorganChase — Lead Software Engineer - AI Application](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210777306?utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210777306?utm_source=chatgpt.com)
 
 这个岗位要求直接做：
 
@@ -164,11 +164,11 @@ Action
 
 ---
 
-# 5. JPMorgan 甚至已经出现“Agent Platform Architect”
+# 5. 某大型企业 甚至已经出现“Agent Platform Architect”
 
 这个岗位尤其值得看：
 
-[JPMorganChase — Applied AI ML Director - AI Agents and Agentic Systems](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791991/?location=New+York%25252525252525252C+United+States&locationId=300000020657200&locationLevel=state&mode=location&utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791991/?location=New+York%25252525252525252C+United+States&locationId=300000020657200&locationLevel=state&mode=location&utm_source=chatgpt.com)
 
 它负责的是 **Agent Builder Platform**。
 
@@ -193,15 +193,15 @@ JD 里面直接要求：
 
 ---
 
-# 6. Citi 的岗位也非常接近，而且更强调 Context Engineering
+# 6. 另一家大型企业 的岗位也非常接近，而且更强调 Context Engineering
 
-例如 Citi 最近的：
+例如 另一家大型企业 最近的：
 
-[Citi — Lead Agentic AI Engineer – Vice President](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer-vice-president/287/100430300208?utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer-vice-president/287/100430300208?utm_source=chatgpt.com)
 
 以及：
 
-[Citi — Lead Agentic AI Engineer](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer/287/100779011472?utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer/287/100779011472?utm_source=chatgpt.com)
 
 JD 中出现了非常明显的一套技术栈：
 
@@ -242,15 +242,15 @@ Business Workflow
 
 > **如何把企业知识、业务上下文、状态、权限、工具和数据组织成 Agent 可以可靠执行的 Context。**
 
-([Citi Careers][4])
+([另一家大型企业 Careers][4])
 
 ---
 
 # 7. 还有一类更高层：AI Transformation
 
-JPMorgan 最近还有：
+某大型企业 最近还有：
 
-[JPMorganChase — Applied AI Transformation Director - Identity Access Management](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791476?utm_source=chatgpt.com)
+[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791476?utm_source=chatgpt.com)
 
 这类岗位不一定天天写 Agent，而是：
 
@@ -286,7 +286,7 @@ Production
 
 ## ① 数据架构
 
-这是你给的 JPMorgan JD 最明显的部分。
+这是你给的 某大型企业 JD 最明显的部分。
 
 需要懂：
 
@@ -310,7 +310,7 @@ Production
 * metadata
 * semantic model
 
-([JPMorgan Chase][1])
+([某大型企业][1])
 
 ---
 
@@ -368,7 +368,7 @@ Transaction
 
 这些东西逐渐成为 **AI infrastructure** 的一部分。
 
-JPMorgan 的这个岗位明确要求 shared business glossary + semantic layer。([JPMorgan Chase][1])
+某大型企业 的这个岗位明确要求 shared business glossary + semantic layer。([某大型企业][1])
 
 ---
 
@@ -390,7 +390,7 @@ Grounding
 Provenance
 ```
 
-Citi 的岗位尤其明确要求 Knowledge Graph + GraphRAG + multi-hop reasoning。([Citi Careers][4])
+另一家大型企业 的岗位尤其明确要求 Knowledge Graph + GraphRAG + multi-hop reasoning。([另一家大型企业 Careers][4])
 
 ---
 
@@ -412,11 +412,11 @@ Error recovery
 State
 ```
 
-JPMorgan 的 AI Application 岗位已经把：
+某大型企业 的 AI Application 岗位已经把：
 
 > agents + skills + memory + guardrails + tool orchestration
 
-直接列成 production AI system 的组成部分。([JPMorgan Chase][5])
+直接列成 production AI system 的组成部分。([某大型企业][5])
 
 ---
 
@@ -437,7 +437,7 @@ Cost Control
 Governance
 ```
 
-JPMorgan 的 Agent Builder Platform 岗位就是这个方向。([JPMorgan Chase][6])
+某大型企业 的 Agent Builder Platform 岗位就是这个方向。([某大型企业][6])
 
 这实际上是在招聘：
 
@@ -466,7 +466,7 @@ JPMorgan 的 Agent Builder Platform 岗位就是这个方向。([JPMorgan Chase]
 
 **他们要的是 Production Agent，不是 Notebook Agent。**
 
-例如 JPMorgan 的 AI Application 岗位明确要求 AWS、Kubernetes、distributed data stores、high availability。([JPMorgan Chase][5])
+例如 某大型企业 的 AI Application 岗位明确要求 AWS、Kubernetes、distributed data stores、high availability。([某大型企业][5])
 
 ---
 
@@ -517,13 +517,13 @@ Latency？
 
 **Evaluation + Observability 已经从“nice to have”逐渐变成 Agent Platform 的核心职责。**
 
-JPMorgan 和 Citi 的相关岗位都明确要求 evaluation / monitoring / reliability。([JPMorgan Chase][5])
+某大型企业 和 另一家大型企业 的相关岗位都明确要求 evaluation / monitoring / reliability。([某大型企业][5])
 
 ---
 
-# 14. ⑧ 金融行业 Governance
+# 14. ⑧ 复杂企业环境 Governance
 
-这是金融机构和普通互联网公司的一个重要区别。
+这是大型企业和普通互联网公司的一个重要区别。
 
 这些 JD 普遍要求：
 
@@ -540,17 +540,17 @@ Risk Management
 Regulatory Compliance
 ```
 
-Scotiabank 的 Chief AI Architect 甚至要求能够覆盖：
+一家大型企业 的 Chief AI Architect 甚至要求能够覆盖：
 
 > LLM + AI architecture + ML architecture + MLOps + Cloud + Agentic harness + workflow + data platform + API + observability
 
-并且要求在大型金融机构的复杂监管环境中担任 architecture authority。([Scotiabank Careers][7])
+并且要求在大型大型企业的复杂监管环境中担任 architecture authority。([一家大型企业 Careers][7])
 
 ---
 
 # 15. 所以这个岗位真正的能力模型其实是这样
 
-如果把这些 JD 画在一起，我认为现在金融机构正在形成一个新的复合型岗位：
+如果把这些 JD 画在一起，我认为现在大型企业正在形成一个新的复合型岗位：
 
 ```text
                  Enterprise AI Architect
@@ -632,14 +632,8 @@ Scotiabank 的 Chief AI Architect 甚至要求能够覆盖：
 
 > **A + B + C 的交叉型架构师。**
 
-也就是你给的这个 JPMorgan 岗位虽然职位名称还是 **Senior Lead Data Architect**，但 JD 已经明显开始往 **AI-ready Data + Semantic Architecture + Agent Infrastructure** 演进。([JPMorgan Chase][1])
+也就是你给的这个 某大型企业 岗位虽然职位名称还是 **Senior Lead Data Architect**，但 JD 已经明显开始往 **AI-ready Data + Semantic Architecture + Agent Infrastructure** 演进。([某大型企业][1])
 
-如果你的目的是**找工作/判断自己应该往哪个岗位包装**，我可以进一步把 JPMorgan、Citi、Goldman、Morgan Stanley、Bank of America、BlackRock 等金融机构最近的这类 JD 拉出来，做一张 **“2026 金融机构 AI Architect / Agent Architect / AI Data Architect 岗位能力矩阵”**，再反推你目前这套经验哪些已经匹配、哪些是明显短板。
+如果你的目的是**找工作/判断自己应该往哪个岗位包装**，我可以进一步把 某大型企业、另一家大型企业、一家大型企业、一家大型企业、一家大型企业、一家大型企业 等大型企业最近的这类 JD 拉出来，做一张 **“2026 大型企业 AI Architect / Agent Architect / AI Data Architect 岗位能力矩阵”**，再反推你目前这套经验哪些已经匹配、哪些是明显短板。
 
-[1]: https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210793254?utm_source=chatgpt.com "Senior Lead Data Architect: Information Architecture - JPMC Candidate Experience page Careers"
-[2]: https://mckesson.wd3.myworkdayjobs.com/en-US/External_Careers/job/Senior---Lead-Data-Architect_JR0140823?utm_source=chatgpt.com "Senior / Lead Data Architect"
-[3]: https://www.linkedin.com/jobs/view/ai-data-architect-at-the-carlyle-group-4444469755?utm_source=chatgpt.com "The Carlyle Group hiring AI & Data Architect in New York, NY | LinkedIn"
-[4]: https://jobs.citi.com/job/irving/lead-agentic-ai-engineer/287/100779011472?utm_source=chatgpt.com "Lead Agentic AI Engineer | Citi Careers"
-[5]: https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210777306?utm_source=chatgpt.com "Lead Software Engineer - AI Application - JPMC Candidate Experience page Careers"
-[6]: https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791991/?location=New+York%25252525252525252C+United+States&locationId=300000020657200&locationLevel=state&mode=location&utm_source=chatgpt.com "Applied AI ML Director - AI Agents and Agentic Systems - JPMC Candidate Experience page Careers"
-[7]: https://jobs.scotiabank.com/job/Dallas-Chief-AI-Architect-TX-75201/601879417/?utm_source=chatgpt.com "Chief AI Architect Job Details | Scotiabank"
+> 本文中的岗位案例已经做过匿名化处理，仅用于说明企业级 Data / AI / Agent 架构岗位的职责边界；不对应任何特定企业。
