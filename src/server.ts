@@ -182,7 +182,11 @@ function routeParam(value: string | string[]): string {
 function sessionKey(name: string): string {
   const safe = path.basename(name);
   if (!name || safe !== name || name === '.' || name === '..') {
-    throw new RequestValidationError('Session 名称不合法，请使用单层目录名。');
+    throw new RequestValidationError([{
+      code: 'custom',
+      path: ['name'],
+      message: 'Session 名称只能使用单层目录名。',
+    }]);
   }
   return safe;
 }
