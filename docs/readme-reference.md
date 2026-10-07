@@ -73,7 +73,7 @@ shared/ 保存跨 session 可以复用的研究资料。
 - `financial-ai-native-architecture`
 - `data-architecture-assessment`
 
-Workflow 只是当前 Investigation 的工作方法，不是 Investigation 类型。内置 Workflow 来自 Skill；进入全屏工作地图后可以复制为 Investigation 级自定义 Workflow，拖动节点、添加步骤和分支、修改 outcome，并在服务端验证通过后应用。工作方式本身的切换仍需要在“调查配置 → 工作方式”执行明确确认；Workflow Editor 的 draft/apply 不会修改内置 Skill。
+Workflow 只是当前 Investigation 的工作方法，不是 Investigation 类型。内置 Workflow 来自 Skill；进入全屏工作地图后可以复制为 Investigation 级自定义 Workflow，拖动节点、添加步骤和分支、修改 outcome，并在服务端验证通过后应用。工作方式本身的切换仍需要在“调查配置 → 工作方式”执行明确确认；Workflow Editor 的 draft/apply 不会修改内置 Skill。Agent Runtime 是独立的 execution 配置，不因为 Workflow 切换而改变。
 
 每次完整 Investigation 至少留下 `reports/report.md`；每个有效调查 turn 还会在 `artifacts/analysis/` 留下一份中间分析记录。最终报告只读，不会因为页面刷新重新调用模型。
 
@@ -127,7 +127,7 @@ task 不是第三种 Skill 类型。复杂程度也不是分类标准。
 
 ## Agent / Skill 边界
 
-核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state 和 turn 生命周期。
+核心代码负责 Evidence、Agent 输出 Schema、只读 SQL guard、Discovery / Lineage / Profiling、Investigation state、turn 生命周期和 Runtime Stop/recovery 边界。
 
 Skill 负责领域检查方法、调查步骤、问题清单、研究来源使用方式和变化较快的业务知识。
 `knowledge/` 负责可跨 Investigation 复用的架构经验；每条知识记录来源、资料时间、复核时间和可信度。知识只指导“怎么做”，不能替代当前 Investigation 的 Evidence。
@@ -149,14 +149,26 @@ CLI 和 Web 共用同一个 Investigation workspace。
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | WORKSPACE_DIR | workspace 根目录 | .workspace |
+| DATA_DIR | Agent Runtime / application 数据根目录 | .data |
 | PORT | Web server 端口 | 3000 |
 | HOST | bind 地址 | 127.0.0.1 |
-| COPILOT_MODEL | Agent 使用的模型 | gpt-5-mini |
-| GITHUB_TOKEN | 服务端 Copilot Token | 空 |
-| TURN_TIMEOUT_MS | 单轮等待上限 | 300000 |
+| ALLOW_REMOTE_HOST | 非 loopback bind 的显式总开关 | false |
+| COPILOT_MODEL | Copilot Runtime 的默认模型 | auto |
+| AGENT_RUNTIME_DEFAULT | 新 Investigation 默认 Runtime | copilot-sdk |
+| AGENT_RUNTIME_FALLBACK_ORDER | quota/usage exhaustion 时的 Runtime 顺序 | copilot-sdk,codebuddy-sdk,opencode-run |
+| CODEBUDDY_DEFAULT_MODEL | CodeBuddy 默认模型 | glm-5.3-flash |
+| CODEBUDDY_MODEL_ALLOWLIST | CodeBuddy 可用模型及顺序 | glm-5.3-flash,deepseek-v4.1-flash,space-bunny |
+| CODEBUDDY_MAX_TURNS | 单次 CodeBuddy query 最大循环轮数 | 200 |
+| OPENCODE_ENABLED | 是否启用 OpenCode Runtime | true |
+| OPENCODE_BASE_URL | OpenCode serve 地址（模型发现） | http://127.0.0.1:4096 |
+| OPENCODE_MODEL_ALLOWLIST | OpenCode 模型过滤 | 空 |
+| OPENCODE_FALLBACK_MODEL | OpenCode quota fallback 模型 | 空 |
+| GITHUB_TOKEN | GitHub API token | 空 |
+| TURN_TIMEOUT_MS | Agent 单轮默认等待上限 | 360000 |
+| USER_INPUT_WAIT_TIMEOUT_MS | 等待用户输入上限 | 3600000 |
+| PERMISSION_WAIT_TIMEOUT_MS | 等待权限确认上限 | 3600000 |
 | SKILLS_DIR | Skill 根目录 | skills |
 | KNOWLEDGE_DIR | 可复用架构知识根目录 | knowledge |
-| COPILOT_SKILLS | 新 Investigation 默认 capability Skill | investigation-session,financial-data-review,structural-analysis,search-github,search-confluence,search-leanix,working-directory |
 
 ## 检查
 
