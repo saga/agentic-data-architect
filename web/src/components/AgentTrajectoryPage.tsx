@@ -109,7 +109,7 @@ function eventLabel(event: TrajectoryEvent) {
     case 'assistant_turn_end': return '模型处理完成';
     case 'intent': return '当前动作';
     case 'model_call': return '模型调用';
-    case 'tool_call': return '调用工具';
+    case 'tool_call': return event.details.mcpServerName === 'graphify-structural-analysis' ? 'Graphify 结构分析' : '调用工具';
     case 'tool_result': return '工具返回';
     case 'tool_progress': return '工具进度';
     case 'permission': return '等待确认';
@@ -211,12 +211,14 @@ function eventDetail(event: TrajectoryEvent) {
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_progress') {
     const server = typeof event.details.mcpServerName === 'string' ? event.details.mcpServerName : undefined;
     const mcpTool = typeof event.details.mcpToolName === 'string' ? event.details.mcpToolName : undefined;
+    const isGraphify = server === 'graphify-structural-analysis';
     const error = typeof event.details.error === 'string' ? event.details.error : formatJson(event.details.error, 500);
     const args = event.details.arguments;
     const resultPreview = typeof event.details.resultPreview === 'string' ? event.details.resultPreview : undefined;
     const progress = typeof event.details.progressMessage === 'string' ? event.details.progressMessage : undefined;
     return (
       <Flex vertical gap={5}>
+        {isGraphify ? <Tag color="purple">Graphify：代码结构</Tag> : null}
         {server ? <Text type="secondary">MCP：{server}{mcpTool ? ` / ${mcpTool}` : ''}</Text> : null}
         {event.durationMs !== undefined ? <Text type="secondary">耗时：{formatDuration(event.durationMs)}</Text> : null}
         {progress ? <Text>{progress}</Text> : null}
