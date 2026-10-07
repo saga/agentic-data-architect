@@ -93,11 +93,8 @@ export async function stopClient(): Promise<void> {
     client = null;
   }
 
-  // 服务退出时不能留下“僵尸权限/用户输入请求”；活动 turn 也必须失效。
-  for (const pending of pendingCopilotUserInputs.values()) {
-    pending.reject(new Error('Copilot client 已停止。'));
-  }
-  pendingCopilotUserInputs.clear();
+  // 服务退出时不能留下等待中的请求；活动 turn 也必须失效。
+  rejectAllPendingAgentUserInputs(new Error('助手服务已经停止。'));
   pendingCopilotPermissions.clear();
   activeSessions.clear();
 }
