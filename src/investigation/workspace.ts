@@ -125,6 +125,11 @@ export function artifactsDir(name: string): string {
   return path.join(workspaceRoot(name), 'artifacts');
 }
 
+/** Session-only cache; unlike shared/global cache it is disposable with the Investigation workspace. */
+export function sessionCacheDir(name: string): string {
+  return path.join(workspaceRoot(name), '.cache');
+}
+
 /** 返回跨 Investigation 的 shared 目录。 */
 export function sharedDir(): string {
   return config.sharedDir;
@@ -163,6 +168,7 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
     fs.mkdir(discoveryDir(name), { recursive: true }),
     fs.mkdir(reportsDir(name), { recursive: true }),
     fs.mkdir(artifactsDir(name), { recursive: true }),
+    fs.mkdir(sessionCacheDir(name), { recursive: true }),
     fs.mkdir(config.sharedDir, { recursive: true }),
     ...(['confluence', 'github', 'leanix', 'web', 'document', 'other'] as const).map((kind) =>
       fs.mkdir(sharedArtifactDir(kind), { recursive: true }),
