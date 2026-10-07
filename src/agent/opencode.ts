@@ -167,7 +167,7 @@ export async function registerOpenCodeGraphifyMcp(
   const existingResponse = await openCodeFetch('/mcp', { method: 'GET' }, workingDirectory);
   if (existingResponse.ok) {
     try {
-      const existing = await existingResponse.json() as Record<string, { status?: string }>;
+      const existing = await existingResponse.json() as Record<string, { status?: unknown }>;
       const current = existing[graphify.name];
       const currentStatus = typeof current?.status === 'string'
         ? current.status
