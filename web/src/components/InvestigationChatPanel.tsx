@@ -163,7 +163,7 @@ export function InvestigationChatPanel(props: {
               <Think
                 title="助手正在分析问题"
                 loading
-                defaultExpanded
+                defaultExpanded={false}
                 blink
                 classNames={{ root: 'assistant-think' }}
               >
