@@ -58,3 +58,4 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 
 | [ADR-026](./026-canonical-derived-state-and-result-boundaries.md) | Canonical Derived State 统一 Mission、Workflow、Gate 的完成语义，并分离 Assessment / Modernization Artifact 与 Workflow runtime | Accepted |
 | [ADR-027](./027-investigation-state-persistence-boundary.md) | 明确 context.json、SQLite、DuckDB 和文件产物各自的 canonical persistence boundary | Accepted |
+| [ADR-028](./028-agent-runtime-selection-and-fallback.md) | 三种 Agent Runtime 选择与 quota fallback：Copilot SDK → CodeBuddy SDK → OpenCode Run | Accepted |
