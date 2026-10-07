@@ -20,14 +20,14 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 
 当前代码状态、下一步实现和边界。不重复架构理论。
 
-## 当前：V1.8
+## 当前实现
 
 已经具备：
 
-- 持续 Investigation session 和可恢复 Copilot session
+- 持续 Investigation session 和 runtime-neutral 的可恢复 Agent session reference
 - `.workspace/<session>/context.json` 持久化 goal、scope、evidence、claims、findings、unknowns 等调查状态
 - `.workspace/conversations.db` 持久化 user / assistant / system 消息，并使用 SQLite FTS5 建立全文索引
-- Copilot SDK 从 `skills/` 自动发现 capability Skill；当前 Investigation 只通过 `workflow` 选择一条 Workflow Skill，其它 Workflow Skill 会被禁用，不能通过 `control.json` 再组装一套 Skill enable list
+- Capability Skill 由当前 Agent Runtime 自动发现；当前 Investigation 只通过 `workflow` 选择一条 Workflow Skill，其它 Workflow Skill 会被禁用，不能通过 `control.json` 再组装一套 Skill enable list
 - 金融领域检查放在 `skills/financial-data-review/`，其中 deterministic 检查放在 `scripts/review.mjs`
 - `.workspace/shared/index.json` 和共享研究资料
 - 本地 SQL / PostgreSQL / Snowflake discovery
@@ -63,9 +63,9 @@ Agent turn
   └─ final turn
 ```
 
-UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查轨迹，展示 Token、模型、工具调用、上下文占用以及 Copilot SDK 的 AI credit / Premium Request Cost。
+UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查轨迹，展示 Token、模型、Runtime、工具调用、上下文占用；Copilot 还会记录 SDK 提供的 AI credit / Premium Request Cost。
 
-成本口径遵循 Copilot SDK：`assistant.usage` 是单次模型调用的 token 与 Premium Request Cost multiplier；`session.usage.getMetrics` 是整个 session 累计 AI credit 与 token。这里的 cost 不是货币金额。SDK 还提供 per-model usage breakdown，因此后续可以按模型拆分成本。
+对于 Copilot Runtime，成本口径遵循 Copilot SDK：`assistant.usage` 是单次模型调用的 token 与 Premium Request Cost multiplier；`session.usage.getMetrics` 是整个 session 累计 AI credit 与 token。这里的 cost 不是货币金额。其它 Runtime 至少记录模型、Runtime、调用名称和耗时，采用各自可提供的 usage 字段。
 
 这套 UI 结构参考 LangSmith 的 trace tree / token-cost breakdown，以及 DeepSeek 的“模型 → tool call → tool result → 后续模型调用”执行链；不展示 reasoning / chain-of-thought 正文。
 
@@ -149,7 +149,7 @@ Archive 必须保留 `sourceRecordIds` / sequence 范围，摘要只是压缩后
 
 ## Agent / Skill / Script 原则
 
-当前只有一个 Investigation 主 Agent，直接使用 Copilot SDK default agent。平台级 evidence / output / safety 约束放在 system prompt 和确定性代码中，不做成一个额外的 custom agent。Workflow 只提供地图骨架；Agent 可以在回答后给出少量下一步候选，用户点击候选后，前端发送 routeId，服务端从当前调查的真实候选中解析并作为结构化上下文交给 Agent，而不是拼一段“我选择这条路线……”的提示词。
+当前 Investigation 保持一个主推理角色，但执行可落到 Copilot SDK、CodeBuddy SDK 或 OpenCode Run；平台级 evidence / output / safety 约束由宿主 system prompt 和确定性代码负责，不额外建立一层业务 Custom Agent。Workflow 只提供地图骨架；Agent 可以在回答后给出少量下一步候选，用户点击候选后，前端发送 routeId，服务端从当前调查的真实候选中解析并作为结构化上下文交给 Agent，而不是拼一段“我选择这条路线……”的提示词。
 
 Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
