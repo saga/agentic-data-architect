@@ -157,3 +157,69 @@ export async function listSkillManifests(): Promise<SkillManifest[]> {
 
   return manifests.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+
+/**
+ * 为不提供 Copilot skillDirectories 的 Runtime 建立本 Investigation 的 Skill bridge。
+ * Bridge 只暴露 capability Skill 和当前 Workflow；不会修改内置 Skill，也不会覆盖用户自己放入 workspace 的 Skill。
+ */
+export async function syncRuntimeSkillWorkspace(
+  workingDirectory: string,
+  workflowSkill?: string,
+): Promise<string> {
+  const root = path.join(workingDirectory, '.agents', 'skills');
+  await fs.mkdir(root, { recursive: true });
+
+  const manifests = await listSkillManifests();
+  const desired = new Set(
+    manifests
+      .filter((manifest) => manifest.metadata.kind === 'capability' || manifest.name === workflowSkill)
+      .map((manifest) => manifest.name),
+  );
+
+  const skillRoot = path.resolve(config.skillsDir);
+  const managedTarget = (name: string) => path.resolve(skillRoot, name);
+  const isManagedTarget = (target: string): boolean => {
+    const relative = path.relative(skillRoot, target);
+    return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
+  };
+
+  const existing = await fs.readdir(root, { withFileTypes: true });
+  for (const entry of existing) {
+    if (!entry.isSymbolicLink()) continue;
+    if (desired.has(entry.name)) continue;
+    const linkPath = path.join(root, entry.name);
+    try {
+      const target = path.resolve(root, await fs.readlink(linkPath));
+      if (isManagedTarget(target)) await fs.rm(linkPath, { force: true });
+    } catch {
+      await fs.rm(linkPath, { force: true }).catch(() => undefined);
+    }
+  }
+
+  for (const name of desired) {
+    const linkPath = path.join(root, name);
+    const target = managedTarget(name);
+    try {
+      const stat = await fs.lstat(linkPath);
+      if (stat.isSymbolicLink()) {
+        const currentTarget = path.resolve(root, await fs.readlink(linkPath));
+        if (currentTarget === target) continue;
+        if (isManagedTarget(currentTarget)) await fs.rm(linkPath, { force: true });
+        else continue;
+      } else {
+        continue;
+      }
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) throw error;
+    }
+
+    await fs.symlink(
+      target,
+      linkPath,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  }
+
+  return root;
+}
