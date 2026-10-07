@@ -16,6 +16,7 @@ import {
   isGraphifyTool,
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
+import { config } from '../config.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
 import { createLocalDataTools } from './local-data-tools.js';
@@ -208,7 +209,7 @@ async function runCodeBuddyQuery(
     ].filter(Boolean).join('\n\n'),
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { resume: input.sessionId } : {}),
-    maxTurns: 20,
+    maxTurns: config.codeBuddyMaxTurns,
     canUseTool: async (
       toolName: string,
       toolInput: unknown,
@@ -491,7 +492,10 @@ export async function askCodeBuddy(
       }
     } else {
       graphifyEnabled = false;
-      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onStatus?.(
+        '结构分析工具这次没有生成可用结果，助手改用源码工具继续调查。'
+        + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
+      );
       input.onTrajectory?.({
         type: 'status',
         name: '结构分析工具不可用，已继续调查',
