@@ -108,8 +108,8 @@ Task Control 保存本次 Investigation 的研究参数和显式 Agent override�
    → 完整 user / assistant / system transcript
 3. discovery / reports / artifacts
    → 调查产物和可追溯原始结果
-4. Copilot Session
-   → Agent runtime 自己的 session history，SDK 可以做上下文 compaction
+4. Agent Runtime Session
+   → Copilot / CodeBuddy / OpenCode 自己的 session history；具体 session 和上下文压缩由各 Runtime adapter 负责
 ```
 
 当前已经做到“原始记录持久化”，但还没有完整的 application-owned Memory Archive：
