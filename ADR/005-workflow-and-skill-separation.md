@@ -16,7 +16,7 @@ Workflow 与 Skill 严格分工：
 - Workflow：定义当前做什么、顺序、分支和完成条件；
 - capability Skill：说明某项能力何时适用以及如何使用；
 - Tool：真正执行 SQL、profiling、lineage、search 等操作；
-- Agent：决定调查动作、解释证据和选择已有 outcome；
+- Agent：决定调查动作、解释证据和选择已有 outcome；capability Skill 由 Runtime / host 自动发现，当前 Workflow Skill 只暴露用户选择的路线；
 - Human：确认业务定义、范围、例外和重要架构判断。
 
 Workflow DSL 保持最小，只使用 @flow、@task、@review、@end，节点只描述必要的业务语义，不把 tools、permissions、route conditions 等执行细节塞入 DSL。
