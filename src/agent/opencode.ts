@@ -22,7 +22,6 @@ import {
   buildGraphifyMcpServer,
   tryEnsureGraphifyGraph,
   isGraphifyTool,
-  requiresGraphifyFirst,
 } from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
@@ -74,9 +73,6 @@ const GRAPHIFY_MCP_TOOL_KEYS = [
   'shortest_path',
 ].map((tool) => GRAPHIFY_MCP_NAME + '_' + tool);
 
-export function requiresGraphifyFirst(prompt: string): boolean {
-  return STRUCTURAL_PROMPT_PATTERN.test(prompt);
-}
 
 export function graphifyPreflightTools(): Record<string, boolean> {
   return {
