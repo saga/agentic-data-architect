@@ -16,8 +16,8 @@
 | WorkflowSnapshot | workflow runtime | /workflow | Workflow / Journey UI |
 | Result View Model | UI projection assembled from canonical resources | Result page | Result page only |
 | Report | Report artifact | /report | Result page projection |
-| Modernization Plan | modernization domain model | /results + /modernization | Result projection |
-| Assessment Plan | assessment domain model | /results + /assessment | Result projection |
+| Modernization Plan | modernization domain model | /modernization | Result page projection |
+| Assessment Plan | assessment domain model | /assessment | Result page projection |
 | Configuration | Control persistence model + API View | /config | Config projection |
 | Current State | Discovery snapshot | Session / Report | explicit UI projection |
 | Discovery Snapshot | Discovery persistence schema | internal store | never direct |
