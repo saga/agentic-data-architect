@@ -5,6 +5,7 @@ import { ApiRequestError, consumeSse, getJson, request } from './api';
 import { workflowOptions } from './workflow-options';
 import {
   AnswerSummarySchema,
+  GlobalConfigurationResponseSchema,
   CreateSessionResponseSchema,
   ExecutionStatusSchema,
   FileUploadResponseSchema,
@@ -26,6 +27,7 @@ import {
   type CopilotModelOption,
   type ExecutionStatus,
   type InvestigationCheckpoint,
+  type GlobalConfiguration,
   type InvestigationControl,
   type JourneyState,
   type MissionContract,
@@ -78,6 +80,7 @@ export function useInvestigationController() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [active, setActive] = useState<string>();
   const [current, setCurrent] = useState<SessionData>();
+  const [globalConfiguration, setGlobalConfiguration] = useState<GlobalConfiguration>();
   const [availableModels, setAvailableModels] = useState<CopilotModelOption[]>([]);
   const [modelSaving, setModelSaving] = useState(false);
   const [streamingReasoning, setStreamingReasoning] = useState('');
@@ -392,7 +395,21 @@ export function useInvestigationController() {
     void getJson('/api/copilot/models', ModelsResponseSchema)
       .then((result) => setAvailableModels(result.models ?? []))
       .catch(() => setAvailableModels([]));
+    void getJson('/api/config/global', GlobalConfigurationResponseSchema)
+      .then((result) => setGlobalConfiguration(result.configuration))
+      .catch(() => setGlobalConfiguration(undefined));
   }, []);
+
+  const updateGlobalConfiguration = async (agent: InvestigationControl['agent']) => {
+    const result = await getJson('/api/config/global', GlobalConfigurationResponseSchema, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent }),
+    });
+    setGlobalConfiguration(result.configuration);
+    setTurnStatus('工作台默认配置已更新；没有覆盖该设置的其它 Investigation 会自动继承新默认值。');
+    return result.configuration;
+  };
 
   useEffect(() => {
     if (!active) return;
@@ -1082,6 +1099,7 @@ export function useInvestigationController() {
     sessions,
     active,
     current,
+    globalConfiguration,
     availableModels,
     modelOptions,
     modelSaving,
@@ -1125,6 +1143,7 @@ export function useInvestigationController() {
     loadSession,
     executionStatusText,
     updateModelSettings,
+    updateGlobalConfiguration,
     copyConversation,
     cancelActiveTurn,
     respondToPermission,
