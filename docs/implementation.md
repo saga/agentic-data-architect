@@ -36,7 +36,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 - read-only profiling / targeted query
 - deterministic findings
 - structured Agent result 和 evidence status 校正
-- Current-State Report
+- 统一用户可读 Investigation Report
 
 运行入口现在是：
 
@@ -159,7 +159,7 @@ Archive 必须保留 `sourceRecordIds` / sequence 范围，摘要只是压缩后
 
 当前 Investigation 保持一个主推理角色，但执行可落到 Copilot SDK、CodeBuddy SDK 或 OpenCode Run；平台级 evidence / output / safety 约束由宿主 system prompt 和确定性代码负责，不额外建立一层业务 Custom Agent。Workflow 只提供地图骨架；Agent 可以在回答后给出少量下一步候选，用户点击候选后，前端发送 routeId，服务端从当前调查的真实候选中解析并作为结构化上下文交给 Agent，而不是拼一段“我选择这条路线……”的提示词。
 
-Skill 是平级、可复用、按 Investigation 配置的能力模块。Research workflow 由 SKILL 定义；确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
+Skill 是平级、可复用的能力模块。Capability Skill 由当前 Agent Runtime 自动发现；Workflow Skill 由 Investigation 的 `workflow` 状态决定。确定性发现由现有 TypeScript / JavaScript / Python 脚本和工具执行。
 
 Structural Analysis 是一个例外边界：Graphify executable 属于平台级 capability，不由 Investigation 的 MCP/Skill 列表决定是否安装。每个 turn 的 Control snapshot 记录平台 capability version；runtime audit 再记录实际 Graphify package version、graph path 和 graph hash。这样既保留能力的稳定可用性，又避免 toolchain 漂移而无法重放。
 
