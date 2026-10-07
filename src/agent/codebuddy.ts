@@ -14,14 +14,15 @@ import {
   buildGraphifyMcpServer,
   tryEnsureGraphifyGraph,
   isGraphifyTool,
+  requiresGraphifyFirst,
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import { config } from '../config.js';
 import * as z from 'zod';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
-import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
+import { requestAgentUserInput } from './user-input-bridge.js';
 import { createLocalDataTools } from './local-data-tools.js';
-import { requestAgentUserInput, type AskInput } from './copilot.js';
+import type { AskInput } from './copilot.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
 
@@ -605,7 +606,7 @@ export async function askCodeBuddy(
     6,
     Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
   );
-  const graphifyRequired = graphifyEnabled && requiresGraphifyPrompt(input.prompt);
+  const graphifyRequired = graphifyEnabled && requiresGraphifyFirst(input.prompt);
   const maxAutomaticContinuations = graphifyRequired
     ? Math.min(6, requestedAutomaticContinuations + 1)
     : requestedAutomaticContinuations;
