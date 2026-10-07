@@ -11,6 +11,16 @@ import { config } from '../config.js';
 const execFileAsync = promisify(execFile);
 const MAX_CACHE_BYTES = 50 * 1024 * 1024;
 
+let ytDlpAvailability: Promise<boolean> | undefined;
+
+async function isYtDlpAvailable(): Promise<boolean> {
+  ytDlpAvailability ??= execFileAsync('yt-dlp', ['--version'], {
+    timeout: 3_000,
+    maxBuffer: 64 * 1024,
+  }).then(() => true).catch(() => false);
+  return ytDlpAvailability;
+}
+
 export type RemoteMediaKind = 'image' | 'video' | 'remote';
 
 export interface ResolvedRemoteMedia {
@@ -82,6 +92,7 @@ function mimeFromMediaUrl(value: string): string | undefined {
 
 async function resolveWithYtDlp(source: string, kind: RemoteMediaKind): Promise<{ remoteUrl?: string; mimeType?: string }> {
   if (kind !== 'video' && !isSupportedSocialMediaPage(source)) return {};
+  if (!(await isYtDlpAvailable())) return {};
   try {
     const { stdout } = await execFileAsync(
       'yt-dlp',
