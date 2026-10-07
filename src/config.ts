@@ -24,7 +24,7 @@ const EnvSchema = z.object({
   /** Default CodeBuddy model. Must normally be present in CODEBUDDY_MODEL_ALLOWLIST. */
   CODEBUDDY_DEFAULT_MODEL: z.string().default('glm-5.3-flash'),
   /** Maximum agent/tool loop turns inside one CodeBuddy SDK query. */
-  CODEBUDDY_MAX_TURNS: z.coerce.number().int().min(1).max(500).default(100),
+  CODEBUDDY_MAX_TURNS: z.coerce.number().int().min(1).max(1000).default(200),
   /** 是否允许工作台发现并使用本机 OpenCode Server。默认开启发现，不代表自动切换。 */
   OPENCODE_ENABLED: z.enum(['true', 'false']).default('true'),
   /** OpenCode Server 地址；默认使用 opencode serve 的本机地址。 */
