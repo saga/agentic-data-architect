@@ -42,17 +42,6 @@ function reportMetadataFile(name: string): string {
   return path.join(reportsDir(name), 'report-meta.json');
 }
 
-async function countAnalysisArtifacts(name: string): Promise<number> {
-  const dir = path.join(path.dirname(reportsDir(name)), 'artifacts', 'analysis');
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-    throw error;
-  }
-}
-
 async function readOptional(file: string): Promise<string | null> {
   try {
     return await fs.readFile(file, 'utf8');
@@ -161,13 +150,13 @@ export async function runReport(
     : { status: 'blocked' as const, plan: null };
   const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
   const assessmentResult = source.investigation.workflow === 'data-architecture-assessment'
-    ? await readArchitectureAssessmentArtifact(name)
+    ? await readArchitectureAssessmentArtifact(name, source)
     : { status: 'blocked' as const, plan: null };
   const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
   await assertInvestigationReportGate(name, {
     investigation: {
       ...source.investigation,
-      resultArtifactCount: await countAnalysisArtifacts(name),
+      resultArtifactCount: source.analysisArtifacts.length,
       workflow: source.investigation.workflow,
       assessmentPlanAvailable: Boolean(assessment),
       assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
@@ -187,7 +176,13 @@ export async function runReport(
     }
   }
 
-  const report = await buildReport(name, { investigation, snapshot, modernization, assessment });
+  const report = await buildReport(name, {
+    investigation,
+    snapshot,
+    modernization,
+    assessment,
+    analysisArtifacts: source.analysisArtifacts,
+  });
   const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
   const artifactHash = hashArtifact(report.markdown);
   const review = await reviewArtifact({
@@ -217,13 +212,16 @@ export async function runReport(
     artifactHash,
     provenance,
   });
-  await fs.mkdir(reportsDir(name), { recursive: true });
-  await fs.writeFile(reportMetadataFile(name), JSON.stringify(metadata, null, 2) + '\n', 'utf8');
-
-  const reviewPath = await saveArtifactReview(name, review);
   if (review.availability !== 'completed' || review.status !== 'pass') {
     throw new ReportQualityGateError(review);
   }
+
+  // Publish the report only after the independent review has passed. A failed or
+  // unavailable review therefore cannot leave a new report looking current.
+  await fs.mkdir(reportsDir(name), { recursive: true });
+  await fs.writeFile(reportFile(name), report.markdown + '\n', 'utf8');
+  await fs.writeFile(reportMetadataFile(name), JSON.stringify(metadata, null, 2) + '\n', 'utf8');
+  await saveArtifactReview(name, review);
 
   return { ...report, review };
   });
