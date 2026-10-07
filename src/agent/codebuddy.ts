@@ -415,7 +415,6 @@ export async function askCodeBuddy(
             '这一轮不要回答最终问题；完成 Graphify 导航后返回关键节点和关系。',
           ]
         : []),
-      currentWorkflowInstruction,
       ...(lastStageAnswer
         ? [
             '上一阶段已经完成。请在不重复已经完成工作的前提下继续当前 Mission。',
