@@ -71,7 +71,7 @@ Task Override schema 不得因为字段上的 default 而在 parse 时补出隐�
 - 配置来源和版本可以审计；
 - runtime capability 不会被用户配置误修改。
 
-代价是读取时需要计算 Effective Config，并维护旧配置格式的迁移逻辑。
+代价是读取时需要计算 Effective Config；当前实现只接受 v2 sparse Task Config，不再承担旧完整 Task Config 的运行时迁移。Task history 必须保留每一条记录当时看到的 globalVersion，不能随着后续 Global 更新而重写。
 
 ## Rejected Alternatives
 
