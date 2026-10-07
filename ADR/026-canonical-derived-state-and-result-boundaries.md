@@ -56,7 +56,7 @@ Assessment 没有 Finding 也是合法结果；此时 recommendations / roadmap 
 
 ### 4. Skill 描述必须与 deterministic condition 一致
 
-Workflow Skill 中的 `completeWhen` 只能引用平台已实现的 deterministic signal。
+Workflow Skill 中的 `completeWhen` 只能引用平台已实现的 deterministic signal。没有 `completeWhen` 的 Agent task 不能靠 Agent 的 `success` 自行推进，必须先通过本阶段的 deterministic Stage Gate。
 
 如果业务语义需要新的完成条件，先扩展 evaluator 和测试，再改变 Workflow Skill；不能通过 Prompt 让 Agent 自己宣布完成。
 
