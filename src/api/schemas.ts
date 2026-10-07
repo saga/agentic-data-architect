@@ -4,7 +4,7 @@
  * 本文件的注释说明职责、输入输出和关键设计原因，方便后续维护。
  */
 import * as z from 'zod';
-import { ControlAgentSchema, ControlResearchSchema, WorkflowIdSchema } from '../investigation/schemas.js';
+import { AgentRuntimeSchema, ControlAgentSchema, ControlResearchSchema, WorkflowIdSchema } from '../investigation/schemas.js';
 
 const WorkflowSelectionSchema = WorkflowIdSchema.nullable().or(z.literal('')).transform((value) => value === '' ? null : value);
 
@@ -13,6 +13,7 @@ export const CreateSessionBodySchema = z.object({
   name: z.string().trim().min(1).optional(),
   userPrompt: z.string().trim().optional(),
   workflow: WorkflowSelectionSchema.optional(),
+  runtime: AgentRuntimeSchema.optional(),
 }).strict();
 
 /** 确认 Investigation Mission；确认后服务端才允许开始正式调查。 */
