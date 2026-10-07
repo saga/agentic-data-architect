@@ -88,8 +88,11 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
         const snapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8')) as DiscoverySnapshot;
         columnsFound = snapshot.lineage?.columns.length
           ?? snapshot.estate.nodes.filter((node) => node.type === 'column').length;
-      } catch {
-        // 旧 snapshot 损坏时不阻塞调用；下一次文件变化会触发新的 Discovery。
+      } catch (error) {
+        throw new Error(
+          'Discovery Snapshot 已损坏，不能复用当前 Discovery Run：'
+          + (error instanceof Error ? error.message : String(error)),
+        );
       }
       return {
         runId: reusable.id,
