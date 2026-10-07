@@ -20,6 +20,7 @@ import {
   GRAPHIFY_SELECTION_INSTRUCTION,
   buildGraphifyMcpServer,
   ensureGraphifyGraph,
+  isGraphifyTool,
 } from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
@@ -322,29 +323,46 @@ async function consumeOpenCodeEvents(
           if (part.type === 'tool') {
             const toolName = part.tool?.trim() || '工具';
             const status = part.state?.status;
+            const graphifyToolCall = isGraphifyTool({ toolName });
             if (status === 'running') {
-              input.onStatus?.('OpenCode 正在使用工具 ' + toolName + '，请稍候…');
+              input.onStatus?.(
+                graphifyToolCall
+                  ? '助手正在用 Graphify 查看代码结构，请稍候…'
+                  : 'OpenCode 正在使用工具 ' + toolName + '，请稍候…',
+              );
               input.onTrajectory?.({
                 type: 'tool_call',
-                name: 'OpenCode 工具：' + toolName,
+                name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'OpenCode 工具：' + toolName,
                 status: 'started',
                 model: input.model,
                 details: {
                   sessionId,
                   tool: toolName,
+                  ...(graphifyToolCall ? {
+                    mcpServerName: GRAPHIFY_MCP_NAME,
+                    mcpToolName: toolName,
+                  } : {}),
                 },
               });
             } else if (status === 'completed' || status === 'error') {
-              input.onStatus?.('OpenCode 已完成工具调用，正在整理结果…');
+              input.onStatus?.(
+                graphifyToolCall
+                  ? 'Graphify 已完成结构查询，正在整理结果…'
+                  : 'OpenCode 已完成工具调用，正在整理结果…',
+              );
               input.onTrajectory?.({
                 type: 'tool_result',
-                name: 'OpenCode 工具：' + toolName,
+                name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'OpenCode 工具：' + toolName,
                 status: status === 'completed' ? 'completed' : 'failed',
                 model: input.model,
                 details: {
                   sessionId,
                   tool: toolName,
                   status,
+                  ...(graphifyToolCall ? {
+                    mcpServerName: GRAPHIFY_MCP_NAME,
+                    mcpToolName: toolName,
+                  } : {}),
                 },
               });
             }
