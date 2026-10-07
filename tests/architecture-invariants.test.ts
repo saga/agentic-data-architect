@@ -29,3 +29,16 @@ test('global media cache has a bounded total lifecycle', async () => {
   assert.match(media, /MAX_CACHE_TOTAL_BYTES = 512 \* 1024 \* 1024/);
   assert.match(media, /enforceCacheBudget/);
 });
+
+test('Agent runtime data stays outside Investigation workspace', async () => {
+  const copilot = await fs.readFile(new URL('../src/agent/copilot.ts', import.meta.url), 'utf8');
+  assert.match(copilot, /path\.join\(config\.dataDir, 'copilot'\)/);
+  assert.doesNotMatch(copilot, /path\.join\(config\.workspaceDir, 'copilot'\)/);
+});
+
+test('CLI does not force a legacy workflow by default', async () => {
+  const cli = await fs.readFile(new URL('../src/cli.ts', import.meta.url), 'utf8');
+  assert.match(cli, /let workflow: WorkflowId \| null = null/);
+  assert.match(cli, /current-data-architecture/);
+  assert.match(cli, /data-architecture-assessment/);
+});
