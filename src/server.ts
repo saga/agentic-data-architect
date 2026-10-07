@@ -112,7 +112,7 @@ function formatUserFacingError(error: unknown): string {
   if (/CodeBuddy SDK 没有返回文本答案/.test(raw)) return '助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。';
   if (/OpenCode CLI 没有返回文本答案/.test(raw)) return 'OpenCode 这次没有返回可用结果。请查看执行轨迹中的最后一条错误，然后重试。';
   if (/OpenCode 运行时没有启用/.test(raw)) return 'OpenCode 当前没有启用。请在服务端设置 OPENCODE_ENABLED=true 后重试。';
-  return raw;
+  return raw.replace(new RegExp('^' + "AI "), '助手 ').replace(/^Agent /, '助手 ').replace(/^当前 Workflow/, '当前工作方式').replace(/^Workflow /, '工作方式').replace(/^CodeBuddy SDK /, '助手 ');
 }
 
 
