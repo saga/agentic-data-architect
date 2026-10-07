@@ -625,7 +625,6 @@ export async function answerQuestion(
       },
       onDelta: emitDelta,
       onStatus: emitStatus,
-      onTrajectory: recordTrajectory,
       onStageResult: async ({ content, execution }) => {
         lastExecution = execution;
         const latestStage = await assertTurnStillCurrent();
