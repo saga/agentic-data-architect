@@ -28,7 +28,6 @@ test('Graphify MCP server exposes only structural read tools', () => {
   assert.equal(result?.name, GRAPHIFY_MCP_NAME);
   assert.equal(result?.server.command, '/opt/graphify-mcp');
   assert.deepEqual(result?.server.args, [
-    '--graph',
     '/tmp/session/graphify-out/graph.json',
   ]);
   assert.deepEqual(result?.server.tools, [
