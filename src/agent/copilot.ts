@@ -663,7 +663,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       mode: 'append' as const,
       // Mission 是最高优先级上下文；即使长期 Session 发生 compaction，
     // 服务器每个 turn 都会通过 system message 重新把任务契约放在最前面。
-    content: [input.missionPrompt, input.systemPrompt, workflowInstruction].filter(Boolean).join('\n\n'),
+    content: [input.missionPrompt, input.systemPrompt, graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '', workflowInstruction].filter(Boolean).join('\\n\\n'),
     },
     skillDirectories: isolatedPurpose ? [] : (input.skillDirectories ?? [config.skillsDir]),
     // Capability Skills stay available for Copilot's automatic task-based selection.
