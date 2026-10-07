@@ -284,6 +284,7 @@ export async function answerQuestion(
             model: control.agent.model,
             modelCallName: '生成陪伴提示',
             workingDirectory: workspaceRoot(investigationName),
+            onTrajectory: recordTrajectory,
             purpose: 'review',
           });
           const value = note.trim();
@@ -517,6 +518,7 @@ export async function answerQuestion(
           });
       },
       workingDirectory: workspaceRoot(inv.name),
+      onTrajectory: recordTrajectory,
       model: control.agent.model,
       modelCallName: '执行当前调查',
       ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
@@ -545,6 +547,7 @@ export async function answerQuestion(
           },
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          onTrajectory: recordTrajectory,
         });
 
         // 行动前检查属于 Mission 执行约束；语义判断不可用时宁可停下来，
@@ -597,6 +600,7 @@ export async function answerQuestion(
               },
               model: control.agent.model,
               workingDirectory: workspaceRoot(inv.name),
+              onTrajectory: recordTrajectory,
             })
           : [];
 
@@ -630,6 +634,7 @@ export async function answerQuestion(
               },
               model: control.agent.model,
               workingDirectory: workspaceRoot(inv.name),
+              onTrajectory: recordTrajectory,
             })
           : null;
 
@@ -670,6 +675,7 @@ export async function answerQuestion(
             unknownReviews: missionUnknownReviews ?? undefined,
             model: control.agent.model,
             workingDirectory: workspaceRoot(inv.name),
+            onTrajectory: recordTrajectory,
           });
           recordTrajectory({
             type: 'status',
@@ -803,6 +809,7 @@ export async function answerQuestion(
           unknownReviews: unknownReviewsForTurn,
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          onTrajectory: recordTrajectory,
         });
         recordTrajectory({
           type: 'status',
@@ -891,6 +898,7 @@ export async function answerQuestion(
           ].join('\\n'),
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          onTrajectory: recordTrajectory,
           purpose: 'review',
         });
         if (rendered.trim()) answer = rendered.trim();
@@ -937,6 +945,7 @@ export async function answerQuestion(
           unknownReviews: unknownReviewsForTurn,
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          onTrajectory: recordTrajectory,
         });
         if (completion.completed) {
           try {
