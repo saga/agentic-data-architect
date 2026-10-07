@@ -158,7 +158,9 @@ export async function answerQuestion(
     if (sameTurnActive) {
       throw new Error('This investigation already has an active turn.');
     }
-    abortStaleConversationTurn(turn.turnId);
+    if (abortStaleConversationTurn(turn.turnId)) {
+      throw new Error('上一进程中未完成的这次请求已经被终止，原有内容已保留。请重新发送一个新问题。');
+    }
   }
 
   if (turn.status === 'failed' || turn.status === 'aborted') {
