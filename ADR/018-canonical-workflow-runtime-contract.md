@@ -13,7 +13,7 @@
 2. Snapshot 由 definition、layout、execution、derived state 和 run events 组成。
 3. execution 只能存在一个 canonical owner；其它旧字段只能作为兼容 projection，不能独立修改。
 4. Web 的 Workflow、Journey、Context Panel 统一消费 WorkflowSnapshot。
-5. /journey 只作为 compatibility endpoint；新代码不得继续创建第二套 Journey response。
+5. `/journey` 是现有路由入口，但返回的就是 canonical `WorkflowSnapshot`；它不是第二套 Journey response，也不承担兼容语义。
 6. Workflow node、actor、status、route 等核心枚举由 canonical contract 定义。
 
 ## Consequences
