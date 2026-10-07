@@ -211,10 +211,10 @@ export async function answerQuestion(
     assistantDraft += delta;
     onDelta?.(delta);
   };
-  const emitReasoning = (delta: string): void => {
+  const emitReasoning = (delta: string, source = '执行当前调查'): void => {
     updateLiveActivity('正在分析问题');
     if (delta.trim()) {
-      reasoningWrite = reasoningWrite.then(() => appendReasoningLog(investigationName, turnId, delta));
+      reasoningWrite = reasoningWrite.then(() => appendReasoningLog(investigationName, turnId, delta, source));
     }
     options?.onReasoningDelta?.(delta);
     emitStatus('助手正在分析你的问题，请稍候…');
@@ -328,6 +328,7 @@ export async function answerQuestion(
             modelCallName: '生成陪伴提示',
             workingDirectory: workspaceRoot(investigationName),
             onTrajectory: recordTrajectory,
+            onReasoningDelta: (delta) => emitReasoning(delta, '生成陪伴提示'),
             purpose: 'review',
           });
           const value = note.trim();
@@ -971,6 +972,7 @@ export async function answerQuestion(
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
           onTrajectory: recordTrajectory,
+          onReasoningDelta: (delta) => emitReasoning(delta, '整理最终回答'),
           purpose: 'review',
         });
         if (rendered.trim()) answer = rendered.trim();
