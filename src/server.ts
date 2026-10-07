@@ -51,6 +51,7 @@ import {
   DatasetsResponseSchema,
   AnswerSummarySchema,
   ReportRegenerateResponseSchema,
+  ReportArtifactStateSchema,
   ControlResponseSchema,
   toControlView,
   HealthResponseSchema,
@@ -1287,35 +1288,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
   app.get('/api/sessions/:name/report', async (req, res) => {
     const name = sessionKey(req.params.name);
     const report = await readReport(name);
-    if (report.status === 'current' && report.markdown) {
-      res.type('text/markdown').send(report.markdown);
-      return;
-    }
-    if (report.status === 'missing') {
-      res.status(404).json(ApiErrorSchema.parse({
-        code: 'REPORT_NOT_GENERATED',
-        error: '还没有生成正式报告，请显式重新生成。',
-      }));
-      return;
-    }
-    if (report.status === 'stale') {
-      res.status(409).json(ApiErrorSchema.parse({
-        code: 'REPORT_STALE',
-        error: '正式报告对应的调查成果已经变化，需要重新生成。',
-      }));
-      return;
-    }
-    if (report.status === 'blocked') {
-      res.status(409).json(ApiErrorSchema.parse({
-        code: report.reviewStatus === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_REQUIRED',
-        error: '正式报告尚未通过独立质量审核，不能作为当前结果发布。',
-      }));
-      return;
-    }
-    res.status(500).json(ApiErrorSchema.parse({
-      code: 'REPORT_METADATA_INVALID',
-      error: '正式报告的元数据无效，需要重新生成。',
-    }));
+    res.json(ReportArtifactStateSchema.parse(report));
   });
 
   app.post('/api/sessions/:name/report/regenerate', async (req, res) => {
