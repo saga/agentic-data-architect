@@ -16,7 +16,6 @@ import {
   isGraphifyTool,
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
-import type { McpServerSetting } from '../investigation/schemas.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
 import { createLocalDataTools } from './local-data-tools.js';
