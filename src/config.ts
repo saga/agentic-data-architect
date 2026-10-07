@@ -16,9 +16,9 @@ const EnvSchema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   COPILOT_MODEL: z.string().default('auto'),
   /** Default Agent Runtime for newly created Investigations. */
-  AGENT_RUNTIME_DEFAULT: z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']).default('codebuddy-sdk'),
+  AGENT_RUNTIME_DEFAULT: z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']).default('copilot-sdk'),
   /** Ordered runtime fallback chain; a selected runtime starts at its own position. */
-  AGENT_RUNTIME_FALLBACK_ORDER: z.string().default('codebuddy-sdk,copilot-sdk,opencode-run'),
+  AGENT_RUNTIME_FALLBACK_ORDER: z.string().default('copilot-sdk,codebuddy-sdk,opencode-run'),
   /** Ordered CodeBuddy model filter; the first model is the default unless overridden explicitly. */
   CODEBUDDY_MODEL_ALLOWLIST: z.string().default('Glm-5.3-flash,DeepSeek-V4.1-flash,Space-Bunny'),
   /** Default CodeBuddy model. Must normally be present in CODEBUDDY_MODEL_ALLOWLIST. */
