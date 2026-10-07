@@ -55,6 +55,13 @@ function input(overrides: Partial<StageGateInput> = {}): StageGateInput {
         { id: 'data-model', title: 'Data Model', description: '说明核心数据模型。', required: true, status: 'not_started', detail: '未开始' },
       ],
     },
+    missionAlignment: {
+      aligned: true,
+      alignment: 0.9,
+      worthContinuing: true,
+      continuationValue: 0.8,
+      reason: '本阶段与 Mission 对齐。',
+    },
     parsed: {
       answer: '已经查清 Position 的主要来源。',
       claims: [
@@ -79,6 +86,14 @@ test('stage gate passes from actual evidence-backed work', () => {
   assert.equal(result.newEvidenceIds[0], 'ev-new');
   assert.equal(result.evidenceBackedClaimCount, 1);
   assert.equal(result.shouldContinue, true);
+});
+
+test('Stage Gate fails closed when Mission Alignment is unavailable', () => {
+  const result = evaluateInvestigationStageGate(input({
+    missionAlignment: null,
+  }));
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && !item.passed));
 });
 
 test('Stage Gate rejects a checkpoint when current scope has not been validated', () => {
