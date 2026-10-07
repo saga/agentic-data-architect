@@ -314,7 +314,7 @@ async function consumeOpenCodeEvents(
   input: OpenCodeAskInput,
   sessionId: string,
   /** 后台 reader 只记录、不抛错：抛错会变成 unhandled rejection 直接崩掉整个服务进程。 */
-  readerState: { sessionError?: string },
+  readerState: { sessionError?: string; graphifyUsed?: boolean },
 ): Promise<void> {
   if (!response.body) return;
 
