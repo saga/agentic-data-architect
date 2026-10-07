@@ -325,6 +325,22 @@ function validateAndNormalize(
   return result;
 }
 
+/**
+ * Smart Function 要的是 JSON，不要求底层模型一定使用同一种输出格式。
+ * 允许模型偶尔包一层 Markdown 代码围栏或附带少量前后说明，避免一次格式偏差直接让 Gate 失效。
+ */
+function extractStructuredJson(raw: string): string {
+  const value = raw.trim();
+  const fenced = value.match(new RegExp('\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\x60{3}', 'i'));
+  if (fenced?.[1]) return fenced[1].trim();
+
+  const start = value.indexOf('{');
+  const end = value.lastIndexOf('}');
+  if (start >= 0 && end > start) return value.slice(start, end + 1).trim();
+
+  return value;
+}
+
 function normalizeProbabilities(
   values: Array<[string, number]>,
   expectedKeys: string[],
@@ -784,7 +800,7 @@ export async function jevSmartFunc(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(extractStructuredJson(raw));
   } catch {
     throw new Error('Smart Function 返回的 structured output 不是合法 JSON。');
   }
