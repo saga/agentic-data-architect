@@ -17,7 +17,7 @@ import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/est
 import { nextId, type DiscoveryRun, type EvidenceRef, type GraphifyRunMetadata } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
-import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
+import { ensureGraphifyGraph } from '../adapters/graphify.js';
 import { assertMissionGate } from './mission-gate.js';
 import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import type { DiscoveryGeneration } from '../investigation/discovery-snapshot-schema.js';
@@ -139,7 +139,9 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
       collectedAt: new Date().toISOString(),
     }));
     inv.evidence.push(...sourceEvidence);
-    graphify = await getGraphifyRuntimeMetadata(opts.path);
+    // Discovery 不再只记录 Graphify 是否安装；它必须先生成/刷新当前 structural graph，
+    // 后续 Agent 查询到的关系才和这次 Discovery 的源码快照一致。
+    graphify = await ensureGraphifyGraph(opts.path, true);
     unknowns.push(...inventory.unknowns);
     lineage = await buildLineage(
       inventory.files
