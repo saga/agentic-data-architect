@@ -9,7 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { config } from './config.js';
-import { listPendingCopilotPermissions, listPendingCopilotUserInputs } from './agent/copilot.js';
+import { listPendingCopilotPermissions } from './agent/copilot.js';
+import { listPendingAgentUserInputs } from './agent/user-input-bridge.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
@@ -48,7 +49,7 @@ async function main(): Promise<void> {
     const name = path.basename(String(req.params.name));
     const active = getActiveInvestigationTurn(name);
     const pendingPermissions = active ? listPendingCopilotPermissions(name) : [];
-    const pendingUserInputs = active ? listPendingCopilotUserInputs(name) : [];
+    const pendingUserInputs = active ? listPendingAgentUserInputs(name) : [];
     const state = !active
       ? 'idle'
       : active.phase === 'committing'
