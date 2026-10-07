@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { config } from './config.js';
 import { listPendingCopilotPermissions } from './agent/copilot.js';
-import { listPendingAgentUserInputs } from './agent/user-input-bridge.js';
+import { listPendingAgentUserInputs, rejectAllPendingAgentUserInputs } from './agent/user-input-bridge.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
@@ -98,6 +98,12 @@ async function main(): Promise<void> {
     // Stop Agent work before closing HTTP/DB so its normal abort/failure path
     // can persist the durable assistant message.
     const activeTurns = listActiveInvestigationTurns();
+
+    // ask_user 本身是一个等待中的 Promise。仅调用 Runtime abort 不保证这个
+    // bridge Promise 会立即结束；先明确拒绝所有待处理输入，再停止各 Runtime，
+    // 这样 shutdown 不会因为一个用户输入一直等到 watchdog 超时。
+    rejectAllPendingAgentUserInputs(new Error('服务器正在关闭，本次等待已结束。'));
+
     await Promise.all(activeTurns.map(async (turn) => {
       requestAbort(turn.investigationName, turn.turnId);
       await Promise.allSettled([
@@ -107,8 +113,8 @@ async function main(): Promise<void> {
       ]);
     }));
 
-    // q.interrupt()/runtime abort only requests cancellation; wait for the workflow's
-    // catch/finally to finish its durable turn write before closing SQLite.
+    // Runtime abort 只是发出取消请求；必须等待 workflow 的 catch/finally 完成
+    // conversation、trajectory、reasoning 等持久化，再关闭 SQLite，避免最后一批记录丢失。
     await waitForInvestigationTurnsToFinish(15_000);
 
     await new Promise<void>((resolve, reject) => {
