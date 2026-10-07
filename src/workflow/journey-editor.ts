@@ -1151,6 +1151,29 @@ export async function applyHumanWorkflowTransition(
       error: message,
     });
 
+    // Human transition 的拒绝同样属于重要控制面事件，不能只有 UI 返回错误而没有审计记录。
+    try {
+      await appendAuditEvent(name, {
+        actor: 'user',
+        action: 'workflow.human.transition.rejected',
+        summary: 'Rejected invalid human Workflow outcome.',
+        details: {
+          workflowId,
+          nodeId,
+          outcome,
+          error: message,
+        },
+      });
+    } catch (auditError) {
+      console.error('[workflow] Failed to persist rejected human transition audit.', {
+        sessionName: name,
+        workflowId,
+        nodeId,
+        outcome,
+        error: auditError,
+      });
+    }
+
     return { applied: false, error: message };
   }
 }
