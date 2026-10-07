@@ -27,8 +27,32 @@ function sameMission(
   left: Investigation['mission'],
   right: Investigation['mission'],
 ): boolean {
-  return left?.purpose === right?.purpose
-    && left?.expectedResult === right?.expectedResult;
+  // Mission identity deliberately ignores confirmation timestamp/version metadata.
+  // The deliverable contract itself is part of the identity: changing only a deliverable
+  // must invalidate old claims/findings just like changing purpose or expectedResult.
+  return Boolean(left && right)
+    && left.purpose === right.purpose
+    && left.expectedResult === right.expectedResult
+    && JSON.stringify(left.deliverables.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      required: item.required,
+    }))) === JSON.stringify(right.deliverables.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      required: item.required,
+    })));
+}
+
+function mergeById<T extends { id: string }>(current: T[], incoming: T[]): T[] {
+  // 保存类操作可能来自并行 Tool；按稳定 ID 合并可以保留另一个请求刚刚追加的记录，
+  // 同时让同一个对象的较新写入覆盖旧快照，避免“最后一个 save 把前一个结果抹掉”。
+  const merged = new Map<string, T>();
+  for (const item of current) merged.set(item.id, item);
+  for (const item of incoming) merged.set(item.id, item);
+  return [...merged.values()];
 }
 
 /** 创建一个空的 Investigation 初始状态；不负责写盘。 */
@@ -75,53 +99,46 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
   return withWorkspaceContextLock(inv.name, async () => {
     await ensureWorkspace(inv.name, {
       userPrompt: inv.userPrompt,
-      // 创建/迁移 workspace 时使用本次 Investigation 的初始 workflow；真正写入时下面会以最新 current.workflow 为准。
       workflow: inv.workflow,
       goal: inv.goal,
       scope: inv.scope,
       systems: inv.systems,
     });
 
-    // Merge investigation-owned state into the latest workspace snapshot.
-    // Inputs/files may have been added while the agent was thinking; never
-    // overwrite those newer workspace inputs with an older in-memory snapshot.
     const current = await loadWorkspaceContext(inv.name);
+    const missionUnchanged = sameMission(current.mission, inv.mission);
+
+    // 这里不是简单的“把 inv 整体覆盖回去”。inv 可能是几十秒前读取的快照，
+    // 在 Agent 调工具期间，用户/API 可能已经更新了 Mission、Workflow、scope 或其它状态。
+    // 用户明确修改过的控制状态必须以锁内最新 context 为准；Agent 这次新增的事实则按 ID 合并。
     const next: Investigation = {
       ...current,
       schemaVersion: 3,
-      name: inv.name,
-      userPrompt: inv.userPrompt,
-      // Workflow 由独立更新 API 管理；这里必须保留 save 前最新值，避免旧 Agent turn 覆盖用户刚切换的路线。
+      name: current.name,
+      userPrompt: current.userPrompt,
       workflow: current.workflow,
-      goal: inv.goal,
-      scope: inv.scope,
-      systems: inv.systems,
-      // Mission 只能通过 confirmInvestigationMission 修改。这里必须保留锁内读到的最新 Mission，
-      // 防止旧 Agent turn 在用户修改 Mission 后把旧任务契约写回去。
+      goal: current.goal,
+      scope: current.scope,
+      systems: current.systems,
       ...(current.mission ? { mission: current.mission } : {}),
-      // Mission 改变后，旧 turn 带来的 Scope Confirmation 也不能恢复，否则正式结果会引用旧 Mission。
-      ...(sameMission(current.mission, inv.mission)
-        ? (inv.scopeValidation ? { scopeValidation: inv.scopeValidation } : {})
-        : (current.scopeValidation ? { scopeValidation: current.scopeValidation } : {})),
-      questions: inv.questions,
-      discoveryRuns: inv.discoveryRuns,
-      evidence: inv.evidence,
-      claims: inv.claims,
-      findings: inv.findings,
-      unknowns: inv.unknowns,
-      importantInformation: inv.importantInformation,
-      ...(inv.agentSessionId ? { agentSessionId: inv.agentSessionId } : {}),
-      ...(inv.agentSessionRuntime ? { agentSessionRuntime: inv.agentSessionRuntime } : {}),
-      ...(typeof inv.agentConfigurationVersion === 'number'
-        ? { agentConfigurationVersion: inv.agentConfigurationVersion }
-        : {}),
-      ...(inv.copilotSessionId ? { copilotSessionId: inv.copilotSessionId } : {}),
-      ...(typeof inv.copilotConfigurationVersion === 'number'
-        ? { copilotConfigurationVersion: inv.copilotConfigurationVersion }
-        : {}),
+      ...(current.scopeValidation ? { scopeValidation: current.scopeValidation } : {}),
+      questions: [...new Set([...current.questions, ...inv.questions])],
+      discoveryRuns: mergeById(current.discoveryRuns, inv.discoveryRuns),
+      evidence: mergeById(current.evidence, inv.evidence),
+      // Claims / Findings / Unknowns 依赖 Mission。Mission 一旦变了，旧快照里的结果
+      // 绝不能重新写回新 Mission；Mission 相同则做按 ID 合并，避免并行调查互相覆盖。
+      claims: missionUnchanged ? mergeById(current.claims, inv.claims) : current.claims,
+      findings: missionUnchanged ? mergeById(current.findings, inv.findings) : current.findings,
+      unknowns: missionUnchanged
+        ? [...new Set([...current.unknowns, ...inv.unknowns])]
+        : current.unknowns,
+      importantInformation: [...new Set([...current.importantInformation, ...inv.importantInformation])],
+      // Runtime Session 的生命周期由 setAgentSessionId / Workflow / Mission 变更管理。
+      // 不能让旧 Agent 快照把刚被清除的 session reference 重新写回来。
       updatedAt: new Date().toISOString(),
     };
-    await writeJsonAtomic(contextFile(inv.name), next);
+
+    await writeJsonAtomic(contextFile(inv.name), WorkspaceContextSchema.parse(next));
     return contextFile(inv.name);
   });
 }
