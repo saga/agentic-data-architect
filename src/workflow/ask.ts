@@ -949,7 +949,7 @@ export async function answerQuestion(
         });
         if (completion.completed) {
           try {
-            await runReport(investigationName);
+            await runReport(investigationName, { onTrajectory: recordTrajectory });
             await appendAuditEvent(investigationName, {
               actor: 'system',
               action: 'investigation.report.generated',
