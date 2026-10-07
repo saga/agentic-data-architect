@@ -57,11 +57,10 @@ interface ProgressSignals {
   sourceOfTruthCount: number;
   lineageEdgeCount: number;
   modernization?: {
+    targetStatus: string;
     targetComponentCount: number;
-    mappingCount: number;
-    validationCount: number;
-    blockingValidationReady: number;
-    blockingValidationTotal: number;
+    mappingStatuses: string[];
+    validationStatuses: Array<{ status: string; blocking: boolean }>;
   } | null;
   assessment?: {
     findingsCount: number;
@@ -171,7 +170,7 @@ function evaluateDeliverable(
       );
 
     case 'target-architecture': {
-      const count = signals.modernization?.targetComponentCount ?? 0;
+      const count = derived.targetComponentCount;
       return covered(
         item,
         derived.targetArchitectureReady ? 'covered' : signals.currentState ? 'in_progress' : 'not_started',
@@ -180,7 +179,7 @@ function evaluateDeliverable(
     }
 
     case 'mapping': {
-      const count = signals.modernization?.mappingCount ?? 0;
+      const count = derived.mappingCount;
       return covered(
         item,
         derived.mappingReady ? 'covered' : 'not_started',
@@ -189,9 +188,9 @@ function evaluateDeliverable(
     }
 
     case 'validation': {
-      const total = signals.modernization?.blockingValidationTotal ?? 0;
-      const ready = signals.modernization?.blockingValidationReady ?? 0;
-      const count = signals.modernization?.validationCount ?? 0;
+      const total = derived.blockingValidationTotal;
+      const ready = derived.blockingValidationReady;
+      const count = derived.validationCount;
       return covered(
         item,
         derived.validationReady ? 'covered' : count > 0 || total > 0 ? 'in_progress' : 'not_started',
@@ -260,12 +259,15 @@ export async function buildMissionProgress(
   if (investigation.workflow === 'legacy-modernization') {
     const plan = await loadModernizationPlan(name);
     if (plan) {
-      signals.modernization = deriveModernizationFacts({
+      signals.modernization = {
         targetStatus: plan.targetArchitecture.status,
         targetComponentCount: plan.targetArchitecture.components.length,
         mappingStatuses: plan.mappings.map((item) => item.status),
-        validationStatuses: plan.validationPlan.checks.map((item) => ({ status: item.status, blocking: item.blocking })),
-      });
+        validationStatuses: plan.validationPlan.checks.map((item) => ({
+          status: item.status,
+          blocking: item.blocking,
+        })),
+      };
     }
   }
 
