@@ -41,6 +41,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     value,
     newSessionOpen,
     newSessionName,
+    newSessionRuntime,
     newSessionGoal,
     newSessionExpectedResult,
     newSessionWorkflow,
@@ -53,6 +54,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     setAttachmentsOpen,
     setUserInputDrafts,
     setNewSessionName,
+    setNewSessionRuntime,
     setNewSessionGoal,
     setNewSessionExpectedResult,
     setNewSessionWorkflow,
@@ -101,12 +103,14 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
           loading={loading}
           newSessionOpen={newSessionOpen}
           newSessionName={newSessionName}
+          newSessionRuntime={newSessionRuntime}
           newSessionGoal={newSessionGoal}
           newSessionExpectedResult={newSessionExpectedResult}
           newSessionWorkflow={newSessionWorkflow}
           unknownsOpen={unknownsOpen}
           userInputDrafts={userInputDrafts}
           setNewSessionName={setNewSessionName}
+          setNewSessionRuntime={setNewSessionRuntime}
           setNewSessionGoal={setNewSessionGoal}
           setNewSessionExpectedResult={setNewSessionExpectedResult}
           setNewSessionWorkflow={setNewSessionWorkflow}
