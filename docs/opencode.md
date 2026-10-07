@@ -18,7 +18,7 @@ node scripts/ensure-opencode.mjs            # 检查并复用/拉起
 node scripts/ensure-opencode.mjs --reset    # 先杀掉占端口的进程，再按 .env 重起
 ```
 
-每次输出一张检查清单（✓ 通过 / ! 有问题）：地址合法、密码已配置、
+每次输出一张检查清单（✓ 通过 / ! 有问题）：地址合法、认证状态、
 代理可达、opencode CLI 存在、端口复用或拉起。任何一项不满足都只告警，
 不阻塞主服务（Copilot 通道照常能用）。日志在
 `.workspace/opencode-serve.log`（gitignored）。
