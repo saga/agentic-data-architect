@@ -64,21 +64,11 @@ function toCodeBuddyMcpServers(
   settings: NonNullable<AskInput['mcpServers']>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  const entries = Array.isArray(settings)
-    ? settings.map((server) => [server.name, server] as const)
-    : Object.entries(settings as Record<string, unknown>);
 
-  for (const [configuredName, value] of entries) {
+  for (const [configuredName, value] of Object.entries(settings)) {
     if (!value || typeof value !== 'object') continue;
+
     const server = value as Record<string, unknown>;
-
-    // AskInput.mcpServers follows the Copilot SDK's object-shaped MCP contract.
-    // Keep accepting the historical internal array shape because persisted callers
-    // may still provide McpServerSetting[] during a rolling upgrade.
-    if (Array.isArray(settings)) {
-      if (server.enabled !== true) continue;
-    }
-
     const name = configuredName.trim();
     if (!name) continue;
 
@@ -478,9 +468,7 @@ export async function askCodeBuddy(
     && input.purpose !== 'review'
     && Boolean(input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis')?.enabled ?? true);
 
-  const mcpServers = toCodeBuddyMcpServers(
-    input.mcpServers as unknown as McpServerSetting[] ?? [],
-  );
+  const mcpServers = toCodeBuddyMcpServers(input.mcpServers ?? {});
 
   if (input.purpose !== 'journey-map' && input.purpose !== 'review' && input.investigationName) {
     const workbench = buildCodeBuddyWorkbenchServer(input.investigationName);
