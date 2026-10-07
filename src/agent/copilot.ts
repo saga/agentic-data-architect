@@ -332,6 +332,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let graphifyUsedExecution = -1;
 
   let copilotSessionId = input.sessionId ?? '';
+  let pendingUserInputWaits = 0;
+  let startUserInputWaitTimeout: () => void = () => undefined;
+  let clearUserInputWaitTimeout: () => void = () => undefined;
 
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
@@ -503,8 +506,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
   if (input.turnId) {
     activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
   }
-  let pendingUserInputWaits = 0;
-
   /**
    * 三类 timeout 完全独立：
    * - Agent 执行 watchdog：只累计真正执行中的时间；
@@ -555,7 +556,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     permissionWaitTimeoutId = undefined;
   };
 
-  const startUserInputWaitTimeout = (): void => {
+  startUserInputWaitTimeout = (): void => {
     if (userInputWaitTimeoutId !== undefined) return;
     userInputWaitTimeoutId = setTimeout(() => {
       rejectUserInputTimeout?.(
@@ -565,7 +566,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     userInputWaitTimeoutId.unref?.();
   };
 
-  const clearUserInputWaitTimeout = (): void => {
+  clearUserInputWaitTimeout = (): void => {
     if (pendingUserInputWaits > 0) return;
     if (userInputWaitTimeoutId !== undefined) clearTimeout(userInputWaitTimeoutId);
     userInputWaitTimeoutId = undefined;
