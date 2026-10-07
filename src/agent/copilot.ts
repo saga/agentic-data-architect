@@ -21,6 +21,7 @@ import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
+import { rejectAllPendingAgentUserInputs } from './user-input-bridge.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
