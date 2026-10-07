@@ -69,8 +69,8 @@ export function InvestigationDialogs(props: {
               value={props.newSessionRuntime}
               onChange={(value) => props.setNewSessionRuntime(value as AgentRuntime)}
               options={[
-                { value: 'codebuddy-sdk', label: 'CodeBuddy SDK' },
                 { value: 'copilot-sdk', label: 'Copilot SDK' },
+                { value: 'codebuddy-sdk', label: 'CodeBuddy SDK' },
                 { value: 'opencode-run', label: 'OpenCode Run' },
               ]}
               style={{ width: '100%', marginTop: 6 }}
