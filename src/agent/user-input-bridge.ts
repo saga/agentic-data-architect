@@ -103,7 +103,16 @@ export async function requestAgentUserInput(
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       pending.delete(requestId);
-      reject(new Error(`等待你的回答超过 ${config.userInputWaitTimeoutMs}ms，这次操作已停止。`));
+      const error = new Error(`等待你的回答超过 ${config.userInputWaitTimeoutMs}ms，这次操作已停止。`);
+      onStatus?.('等待你的回答超时，这次操作已经停止。');
+      onTrajectory?.({
+        type: 'user_input_completed',
+        name: '等待用户输入超时',
+        status: 'failed',
+        durationMs: Math.max(0, Date.now() - Date.parse(requestedAt)),
+        details: { requestId, reason: 'timeout' },
+      });
+      reject(error);
     }, config.userInputWaitTimeoutMs);
     timeoutId.unref?.();
 
