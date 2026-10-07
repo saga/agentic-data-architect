@@ -20,6 +20,7 @@ import {
   type TaskConfiguration,
   GlobalConfigurationSchema,
   TaskConfigurationSchema,
+  TaskAgentOverrideSchema,
 } from './schemas.js';
 
 /** 返回当前 Investigation 的 control.json 路径。 */
