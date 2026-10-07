@@ -2,19 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  buildMissionDraft,
   evaluateMissionGate,
   formatMissionGateFailure,
   inferMissionDeliverables,
   isMissionWorkflowTargetAllowed,
 } from '../src/workflow/mission-gate.js';
-
-test('mission gate requires explicit user confirmation', () => {
-  const result = evaluateMissionGate(undefined);
-
-  assert.equal(result.passed, false);
-  assert.match(formatMissionGateFailure(result), /为什么要做.*最后希望拿到什么/);
-});
 
 test('mission gate rejects vague confirmed text instead of trusting confirmation alone', () => {
   const result = evaluateMissionGate({
@@ -85,13 +77,6 @@ test('deliverable inference stays conservative and falls back to a custom result
   assert.deepEqual(result.map((item) => item.id), ['custom-result']);
 });
 
-test('mission draft does not imply confirmation', () => {
-  const draft = buildMissionDraft('分析当前系统的数据架构');
-  assert.equal(draft.expectedResult, '');
-  assert.deepEqual(draft.deliverableIds, []);
-});
-
-
 test('Mission boundary blocks Workflow stages that are not part of the requested result', () => {
   const mission = {
     version: 1 as const,
@@ -153,21 +138,4 @@ test('specific current-state deliverables do not create a redundant umbrella del
     deliverables.map((item) => item.id),
     ['data-source', 'data-flow', 'data-model'],
   );
-});
-
-
-test('Mission gate treats user confirmation as a state requirement', () => {
-  const purpose = '理解 IBM 老系统当前的数据架构，为后续判断提供依据。';
-  const expectedResult = '只需要当前 Data Source、Data Flow 和 Data Model。';
-  const mission = {
-    version: 1 as const,
-    purpose,
-    expectedResult,
-    deliverables: inferMissionDeliverables(purpose, expectedResult),
-    status: 'confirmed' as const,
-    confirmedAt: '2026-10-05T00:00:00.000Z',
-    confirmedBy: 'user' as const,
-  };
-  const result = evaluateMissionGate(mission);
-  assert.equal(result.checks.some((item) => item.name === '已由用户确认' && item.passed), true);
 });

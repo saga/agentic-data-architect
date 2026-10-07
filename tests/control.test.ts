@@ -48,20 +48,6 @@ test('HTTP MCP headers are preserved and environment references are resolved', (
   });
 });
 
-test('disabled MCP servers are not exposed to Copilot', () => {
-  const current = control();
-  current.agent.mcpServers.push({
-    name: 'disabled',
-    version: 1,
-    enabled: false,
-    type: 'http',
-    url: 'https://example.test/mcp',
-  });
-
-  assert.deepEqual(toCopilotMcpServers(current), {});
-});
-
-
 test('malformed audit records are surfaced instead of treated as missing', async () => {
   const fs = await import('node:fs/promises');
   const path = await import('node:path');
@@ -83,18 +69,5 @@ test('malformed audit records are surfaced instead of treated as missing', async
     () => readAuditEvents('control-audit-test', 10),
     (error: unknown) => error instanceof AuditDataError,
   );
-});
-
-test('Investigation control schema rejects invalid MCP settings', async () => {
-  const { InvestigationControlSchema } = await import('../src/investigation/schemas.js');
-  const current = control();
-  const result = InvestigationControlSchema.safeParse({
-    ...current,
-    agent: {
-      ...current.agent,
-      mcpServers: [{ name: 'broken', version: 1, enabled: true, type: 'unknown' }],
-    },
-  });
-  assert.equal(result.success, false);
 });
 

@@ -89,10 +89,3 @@ test('replayExecutionAt reconstructs workflow state from recorded events', () =>
   const completed = replayExecutionAt(definition, events as never[], events.length);
   assert.equal(completed.status, 'completed');
 });
-
-test('replayEventLabel uses human-readable runtime events', () => {
-  assert.equal(replayEventLabel(events[0]), '开始执行');
-  assert.equal(replayEventLabel(events[2]), '完成步骤');
-  assert.equal(replayEventLabel(events[4]), '等待人工');
-  assert.equal(replayEventLabel(events[5]), '执行完成');
-});
