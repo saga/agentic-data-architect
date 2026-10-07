@@ -139,10 +139,8 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     0,
     input.after.discoveryRunCount - input.before.discoveryRunCount,
   );
-  const scopeValidated = Boolean(
-    input.after.scopeValidatedAt
-    && input.after.scopeValidatedAt !== input.before.scopeValidatedAt,
-  );
+  const scopeValidated = Boolean(input.after.scopeValidatedAt);
+
   const persistedWorkProductChanged = input.persistedWorkProductChanged === true;
   const advancedDeliverables = deliverableAdvanced(
     input.missionProgressBefore,
@@ -154,6 +152,14 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     || newDiscoveryRuns > 0
     || scopeValidated
     || persistedWorkProductChanged;
+
+  add(
+    '正式范围已经确认',
+    scopeValidated,
+    scopeValidated
+      ? '当前阶段属于已经确认的调查范围。'
+      : '调查范围还没有完成确认，不能形成正式阶段小结。',
+  );
 
   add(
     '阶段回答存在',
