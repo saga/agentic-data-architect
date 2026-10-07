@@ -9,7 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { askAgentWithFallback } from '../agent/runtime.js';
-import type { AskInput } from '../agent/copilot.js';
+import type { AskInput } from '../agent/ask-input.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import type { AgentRuntime, MissionContract } from '../investigation/schemas.js';
