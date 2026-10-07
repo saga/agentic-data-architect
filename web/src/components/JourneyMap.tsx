@@ -343,6 +343,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 selectedEdgeId={selectedEdge?.id}
                 fitViewRequest={fitViewRequest}
                 execution={displayedExecution}
+                executionAnimation={!replayMode || replayPlaying}
                 onNodeClick={onNodeClick}
                 onEdgeClick={onEdgeClick}
                 onBlankClick={clearSelection}
