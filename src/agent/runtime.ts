@@ -12,6 +12,7 @@ import { askCopilot } from './copilot.js';
 import type { AskInput } from './ask-input.js';
 import { askOpenCode, listOpenCodeModels } from './opencode.js';
 import { syncRuntimeSkillWorkspace } from '../skills/catalog.js';
+import { appendAuditEvent } from '../investigation/control.js';
 
 function runtimeFromModel(model: string | undefined): AgentRuntime | undefined {
   const value = model?.trim().toLowerCase() ?? '';
@@ -202,7 +203,32 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       model = await resolveModelForRuntime(runtime, input.model);
     } catch (error) {
       // Resolution failure for the selected runtime must surface; a fallback runtime
-      // may be unavailable and can simply be skipped.
+      // may be unavailable and can simply be skipped. Either way it is operationally
+      // important: otherwise the reason a fallback was skipped disappears from logs.
+      console.warn('[agent-runtime] Failed to resolve runtime model.', {
+        investigationName: input.investigationName,
+        runtime,
+        selectedRuntime,
+        error,
+      });
+      if (input.investigationName) {
+        await appendAuditEvent(input.investigationName, {
+          actor: 'system',
+          action: 'agent.runtime.model_resolution_failed',
+          summary: 'Agent Runtime 模型解析失败。',
+          details: {
+            runtime,
+            selectedRuntime,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        }).catch((auditError) => {
+          console.error('[agent-runtime] Failed to persist model resolution failure audit.', {
+            investigationName: input.investigationName,
+            runtime,
+            error: auditError,
+          });
+        });
+      }
       if (runtime === selectedRuntime) throw error;
       continue;
     }
@@ -226,6 +252,36 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       details: { runtime: attempt.runtime, purpose: input.purpose ?? 'investigation', ...(input.responseSchema ? { structuredOutput: true } : {}) },
     });
 
+    console.info('[agent-runtime] Starting model execution.', {
+      investigationName: input.investigationName,
+      runtime: attempt.runtime,
+      model,
+      purpose: input.purpose ?? 'investigation',
+      attempt: index + 1,
+      totalAttempts: attempts.length,
+    });
+
+    if (input.investigationName) {
+      await appendAuditEvent(input.investigationName, {
+        actor: 'system',
+        action: 'agent.runtime.started',
+        summary: 'Agent Runtime 开始执行模型调用。',
+        details: {
+          runtime: attempt.runtime,
+          model,
+          purpose: input.purpose ?? 'investigation',
+          attempt: index + 1,
+          totalAttempts: attempts.length,
+        },
+      }).catch((auditError) => {
+        console.error('[agent-runtime] Failed to persist runtime start audit.', {
+          investigationName: input.investigationName,
+          runtime: attempt.runtime,
+          error: auditError,
+        });
+      });
+    }
+
     try {
       const result = await executeRuntime(attempt.runtime, input, model);
       if (attempt.runtime !== 'copilot-sdk') {
@@ -238,8 +294,43 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
           details: {},
         });
       }
+      console.info('[agent-runtime] Model execution completed.', {
+        investigationName: input.investigationName,
+        runtime: attempt.runtime,
+        model,
+        durationMs: Math.max(0, Date.now() - callStartedAt),
+      });
       return result;
     } catch (error) {
+      const durationMs = Math.max(0, Date.now() - callStartedAt);
+      console.error('[agent-runtime] Model execution failed.', {
+        investigationName: input.investigationName,
+        runtime: attempt.runtime,
+        model,
+        durationMs,
+        quotaError: isQuotaError(error),
+        error,
+      });
+      if (input.investigationName) {
+        await appendAuditEvent(input.investigationName, {
+          actor: 'system',
+          action: 'agent.runtime.failed',
+          summary: 'Agent Runtime 模型调用失败。',
+          details: {
+            runtime: attempt.runtime,
+            model,
+            durationMs,
+            quotaError: isQuotaError(error),
+            error: error instanceof Error ? error.message : String(error),
+          },
+        }).catch((auditError) => {
+          console.error('[agent-runtime] Failed to persist runtime failure audit.', {
+            investigationName: input.investigationName,
+            runtime: attempt.runtime,
+            error: auditError,
+          });
+        });
+      }
       if (attempt.runtime !== 'copilot-sdk') {
         input.onTrajectory?.({
           type: 'model_call',
@@ -259,6 +350,14 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       const sameRuntime = next.runtime === attempt.runtime;
       const runtimeLabel = (value: AgentRuntime) =>
         value === 'codebuddy-sdk' ? 'CodeBuddy' : value === 'copilot-sdk' ? 'Copilot' : 'OpenCode';
+
+      console.warn('[agent-runtime] Falling back after quota/usage exhaustion.', {
+        investigationName: input.investigationName,
+        fromRuntime: attempt.runtime,
+        fromModel: model,
+        toRuntime: next.runtime,
+        toModel: next.model,
+      });
 
       input.onStatus?.(
         sameRuntime
