@@ -34,8 +34,8 @@ function asCheckpoint(event: TrajectoryEvent): InvestigationCheckpoint | undefin
 function humanizeResultsError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiRequestError) return cause.apiError.error || fallback;
   const message = cause instanceof Error ? cause.message : String(cause);
-  if (/reportResponse is not defined/i.test(message)) {
-    return '结果报告暂时无法读取；阶段小结和其它调查结果仍然可以查看，请稍后刷新。';
+  if (/ is not defined$/i.test(message)) {
+    return '结果页面的一部分暂时无法读取；阶段小结和其它调查结果仍然可以查看，请稍后刷新。';
   }
   return fallback;
 }
