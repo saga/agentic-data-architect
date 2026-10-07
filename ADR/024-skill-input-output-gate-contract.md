@@ -25,6 +25,7 @@ Skill 同时承担调查方法、领域能力和 Workflow 说明。过去不同 
 - Capability：Gate 不负责整个 Investigation 的阶段转换，而负责本能力输出的可复核条件。需要进入正式结果时，还必须满足通用 Mission / Scope / Evidence / Report 规则。
 
 `src/workflow/lint.ts` 和 Skill 回归测试负责检查五个章节存在。具体业务结果仍由对应的确定性 Schema、Script、Gate 或工具校验。
+此外，Skill lint 必须拒绝当前 DSL 明确不支持的 frontmatter 字段、`@gate` / `@stop` 以及节点未定义的自定义属性，不能把这些内容静默丢掉。
 
 ## Consequences
 
