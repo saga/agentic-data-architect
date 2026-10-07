@@ -63,7 +63,7 @@ interface OpenCodePart {
 }
 
 const STRUCTURAL_PROMPT_PATTERN =
-  /(调用链|调用关系|依赖关系|依赖图|上下游|数据流|血缘|路径|结构枢纽|结构节点|子系统|组件关系|模块关系|连接关系|从哪里来|被谁调用|call\s*graph|dependency\s*(graph|chain)|upstream|downstream|lineage|data\s*flow|shortest\s*path|subsystem|hub|module\s+relationship|component\s+relationship)/iu;
+  /(调用链|调用关系|依赖关系|依赖图|上下游|数据流|血缘|路径|结构枢纽|结构节点|子系统|组件关系|模块关系|连接关系|从哪里来|被谁调用|call\s*graph|dependenc(?:y|ies)\s*(graph|chain)?|upstream|downstream|lineage|data\s*flow|shortest\s*path|subsystem|hub|module\s+relationship|component\s+relationship)/iu;
 
 const GRAPHIFY_MCP_TOOL_KEYS = [
   'query_graph',
@@ -75,11 +75,11 @@ const GRAPHIFY_MCP_TOOL_KEYS = [
   'shortest_path',
 ].map((tool) => GRAPHIFY_MCP_NAME + '_' + tool);
 
-function requiresGraphifyFirst(prompt: string): boolean {
+export function requiresGraphifyFirst(prompt: string): boolean {
   return STRUCTURAL_PROMPT_PATTERN.test(prompt);
 }
 
-function graphifyPreflightTools(): Record<string, boolean> {
+export function graphifyPreflightTools(): Record<string, boolean> {
   return {
     read: false,
     grep: false,
@@ -91,6 +91,9 @@ function graphifyPreflightTools(): Record<string, boolean> {
     task: false,
     webfetch: false,
     websearch: false,
+    skill: false,
+    todowrite: false,
+    todoread: false,
     ...Object.fromEntries(GRAPHIFY_MCP_TOOL_KEYS.map((tool) => [tool, true])),
   };
 }
