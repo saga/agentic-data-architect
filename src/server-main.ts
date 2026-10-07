@@ -88,11 +88,13 @@ async function main(): Promise<void> {
   });
 
   const shutdown = async () => {
-    server.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
     await vite?.close();
+    await stopClient();
     closeLocalAnalytics();
     closeConversationStore();
-    await stopClient();
   };
 
   process.once('SIGINT', shutdown);
