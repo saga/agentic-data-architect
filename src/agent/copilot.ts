@@ -180,7 +180,8 @@ async function getSessionUsageMetrics(session: unknown): Promise<Record<string, 
     if (!usage?.getMetrics) return undefined;
     const metrics = await usage.getMetrics();
     return metrics && typeof metrics === 'object' ? metrics as Record<string, unknown> : undefined;
-  } catch {
+  } catch (error) {
+    console.warn('[copilot] Unable to read session usage metrics; continuing without the optional usage summary.', error);
     return undefined;
   }
 }
