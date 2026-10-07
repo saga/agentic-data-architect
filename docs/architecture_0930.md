@@ -1286,7 +1286,7 @@ Bronze / Silver / Gold 可以作为物理层，但不要把它当作完整逻辑
 也就是：
 
 ```text
-Source Fidelity
+Source Reliability
       ↓
 Normalization
       ↓
@@ -2763,7 +2763,7 @@ Evidence
                  Human Decision
 ```
 
-这套结构和当前行业实践的交集比较大：AWS 强调 progressive discovery、metadata 和 high-fidelity assessment；EY 已经把 legacy ETL 的 AI 分析做成“flow reconstruction + parsing + LLM interpretation + validation”；Databricks/OpenLineage 强调可追踪的 lineage；dbt/Snowflake 都把 business semantics 往数据建模层推进；行业参考 vocabulary 则可以提供机器可读的业务语义参考。([AWS Documentation][12])
+这套结构和当前行业实践的交集比较大：AWS 强调 progressive discovery、metadata 和 high-confidence assessment；EY 已经把 legacy ETL 的 AI 分析做成“flow reconstruction + parsing + LLM interpretation + validation”；Databricks/OpenLineage 强调可追踪的 lineage；dbt/Snowflake 都把 business semantics 往数据建模层推进；行业参考 vocabulary 则可以提供机器可读的业务语义参考。([AWS Documentation][12])
 
 对于你的场景，**第一优先级不是做“最聪明的 Data Architect Agent”，而是先把 `Evidence → Metadata Graph → Deterministic Analysis → Agent Reasoning → Validation` 这条链做扎实**。一旦这条链成立，Data Analyst、Data Architect、Migration Architect 其实都可以只是不同的工作模式，而不需要再堆很多 Agent。
 
