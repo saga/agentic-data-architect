@@ -121,6 +121,9 @@ export function JourneyMap(props: JourneyMapProps) {
   }, [snapshot?.execution.runId]);
 
   const displayedExecution = replayMode ? replayExecution : snapshot?.execution;
+  const displayedNode = displayedExecution
+    ? currentDefinition?.nodes.find((node) => node.id === displayedExecution.currentNodeId)
+    : undefined;
 
   return (
     <div className="journey-map-page">
@@ -377,7 +380,7 @@ export function JourneyMap(props: JourneyMapProps) {
 
           <footer className="journey-map-page-footer">
             <Flex align="center" gap={8} wrap>
-              <Text strong>{currentStage?.title ?? '当前步骤'}</Text>
+              <Text strong>{displayedNode?.title ?? currentStage?.title ?? '当前步骤'}</Text>
               <Tag variant="filled">
                 {completedCount}/
                 {Math.max(
@@ -387,7 +390,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 已完成
               </Tag>
               <Text type="secondary">
-                当前执行位置：{snapshot.execution.currentNodeId}
+                当前执行位置：{displayedExecution?.currentNodeId ?? snapshot.execution.currentNodeId}
               </Text>
             </Flex>
 
