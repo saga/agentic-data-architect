@@ -83,3 +83,22 @@ https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/headless.md 无头模
 https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/goal.md /goal 命令设置一个完成条件，CodeBuddy 持续向其推进而无需你逐步催促。每轮（turn）结束时，由小模型（small-fast model）评估器判断条件是否成立——若不成立，CodeBuddy 自动开始下一轮，而不是把控制权交回给你。一旦条件满足，目标自动清除。
 
 
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/best-practices.md 本指南汇集了在各类代码库、语言和环境中经过验证的实践模式。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/codebuddy-dir.md 了解 CodeBuddy Code 的配置目录 ~/.codebuddy 和项目级 .codebuddy 的文件与子目录。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/common-workflows.md CodeBuddy Code 的常见工作流程。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/costs.md CodeBuddy Code 每次交互都会消耗 Token。成本因代码库大小、查询复杂度和对话长度而异。本文档介绍如何追踪成本、多场景模型机制和降低 Token 消耗。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/daemon.md Daemon 模式让 CodeBuddy Code 以后台常驻服务的方式运行，不依赖终端窗口。启动后提供完整的 HTTP API 和 Web UI，随时接受请求。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/env-vars.md CodeBuddy Code 支持通过环境变量来控制其行为。这些变量可以在启动前设置，也可以在 settings.json 的 env 字段中配置以应用到每个会话。
+
+
+https://cnb.cool/codebuddy/codebuddy-code/-/blob/main/docs/function-hooks.md Function Hooks 把 CodeBuddy Code 的引擎关键路径（工具调用、命令、Prompt 组装、Session 生命周期、UI 渲染等）暴露成一组带类型的 middleware 事件
