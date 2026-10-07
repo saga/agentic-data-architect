@@ -42,6 +42,25 @@ function snapshot(estateName: string) {
   } as Parameters<typeof computeArtifactProvenance>[1];
 }
 
+test('scope identity does not change when only Mission goal changes', () => {
+  const first = computeScopeFingerprint(investigation);
+  const changedGoal = {
+    ...investigation,
+    goal: 'A different wording for the same confirmed scope.',
+  };
+  assert.equal(computeScopeFingerprint(changedGoal), first);
+});
+
+test('scope identity is canonicalized', () => {
+  const first = computeScopeFingerprint(investigation);
+  const reordered = {
+    ...investigation,
+    scope: ['orders', 'positions', 'positions'],
+    systems: ['legacy-platform', 'legacy-platform'],
+  };
+  assert.equal(computeScopeFingerprint(reordered), first);
+});
+
 test('mission provenance changes when a deliverable changes semantically', () => {
   const first = computeArtifactProvenance(investigation, snapshot('legacy-a'), 1);
   const changedMission = {
