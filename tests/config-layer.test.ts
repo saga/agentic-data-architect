@@ -36,6 +36,7 @@ test('task configuration inherits Global and stores only explicit overrides', as
   assert.equal(stored.schemaVersion, 2);
   assert.equal(stored.agent.personality, 'Task A personality');
   assert.equal('model' in stored.agent, false);
+  assert.equal(stored.history[0].globalVersion, first.history[0].globalVersion);
 });
 
 test('Global changes flow into inheriting tasks but never overwrite task overrides', async () => {
