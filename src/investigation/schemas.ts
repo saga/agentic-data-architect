@@ -42,6 +42,10 @@ export type MissionDraft = SharedMissionDraft;
 export const WorkflowIdSchema = SharedWorkflowIdSchema;
 export type WorkflowId = SharedWorkflowId;
 
+/** Agent execution runtime. The selected runtime is a task-level preference; fallback order is application configuration. */
+export const AgentRuntimeSchema = z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']);
+export type AgentRuntime = z.infer<typeof AgentRuntimeSchema>;
+
 /** Workspace 输入事件的来源类型；用于区分用户、Agent、Discovery 和外部文档。 */
 export const WorkspaceInputKindSchema = z.enum([
   'user_prompt', 'user_message', 'assistant_message', 'question',
@@ -218,6 +222,8 @@ export const PlatformCapabilitySettingSchema = z.object({
 export type PlatformCapabilitySetting = z.infer<typeof PlatformCapabilitySettingSchema>;
 
 export const ControlAgentSchema = z.object({
+  /** 当前 Investigation 首选 Agent Runtime；quota 不足时由 runtime 层按配置顺序自动 fallback。 */
+  runtime: AgentRuntimeSchema.default('codebuddy-sdk'),
   /** 每个 Investigation 当前使用的模型；默认由 Auto 自动选择。 */
   model: z.string().trim().min(1).max(200).default('auto'),
   /** Auto 模式下的路由偏好；不设置时使用 Copilot 当前默认选择。 */
