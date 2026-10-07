@@ -206,13 +206,18 @@ export function isGraphifyTool(input: {
 }): boolean {
   const values = [input.toolName, input.mcpServerName, input.mcpToolName]
     .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.toLowerCase());
+    .map((value) => value.trim().toLowerCase());
+
+  const graphifyMcpNamespace = `mcp__${GRAPHIFY_MCP_NAME}__`;
+
   return values.some((value) =>
     value === GRAPHIFY_MCP_NAME
     || value.startsWith(GRAPHIFY_MCP_NAME + '_')
     || value.startsWith(GRAPHIFY_MCP_NAME + '.')
     || value === 'graphify'
-    || value.startsWith('graphify_'),
+    || value.startsWith('graphify_')
+    || value.startsWith(graphifyMcpNamespace)
+    || value === `mcp__${GRAPHIFY_MCP_NAME}`,
   );
 }
 
