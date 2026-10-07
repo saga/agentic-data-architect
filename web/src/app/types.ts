@@ -1,6 +1,5 @@
-export type AgentRuntime = 'codebuddy-sdk' | 'copilot-sdk' | 'opencode-run';
-
 import type {
+  AgentRuntime as SharedAgentRuntime,
   AuditEvent as SharedAuditEvent,
   ConversationTurnSummary as SharedConversationTurnSummary,
   CopilotModelOption as SharedCopilotModelOption,
@@ -23,6 +22,7 @@ import type {
   WorkflowSnapshot as SharedWorkflowSnapshot,
 } from '../../../src/api/contracts.js';
 
+export type AgentRuntime = SharedAgentRuntime;
 export type SessionSummary = SharedSessionSummary;
 export type WorkspaceInput = SharedSessionData['context']['inputs'][number];
 export type AutoTier = 'efficiency' | 'balance' | 'intelligence' | 'fast';
