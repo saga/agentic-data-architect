@@ -69,6 +69,27 @@ test('non-copilot Skill bridge exposes capability Skills and only the selected W
   }
 });
 
+test('unsupported Skill frontmatter fields are rejected', () => {
+  assert.throws(
+    () =>
+      parseSkillManifest(
+        [
+          '---',
+          'name: demo',
+          'description: Demo',
+          'metadata:',
+          '  kind: capability',
+          'tools: bash',
+          '---',
+          '# Demo',
+          '## 输入校验',
+          'x',
+        ].join('\n'),
+        'demo/SKILL.md',
+      ),
+    /不支持的 frontmatter 字段：tools/,
+  );
+});
 test('missing Skill kind is rejected', () => {
   assert.throws(
     () =>
