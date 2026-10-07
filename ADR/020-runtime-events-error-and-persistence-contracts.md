@@ -15,7 +15,7 @@ SSE、Trajectory、HTTP errors、Discovery snapshots 和其它 durable data 过�
 4. Mission / Scope / Workflow 等业务前置条件失败使用可区分的 4xx。
 5. Durable snapshots / artifacts 读取必须经过 runtime schema validation。
 6. Trajectory / Workflow run event 的已知 nested payload 必须通过 type-specific schema 校验；known payload schema 使用 strict object，只有真正 provider-opaque 的字段（例如 tool arguments / provider error payload）允许保留 `z.unknown()`。不能因为外层 event 合法就接受任意 nested object。
-7. malformed durable data 不得静默当成 missing；必须可观察。
+7. malformed durable data 不得静默当成 missing；必须可观察。任何 JSON / JSONL record parse failure、损坏的 review metadata、损坏的 Discovery snapshot 都必须保留为明确的 data-invalid / error 状态，不能通过 catch 后返回空结果、重新生成或降级成 missing 来隐藏。
 
 对 JSONL 而言，一条 malformed record 不得被 `filter(Boolean)` 静默移除；reader 必须返回可区分的数据错误，让上层决定显示、阻断或记录 audit。对于 snapshot / artifact 这类单体 durable object，parse failure 同样不得返回 `null` 来伪装成 missing。
 8. 一个持久化对象只能有一个 schema owner。
