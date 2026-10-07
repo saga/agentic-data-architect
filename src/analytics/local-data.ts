@@ -111,6 +111,7 @@ interface DatasetRow {
 let registryDb: DatabaseSync | undefined;
 let registryPath: string | undefined;
 const engines = new Map<string, Promise<LocalDuckDBEngine>>();
+const MAX_ACTIVE_ENGINES = 8;
 
 const SUPPORTED_EXTENSIONS: Record<string, LocalDatasetFormat> = {
   '.csv': 'csv',
@@ -490,14 +491,51 @@ export function validateLocalReadOnlySql(sql: string): string {
   return trimmed;
 }
 
+async function evictIdleEngines(excludeSessionName: string): Promise<void> {
+  if (engines.size <= MAX_ACTIVE_ENGINES) return;
+
+  const candidates: Array<{ sessionName: string; pending: Promise<LocalDuckDBEngine> }> = [];
+  for (const [sessionName, pending] of engines) {
+    if (sessionName !== excludeSessionName) candidates.push({ sessionName, pending });
+  }
+
+  const resolved: Array<{ sessionName: string; pending: Promise<LocalDuckDBEngine>; engine: LocalDuckDBEngine }> = [];
+  for (const candidate of candidates) {
+    try {
+      const engine = await candidate.pending;
+      if (engine.isIdle()) resolved.push({ ...candidate, engine });
+    } catch (error) {
+      console.warn('[local-data] Failed to inspect an idle engine for cleanup.', {
+        sessionName: candidate.sessionName,
+        error,
+      });
+    }
+  }
+
+  resolved.sort((a, b) => a.engine.lastUsedAt - b.engine.lastUsedAt);
+  for (const candidate of resolved) {
+    if (engines.size <= MAX_ACTIVE_ENGINES) break;
+    if (engines.get(candidate.sessionName) !== candidate.pending || !candidate.engine.isIdle()) continue;
+    engines.delete(candidate.sessionName);
+    candidate.engine.close();
+  }
+}
+
 async function ensureEngine(sessionName: string): Promise<LocalDuckDBEngine> {
   const current = engines.get(sessionName);
-  if (current) return current;
+  if (current) {
+    const engine = await current;
+    engine.touch();
+    return engine;
+  }
 
   const pending = LocalDuckDBEngine.create(sessionName);
   engines.set(sessionName, pending);
   try {
-    return await pending;
+    const engine = await pending;
+    engine.touch();
+    await evictIdleEngines(sessionName);
+    return engine;
   } catch (error) {
     engines.delete(sessionName);
     throw error;
@@ -545,16 +583,35 @@ class LocalDuckDBEngine {
   }
 
   private queue: Promise<unknown> = Promise.resolve();
+  private activeOperations = 0;
+  lastUsedAt = Date.now();
+
+  touch(): void {
+    this.lastUsedAt = Date.now();
+  }
+
+  isIdle(): boolean {
+    return this.activeOperations === 0;
+  }
+
+  close(): void {
+    this.connection.disconnectSync();
+  }
 
   /** DuckDB 是本进程的分析引擎；所有操作串行化，避免同一个 connection 被 Agent 并发使用。 */
   private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
+    this.activeOperations += 1;
+    this.touch();
     const previous = this.queue;
     let release!: () => void;
     this.queue = new Promise<void>((resolve) => { release = resolve; });
-    await previous.catch(() => undefined);
     try {
+      await previous.catch(() => undefined);
+      this.touch();
       return await operation();
     } finally {
+      this.activeOperations -= 1;
+      this.touch();
       release();
     }
   }
@@ -1207,7 +1264,7 @@ export async function closeLocalAnalytics(): Promise<void> {
   const closeResults = await Promise.allSettled(
     pendingEngines.map(async (pending) => {
       const engine = await pending;
-      engine.connection.disconnectSync();
+      engine.close();
     }),
   );
   for (const result of closeResults) {
