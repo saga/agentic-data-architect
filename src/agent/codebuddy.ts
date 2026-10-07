@@ -219,7 +219,8 @@ export async function abortCodeBuddyTurn(turnId: string): Promise<boolean> {
   try {
     await abort();
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('[codebuddy] Failed to abort the active CodeBuddy turn.', error);
     return false;
   }
 }
@@ -598,7 +599,10 @@ export async function askCodeBuddy(
 
   let currentPrompt = input.prompt;
   let currentWorkflowInstruction = input.workflowSkill && input.investigationName
-    ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
+    ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch((error) => {
+        console.warn('[codebuddy] Failed to load Workflow instruction; continuing without it.', error);
+        return '';
+      })
     : '';
   let finalAnswer = '';
 
@@ -729,7 +733,10 @@ export async function askCodeBuddy(
       currentWorkflowInstruction = await buildJourneyAgentInstruction(
         input.investigationName,
         input.workflowSkill,
-      ).catch(() => currentWorkflowInstruction);
+      ).catch((error) => {
+        console.warn('[codebuddy] Failed to refresh Workflow instruction; keeping the previous instruction.', error);
+        return currentWorkflowInstruction;
+      });
     }
   }
 
