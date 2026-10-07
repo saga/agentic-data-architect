@@ -30,6 +30,8 @@ test('remote media resolves through yt-dlp and stores cache outside investigatio
   const avatar = await fs.readFile(new URL('../web/src/components/AssistantAvatar.tsx', import.meta.url), 'utf8');
 
   assert.match(media, /yt-dlp/);
+  assert.match(media, /isYtDlpAvailable/);
+  assert.match(media, /await isYtDlpAvailable\(\)/);
   assert.match(media, /best\[ext=mp4\]\/best/);
   assert.match(media, /config\.dataDir, 'cache', 'media'/);
   assert.match(media, /getCachedRemoteMedia/);
@@ -41,4 +43,5 @@ test('remote media resolves through yt-dlp and stores cache outside investigatio
   assert.match(avatar, /\/api\/global\/media\/resolve/);
   assert.match(avatar, /setUsingCache/);
   assert.match(avatar, /cacheUrl/);
+  assert.equal(page.includes('https?:\\\\/\\\\//'), false);
 });
