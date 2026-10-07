@@ -7,7 +7,7 @@
  */
 import { config } from '../config.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
-import { askCodeBuddy, resolveCodeBuddyModel } from './codebuddy.js';
+import { askCodeBuddy, normalizeCodeBuddyModel, resolveCodeBuddyModel } from './codebuddy.js';
 import { askCopilot, type AskInput } from './copilot.js';
 import { askOpenCode, listOpenCodeModels } from './opencode.js';
 
@@ -64,7 +64,7 @@ async function resolveOpenCodeModel(requestedModel: string | undefined): Promise
   return models[0].id;
 }
 
-async function resolveCodeBuddyModels(requestedModel?: string): string[] {
+function resolveCodeBuddyModels(requestedModel?: string): string[] {
   const requested = normalizeCodeBuddyModel(requestedModel);
   const base = [config.codeBuddyDefaultModel, ...config.codeBuddyModelAllowlist]
     .map((model) => model.trim())
@@ -168,7 +168,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       continue;
     }
 
-    let model;
+    let model: string;
     try {
       model = await resolveModelForRuntime(runtime, input.model);
     } catch {
