@@ -206,7 +206,9 @@ export async function buildReport(
     : inv.workflow === 'data-architecture-assessment'
       ? await loadArchitectureAssessmentPlan(name)
       : null;
-  const analysisArtifacts = await listAnalysisArtifacts(name);
+  const analysisArtifacts = source?.analysisArtifacts
+    ? [...source.analysisArtifacts]
+    : await listAnalysisArtifacts(name);
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
   const coverage = current?.coverage;
@@ -381,9 +383,6 @@ export async function buildReport(
   );
 
   const markdown = lines.join('\n');
-  const dir = reportsDir(name);
-  await fs.mkdir(dir, { recursive: true });
-  const fp = path.join(dir, 'report.md');
-  await fs.writeFile(fp, markdown + '\n', 'utf8');
+  const fp = path.join(reportsDir(name), 'report.md');
   return { markdown, path: fp };
 }
