@@ -539,7 +539,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
     graphifyRuntime = graphifyPreparation.metadata;
     if (!graphifyPreparation.available) {
       graphifyEnabled = false;
-      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onStatus?.(
+        '结构分析工具这次没有生成可用结果，助手改用源码工具继续调查。'
+        + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
+      );
       input.onTrajectory?.({
         type: 'status',
         name: '结构分析工具不可用，已继续调查',
