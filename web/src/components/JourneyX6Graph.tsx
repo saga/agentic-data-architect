@@ -36,6 +36,7 @@ export interface JourneyX6GraphProps {
   onReconnect: (edgeId: string, connection: GraphConnection) => Promise<void>;
   onDeleteSelected: (cellId: string, kind: 'node' | 'edge') => void;
   execution?: import('./journey-map-types.js').WorkflowExecution;
+  executionAnimation?: boolean;
 }
 
 function activeExecutionEdgeId(
@@ -78,6 +79,7 @@ export function JourneyX6Graph({
   onReconnect,
   onDeleteSelected,
   execution,
+  executionAnimation = true,
 }: JourneyX6GraphProps) {
   const executionOverlayRef = useRef<SVGSVGElement>(null);
   const executionTokenRef = useRef<SVGCircleElement>(null);
@@ -766,7 +768,7 @@ export function JourneyX6Graph({
     const container = containerRef.current;
     const overlay = executionOverlayRef.current;
     const token = executionTokenRef.current;
-    if (!graph || !container || !overlay || !token || !activeExecutionEdgeIdValue) {
+    if (!graph || !container || !overlay || !token || !activeExecutionEdgeIdValue || !executionAnimation) {
       if (overlay && token) token.setAttribute('visibility', 'hidden');
       return;
     }
@@ -865,7 +867,7 @@ export function JourneyX6Graph({
       raf = 0;
       hideToken();
     };
-  }, [activeExecutionEdgeIdValue]);
+  }, [activeExecutionEdgeIdValue, executionAnimation]);
 
   /** 只处理 editor 明确发出的 fit 请求；普通拖动不会触发缩放。 */
   useEffect(() => {
