@@ -17,7 +17,7 @@ import type {
   FlowNodeData,
   JourneyEdgeKind,
 } from './journey-map-types.js';
-import { classifyJourneyEdge } from './journey-map-visuals.js';
+import { classifyJourneyEdge, JOURNEY_EDGE_VISUALS } from './journey-map-visuals.js';
 import { JOURNEY_X6_SHAPE } from './JourneyX6Node.js';
 import type { GraphConnection } from './journey-map-graph.js';
 
@@ -304,28 +304,7 @@ export function JourneyX6Graph({
           const selected = edge.id === selectedEdgeId;
           const active = edge.id === activeExecutionEdgeIdValue;
 
-          const style = {
-            success: {
-              stroke: '#52c41a',
-              opacity: 0.82,
-              dash: undefined,
-            },
-            fail: {
-              stroke: '#ff4d4f',
-              opacity: 0.86,
-              dash: undefined,
-            },
-            retry: {
-              stroke: '#8c99a8',
-              opacity: 0.86,
-              dash: '7 5',
-            },
-            other: {
-              stroke: '#9aa7b7',
-              opacity: 0.66,
-              dash: undefined,
-            },
-          }[kind];
+          const style = JOURNEY_EDGE_VISUALS[kind];
 
           const edgeConfig = {
             id: edge.id,
@@ -658,9 +637,7 @@ export function JourneyX6Graph({
         || data.nodeType !== node.data.nodeType
         || data.actor !== node.data.actor
         || data.status !== node.data.status
-        || data.completion !== node.data.completion
         || data.completeWhen !== node.data.completeWhen
-        || data.visible !== node.data.visible
         || data.connectionIssue !== node.data.connectionIssue
         || data.connectionIssueText !== node.data.connectionIssueText
         || data.selected !== (node.id === selectedNodeId)
@@ -690,29 +667,11 @@ export function JourneyX6Graph({
       const active = edge.id === activeExecutionEdgeIdValue;
       const kind: JourneyEdgeKind =
         edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
-      const stroke =
-        kind === 'success'
-          ? '#52c41a'
-          : kind === 'fail'
-            ? '#ff4d4f'
-            : kind === 'retry'
-              ? '#8c99a8'
-              : '#9aa7b7';
+      const style = JOURNEY_EDGE_VISUALS[kind];
 
       cell.setVisible(true);
-      cell.attr('line/stroke', stroke);
-      cell.attr(
-        'line/strokeOpacity',
-        selected
-          ? 1
-          : kind === 'success'
-            ? 0.82
-            : kind === 'fail'
-              ? 0.86
-              : kind === 'retry'
-                ? 0.86
-                : 0.66,
-      );
+      cell.attr('line/stroke', style.stroke);
+      cell.attr('line/strokeOpacity', selected ? 1 : style.opacity);
       cell.attr('line/strokeWidth', selected ? 3 : 2);
       cell.attr('line/targetMarker', {
         name: 'block',
