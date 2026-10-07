@@ -243,10 +243,10 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   }
 
   for (const node of nodes) {
-    if (node.completeWhen && !WORKFLOW_COMPLETION_CONDITIONS.includes(node.completeWhen as typeof WORKFLOW_COMPLETION_CONDITIONS[number])) {
+    if (node.completeWhen && !KNOWN_COMPLETION_CONDITIONS.includes(node.completeWhen as typeof KNOWN_COMPLETION_CONDITIONS[number])) {
       issues.push(
         node.id + ' 使用了未知的 completeWhen：' + node.completeWhen
-        + '。只能使用：' + WORKFLOW_COMPLETION_CONDITIONS.join('、') + '。',
+        + '。只能使用：' + KNOWN_COMPLETION_CONDITIONS.join('、') + '。',
       );
     }
     if (node.actor === 'human' && node.completeWhen) {
