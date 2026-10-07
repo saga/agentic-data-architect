@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { buildReport } from '../analysis/report.js';
+import { loadInvestigationControl } from '../investigation/control.js';
 import { ArtifactReviewSchema, reviewArtifact, saveArtifactReview, summarizeReviewFailure } from '../analysis/reviewer.js';
 import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigation/store.js';
 import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
@@ -143,6 +144,7 @@ export async function runReport(
   const source = await captureInvestigationArtifactSource(name);
   const investigation = source.investigation;
   const snapshot = source.snapshot;
+  const control = await loadInvestigationControl(name);
   assertMissionGate(investigation.mission);
   assertInvestigationArtifactSourceScope(source);
   const modernizationResult = source.investigation.workflow === 'legacy-modernization'
@@ -187,7 +189,9 @@ export async function runReport(
   const artifactHash = hashArtifact(report.markdown);
   const review = await reviewArtifact({
     investigationName: name,
-    goal: investigation.mission?.purpose || investigation.goal || investigation.userPrompt,
+    mission: investigation.mission!,
+    runtime: control.agent.runtime,
+    model: control.agent.model,
     artifactType: 'report',
     artifact: report.markdown,
     facts: JSON.stringify({
