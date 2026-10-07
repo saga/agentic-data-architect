@@ -2,7 +2,7 @@
 # Agentic Data Architect：数据流、控制流与并发模型
 
 > 2026-10-03
-> 本文以当前 main 实现为准，重点检查一次 Investigation 从浏览器发起问题，到 Copilot 执行、状态持久化、SSE 返回、取消、重启恢复的完整链路，以及文件状态和配置状态的竞争问题。
+> 本文以当前 main 实现为准，重点检查一次 Investigation 从浏览器发起问题，到 Agent Runtime 执行、状态持久化、SSE 返回、取消、重启恢复的完整链路，以及文件状态和配置状态的竞争问题。当前 Runtime 包括 Copilot SDK、CodeBuddy SDK 和 OpenCode Run。
 
 ## 1. 结论
 
@@ -19,15 +19,15 @@ Agent session 本身不作为业务状态源，而是由 context.json 保存的�
 本轮已经处理的关键问题：
 
 1. 一个 Investigation 同时只允许一个 active turn。
-2. turn 在 Copilot 真正启动前就完成进程内 reservation，避免异步创建 session 的竞争窗口。
+2. turn 在任何 Agent Runtime 真正启动前就完成进程内 reservation，避免异步创建 runtime session 的竞争窗口。
 3. server 重启后残留的 running turn 会恢复成 aborted。
-4. 没有真实 Copilot execution 的 stale running turn 可以被恢复。
+4. 没有真实 Agent Runtime execution 的 stale running turn 可以被恢复。
 5. 前端使用稳定 turnId，SSE 与 abort 使用同一个 turn。
 6. SSE 现在是真实使用路径，不再存在“后端有 streaming、前端却调用普通 POST”的双轨问题。
 7. workspace JSON 使用临时文件 + rename 原子更新。
 8. Investigation 保存不会覆盖回答期间新上传的文件/input。
 9. 同一个 session 的 context 写入和 configuration 写入分别做轻量串行化。
-10. 取消状态在 Copilot session 创建前后都能被感知；模型返回后进入不可取消的 commit phase，避免半提交。
+10. 取消状态在 Runtime session 创建前后都能被感知；模型返回后进入不可取消的 commit phase，避免半提交。
 
 仍然需要注意：当前项目是单 Node 进程模型。这些进程内 reservation / write lock 不是分布式锁。如果以后运行多个 API replica，需要把 turn lease / session ownership / workspace state 迁移到共享存储。
 
@@ -206,7 +206,7 @@ flowchart TD
     Start[Node process starts]
     DB[Open conversations.db]
     Recover[Find status=running]
-    Abort[mark stale turns as aborted]
+    Abort[recover as aborted + durable assistant message]
     App[Create Express app]
     Listen[HTTP listen]
 
@@ -215,6 +215,12 @@ flowchart TD
 
 当前 server 在开始监听之前执行 recovery。
 
+### 重启与 SSE 断线的 durable recovery
+
+Server 正常关闭时，会先请求所有 active turn 停止，并等待 workflow 的 abort/failure 收尾完成后再关闭 SQLite。进程已经意外退出时，下一次启动会扫描遗留的 `running` turn：如果存在 `assistant_draft`，会连同已生成的秘书/assistant 内容恢复成可见的 assistant 中断消息，然后把 turn 标记为 `aborted`。
+
+因此 SSE 不是 Conversation 的 source of truth。浏览器看到 “network error” 时，不能直接把 turn 当作失败并丢掉已有内容；当前前端会先检查服务器是否恢复，并重新加载 durable conversation。
+
 ## 6. 取消 / Stop 的控制流
 
 ~~~mermaid
@@ -222,20 +228,20 @@ sequenceDiagram
     participant U as Browser
     participant API as Express
     participant W as Workflow
-    participant CP as Copilot
+    participant RT as Agent Runtime
 
     U->>API: POST /messages/abort {turnId}
     API->>W: requestAbort(session, turnId)
     W->>W: abortRequestedTurns.add(turnId)
-    API->>CP: session.abort()
+    API->>RT: runtime-specific abort
 
-    alt Copilot session already exists
-        CP-->>W: abort
+    alt Runtime session already exists
+        RT-->>W: abort
         W-->>API: aborted=true
-    else Copilot session not created yet
+    else Runtime session not created yet
         W-->>API: cancellation requested
-        W->>CP: shouldAbort() checked before send
-        CP-->>W: stop before model execution
+        W->>RT: shouldAbort() checked before execution
+        RT-->>W: stop before model execution
     end
 
     API-->>U: abort result
@@ -282,7 +288,7 @@ turnId 是一次用户操作的幂等键。
 flowchart TD
     Send[Browser sends message + turnId]
     Running[turn=running]
-    Agent[Copilot runs]
+    Agent[Agent Runtime runs]
     Done[turn=completed + result saved]
     Network[Network failure]
     Retry[Retry same turnId]
@@ -301,7 +307,7 @@ same turnId + completed
     => directly return stored result
 ~~~
 
-而不是再次启动 Copilot。
+而不是再次启动 Agent Runtime。
 
 不同 turnId + 相同 user text 仍然被认为是新的业务操作。
 
@@ -480,7 +486,7 @@ flowchart TD
     K[Load control]
     H[Retrieve relevant history]
     G[Build grounded prompt]
-    CP[Create/resume Copilot]
+    RT[Create/resume selected Agent Runtime]
     D[Stream deltas]
     F[Parse result]
     V[Save Investigation]
@@ -632,7 +638,7 @@ grounded context
   ↓
 fixed configuration version
   ↓
-Copilot execution
+selected Agent Runtime execution
   ↓
 stream
   ↓
@@ -648,7 +654,7 @@ completed
 
 ## 17. 当前 Agent / Skill / Local Data 运行边界
 
-当前 session 不再注册 `lead-data-agent` custom agent。每个 Investigation 直接使用 Copilot SDK default agent：
+当前 session 不再注册 `lead-data-agent` custom agent。每个 Investigation 通过 Runtime adapter 使用选定的 Agent Runtime；Copilot 自身才使用 SDK default agent。
 
 ```text
 default agent
@@ -664,9 +670,9 @@ configured MCP
 explicit built-in tool allowlist
 ```
 
-Capability Skill 不再保存为 Investigation 的“启用清单”。Copilot 通过 skillDirectories 自动发现 capability；只有用户选中的 Workflow Skill 保持可用，其它 Workflow Skill 通过 disabledSkills 关闭，避免路线混用。
+Capability Skill 不再保存为 Investigation 的“启用清单”。当前 Runtime 负责发现 capability；只有用户选中的 Workflow Skill 保持可用，其它 Workflow Skill 通过 Runtime-specific 禁用策略关闭，避免路线混用。
 
-Copilot 使用 mode: "copilot-cli"，因为当前产品是个人本机 Agent，需要保留 Copilot CLI 的 ambient skills、工具和内置 MCP。
+Copilot Runtime 使用 mode: "copilot-cli"，因为当前产品是个人本机 Agent，需要保留 Copilot CLI 的 ambient skills、工具和内置 MCP；CodeBuddy / OpenCode 使用各自的 Runtime boundary。
 
 本地数据工具由应用显式注册。它们通过 Dataset Registry 和 DuckDB 查询当前 workspace 数据，并把分析结果写成 Evidence；Agent 没有直接打开 local.duckdb 或任意本地文件的工具。
 
