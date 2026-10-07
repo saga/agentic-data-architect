@@ -37,7 +37,7 @@ interface RelationshipMemoryStore {
 }
 
 function memoryFile(): string {
-  return path.join(config.legacyDataDir, 'relationship-memory.json');
+  return path.join(config.dataDir, 'relationship-memory.json');
 }
 
 async function writeAtomic(value: RelationshipMemoryStore): Promise<void> {
