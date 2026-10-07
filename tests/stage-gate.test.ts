@@ -303,6 +303,13 @@ test('a later real stage can still leave a checkpoint after earlier deliverables
       followUpQuestions: [],
       routeOptions: [],
     },
+    missionAlignment: {
+      aligned: true,
+      alignment: 0.9,
+      worthContinuing: false,
+      continuationValue: 0.1,
+      reason: '交付物已经覆盖，本轮只是补齐证据，不需要继续深挖。',
+    },
   });
   const result = evaluateInvestigationStageGate(base);
   assert.equal(result.passed, true);

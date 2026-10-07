@@ -106,11 +106,13 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
   const issues: string[] = [];
   let flowId: string | undefined;
   let declaredStart: string | undefined;
+  let inFence = false;
   let current: {
     id: string;
     type: JourneyNodeType;
     title: string;
     attrs: Record<string, string>;
+    attrsClosed: boolean;
     routes: JourneyRoute[];
     line: number;
   } | undefined;
@@ -143,6 +145,12 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     const raw = lines[index].trim();
     if (!raw) continue;
 
+    if (raw.startsWith('```') || raw.startsWith('~~~')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
     if (/^(?:##\s+)?@(gate|stop)\b/i.test(raw)) {
       issues.push('不再支持 @gate / @stop；Workflow Gate 必须由服务端确定性逻辑实现。第 ' + lineNumber + ' 行无效。');
       continue;
@@ -162,6 +170,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
           type: kind as JourneyNodeType,
           title: id,
           attrs: {},
+          attrsClosed: false,
           routes: [],
           line: lineNumber,
         };
@@ -192,13 +201,17 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     }
 
     const attr = attrPattern.exec(raw);
-    if (attr && current.routes.length === 0) {
+    if (attr && current.routes.length === 0 && !current.attrsClosed) {
       if (!['title', 'objective', 'actor', 'completeWhen'].includes(attr[1])) {
         issues.push(current.id + ' 使用了不支持的 Workflow 字段：' + attr[1] + '。第 ' + lineNumber + ' 行无效。');
       } else {
         current.attrs[attr[1]] = attr[2];
       }
       continue;
+    }
+
+    if (!attr && current.routes.length === 0 && !raw.startsWith('#')) {
+      current.attrsClosed = true;
     }
 
     if (current.title === current.id && !raw.startsWith('#')) {
