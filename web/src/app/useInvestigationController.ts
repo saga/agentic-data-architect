@@ -397,7 +397,10 @@ export function useInvestigationController() {
       .then((result) => setAvailableModels(result.models ?? []))
       .catch(() => setAvailableModels([]));
     void getJson('/api/config/global', GlobalConfigurationResponseSchema)
-      .then((result) => setGlobalConfiguration(result.configuration))
+      .then((result) => {
+        setGlobalConfiguration(result.configuration);
+        setNewSessionRuntime(result.configuration.agent.runtime);
+      })
       .catch(() => setGlobalConfiguration(undefined));
   }, []);
 
