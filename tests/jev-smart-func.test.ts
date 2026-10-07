@@ -50,7 +50,7 @@ const questions: Record<string, JevQuestion> = {
 
 test('Mission Alignment distinguishes relevance from whether more work is worthwhile', () => {
   const mission = {
-    purpose: '理解 IBM 老系统，为 replatform 决策提供依据。',
+    purpose: '理解 某大型企业老系统，为 replatform 决策提供依据。',
     expectedResult: '形成当前数据来源、数据流和数据模型。',
     deliverables: [
       { id: 'data-source', title: 'Data Source', description: '关键数据来源。', required: true },
@@ -91,7 +91,7 @@ test('Mission Alignment stops once the Mission is sufficiently supported', () =>
 
 test('Mission Action requires both direct Mission alignment and current necessity', () => {
   const mission = {
-    purpose: '理解 IBM 老系统，为 replatform 决策提供依据。',
+    purpose: '理解 某大型企业老系统，为 replatform 决策提供依据。',
     expectedResult: '形成当前 Data Source、Data Flow、Data Model。',
     deliverables: [
       { id: 'data-source', title: 'Data Source', description: '关键数据来源。', required: true },
