@@ -306,7 +306,7 @@ async function loadCustomActive(
  * 从已有 Investigation 状态组装 deterministic facts。
  *
  * 这个函数绝不能为了判断 Workflow 又发起一次 Agent 调用；否则“是否完成”会变成不稳定的模型结果。
- * 当前三条内置 Workflow 共享一部分事实，因此这里暂时集中组装；真正需要扩展时优先改 evaluator，
+ * 当前四条内置 Workflow 共享一部分事实，因此这里暂时集中组装；真正需要扩展时优先改 evaluator，
  * 不要给 Markdown DSL 增加新的字段。
  */
 async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
@@ -333,6 +333,7 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
         }
       : null,
     unknowns: context.unknowns,
+    findingCount: context.findings.length,
     highGapKinds: buildModernizationGaps({
       currentState: snapshot?.currentState ?? null,
       estate: snapshot?.estate ?? null,
