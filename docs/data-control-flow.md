@@ -155,7 +155,7 @@ request B
   ↓
 看到 running
   ↓
-但 A 还没有把 Copilot session 放进 activeSessions
+但 A 还没有把 Agent Runtime session 放进进程内 reservation
   ↓
 B 误认为 A 是 stale
   ↓
@@ -173,26 +173,26 @@ sequenceDiagram
     participant A as Request A
     participant W as Workflow Reservation
     participant DB as SQLite
-    participant CP as Copilot
+    participant RT as Agent Runtime
     participant B as Request B
 
     A->>DB: INSERT turn=running
     A->>W: activeInvestigationTurns[session]=turnA
-    A->>CP: createSession / resumeSession
+    A->>RT: create/resume Runtime session
 
     B->>W: check session reservation
     W-->>B: turnA already reserved
     B-->>B: reject active turn
 
-    CP-->>A: session created
-    A->>W: active Copilot session registered
+    RT-->>A: session created
+    A->>W: runtime session registered
 ~~~
 
 关键点：
 
-> 是否允许新 turn 的 reservation 必须发生在任何可能 await 的 Copilot 操作之前。
+> 是否允许新 turn 的 reservation 必须发生在任何可能 await 的 Agent Runtime 操作之前。
 
-SQLite 负责持久化事实，进程内 Map 负责填补同一进程中的异步时间窗口。
+SQLite 负责持久化事实，进程内 active-turn reservation 负责填补同一进程中的异步时间窗口。
 
 ## 5. 重启恢复
 
@@ -454,7 +454,7 @@ findings
 unknowns
 questions
 workspace inputs
-copilot session reference
+runtime-neutral Agent session reference
 ~~~
 
 用于：
@@ -462,7 +462,7 @@ copilot session reference
 - Investigation current state
 - report generation
 - discovery results
-- agent next-turn context
+- Agent next-turn context
 
 因此：
 
