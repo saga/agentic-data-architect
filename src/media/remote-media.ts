@@ -127,7 +127,7 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
   if (!response.ok || !response.body) return undefined;
 
   const mimeType = response.headers.get('content-type')?.split(';', 1)[0].trim() || mimeHint;
-  if (!mimeType || (kind === 'video' && !mimeType.startsWith('video/')) || (kind === 'image' && !mimeType.startsWith('image/'))) {
+  if (!mimeType || (kind === 'video' && !mimeType.startsWith('video/')) || (kind === 'image' && !mimeType.startsWith('image/')) || (kind === 'remote' && !mimeType.startsWith('image/') && !mimeType.startsWith('video/'))) {
     return undefined;
   }
   const contentLength = Number(response.headers.get('content-length') || 0);
@@ -156,6 +156,22 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
     return { cachePath: target, ...(mimeType ? { mimeType } : {}) };
   } catch {
     await fs.rm(temporary, { force: true });
+    return undefined;
+  }
+}
+
+export async function getCachedRemoteMedia(cacheKey: string): Promise<{ path: string; mimeType?: string; sizeBytes: number } | undefined> {
+  const target = mediaCacheFile(cacheKey);
+  try {
+    const stat = await fs.stat(target);
+    if (!stat.isFile() || stat.size <= 0) return undefined;
+    let mimeType: string | undefined;
+    try {
+      const metadata = JSON.parse(await fs.readFile(mediaCacheMetaFile(cacheKey), 'utf8')) as { mimeType?: unknown };
+      if (typeof metadata.mimeType === 'string') mimeType = metadata.mimeType;
+    } catch {}
+    return { path: target, sizeBytes: stat.size, ...(mimeType ? { mimeType } : {}) };
+  } catch {
     return undefined;
   }
 }
