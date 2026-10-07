@@ -5,7 +5,6 @@
  * its quota, execution automatically continues with the next configured runtime;
  * no user confirmation is required for this availability fallback.
  */
-import path from 'node:path';
 import { config } from '../config.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import { askCodeBuddy, resolveCodeBuddyModel } from './codebuddy.js';
@@ -65,6 +64,21 @@ async function resolveOpenCodeModel(requestedModel: string | undefined): Promise
   return models[0].id;
 }
 
+async function resolveCodeBuddyModels(requestedModel: string | undefined): string[] {
+  const requested = requestedModel?.trim() ?? '';
+  const requestedNormalized = requested.toLowerCase().startsWith('codebuddy:')
+    ? requested.slice('codebuddy:'.length)
+    : '';
+  const ordered = [
+    requestedNormalized,
+    config.codeBuddyDefaultModel,
+    ...config.codeBuddyModelAllowlist,
+  ].map((model) => model.trim()).filter(Boolean);
+  return [...new Set(ordered.map((model) => model.toLowerCase()))]
+    .map((normalized) => ordered.find((model) => model.toLowerCase() === normalized)!)
+    .map((model) => 'codebuddy:' + model);
+}
+
 async function resolveModelForRuntime(
   runtime: AgentRuntime,
   requestedModel: string | undefined,
@@ -72,9 +86,11 @@ async function resolveModelForRuntime(
   const value = requestedModel?.trim() ?? '';
   switch (runtime) {
     case 'codebuddy-sdk':
-      return 'codebuddy:' + resolveCodeBuddyModel(
-        value.startsWith('codebuddy:') ? value : undefined,
-        config.codeBuddyDefaultModel,
+      return resolveCodeBuddyModels(value.startsWith('codebuddy:') ? value : undefined)[0] ?? (
+        'codebuddy:' + resolveCodeBuddyModel(
+          undefined,
+          config.codeBuddyDefaultModel,
+        )
       );
     case 'copilot-sdk':
       return value && !value.startsWith('codebuddy:') && !value.startsWith('opencode:') && value.toLowerCase() !== 'auto'
@@ -125,62 +141,67 @@ async function executeRuntime(
  */
 export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const selectedRuntime = input.runtime ?? runtimeFromModel(input.model) ?? config.agentRuntimeDefault;
-  const candidates = runtimeCandidates(selectedRuntime);
-  let lastQuotaError: unknown;
+  const runtimeOrder = runtimeCandidates(selectedRuntime);
+  const attempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
 
-  for (let index = 0; index < candidates.length; index += 1) {
-    const runtime = candidates[index];
-    let model: string;
-    try {
-      model = await resolveModelForRuntime(runtime, input.model);
-    } catch (error) {
-      // A disabled/unconfigured fallback is not itself a quota condition. If it is
-      // the selected runtime, surface it; otherwise continue to the next runtime
-      // because the user asked for automatic availability fallback.
-      if (index === 0) throw error;
-      lastQuotaError = error;
+  for (const runtime of runtimeOrder) {
+    if (runtime === 'codebuddy-sdk' && selectedRuntime === 'codebuddy-sdk') {
+      attempts.push(
+        ...resolveCodeBuddyModels(input.model).map((model) => ({
+          runtime,
+          model,
+        })),
+      );
       continue;
     }
 
+    let model: string;
     try {
-      return await executeRuntime(runtime, input, model);
+      model = await resolveModelForRuntime(runtime, input.model);
+    } catch {
+      // Resolution failure for a fallback runtime should not obscure a later runtime.
+      if (runtime === selectedRuntime) throw;
+      continue;
+    }
+    attempts.push({ runtime, model });
+  }
+
+  let lastQuotaError: unknown;
+  for (let index = 0; index < attempts.length; index += 1) {
+    const attempt = attempts[index];
+    const model = attempt.model;
+    if (!model) continue;
+
+    try {
+      return await executeRuntime(attempt.runtime, input, model);
     } catch (error) {
-      if (!isQuotaError(error) || index === candidates.length - 1) {
-        if (lastQuotaError && index === candidates.length - 1 && isQuotaError(error)) {
-          throw new Error(
-            '所有可用 Agent Runtime 的配额都已达到上限：'
-            + candidates.join(' → ')
-            + '。最后一个运行时错误：'
-            + (error instanceof Error ? error.message : String(error)),
-          );
-        }
+      if (!isQuotaError(error) || index === attempts.length - 1) {
         throw error;
       }
 
       lastQuotaError = error;
-      const nextRuntime = candidates[index + 1];
-      let nextModel: string | undefined;
-      try {
-        nextModel = await resolveModelForRuntime(nextRuntime, input.model);
-      } catch {
-        // Let the next loop produce the definitive error if no runtime remains.
-      }
+      const next = attempts[index + 1];
+      const sameRuntime = next.runtime === attempt.runtime;
+      const runtimeLabel = (value: AgentRuntime) =>
+        value === 'codebuddy-sdk' ? 'CodeBuddy' : value === 'copilot-sdk' ? 'Copilot' : 'OpenCode';
 
       input.onStatus?.(
-        (runtime === 'codebuddy-sdk' ? 'CodeBuddy' : runtime === 'copilot-sdk' ? 'Copilot' : 'OpenCode')
-        + ' 配额已用尽，自动切换到 '
-        + (nextRuntime === 'codebuddy-sdk' ? 'CodeBuddy' : nextRuntime === 'copilot-sdk' ? 'Copilot' : 'OpenCode')
-        + '，继续当前调查。'
+        sameRuntime
+          ? 'CodeBuddy 当前模型配额已用尽，自动切换到下一个 CodeBuddy 模型，继续当前调查。'
+          : runtimeLabel(attempt.runtime) + ' 配额已用尽，自动切换到 ' + runtimeLabel(next.runtime) + '，继续当前调查。',
       );
       input.onTrajectory?.({
         type: 'status',
-        name: 'Agent Runtime 配额已用尽，自动 fallback',
+        name: sameRuntime
+          ? 'CodeBuddy 模型配额已用尽，自动 fallback'
+          : 'Agent Runtime 配额已用尽，自动 fallback',
         status: 'info',
-        model: nextModel,
+        model: next.model,
         details: {
           fallback: true,
-          fromRuntime: runtime,
-          toRuntime: nextRuntime,
+          fromRuntime: attempt.runtime,
+          toRuntime: next.runtime,
+          ...(sameRuntime ? { fromModel: model, toModel: next.model } : {}),
           originalError: error instanceof Error ? error.message : String(error),
         },
       });
