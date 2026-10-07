@@ -115,6 +115,11 @@ flowchart LR
 
 ### Phase 3 — Final Hardening
 
+已完成的最终收口还包括：
+- Mission / Workflow / Result Gate 统一使用 `src/workflow/derived-state.ts` 的 canonical evaluator。
+- Assessment 与 Modernization 的专用 Artifact 严格按 Workflow 分开；Workflow runtime 不再嵌入业务 Artifact。
+- Report / Assessment generation 按 Investigation 串行化，避免版本竞争。
+
 阶段 3 聚焦“contract declared but not enforced”的剩余问题：
 
 - Report generation 真正执行 Current-State deterministic Gate。
@@ -124,7 +129,7 @@ flowchart LR
 - SessionContext 改为明确 API Projection，不再直接暴露完整 persistence object。
 - Web controller、Result、Trajectory、Config 页面统一消费 Shared Contract，移除重复 interface / response casts。
 - JourneyPlan / Workflow AI Change / Artifact Review 等剩余跨边界对象统一 canonical owner。
-- 持久化 Schema 与 Shared API Contract 同名对象通过 re-export 对齐，避免语义漂移。
+- Domain persistence schema 与 Shared API Contract 不直接互相暴露；跨 server/web 的对象必须通过 canonical API projection + runtime validation 对齐，避免 persistence 字段泄漏。
 - 增加 artifact provenance、checkpoint、shared contract 相关 regression tests。
 
 ## 8. Remaining work / phase boundary
