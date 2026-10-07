@@ -15,14 +15,14 @@
 
 Reviewer：
 
-- 使用独立 Copilot Session，不继承主 Agent 的 Session；
+- 使用独立 Agent Session，不继承主 Agent 的 Session。Reviewer 走与主 Investigation 相同的 Runtime abstraction，可按当前 Runtime / model 与 quota fallback 规则执行，但绝不复用主 Agent Session；
 - 不提供 GitHub、数据库、grep、bash 等调查工具，不负责补证据；
-- 只读取原始用户目标、待审核成果和必要的确定性事实摘要；
+- 只读取完整 Mission Contract（purpose / expectedResult / deliverables）、待审核成果和必要的确定性事实摘要；
 - 检查目标匹配、可读性、结论、信息噪声、一致性和决策价值；
 - 输出结构化 pass/fail、分数和具体问题；
 - 只把 Reviewer 作为语义质量检查，不取代 Evidence Gate 或实际验证结果。
 
-Reviewer 是 ADR-014 控制模型中的 advisory semantic signal。它不能单独授权 Workflow transition，也不能替代 deterministic Gate。
+Reviewer 是 ADR-014 控制模型中的独立 semantic quality gate signal。它不能替代 Evidence / deterministic Gate，也不能替代 Human approval；需要 Reviewer 的交付流程必须在 Reviewer unavailable / fail 时保持 blocked。Reviewer 本身使用 runtime-neutral 的独立 Agent Session。
 
 当前接入：
 
