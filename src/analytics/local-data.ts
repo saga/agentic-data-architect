@@ -477,8 +477,8 @@ export function validateLocalReadOnlySql(sql: string): string {
     throw new Error('本地分析查询必须使用已经登记的数据集，不能自己读取文件、网络或其它数据库。');
   }
 
-  const trimmed = sanitized.replace(/;\s*$/g, '');
-  if (trimmed.includes(';')) throw new Error('本地分析一次只能执行一条查询。');
+  const trimmed = sql.trim().replace(/;\s*$/g, '');
+  if (sanitized.replace(/;\s*$/g, '').includes(';')) throw new Error('本地分析一次只能执行一条查询。');
   return trimmed;
 }
 
