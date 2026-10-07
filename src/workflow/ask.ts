@@ -185,8 +185,11 @@ export async function answerQuestion(
     updateLiveActivity(status);
     onStatus?.(status);
   };
+  let assistantDraft = '';
+  let latestCompanionNote = '';
   const emitDelta = (delta: string): void => {
     updateLiveActivity('正在生成回答');
+    assistantDraft += delta;
     onDelta?.(delta);
   };
   const emitReasoning = (delta: string): void => {
@@ -309,7 +312,10 @@ export async function answerQuestion(
             purpose: 'review',
           });
           const value = note.trim();
-          if (!abortRequestedTurns.has(turnId) && value && value.length <= 120) options.onCompanionNote?.(value);
+          if (!abortRequestedTurns.has(turnId) && value && value.length <= 120) {
+            latestCompanionNote = value;
+            options.onCompanionNote?.(value);
+          }
         } catch (error) {
           await appendAuditEvent(investigationName, {
             actor: 'system',
@@ -1104,6 +1110,34 @@ export async function answerQuestion(
         sessionName: investigationName,
         turnId,
         error: diagnosticError,
+      });
+    }
+    const failureContent = [
+      latestCompanionNote.trim(),
+      assistantDraft.trim(),
+      '这次调查没有完成，我已经保留刚才得到的内容。你可以继续提问。',
+    ].filter(Boolean).join('\n\n');
+    try {
+      saveConversationMessage({
+        id: turnId + ':assistant:failure',
+        sessionName: investigationName,
+        role: 'assistant',
+        content: failureContent,
+      });
+      await appendTranscript(investigationName, 'assistant', failureContent);
+    } catch (persistenceError) {
+      console.error('[investigation] Failed to persist assistant failure message; the original execution error is preserved.', {
+        sessionName: investigationName,
+        turnId,
+        error: persistenceError,
+      });
+      recordTrajectory({
+        type: 'status',
+        name: '这次调查没有完成，而且失败提示没有保存成功',
+        status: 'failed',
+        details: {
+          persistenceError: persistenceError instanceof Error ? persistenceError.message : String(persistenceError),
+        },
       });
     }
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
