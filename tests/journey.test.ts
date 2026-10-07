@@ -7,7 +7,6 @@ import {
   loadWorkflowJourney,
   parseJourneyMarkdown,
   validateJourneyDefinition,
-  deriveModernizationFacts,
   type JourneyFacts,
 } from '../src/workflow/journey.js';
 
@@ -16,10 +15,10 @@ const baseFacts: JourneyFacts = {
   currentState: null,
   unknowns: ['where is the source table?'],
   highGapKinds: ['discovery'],
+  targetStatus: 'draft',
   targetComponentCount: 0,
-  mappingCount: 0,
-  blockingValidationReady: 0,
-  blockingValidationTotal: 0,
+  mappingStatuses: [],
+  validationStatuses: [],
 };
 
 
@@ -322,8 +321,10 @@ test('cutover is an explicit human review after validation', () => {
     result.definition!,
     {
       ...baseFacts,
-      blockingValidationReady: 1,
-      blockingValidationTotal: 1,
+      targetStatus: 'in_review',
+      targetComponentCount: 1,
+      mappingStatuses: ['reviewed'],
+      validationStatuses: [{ status: 'passed', blocking: true }],
     },
     execution,
   );
