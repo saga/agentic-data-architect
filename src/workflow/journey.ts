@@ -229,6 +229,18 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     seen.add(node.id);
   }
 
+  for (const node of nodes) {
+    if (node.completeWhen && !WORKFLOW_COMPLETION_CONDITIONS.includes(node.completeWhen as typeof WORKFLOW_COMPLETION_CONDITIONS[number])) {
+      issues.push(
+        node.id + ' 使用了未知的 completeWhen：' + node.completeWhen
+        + '。只能使用：' + WORKFLOW_COMPLETION_CONDITIONS.join('、') + '。',
+      );
+    }
+    if (node.actor === 'human' && node.completeWhen) {
+      issues.push(node.id + ' 是人工步骤，不能设置 completeWhen；人工步骤必须由用户选择 outcome 推进。');
+    }
+  }
+
   const startNode = nodes.find((node) => node.id === 'start');
   const startRoute = startNode?.routes.find((route) => route.outcome === 'success');
   const startTarget = declaredStart ?? startRoute?.target;
