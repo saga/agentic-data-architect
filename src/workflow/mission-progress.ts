@@ -294,7 +294,7 @@ export async function buildMissionProgress(
     findingsCount: signals.findingsCount,
     scopeReady: Boolean(investigation.scopeValidation?.status === 'validated'),
     highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    modernization: signals.modernization,
+    modernization: signals.modernization ?? null,
     assessment: signals.assessment
       ? {
           exists: true,
