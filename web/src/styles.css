@@ -2008,6 +2008,62 @@ body {
   white-space: nowrap;
 }
 
+/* Runtime flow animation -------------------------------------------------- */
+/*
+ * 参考 Magpie：静态 Workflow 图保持稳定，运行态只叠加轻量动画。
+ * Edge 的拓扑仍由 X6 管理，token 只跟随真实 Edge SVG path。
+ */
+.journey-flow-edge-active .x6-edge-line {
+  stroke-dasharray: 10 7;
+  animation: journey-flow-edge-flow 0.75s linear infinite;
+}
+
+@keyframes journey-flow-edge-flow {
+  to {
+    stroke-dashoffset: -17;
+  }
+}
+
+.journey-flow-execution-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.journey-flow-execution-token {
+  fill: #1677ff;
+  stroke: #fff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(22, 119, 255, 0.55));
+  opacity: 0.96;
+}
+
+.journey-flow-node-status-current .journey-flow-node-status-dot {
+  animation: journey-flow-current-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes journey-flow-current-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.10);
+    opacity: 0.86;
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(22, 119, 255, 0.02);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-flow-edge-active .x6-edge-line,
+  .journey-flow-node-status-current .journey-flow-node-status-dot {
+    animation: none;
+  }
+}
+
 /* retry 使用真实 Edge；视觉上采用灰色虚线回线，不使用额外 Group 语义。 */
 
 /* Connection diagnostics -------------------------------------------------- */
