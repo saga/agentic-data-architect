@@ -122,7 +122,9 @@ function adaptInput(
     model,
     // A session belongs to one runtime+model selection. A quota fallback starts
     // a fresh session and never persists that fallback session as the preferred runtime.
-    ...(preserveSession ? { sessionId, onSessionId } : {}),
+    ...(preserveSession && sessionId
+      ? { sessionId, ...(onSessionId ? { onSessionId } : {}) }
+      : {}),
   };
 }
 
