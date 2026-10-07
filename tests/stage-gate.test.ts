@@ -27,6 +27,7 @@ function input(overrides: Partial<StageGateInput> = {}): StageGateInput {
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     after: {
       evidenceIds: ['ev-old', 'ev-new'],
@@ -77,6 +78,19 @@ test('stage gate passes from actual evidence-backed work', () => {
   assert.equal(result.newEvidenceIds[0], 'ev-new');
   assert.equal(result.evidenceBackedClaimCount, 1);
   assert.equal(result.shouldContinue, true);
+});
+
+test('Stage Gate rejects a checkpoint when current scope has not been validated', () => {
+  const base = input();
+  const result = evaluateInvestigationStageGate({
+    ...base,
+    after: {
+      ...base.after,
+      scopeValidatedAt: undefined,
+    },
+  });
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '正式范围已经确认' && !item.passed));
 });
 
 test('Stage Gate rejects real but Mission-unrelated work when Smart Alignment says it is unrelated', () => {
