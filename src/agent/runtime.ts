@@ -74,18 +74,14 @@ function resolveCodeBuddyModels(requestedModel?: string): string[] {
     base.map((model) => [model.toLowerCase(), model]),
   ).values()];
 
-  if (!requested || requested.toLowerCase() === 'auto') {
-    return ordered.map((model) => 'codebuddy:' + model);
-  }
+  if (!requested || requested.toLowerCase() === 'auto') return ordered;
 
   const requestedIndex = ordered.findIndex(
     (model) => model.toLowerCase() === requested.toLowerCase(),
   );
-  if (requestedIndex >= 0) {
-    return ordered.slice(requestedIndex).map((model) => 'codebuddy:' + model);
-  }
+  if (requestedIndex >= 0) return ordered.slice(requestedIndex);
 
-  return ['codebuddy:' + requested, ...ordered.map((model) => 'codebuddy:' + model)];
+  return [requested, ...ordered];
 }
 
 async function resolveModelForRuntime(
@@ -95,12 +91,8 @@ async function resolveModelForRuntime(
   const value = requestedModel?.trim() ?? '';
   switch (runtime) {
     case 'codebuddy-sdk':
-      return resolveCodeBuddyModels(value.startsWith('codebuddy:') ? value : undefined)[0] ?? (
-        'codebuddy:' + resolveCodeBuddyModel(
-          undefined,
-          config.codeBuddyDefaultModel,
-        )
-      );
+      return resolveCodeBuddyModels(value.startsWith('codebuddy:') ? value : undefined)[0]
+        ?? resolveCodeBuddyModel(undefined, config.codeBuddyDefaultModel);
     case 'copilot-sdk':
       return value && !value.startsWith('codebuddy:') && !value.startsWith('opencode:') && value.toLowerCase() !== 'auto'
         ? value
@@ -115,10 +107,13 @@ function adaptInput(
   runtime: AgentRuntime,
   model: string,
 ): AskInput {
+  const inputModel = runtime === 'codebuddy-sdk'
+    ? normalizeCodeBuddyModel(input.model)
+    : input.model;
   const preserveSession =
-    runtime !== 'codebuddy-sdk'
-    && runtime === input.runtime
-    && model === input.model;
+    runtime === input.runtime
+    && model === inputModel
+    && Boolean(input.sessionId);
 
   return {
     ...input,
