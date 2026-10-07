@@ -141,9 +141,9 @@ export async function confirmInvestigationMission(
   name: string,
   mission: Investigation['mission'],
 ): Promise<Investigation> {
-  if (!mission) throw new Error('Mission 不能为空。');
+  if (!mission) throw new Error('还没有确认这次调查的任务目的和期望结果。请先完成任务确认。');
   if (mission.status !== 'confirmed' || mission.confirmedBy !== 'user') {
-    throw new Error('只有用户明确确认的 Mission Contract 才能保存为正式任务。');
+    throw new Error('任务目的和期望结果还没有得到你的确认，因此不能开始正式调查。请先确认任务。');
   }
 
   return withWorkspaceContextLock(name, async () => {
@@ -263,7 +263,7 @@ export async function investigationExists(name: string): Promise<boolean> {
 export async function saveDiscoverySnapshot(name: string, runId: string, snapshot: unknown): Promise<string> {
   const parsed = DiscoverySnapshotSchema.parse(snapshot);
   if (parsed.run.id !== runId) throw new Error('Discovery Snapshot runId 与文件 runId 不一致。');
-  if (!parsed.run.scopeFingerprint) throw new Error('Discovery Snapshot 缺少 Scope fingerprint，不能作为新的 current source。');
+  if (!parsed.run.scopeFingerprint) throw new Error('这份代码发现结果没有记录调查范围，不能作为最新结果使用。请重新运行发现。');
   const normalized = DiscoverySnapshotSchema.parse({
     ...parsed,
     generation: parsed.generation ?? {
