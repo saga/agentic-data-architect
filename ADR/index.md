@@ -63,3 +63,4 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-029](./029-conversation-turn-failure-durability.md) | Agent 失败也是已发生的 Conversation Turn；秘书消息和已流出的 assistant 内容必须在失败时持久化，SSE 只是实时显示通道 | Accepted |
 | [ADR-030](./030-sse-restart-and-turn-recovery.md) | SSE 只负责实时显示；turn draft、Server shutdown、restart recovery 和浏览器 reconnect 必须保护 Conversation Turn 可恢复性 | Accepted |
 | [ADR-031](./031-codebuddy-investigation-sandbox.md) | CodeBuddy Investigation 只使用只读 built-in tools；禁止宿主仓库写入和 shell 路径逃逸 | Accepted |
+| [ADR-032](./032-agent-runtime-adapter-isolation-and-workflow-completion.md) | Runtime adapter 互不直接依赖；共享输入/Graphify 能力下沉；无 completeWhen 的 Agent 节点必须先通过 Stage Gate | Accepted |
