@@ -31,7 +31,7 @@ Reviewer 是 ADR-014 控制模型中的独立 semantic quality gate signal。它
 - Intake / Scope：继续由确定性检查和用户确认负责；
 - Cutover：继续由人工负责，不由 Reviewer 代替批准。
 
-Reviewer 失败时，不能推进对应的报告/Modernization 阶段；失败原因保存到 reports 中，并作为 Agent 继续工作的明确反馈。
+Reviewer 失败时，不能推进对应的报告/Modernization 阶段；失败原因必须保存到 reports 中。对于已有已发布 Report，其当前成功 review 不得被新的失败尝试覆盖；新的失败尝试单独保存，作为诊断和后续重试依据。
 
 ## Consequences
 
