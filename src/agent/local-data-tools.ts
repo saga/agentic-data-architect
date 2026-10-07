@@ -1,7 +1,7 @@
 /**
- * Copilot Agent 的本地数据工具。
+ * Agent Runtime 的本地数据工具。
  *
- * 暴露 catalog、register、describe、sample、profile、query、transform、export、explain、reconcile 等高价值本地分析操作。
+ * Copilot、CodeBuddy 等 Runtime 复用这套 Workbench tool implementation；暴露 catalog、register、describe、sample、profile、query、transform、export、explain、reconcile 等本地分析操作。
  * Agent 不直接拿到 DuckDB 文件路径，也没有 ATTACH / COPY / INSTALL / LOAD 能力。
  */
 import { defineTool } from '@github/copilot-sdk';
