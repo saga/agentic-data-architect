@@ -26,6 +26,7 @@ test('global/task configuration and cache boundaries are explicit', async () => 
 
 test('remote media resolves through yt-dlp and stores cache outside investigation workspace', async () => {
   const media = await fs.readFile(new URL('../src/media/remote-media.ts', import.meta.url), 'utf8');
+  const page = await fs.readFile(new URL('../web/src/components/InvestigationConfigPage.tsx', import.meta.url), 'utf8');
   const server = await fs.readFile(new URL('../src/server.ts', import.meta.url), 'utf8');
   const avatar = await fs.readFile(new URL('../web/src/components/AssistantAvatar.tsx', import.meta.url), 'utf8');
 
