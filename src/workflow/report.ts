@@ -154,7 +154,15 @@ function reportSourceFingerprint(value: unknown): string {
 
 export async function runReport(
   name: string,
+  options: { onTrajectory?: import('../agent/copilot.js').AskInput['onTrajectory'] } = {},
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
+  const startedAt = Date.now();
+  options.onTrajectory?.({
+    type: 'status',
+    name: '生成最终报告',
+    status: 'started',
+    details: { operation: 'report_generation' },
+  });
   const prepared = await withWorkspaceContextLock(name, async () => {
     const source = await captureInvestigationArtifactSource(name);
     const investigation = source.investigation;
@@ -247,6 +255,7 @@ export async function runReport(
     artifactHash: prepared.artifactHash,
     sourceRevision: prepared.provenance.sourceRevision,
     artifactVersion: prepared.nextVersion,
+    onTrajectory: options.onTrajectory,
   });
 
   if (review.availability !== 'completed' || review.status !== 'pass') {
@@ -304,5 +313,12 @@ export async function runReport(
     await saveArtifactReview(name, review);
   });
 
+  options.onTrajectory?.({
+    type: 'status',
+    name: '生成最终报告',
+    status: 'completed',
+    durationMs: Math.max(0, Date.now() - startedAt),
+    details: { operation: 'report_generation' },
+  });
   return { ...prepared.report, review };
 }
