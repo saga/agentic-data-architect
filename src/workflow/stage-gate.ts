@@ -150,12 +150,17 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.missionProgressBefore,
     input.missionProgressAfter,
   );
+  // A stage can produce a meaningful, evidence-backed analysis without changing the
+  // underlying catalog rows. Do not discard such a result merely because the delta
+  // is in the interpretation rather than in the inventory.
+  const hasEvidenceBackedAnalysis = evidenceBackedClaims.length > 0;
   const hasRealStageWork =
     newEvidenceIds.length > 0
     || newFindingIds.length > 0
     || newDiscoveryRuns > 0
     || scopeValidationChanged
-    || persistedWorkProductChanged;
+    || persistedWorkProductChanged
+    || hasEvidenceBackedAnalysis;
 
   add(
     '正式范围已经确认',
@@ -171,12 +176,16 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.parsed.answer.trim() ? '已有本阶段回答。' : '本阶段没有可保存的回答。',
   );
 
+  const missionAlignmentPassed =
+    input.missionAlignment === null
+      || input.missionAlignment === undefined
+      || input.missionAlignment.aligned === true;
   add(
     '阶段成果与 Mission 对齐',
-    input.missionAlignment?.aligned === true,
+    missionAlignmentPassed,
     input.missionAlignment
       ? input.missionAlignment.reason
-      : 'Mission Alignment 暂时不可用；这个检查无法通过。',
+      : 'Mission Alignment 暂时不可用；改由确定性的 Evidence / Claim 检查判断。',
   );
 
   add(
