@@ -88,12 +88,34 @@ test('stage gate passes from actual evidence-backed work', () => {
   assert.equal(result.shouldContinue, true);
 });
 
-test('Stage Gate fails closed when Mission Alignment is unavailable', () => {
+test('Stage Gate falls back to deterministic checks when Mission Alignment is unavailable', () => {
   const result = evaluateInvestigationStageGate(input({
     missionAlignment: null,
   }));
+  assert.equal(result.passed, true);
+  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && item.passed));
+});
+
+test('Stage Gate still rejects empty work when Mission Alignment is unavailable', () => {
+  const base = input({
+    missionAlignment: null,
+    after: {
+      evidenceIds: ['ev-old'],
+      findingIds: ['finding-old'],
+      discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
+    },
+    parsed: {
+      answer: '只是重新表述之前已经知道的内容。',
+      claims: [],
+      unknowns: [],
+      followUpQuestions: [],
+      routeOptions: [],
+    },
+  });
+  const result = evaluateInvestigationStageGate(base);
   assert.equal(result.passed, false);
-  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && !item.passed));
+  assert.ok(result.checks.some((item) => item.name === '本阶段存在真实调查成果' && !item.passed));
 });
 
 test('Stage Gate rejects a checkpoint when current scope has not been validated', () => {
