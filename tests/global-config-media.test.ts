@@ -7,6 +7,7 @@ test('global/task configuration and cache boundaries are explicit', async () => 
   const workspace = await fs.readFile(new URL('../src/investigation/workspace.ts', import.meta.url), 'utf8');
   const config = await fs.readFile(new URL('../src/config.ts', import.meta.url), 'utf8');
   const page = await fs.readFile(new URL('../web/src/components/InvestigationConfigPage.tsx', import.meta.url), 'utf8');
+  const server = await fs.readFile(new URL('../src/server.ts', import.meta.url), 'utf8');
 
   assert.match(control, /globalConfigFile\(\).*global-config\.json/);
   assert.match(control, /TaskAgentOverrideSchema|extractTaskAgentOverrides/);
@@ -15,6 +16,10 @@ test('global/task configuration and cache boundaries are explicit', async () => 
   assert.match(config, /dataDir: path\.resolve\(envConfig\.DATA_DIR\)/);
   assert.match(page, /工作台默认（Global）/);
   assert.match(page, /本次 Investigation（Task）/);
+  assert.match(server, /GET.*api\/config\/global|api\/config\/global/);
+  assert.match(server, /PUT.*api\/config\/global|api\/config\/global/);
+  assert.match(page, /Global v/);
+  assert.match(page, /将当前设置设为 Global 默认/);
   assert.match(page, /Global Cache/);
   assert.match(page, /Task Cache/);
 });
