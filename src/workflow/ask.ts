@@ -934,7 +934,6 @@ export async function answerQuestion(
       elapsedMs: Math.max(0, Date.now() - new Date(turnStartedAt).getTime()),
       ...(activeFailure?.lastActivityAt ? { lastActivityAt: activeFailure.lastActivityAt } : {}),
       ...(activeFailure?.lastActivity ? { lastActivity: activeFailure.lastActivity } : {}),
-      ...(activeFailure?.lastActivity ? { lastActivityType: activeFailure.phase } : {}),
       pendingTools: 0,
       pendingPermissions: 0,
       pendingUserInputs: 0,
@@ -949,16 +948,20 @@ export async function answerQuestion(
       details: failureDetails,
     });
     await trajectoryWrite;
-    await appendAuditEvent(investigationName, {
-      actor: 'system',
-      action: 'investigation.execution_failed',
-      summary: 'Investigation 执行失败，已保存详细错误信息。',
-      details: {
-        turnId,
-        execution: lastExecution,
-        ...failureDetails,
-      },
-    });
+    try {
+      await appendAuditEvent(investigationName, {
+        actor: 'system',
+        action: 'investigation.execution_failed',
+        summary: 'Investigation 执行失败，已保存详细错误信息。',
+        details: {
+          turnId,
+          execution: lastExecution,
+          ...failureDetails,
+        },
+      });
+    } catch {
+      // The original execution error must remain the turn outcome even if diagnostics persistence fails.
+    }
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
