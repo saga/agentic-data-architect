@@ -118,6 +118,7 @@ function buildCodeBuddyWorkbenchServer(sessionName: string): ReturnType<typeof c
 
   return createSdkMcpServer({
     name: 'workbench',
+    version: '1.0.0',
     tools: serverTools as never[],
   });
 }
