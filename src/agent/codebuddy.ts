@@ -303,7 +303,7 @@ async function runCodeBuddyQuery(
   try {
     input.onTrajectory?.({
       type: 'turn_start',
-      name: 'CodeBuddy SDK Agent 开始',
+      name: '助手开始执行',
       status: 'started',
       model,
       details: {
@@ -644,7 +644,7 @@ export async function askCodeBuddy(
 
   input.onTrajectory?.({
     type: 'assistant_turn_end',
-    name: 'CodeBuddy SDK Agent 完成',
+    name: '助手完成这一阶段',
     status: 'completed',
     model,
     details: {
