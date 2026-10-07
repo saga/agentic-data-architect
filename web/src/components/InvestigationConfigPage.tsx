@@ -137,7 +137,8 @@ export function InvestigationConfigPage(props:{
       <Flex align='center' gap={10} className='subpage-header-left'>
         <Button type='text' onClick={props.onBack} disabled={saving}>退出</Button>
         <SettingOutlined/> <Title level={4} style={{margin:0}}>调查配置</Title>
-        <Tag>v{props.control.version}</Tag>
+        <Tag>Task v{props.control.version}</Tag>
+        <Tag color={props.globalConfiguration ? 'blue' : undefined}>Global v{props.globalConfiguration?.version ?? '—'}</Tag>
       </Flex>
       <Space className='subpage-header-actions'>
         <Button icon={<SaveOutlined/>} type='primary' loading={saving} onClick={()=>void save()}>保存配置</Button>
@@ -285,9 +286,9 @@ export function InvestigationConfigPage(props:{
                  return <Avatar shape='square' src={previewUrl} icon={<PictureOutlined />} style={mediaStyle} />;
                })()}
                <div style={{minWidth:260,flex:'1 1 320px'}}>
-                 <Paragraph type='secondary'>支持本地图片、GIF 动图，以及远程图片 / GIF / 视频 URL。每条回复会随机选择一个头像来源。</Paragraph>
+                 <Paragraph type='secondary'>支持本地图片、GIF 动图，以及远程图片 / GIF / 视频 URL，包括 X/Twitter 视频帖子链接。系统会先解析实际媒体地址并预热 Global Cache。</Paragraph>
                  <Input.Search
-                   placeholder='粘贴远程图片 / GIF / MP4 / WebM URL'
+                   placeholder='粘贴远程图片 / GIF / MP4 / WebM / X 视频链接'
                    enterButton='添加远程头像'
                    onSearch={(value) => {
                      const src = value.trim();
