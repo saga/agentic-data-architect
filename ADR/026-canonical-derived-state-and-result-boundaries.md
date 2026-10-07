@@ -13,7 +13,7 @@
 - Source-of-Truth candidate 在 Current-State 中只是待确认项，但 Mission Progress 可能把它算成 covered；
 - Assessment、Modernization 都可以产生自己的 Journey projection，导致 Workflow runtime 出现第二份状态；
 - Assessment 的零 Finding 结果被当成“没有完成”，而不是合法的评估结论；
-- 最终 Report 与 route-specific artifact 之间没有统一的结果入口。
+- 结果页曾被误写成独立 `/results` resource；当前架构明确 Result page 只是 UI aggregation projection，不建立第二套 canonical Result resource。
 
 这些问题不是再增加字段就能长期解决的，必须明确唯一的 derived-state 解释边界。
 
