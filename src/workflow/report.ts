@@ -141,104 +141,168 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
 }
 
 /** report 的生成入口；生成、Reviewer 和持久化只从显式 regenerate 调用。 */
+export class ReportSourceChangedError extends Error {
+  constructor() {
+    super('报告生成期间调查资料发生了变化，这次生成结果没有发布。请重新生成报告。');
+    this.name = 'ReportSourceChangedError';
+  }
+}
+
+function reportSourceFingerprint(value: unknown): string {
+  return hashArtifact(JSON.stringify(value));
+}
+
 export async function runReport(
   name: string,
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
-  return withWorkspaceContextLock(name, async () => {
-  const source = await captureInvestigationArtifactSource(name);
-  const investigation = source.investigation;
-  const snapshot = source.snapshot;
-  const control = await loadInvestigationControl(name);
-  assertMissionGate(investigation.mission);
-  assertInvestigationArtifactSourceScope(source);
-  const modernizationResult = source.investigation.workflow === 'legacy-modernization'
-    ? await readModernizationArtifact(name, source)
-    : { status: 'blocked' as const, plan: null };
-  const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
-  const assessmentResult = source.investigation.workflow === 'data-architecture-assessment'
-    ? await readArchitectureAssessmentArtifact(name, source)
-    : { status: 'blocked' as const, plan: null };
-  const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
-  await assertInvestigationReportGate(name, {
-    investigation: {
-      ...source.investigation,
-      resultArtifactCount: source.analysisArtifacts.length,
-      workflow: source.investigation.workflow,
-      assessmentPlanAvailable: Boolean(assessment),
-      assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
-      assessmentRoadmapCount: assessment?.roadmap.length ?? 0,
-    },
-    snapshot: source.snapshot,
-  });
+  const prepared = await withWorkspaceContextLock(name, async () => {
+    const source = await captureInvestigationArtifactSource(name);
+    const investigation = source.investigation;
+    const snapshot = source.snapshot;
+    const control = await loadInvestigationControl(name);
+    assertMissionGate(investigation.mission);
+    assertInvestigationArtifactSourceScope(source);
 
-  const existingRaw = await readOptional(reportMetadataFile(name));
-  let nextVersion = 1;
-  if (existingRaw) {
-    try {
+    const modernizationResult = investigation.workflow === 'legacy-modernization'
+      ? await readModernizationArtifact(name, source)
+      : { status: 'blocked' as const, plan: null };
+    const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
+
+    const assessmentResult = investigation.workflow === 'data-architecture-assessment'
+      ? await readArchitectureAssessmentArtifact(name, source)
+      : { status: 'blocked' as const, plan: null };
+    const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
+
+    await assertInvestigationReportGate(name, {
+      investigation: {
+        ...investigation,
+        resultArtifactCount: source.analysisArtifacts.length,
+        workflow: investigation.workflow,
+        assessmentPlanAvailable: Boolean(assessment),
+        assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
+        assessmentRoadmapCount: assessment?.roadmap.length ?? 0,
+      },
+      snapshot,
+    });
+
+    const existingRaw = await readOptional(reportMetadataFile(name));
+    let nextVersion = 1;
+    if (existingRaw) {
       const existing = ReportMetadataSchema.parse(JSON.parse(existingRaw));
       nextVersion = existing.version + 1;
-    } catch {
-      nextVersion = 1;
     }
-  }
 
-  const report = await buildReport(name, {
-    investigation,
-    snapshot,
-    modernization,
-    assessment,
-    analysisArtifacts: source.analysisArtifacts,
+    const report = await buildReport(name, {
+      investigation,
+      snapshot,
+      modernization,
+      assessment,
+      analysisArtifacts: source.analysisArtifacts,
+    });
+    const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
+    const artifactHash = hashArtifact(report.markdown);
+    const sourceFingerprint = reportSourceFingerprint({
+      investigation,
+      snapshot,
+      modernization,
+      assessment,
+      analysisArtifacts: source.analysisArtifacts,
+      sourceRevision: provenance.sourceRevision,
+    });
+
+    return {
+      source,
+      report,
+      provenance,
+      artifactHash,
+      sourceFingerprint,
+      nextVersion,
+      runtime: control.agent.runtime,
+      model: control.agent.model,
+      mission: investigation.mission!,
+      facts: JSON.stringify({
+        findings: investigation.findings.slice(0, 20).map((finding) => ({
+          title: finding.title,
+          severity: finding.severity,
+          affectedAssets: finding.affectedAssets,
+        })),
+        claims: investigation.claims.slice(0, 20).map((claim) => ({
+          claim: claim.claim,
+          status: claim.status,
+        })),
+      }, null, 2),
+    };
   });
-  const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
-  const artifactHash = hashArtifact(report.markdown);
+
+  // Reviewer is intentionally outside the workspace lock. The lock only protects
+  // the short capture/gate/publish critical sections.
   const review = await reviewArtifact({
     investigationName: name,
-    mission: investigation.mission!,
-    runtime: control.agent.runtime,
-    model: control.agent.model,
+    mission: prepared.mission,
+    runtime: prepared.runtime,
+    model: prepared.model,
     artifactType: 'report',
-    artifact: report.markdown,
-    facts: JSON.stringify({
-      findings: investigation.findings.slice(0, 20).map((finding) => ({
-        title: finding.title,
-        severity: finding.severity,
-        affectedAssets: finding.affectedAssets,
-      })),
-      claims: investigation.claims.slice(0, 20).map((claim) => ({
-        claim: claim.claim,
-        status: claim.status,
-      })),
-    }, null, 2),
-    artifactHash,
-    sourceRevision: provenance.sourceRevision,
-    artifactVersion: nextVersion,
+    artifact: prepared.report.markdown,
+    facts: prepared.facts,
+    artifactHash: prepared.artifactHash,
+    sourceRevision: prepared.provenance.sourceRevision,
+    artifactVersion: prepared.nextVersion,
   });
-  const metadata: ReportMetadata = ReportMetadataSchema.parse({
-    schemaVersion: 1,
-    version: nextVersion,
-    generatedAt: new Date().toISOString(),
-    artifactHash,
-    provenance,
-  });
+
   if (review.availability !== 'completed' || review.status !== 'pass') {
-    // Keep the failed review attempt for diagnosis without replacing the review
-    // attached to an already-published report version.
-    const failurePath = path.join(
-      reportsDir(name),
-      'report-review-failure-v' + String(nextVersion) + '.json',
-    );
-    await fs.mkdir(reportsDir(name), { recursive: true });
-    await fs.writeFile(failurePath, JSON.stringify(review, null, 2) + '\n', 'utf8');
+    await withWorkspaceContextLock(name, async () => {
+      const failurePath = path.join(
+        reportsDir(name),
+        'report-review-failure-v' + String(prepared.nextVersion) + '.json',
+      );
+      await fs.mkdir(reportsDir(name), { recursive: true });
+      await fs.writeFile(failurePath, JSON.stringify(review, null, 2) + '\n', 'utf8');
+    });
     throw new ReportQualityGateError(review);
   }
 
-  // Publish the report only after the independent review has passed. A failed or
-  // unavailable review therefore cannot leave a new report looking current.
-  await fs.mkdir(reportsDir(name), { recursive: true });
-  await fs.writeFile(reportFile(name), report.markdown + '\n', 'utf8');
-  await fs.writeFile(reportMetadataFile(name), JSON.stringify(metadata, null, 2) + '\n', 'utf8');
-  await saveArtifactReview(name, review);
+  await withWorkspaceContextLock(name, async () => {
+    const currentSource = await captureInvestigationArtifactSource(name);
+    const currentInvestigation = currentSource.investigation;
+    const currentSnapshot = currentSource.snapshot;
+    const currentModernizationResult = currentInvestigation.workflow === 'legacy-modernization'
+      ? await readModernizationArtifact(name, currentSource)
+      : { status: 'blocked' as const, plan: null };
+    const currentAssessmentResult = currentInvestigation.workflow === 'data-architecture-assessment'
+      ? await readArchitectureAssessmentArtifact(name, currentSource)
+      : { status: 'blocked' as const, plan: null };
+    const currentSourceFingerprint = reportSourceFingerprint({
+      investigation: currentInvestigation,
+      snapshot: currentSnapshot,
+      modernization: currentModernizationResult.status === 'current' ? currentModernizationResult.plan : null,
+      assessment: currentAssessmentResult.status === 'current' ? currentAssessmentResult.plan : null,
+      analysisArtifacts: currentSource.analysisArtifacts,
+      sourceRevision: computeArtifactProvenance(currentInvestigation, currentSnapshot, prepared.nextVersion).sourceRevision,
+    });
+    if (currentSourceFingerprint !== prepared.sourceFingerprint) {
+      throw new ReportSourceChangedError();
+    }
 
-  return { ...report, review };
+    const existingRaw = await readOptional(reportMetadataFile(name));
+    const existingVersion = existingRaw
+      ? ReportMetadataSchema.parse(JSON.parse(existingRaw)).version
+      : 0;
+    if (existingVersion + 1 !== prepared.nextVersion) {
+      throw new ReportSourceChangedError();
+    }
+
+    const metadata: ReportMetadata = ReportMetadataSchema.parse({
+      schemaVersion: 1,
+      version: prepared.nextVersion,
+      generatedAt: new Date().toISOString(),
+      artifactHash: prepared.artifactHash,
+      provenance: prepared.provenance,
+    });
+    await fs.mkdir(reportsDir(name), { recursive: true });
+    await fs.writeFile(reportFile(name), prepared.report.markdown + '\n', 'utf8');
+    await fs.writeFile(reportMetadataFile(name), JSON.stringify(metadata, null, 2) + '\n', 'utf8');
+    await saveArtifactReview(name, review);
   });
+
+  return { ...prepared.report, review };
 }
