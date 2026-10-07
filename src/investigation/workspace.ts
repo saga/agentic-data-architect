@@ -24,7 +24,7 @@ export type { WorkspaceContext, WorkspaceInput, WorkspaceSeed, SharedArtifactInd
 /** 校验 Session 名称只能是单层安全路径名，阻止通过 workspace 路径逃逸。 */
 function safeName(name: string): string {
   if (!name || name !== path.basename(name) || name === '.' || name === '..') {
-    throw new Error('Invalid Session name: ' + name);
+    throw new Error('调查名称不正确：只能使用单层目录名。');
   }
   return name;
 }
