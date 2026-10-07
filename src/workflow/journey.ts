@@ -177,6 +177,11 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
 
     if (!current) continue;
 
+    if (raw.includes('->') && !route) {
+      issues.push('Workflow 不支持带条件或其它扩展语法的连线，只能使用 outcome -> target。第 ' + lineNumber + ' 行无效。');
+      continue;
+    }
+
     if (route) {
       current.routes.push({
         outcome: route[1].toLowerCase(),
