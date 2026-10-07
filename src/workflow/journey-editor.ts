@@ -22,6 +22,7 @@ import {
   workspaceRoot,
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
+import { computeMissionFingerprint, computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { buildArchitectureAssessmentPlan, loadArchitectureAssessmentPlan } from './assessment.js';
 import { JourneyLayoutSchema, WorkflowSnapshotSchema, JourneyRunEventSchema, JourneyExecutionSchema } from '../api/contracts.js';
@@ -817,7 +818,12 @@ export async function applyAgentWorkflowTransition(
   options: { persistModernizationResult?: boolean; stageValidationPassed?: boolean } = {},
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
   if (!workflowId) return { applied: false };
-  const mission = assertMissionGate((await loadInvestigation(name)).mission);
+  const initialContext = await loadInvestigation(name);
+  const mission = assertMissionGate(initialContext.mission);
+  // 绑定 transition 开始时的 Mission / Scope。后面的模型审核、Gate 和文件操作都可能等待；
+  // 用户若在等待期间修改任务，这次 transition 必须失效，不能把旧任务结果写回去。
+  const expectedMissionFingerprint = computeMissionFingerprint(initialContext);
+  const expectedScopeFingerprint = computeScopeFingerprint(initialContext);
 
   /**
    * 先解析 Agent 提出的 outcome，并检查 Mission / Workflow 边界。
@@ -995,6 +1001,14 @@ export async function applyAgentWorkflowTransition(
         latestActive.version,
       );
 
+      const latestContext = await loadWorkspaceContext(name);
+      if (
+        computeMissionFingerprint(latestContext) !== expectedMissionFingerprint
+        || computeScopeFingerprint(latestContext) !== expectedScopeFingerprint
+      ) {
+        throw new Error('任务或调查范围在 Workflow 推进期间发生了变化，这一步已经失效，请刷新后重新处理。');
+      }
+
       if (!sameJourneyExecution(latest, execution)) {
         throw new Error('Workflow 在 Agent 执行期间发生变化，本次 transition 不再适用。');
       }
@@ -1069,6 +1083,9 @@ export async function applyHumanWorkflowTransition(
   try {
     const context = await loadWorkspaceContext(name);
     const mission = assertMissionGate(context.mission);
+    // 人工操作也必须绑定当时看到的任务和范围，不能把旧页面的选择提交到新 Mission。
+    const expectedMissionFingerprint = computeMissionFingerprint(context);
+    const expectedScopeFingerprint = computeScopeFingerprint(context);
     const active = await loadActiveJourney(name, workflowId);
     const execution = await loadJourneyExecution(name, active.definition, active.version);
     eventRunId = execution.runId;
@@ -1113,6 +1130,13 @@ export async function applyHumanWorkflowTransition(
       }
 
       const latest = await loadJourneyExecution(name, latestActive.definition, latestActive.version);
+      const latestContext = await loadWorkspaceContext(name);
+      if (
+        computeMissionFingerprint(latestContext) !== expectedMissionFingerprint
+        || computeScopeFingerprint(latestContext) !== expectedScopeFingerprint
+      ) {
+        throw new Error('任务或调查范围在处理期间发生了变化，这一步已经失效，请刷新后重新处理。');
+      }
       if (!sameJourneyExecution(latest, execution)) {
         throw new Error('执行状态已经变化，请刷新页面后重新处理。');
       }
