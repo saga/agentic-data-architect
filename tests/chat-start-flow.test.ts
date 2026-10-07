@@ -18,3 +18,26 @@ test('new-investigation dialog no longer tells users to type a separate start pr
   assert.match(dialog, /创建调查会直接开始/);
   assert.doesNotMatch(dialog, /创建工作空间不会直接开始调查/);
 });
+
+
+test('results page does not expose the obsolete report response variable', async () => {
+  const results = await fs.readFile(new URL('../web/src/components/InvestigationResultsPage.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(results, /if \(reportResponse\.ok\)/);
+  assert.match(results, /reportPayload !== undefined/);
+  assert.match(results, /结果页面的一部分暂时无法读取/);
+});
+
+test('important report regeneration requires confirmation', async () => {
+  const results = await fs.readFile(new URL('../web/src/components/InvestigationResultsPage.tsx', import.meta.url), 'utf8');
+  assert.match(results, /Modal\.confirm\(/);
+  assert.match(results, /重新生成报告？/);
+});
+
+test('Work Map remains reachable from the workspace and results navigation', async () => {
+  const topbar = await fs.readFile(new URL('../web/src/components/InvestigationTopbar.tsx', import.meta.url), 'utf8');
+  const workspace = await fs.readFile(new URL('../web/src/components/InvestigationWorkspace.tsx', import.meta.url), 'utf8');
+  const results = await fs.readFile(new URL('../web/src/components/InvestigationResultsPage.tsx', import.meta.url), 'utf8');
+  assert.match(topbar, /工作地图/);
+  assert.match(workspace, /onOpenJourney=\{\(\) => navigatePage\('journey'\)\}/);
+  assert.match(results, /onOpenJourney: \(\) => void/);
+});
