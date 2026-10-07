@@ -147,6 +147,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
             executionStatusText={executionStatusText}
             onCopyConversation={() => void copyConversation()}
             onOpenResults={() => navigatePage('results')}
+            onOpenJourney={() => navigatePage('journey')}
             onOpenTrajectory={() => navigatePage('trajectory')}
             onOpenConfig={() => navigatePage('config')}
             onOpenUnknowns={() => setUnknownsOpen(true)}
