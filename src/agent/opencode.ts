@@ -22,6 +22,7 @@ import {
   buildGraphifyMcpServer,
   tryEnsureGraphifyGraph,
   isGraphifyTool,
+  requiresGraphifyFirst,
 } from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
