@@ -31,7 +31,7 @@ Mission → Scope → 调查成果 → 中间分析记录 → 最终报告 → �
 | Skill | 主要 Gate / 验证 |
 |---|---|
 | current-data-architecture | Workflow completion condition + 通用 Report Gate + 独立 Reviewer |
-| data-architecture-assessment | Workflow completion condition + assessment 结构化结果 + 通用 Report Gate + Reviewer |
+| data-architecture-assessment | Workflow completion condition + assessment 结构化结果 + 通用 Report Gate + 最终报告 Reviewer |
 | legacy-modernization | Workflow completion condition + modernization Gate + 通用 Report Gate + Reviewer |
 | financial-ai-native-architecture | Workflow completion condition + 各阶段真实成果检查 + 通用 Report Gate + Reviewer |
 | investigation-session | Mission / Scope / Stage / Mission Completion / Report Gate |
