@@ -437,7 +437,7 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
       issues.push(node.id + ' 使用了未知 actor：' + node.actor);
     }
     if (node.completeWhen && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(node.completeWhen)) {
-      issues.push(node.id + ' 使用了未知 completeWhen：' + node.completeWhen);
+      issues.push(node.id + ' 使用了未知的 completeWhen：' + node.completeWhen);
     }
     if (node.type === 'end' && node.completeWhen) {
       issues.push(node.id + ' 是终点节点，不需要 completeWhen。');
