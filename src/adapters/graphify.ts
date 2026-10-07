@@ -7,7 +7,7 @@
  * 3. 保持 Graphify 的输出停留在“导航/候选关系”层，不直接写入 Evidence。
  *
  * Graphify 本身是 Python 工具，因此这里不引入其内部实现或 Python API。
- * 运行时只依赖它提供的 graphify-mcp CLI。
+ * 运行时通过它提供的 graphify / graphify-mcp CLI，不引入 Graphify Python API。
  */
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
