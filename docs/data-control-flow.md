@@ -258,7 +258,7 @@ abort request
   ↓
 workflow cancellation state
   ↓
-Copilot session abort
+Agent Runtime abort
   ↓
 turn = aborted
 ~~~
@@ -290,14 +290,13 @@ flowchart TD
     Running[turn=running]
     Agent[Agent Runtime runs]
     Done[turn=completed + result saved]
-    Network[Network failure]
-    Retry[Retry same turnId]
-    Return[Return stored result]
+    Network[SSE / transport disconnect]
+    Recover[等待服务恢复并读取 durable turn]
+    Return[Reload durable conversation]
 
     Send --> Running --> Agent --> Done
     Done --> Network
-    Network --> Retry
-    Retry --> Return
+    Network --> Recover --> Return
 ~~~
 
 因此：
@@ -616,9 +615,12 @@ read-modify-write 必须避免覆盖同时产生的新 input
 
 ### Restart
 
+Server restart 的恢复不是只把状态改成 aborted。当前规则是：启动时扫描遗留 running turn → 恢复已保存的 assistant draft → 生成可见的 assistant 中断消息 → 标记 turn 为 aborted。这样重启不会让用户看到只有自己的问题而没有秘书/助手反馈。
+
 ~~~text
 server restart
   => 不允许旧 running turn 永久锁死 Investigation
+  => 不允许已流出的可见内容因为 SSE / process 生命周期而消失
 ~~~
 
 ## 16. 检查结论
