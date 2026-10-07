@@ -25,7 +25,7 @@ metadata:
 
 ## 第一次进入 Investigation
 
-Investigation 进入代码仓库后，宿主运行时会先尝试为当前 working directory 建一份可查询的 Graphify 结构图。第一次没有 graph 时生成，正式 Discovery 会刷新已有 graph。Graphify 生成失败或结果为空时，不应让整个 Investigation 失败；Runtime 会记录这次能力不可用，并改用常规源码工具继续调查。Skill 自己负责在源码明显变化后按需刷新：
+Investigation 进入代码仓库后，宿主运行时会先尝试为当前 working directory 建一份可查询的 Graphify 结构图。第一次没有 graph 时生成，正式 Discovery 会刷新已有 graph。Graphify 生成失败或结果为空时，不应让整个 Investigation 失败；Runtime 会记录这次能力不可用，并改用常规源码工具继续调查。Skill 自己负责在源码明显变化后按需刷新。运行环境优先使用当前项目的 Graphify executable；如果 Graphify 只安装在项目虚拟环境中，就直接调用 `.venv/bin/graphify`，不要假定 `graphify` 一定在 PATH：
 
 ~~~bash
 <项目 Graphify 命令> extract . --code-only --no-viz
