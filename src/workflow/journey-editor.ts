@@ -22,7 +22,7 @@ import {
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
-import { loadArchitectureAssessmentPlan } from './assessment.js';
+import { buildArchitectureAssessmentPlan, loadArchitectureAssessmentPlan } from './assessment.js';
 import { JourneyLayoutSchema, WorkflowSnapshotSchema, JourneyRunEventSchema, JourneyExecutionSchema } from '../api/contracts.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import { parseAgentAnswer } from '../agent/result.js';
@@ -340,6 +340,9 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
           datasets: snapshot.currentState.coverage.datasets,
           semanticAssets: snapshot.currentState.coverage.semanticAssets,
           parseFailures: snapshot.currentState.coverage.sqlParseFailures,
+          connectedDatasets: snapshot.currentState.coverage.connectedDatasets,
+          sqlFiles: snapshot.currentState.coverage.sqlFiles,
+          sqlParsedStatements: snapshot.currentState.coverage.sqlParsedStatements,
         }
       : null,
     unknowns: context.unknowns,
@@ -355,7 +358,11 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
       blockingValidationReady: 0,
       blockingValidationTotal: 0,
     }),
-    findingCount: assessment?.findings.length ?? 0,
+    estateColumnCount: snapshot?.estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
+    sourceOfTruthCandidateCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
+    lineageEdgeCount: snapshot?.lineage?.edges.length ?? snapshot?.estate?.edges.length ?? 0,
+    assessmentPlanExists: Boolean(assessment),
+    findingCount: assessment?.findings.length ?? context.findings.length,
     recommendationCount: assessment?.recommendations.length ?? 0,
     roadmapItemCount: assessment?.roadmap.length ?? 0,
   };
@@ -873,6 +880,23 @@ export async function applyAgentWorkflowTransition(
             + '。请先完成这些结果，再结束 Workflow。',
           );
         }
+      }
+    }
+
+    if (
+      workflowId === 'data-architecture-assessment'
+      && transition.outcome === 'success'
+      && currentNode
+      && ['findings', 'recommendation', 'roadmap'].includes(currentNode.id)
+    ) {
+      try {
+        await buildArchitectureAssessmentPlan(name);
+      } catch (error) {
+        return {
+          applied: false,
+          error: '保存 Data Architecture Assessment 结果失败：'
+            + (error instanceof Error ? error.message : String(error)),
+        };
       }
     }
 
