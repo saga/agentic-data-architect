@@ -44,6 +44,14 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 npm run start
 ```
 
+## SSE 断线、Stop 与 Server Restart
+
+Conversation 的 source of truth 不是 SSE。每个 running turn 在 SQLite 中都有 durable turn row，并在流式生成过程中保存有限长度的 assistant draft。正常完成、失败或 Stop 后清理 draft；Server 正常关闭时先请求 active Agent Runtime 停止并等待 turn 收尾，再关闭 SQLite；异常退出时由下一次启动执行 running-turn recovery。
+
+用户在执行中可以直接点击“停止”。它使用当前 turnId 调用统一 abort API，再由当前 Runtime 执行具体停止动作。SSE 意外断开时，前端先进入恢复流程并重新读取 durable conversation，不把 network error 直接当成调查失败。
+
+这套生命周期规则见 ADR-030；CodeBuddy Investigation 的只读 capability boundary 见 ADR-031。
+
 ## Agent Trajectory / 执行轨迹
 
 Investigation 现在持久化 Agent 执行轨迹到 `.workspace/<session>/trajectory.jsonl`。
@@ -108,7 +116,7 @@ Task Control 保存本次 Investigation 的研究参数和显式 Agent override�
 
 - `listConversationMessages(limit)` 只是限制返回数量，不是完整的 cursor pagination。
 - `searchConversation(... beforeRowId)` 已有一个内部时间水位，但没有形成统一的 Memory Page API。
-- Copilot SDK 的 compaction 是 runtime 侧的上下文压缩，不等于本项目自己的长期记忆归档。
+- Agent Runtime 的 compaction 是 runtime 侧的上下文压缩，不等于本项目自己的长期记忆归档。Copilot、CodeBuddy、OpenCode 的具体 session 机制仍由各自 Runtime adapter 负责。
 - 当前没有 `MemoryArchive` / `memory summary` 持久化层，因此不能保证很长调查经过多次上下文压缩后仍有一份独立、可分页、可回溯的历史摘要。
 
 目标模型应改为：
