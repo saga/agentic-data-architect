@@ -2797,14 +2797,14 @@ Evidence
 
 ## context.json 是研究上下文的入口
 
-context.json 至少记录：
+context.json 是当前 Investigation 状态的 canonical persistence boundary，至少记录：
 
 - 用户最初 prompt
 - 每次新的 input / question / research query
 - 重要事实、约束和决定
 - 长研究结果对应的 artifactPath
 
-它是工作记忆和研究索引，不替代 investigation.json 中的规范化业务状态，也不替代 Evidence Catalog。
+它是当前 Investigation 的规范化业务状态入口；对话正文由 conversations.db 保存，Evidence 仍按 Evidence Catalog 的 schema 管理。
 
 ## 企业研究来源的优先级
 
@@ -2813,7 +2813,7 @@ context.json 至少记录：
 代码研究开始时由用户选择：
 
 1. 直接 GitHub Tool：通过 repository URL/API 读取，适合公司 GitHub Organization 和小范围检查。
-2. Clone 到 workspace/sources/github/：使用本地 find / grep / rg / git 做大范围、跨文件、反复分析。
+2. 大仓库研究由当前 Investigation 的 GitHub research 能力纳入 workspace，再用本地 find / grep / rg / git 做大范围、跨文件、反复分析。
 
 代码、README、Issue/PR 分别视为实现证据、文档证据、讨论证据。不要把 README 当成比实际代码更高优先级的事实来源。
 
