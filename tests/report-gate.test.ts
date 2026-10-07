@@ -126,3 +126,31 @@ test('report gate rejects a stale discovery snapshot', () => {
   assert.equal(result.passed, false);
   assert.ok(result.checks.some((check) => check.name === '发现结果仍属于当前范围' && !check.passed));
 });
+
+
+test('report gate accepts a valid assessment with zero findings and no roadmap work', () => {
+  const input = {
+    ...base(),
+    workflow: 'data-architecture-assessment',
+    findings: [],
+    assessmentPlanAvailable: true,
+    assessmentRecommendationCount: 0,
+    assessmentRoadmapCount: 0,
+  };
+  const result = evaluateInvestigationReportGate(input, snapshot());
+  assert.equal(result.passed, true);
+});
+
+test('report gate rejects an assessment that has recommendations but no roadmap', () => {
+  const input = {
+    ...base(),
+    workflow: 'data-architecture-assessment',
+    findings: [{ evidenceIds: ['ev-1'] }],
+    assessmentPlanAvailable: true,
+    assessmentRecommendationCount: 2,
+    assessmentRoadmapCount: 0,
+  };
+  const result = evaluateInvestigationReportGate(input, snapshot());
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((check) => check.name === '数据架构评估结果已经形成' && !check.passed));
+});
