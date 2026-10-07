@@ -27,10 +27,10 @@ ADR-029 只覆盖 Agent 正常进入 catch/finally 后的失败收尾。Server �
 3. **Server graceful shutdown 顺序固定。**
    - 先枚举 active turns；
    - 先向 active Agent runtime 发出 Stop；
-   - 让 turn 走正常 abort/failure 收尾并完成 durable write；
+   - 先等待 turn 的 abort/failure/completed finally 完成 durable write（有明确超时，超时后由下一次 startup recovery 接管）；
    - 再关闭 HTTP/Vite；
    - 最后关闭 SQLite 和其它本地资源。
-   服务生命周期关闭不是业务级 Agent Stop。
+   服务生命周期关闭不是业务级 Agent Stop；如果 Agent 无法及时退出，下一次启动仍由 durable recovery 接管残留 running turn。
 
 4. **浏览器区分 Stop、Agent failure 与 transport disconnect。**
    - 用户点击 Stop 是正常操作，不显示 network error；
