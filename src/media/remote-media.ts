@@ -110,7 +110,8 @@ async function resolveWithYtDlp(source: string, kind: RemoteMediaKind): Promise<
       },
     );
     const remoteUrl = stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
-    return remoteUrl ? { remoteUrl, ...(mimeFromMediaUrl(remoteUrl) ? { mimeType: mimeFromMediaUrl(remoteUrl) } : {}) } : {};
+    const mimeType = remoteUrl ? mimeFromMediaUrl(remoteUrl) : undefined;
+    return remoteUrl ? { remoteUrl, ...(mimeType ? { mimeType } : {}) } : {};
   } catch {
     return {};
   }
@@ -149,7 +150,7 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
 
   const temporary = target + '.tmp-' + process.pid + '-' + Date.now();
   let bytes = 0;
-  const limited = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+  const limited = Readable.fromWeb(response.body as any);
 
   const limiter = async function* () {
     for await (const chunk of limited) {
