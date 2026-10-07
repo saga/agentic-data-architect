@@ -21,12 +21,16 @@ import {
 
 export type { WorkspaceContext, WorkspaceInput, WorkspaceSeed, SharedArtifactIndexEntry, SharedIndex } from './schemas.js';
 
-/** 校验 Session 名称只能是单层安全路径名，阻止通过 workspace 路径逃逸。 */
-function safeName(name: string): string {
+/** 统一 Investigation 名称；macOS 默认大小写不敏感，因此文件系统和 SQLite 必须使用同一大小写。 */
+export function normalizeInvestigationName(name: string): string {
   if (!name || name !== path.basename(name) || name === '.' || name === '..') {
     throw new Error('调查名称不正确：只能使用单层目录名。');
   }
-  return name;
+  return process.platform === 'darwin' ? name.toLowerCase() : name;
+}
+
+function safeName(name: string): string {
+  return normalizeInvestigationName(name);
 }
 
 /** 返回指定 Investigation 的工作目录；同时执行 Session 名称安全校验。 */
