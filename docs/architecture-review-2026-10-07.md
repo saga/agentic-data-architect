@@ -4,6 +4,25 @@
 **这是 2026-10-07 早期审查的历史快照，不代表当前 `main`；文中代码行号、代码规模和测试数量均以当时基线为准。**
 后续实现已针对其中部分问题进行了修复；当前 `main` 的规范以 ADR 和实际代码为准。
 
+### 2026-10-08 后续审查与修复
+
+在继续检查运行记录、状态机和并发边界后，又确认并修复了以下问题：
+
+| 新发现 | 处理 |
+|---|---|
+| Investigation 首次创建时多个请求可同时看到 `context.json` 不存在，后写入者可能覆盖初始化 seed | `ensureWorkspace` 增加单 Investigation 初始化锁并做二次检查 |
+| 长时间 Agent turn 保存旧 `Investigation` 快照时，可能把并发写入的 Evidence / Discovery / Claims / Findings 覆盖掉 | `saveInvestigation` 改为基于锁内最新状态按 ID 合并，并把 Mission deliverables 纳入身份判断 |
+| Agent / Human Workflow transition 只比较 `currentNodeId`，存在 ABA：状态 A→B→A 后旧 transition 仍可能被接受 | 增加完整 Execution 快照比较，并同时绑定 Mission / Scope fingerprint |
+| Stage Gate 的异步审核期间用户修改 Mission / Scope，旧 turn 可能继续写 checkpoint | Gate 完成后、checkpoint / transition 前再次校验当前 Mission / Scope |
+| SSE checkpoint 与 durable trajectory 各自产生 id/timestamp，实时记录和持久化记录无法一一对应 | 使用同一 checkpoint id/timestamp |
+| 已验证 Claim 没有进入阶段小结 | checkpoint 同时保留 `supported` 与 `verified` Claim |
+| reasoning 日志写失败后仍可能继续返回成功结果 | reasoning 持久化失败现在会被 turn 识别并阻止可靠结果提交 |
+| shutdown 时 pending `ask_user` Promise 可能继续等到超时 | shutdown 主动结束 pending user-input wait |
+| 人工 Workflow transition 被拒绝时只有 UI 错误，没有审计记录 | 增加 rejected transition audit |
+
+这些修复都属于已有 ADR 边界内的实现硬化，没有引入新的 Workflow / Agent / storage abstraction。
+
+
 ---
 
 ## 2026-10-07 后续修复状态
