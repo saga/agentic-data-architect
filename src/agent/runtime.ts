@@ -106,7 +106,7 @@ function adaptInput(
   input: AskInput,
   runtime: AgentRuntime,
   model: string,
-): AskInput {
+): AskInput & { model: string } {
   const inputModel = runtime === 'codebuddy-sdk'
     ? normalizeCodeBuddyModel(input.model)
     : input.model;
@@ -115,13 +115,14 @@ function adaptInput(
     && model === inputModel
     && Boolean(input.sessionId);
 
+  const { sessionId, onSessionId, ...rest } = input;
   return {
-    ...input,
+    ...rest,
     runtime,
     model,
     // A session belongs to one runtime+model selection. A quota fallback starts
     // a fresh session and never persists that fallback session as the preferred runtime.
-    ...(!preserveSession ? { sessionId: undefined, onSessionId: undefined } : {}),
+    ...(preserveSession ? { sessionId, onSessionId } : {}),
   };
 }
 
@@ -137,7 +138,7 @@ async function executeRuntime(
     case 'copilot-sdk':
       return askCopilot(adapted);
     case 'opencode-run':
-      return askOpenCode(adapted);
+      return askOpenCode({ ...adapted, model });
   }
 }
 
@@ -205,7 +206,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
           ? 'CodeBuddy 模型配额已用尽，自动 fallback'
           : 'Agent Runtime 配额已用尽，自动 fallback',
         status: 'info',
-        model: next.model,
+        ...(next.model !== undefined ? { model: next.model } : {}),
         details: {
           fallback: true,
           fromRuntime: attempt.runtime,
