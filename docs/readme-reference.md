@@ -91,14 +91,14 @@ PATCH /api/sessions/:name/workflow
 POST /api/sessions/:name/messages/abort
 GET  /api/sessions/:name/journey
 GET  /api/sessions/:name/workflow
-PUT  /api/sessions/:name/workflow/draft
-POST /api/sessions/:name/workflow/validate
-POST /api/sessions/:name/workflow/apply
+PUT  /api/sessions/:name/workflow
+POST /api/sessions/:name/workflow/ai
+POST /api/sessions/:name/workflow/transition
 POST /api/sessions/:name/workflow/reset
 GET  /api/sessions/:name/workflow/instruction
 GET  /api/sessions/:name/modernization
 GET  /api/sessions/:name/assessment
-GET  /api/sessions/:name/report
+GET  /api/sessions/:name/report  # 返回 ReportArtifactState lifecycle contract
 GET  /api/sessions/:name/audit
 GET  /api/shared
 GET  /api/skills
