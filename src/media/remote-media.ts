@@ -102,7 +102,7 @@ async function resolveWithYtDlp(source: string, kind: RemoteMediaKind): Promise<
   }
 }
 
-async function cacheRemoteResource(cacheKey: string, remoteUrl: string, mimeHint?: string): Promise<{ cachePath: string; mimeType?: string } | undefined> {
+async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: RemoteMediaKind, mimeHint?: string): Promise<{ cachePath: string; mimeType?: string } | undefined> {
   await ensureCacheRoot();
   const target = mediaCacheFile(cacheKey);
   const metadata = mediaCacheMetaFile(cacheKey);
@@ -127,6 +127,9 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, mimeHint
   if (!response.ok || !response.body) return undefined;
 
   const mimeType = response.headers.get('content-type')?.split(';', 1)[0].trim() || mimeHint;
+  if (!mimeType || (kind === 'video' && !mimeType.startsWith('video/')) || (kind === 'image' && !mimeType.startsWith('image/'))) {
+    return undefined;
+  }
   const contentLength = Number(response.headers.get('content-length') || 0);
   if (contentLength > MAX_CACHE_BYTES) return undefined;
 
@@ -170,6 +173,9 @@ export async function resolveAndCacheRemoteMedia(
   }
   if (!/^https?:$/.test(url.protocol)) throw new Error('只支持 HTTP/HTTPS 远程媒体 URL。');
 
+  const resolvedKind: RemoteMediaKind = kind === 'remote' && /\/video\//i.test(url.pathname) && isSupportedSocialMediaPage(normalizedSource)
+    ? 'video'
+    : kind;
   const cacheKey = cacheKeyFor(normalizedSource);
   const existingMeta = await (async () => {
     try {
@@ -184,20 +190,17 @@ export async function resolveAndCacheRemoteMedia(
   let remoteUrl = typeof existingMeta?.source === 'string' ? existingMeta.source : undefined;
   let mimeType = typeof existingMeta?.mimeType === 'string' ? existingMeta.mimeType : undefined;
 
-  const resolved = await resolveWithYtDlp(normalizedSource, kind);
-  remoteUrl = resolved.remoteUrl ?? remoteUrl ?? (looksLikeDirectMedia(normalizedSource, kind) ? normalizedSource : undefined);
+  const resolved = await resolveWithYtDlp(normalizedSource, resolvedKind);
+  remoteUrl = resolved.remoteUrl ?? remoteUrl ?? (looksLikeDirectMedia(normalizedSource, resolvedKind) ? normalizedSource : undefined);
   mimeType = resolved.mimeType ?? mimeType;
 
-  if (!remoteUrl) {
-    // A non-media page needs a resolver. Direct media URL can be used as-is.
-    remoteUrl = normalizedSource;
-  }
-
-  const cached = await cacheRemoteResource(cacheKey, remoteUrl, mimeType);
+  const cached = remoteUrl
+    ? await cacheRemoteResource(cacheKey, remoteUrl, resolvedKind, mimeType)
+    : undefined;
   return {
     source: normalizedSource,
-    kind,
-    remoteUrl,
+    kind: resolvedKind,
+    ...(remoteUrl ? { remoteUrl } : {}),
     cacheKey,
     ...(cached?.cachePath ? { cachePath: cached.cachePath } : {}),
     ...(cached?.mimeType ? { mimeType: cached.mimeType } : {}),
