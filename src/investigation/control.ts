@@ -151,6 +151,29 @@ export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
   return global;
 }
 
+/** 把任务真正改动的字段保存为 sparse override；未改动的 inherited field 不会被旧 Global 值污染。 */
+function mergeTaskAgentOverrides(
+  currentAgent: InvestigationControl['agent'],
+  nextAgent: InvestigationControl['agent'],
+  globalAgent: InvestigationControl['agent'],
+): TaskConfiguration['agent'] {
+  const overrides = extractTaskAgentOverrides(currentAgent, globalAgent) as Record<string, unknown>;
+
+  for (const key of Object.keys(nextAgent) as Array<keyof InvestigationControl['agent']>) {
+    if (key === 'platformCapabilities') continue;
+
+    if (sameValue(currentAgent[key], nextAgent[key])) continue;
+
+    if (sameValue(nextAgent[key], globalAgent[key])) {
+      delete overrides[key];
+    } else {
+      overrides[key] = clone(nextAgent[key]);
+    }
+  }
+
+  return TaskAgentOverrideSchema.parse(overrides);
+}
+
 /** 只把与 Global 不同的 Agent 字段保存到任务 workspace，避免任务复制出一份全局配置。 */
 function extractTaskAgentOverrides(
   agent: InvestigationControl['agent'],
@@ -327,11 +350,11 @@ export async function updateInvestigationControl(
       updatedAt: now,
       research: nextResearch,
       // Only task-specific deviations are persisted. Everything else follows Global.
-      agent: extractTaskAgentOverrides(effectiveAgent, global.agent),
+      agent: mergeTaskAgentOverrides(current.agent, effectiveAgent, global.agent),
       history: [
         ...current.history.map((entry) => ({
           version: entry.version,
-          globalVersion: global.version,
+          globalVersion: entry.globalVersion,
           updatedAt: entry.updatedAt,
           reason: entry.reason,
           snapshot: { research: clone(entry.snapshot.research), agent: clone(entry.snapshot.agent) },
