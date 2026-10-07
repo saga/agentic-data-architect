@@ -384,7 +384,27 @@ function eventDetail(event: TrajectoryEvent) {
 
   if (event.type === 'error') {
     const message = typeof event.details.error === 'string' ? event.details.error : undefined;
-    return message ? <Text type="danger">{message}</Text> : null;
+    if (!message) return null;
+    const stackMarker = '\\n\\nStack:\\n';
+    const [summary, stack] = message.includes(stackMarker)
+      ? message.split(stackMarker, 2)
+      : [message, ''];
+    return (
+      <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+        <Text type="danger">{summary}</Text>
+        {typeof event.details.lastActivity === 'string' ? (
+          <Text type="secondary">失败前最后活动：{event.details.lastActivity}</Text>
+        ) : null}
+        {typeof event.details.elapsedMs === 'number' ? (
+          <Text type="secondary">已运行 {formatDuration(event.details.elapsedMs)}</Text>
+        ) : null}
+        {stack ? (
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: 360, overflow: 'auto' }}>
+            {stack}
+          </pre>
+        ) : null}
+      </Space>
+    );
   }
 
   return null;
