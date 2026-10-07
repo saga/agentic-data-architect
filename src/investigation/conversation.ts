@@ -300,16 +300,44 @@ export function recoverRunningConversationTurns(): number {
 
   return rows.length;
 }
-/** 在确认旧 turn 已无人执行后，把它安全终止，释放重试机会。 */
-export function abortStaleConversationTurn(turnId: string, error = 'The previous process did not complete this turn.'): boolean {
-  const result = getDatabase().prepare(`
-    UPDATE conversation_turns
-    SET status = 'aborted', error = ?, assistant_draft = NULL, updated_at = ?
-    WHERE turn_id = ? AND status = 'running'
-  `).run(error, new Date().toISOString(), turnId);
+/** 在确认旧 turn 已无人执行后，把它安全终止，且保留用户已经看到的 assistant 内容。 */
+export function abortStaleConversationTurn(
+  turnId: string,
+  error = 'The previous process did not complete this turn.',
+): boolean {
+  const db = getDatabase();
+  const row = db.prepare('SELECT session_name, assistant_draft FROM conversation_turns WHERE turn_id = ? AND status = \'running\'')
+    .get(turnId) as { session_name?: unknown; assistant_draft?: unknown } | undefined;
+  if (!row) return false;
+
+  const sessionName = String(row.session_name);
+  const draft = typeof row.assistant_draft === 'string' ? row.assistant_draft.trim() : '';
+  const content = [
+    draft,
+    draft
+      ? '上一进程没有完成这次调查，已经把当时留下的内容保留下来。你可以重新发送一个新问题。'
+      : '上一进程没有完成这次调查，这次请求已经终止。你可以重新发送一个新问题。',
+  ].filter(Boolean).join('\n\n');
+
+  try {
+    saveConversationMessage({
+      id: turnId + ':assistant:failure',
+      sessionName,
+      role: 'assistant',
+      content,
+    });
+  } catch (persistenceError) {
+    console.error('[conversation] Failed to persist stale-turn assistant failure message.', {
+      turnId,
+      sessionName,
+      error: persistenceError,
+    });
+  }
+
+  const result = db.prepare('UPDATE conversation_turns SET status = \'aborted\', error = ?, assistant_draft = NULL, updated_at = ? WHERE turn_id = ? AND status = \'running\'')
+    .run(error, new Date().toISOString(), turnId);
   return Number(result.changes) > 0;
 }
-
 export interface ConversationTurnSummary {
   turnId: string;
   sessionName: string;
