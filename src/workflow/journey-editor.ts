@@ -504,12 +504,12 @@ export async function saveJourneyDefinition(
   const layout = JourneyLayoutSchema.parse(layoutInput);
 
   if (definition.id !== workflowId) {
-    throw new Error('Workflow id 不能修改为另一个工作方式。');
+    throw new Error('不能把当前工作方式改成另一种工作方式。请先选择正确的工作方式。');
   }
 
   const validation = validateJourneyEdit(definition, layout);
   if (validation.issues.length) {
-    throw new Error('Workflow 验证失败：\n' + validation.issues.join('\n'));
+    throw new Error('工作方式检查没有通过：\n' + validation.issues.join('\n'));
   }
 
   const version = await withWorkspaceContextLock(name, async () => {
@@ -831,7 +831,7 @@ export async function applyAgentWorkflowTransition(
     eventWorkflowVersion = execution.workflowVersion;
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (execution.status === 'waiting' || currentNode?.actor === 'human') {
-      throw new Error('当前 Workflow 正在等待人工处理，Agent 不能替代人工推进。');
+      throw new Error('这一步正在等待你的处理，助手不能替你完成。请先完成当前人工步骤。');
     }
 
     const route = currentNode?.routes.find((item) =>
@@ -962,7 +962,7 @@ export async function applyAgentWorkflowTransition(
         latestActive.source !== active.source
         || latestActive.version !== active.version
       ) {
-        throw new Error('Workflow 在 Agent 执行期间发生变化，本次 transition 不再适用。');
+        throw new Error('执行期间工作方式发生了变化，这一步已经失效。请刷新页面后重新选择下一步。');
       }
 
       const latest = await loadJourneyExecution(
@@ -1053,15 +1053,15 @@ export async function applyHumanWorkflowTransition(
     eventRunId = execution.runId;
     eventWorkflowVersion = execution.workflowVersion;
     if (execution.status !== 'waiting') {
-      throw new Error('当前 Workflow 并未等待人工处理。');
+      throw new Error('当前没有需要你处理的人工步骤。');
     }
 
     const currentNode = active.definition.nodes.find((node) => node.id === execution.currentNodeId);
     if (!currentNode || currentNode.actor !== 'human') {
-      throw new Error('当前 Workflow 节点不是人工步骤。');
+      throw new Error('当前步骤不需要人工处理。');
     }
     if (currentNode.id !== nodeId) {
-      throw new Error('提交的人工节点不是当前 waiting 节点。');
+      throw new Error('你提交的步骤已经不是当前等待处理的步骤，请刷新后再试。');
     }
 
     if (outcome === 'approved') {
@@ -1088,7 +1088,7 @@ export async function applyHumanWorkflowTransition(
     await withWorkspaceContextLock(name, async () => {
       const latestActive = await loadActiveJourney(name, workflowId);
       if (latestActive.source !== active.source || latestActive.version !== active.version) {
-        throw new Error('Workflow 在人工处理期间发生变化，本次 transition 不再适用。');
+        throw new Error('你处理期间工作方式发生了变化，这一步已经失效。请刷新页面后重新处理。');
       }
 
       const latest = await loadJourneyExecution(name, latestActive.definition, latestActive.version);
@@ -1097,7 +1097,7 @@ export async function applyHumanWorkflowTransition(
         || latest.workflowVersion !== execution.workflowVersion
         || latest.status !== execution.status
       ) {
-        throw new Error('Workflow 执行状态已变化，请刷新后重新处理。');
+        throw new Error('执行状态已经变化，请刷新页面后重新处理。');
       }
 
       await fs.mkdir(journeyDir(name), { recursive: true });
