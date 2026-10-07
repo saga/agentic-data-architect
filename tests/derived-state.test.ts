@@ -79,6 +79,35 @@ test('assessment requires recommendations and roadmap when findings produce work
   assert.equal(complete.assessmentRoadmapReady, true);
 });
 
+test('modernization readiness is derived from persisted status semantics in one place', () => {
+  const targetOnly = evaluateDerivedState(state({
+    modernization: {
+      targetStatus: 'in_review',
+      targetComponentCount: 2,
+      mappingStatuses: ['proposed'],
+      validationStatuses: [{ status: 'planned', blocking: true }],
+    },
+  }));
+  assert.equal(targetOnly.targetArchitectureReady, true);
+  assert.equal(targetOnly.mappingReady, false);
+  assert.equal(targetOnly.mappingCount, 0);
+  assert.equal(targetOnly.validationReady, false);
+  assert.equal(targetOnly.validationCount, 1);
+
+  const complete = evaluateDerivedState(state({
+    modernization: {
+      targetStatus: 'in_review',
+      targetComponentCount: 2,
+      mappingStatuses: ['reviewed', 'approved'],
+      validationStatuses: [{ status: 'passed', blocking: true }],
+    },
+  }));
+  assert.equal(complete.targetArchitectureReady, true);
+  assert.equal(complete.mappingReady, true);
+  assert.equal(complete.mappingCount, 2);
+  assert.equal(complete.validationReady, true);
+});
+
 test('current data architecture readiness is blocked by missing flow, model, or transformation facts', () => {
   const noFlow = evaluateDerivedState(state({ lineageEdgeCount: 0 }));
   assert.equal(noFlow.currentDataArchitectureReady, false);
