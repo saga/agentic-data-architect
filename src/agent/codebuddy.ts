@@ -68,7 +68,7 @@ function toCodeBuddyMcpServers(
   for (const [configuredName, value] of Object.entries(settings)) {
     if (!value || typeof value !== 'object') continue;
 
-    const server = value as Record<string, unknown>;
+    const server = value as unknown as Record<string, unknown>;
     const name = configuredName.trim();
     if (!name) continue;
 
