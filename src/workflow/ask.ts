@@ -334,6 +334,15 @@ export async function answerQuestion(
           const value = note.trim();
           if (!abortRequestedTurns.has(turnId) && value && value.length <= 120) {
             latestCompanionNote = value;
+            try {
+              await appendTranscript(investigationName, 'assistant', value);
+            } catch (logError) {
+              console.error('[companion-note] Failed to persist visible companion note to transcript.', {
+                sessionName: investigationName,
+                turnId,
+                error: logError,
+              });
+            }
             options.onCompanionNote?.(value);
           }
         } catch (error) {
@@ -1088,6 +1097,7 @@ export async function answerQuestion(
     finishConversationTurn(turnId, 'completed', JSON.stringify(result));
     return result;
   } catch (error) {
+    await reasoningWrite;
     const message = error instanceof Error ? error.message : String(error);
     const activeFailure = activeInvestigationTurns.get(investigationName);
     const detailedError = [
