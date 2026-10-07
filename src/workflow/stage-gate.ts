@@ -268,7 +268,7 @@ export function buildStageCheckpoint(
   const knownEvidence = new Set(input.after.evidenceIds);
   const confirmed = input.parsed.claims
     .filter((claim) =>
-      claim.status === 'supported'
+      (claim.status === 'supported' || claim.status === 'verified')
       && claim.evidenceIds.length > 0
       && claim.evidenceIds.every((id) => knownEvidence.has(id)),
     )
