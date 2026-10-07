@@ -32,6 +32,11 @@ export const UpdateConfigBodySchema = z.object({
   agent: ControlAgentSchema,
 }).strict();
 
+/** 保存工作台级 Global Agent 默认配置；不会修改任何 Investigation 的 Task Override。 */
+export const UpdateGlobalConfigBodySchema = z.object({
+  agent: ControlAgentSchema,
+}).strict();
+
 /** 主对话框修改模型和 Auto 选择方式时使用的轻量请求 Schema。 */
 export const UpdateAgentModelBodySchema = z.object({
   model: z.string().trim().min(1).max(200),
