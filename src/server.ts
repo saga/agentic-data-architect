@@ -1463,14 +1463,6 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     }
 
     const turnId = body.turnId ?? randomUUID();
-    // The user message is durable before Agent execution starts. Even when the Agent
-    // fails during preparation/commit, the conversation must not disappear from the UI.
-    saveConversationMessage({
-      id: turnId + ':user',
-      sessionName: name,
-      role: 'user',
-      content: message,
-    });
 
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
