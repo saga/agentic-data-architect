@@ -114,13 +114,13 @@ Evidence / Tool / Skill
 
 用户输入：
 
-> 分析 IBM 的老系统，给我 replatform 方案。
+> 分析某大型企业的老系统，给我 replatform 方案。
 
 系统会要求先确认：
 
 **任务目的**
 
-> 理解 IBM 老系统当前的数据架构，为 replatform 决策提供依据。
+> 理解某大型企业老系统当前的数据架构，为 replatform 决策提供依据。
 
 **期望结果**
 
