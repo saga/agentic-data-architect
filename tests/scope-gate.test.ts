@@ -59,6 +59,34 @@ test('explicit user-provided scope passes without fabricated evidence', () => {
   );
 
   assert.equal(result.passed, true);
+  assert.ok(validation?.scopeFingerprint);
+});
+
+test('canonical scope identity ignores ordering and rejects legacy validation without a fingerprint', () => {
+  const validation = createUserScopeValidation(
+    '替换老的投票工作流',
+    ['投票结果', 'Proxy Voting'],
+    ['内部持仓系统', 'ISS Portal'],
+  );
+  assert.ok(validation?.scopeFingerprint);
+
+  const result = evaluateInvestigationScopeGate(
+    investigation({
+      scope: ['Proxy Voting', '投票结果'],
+      systems: ['ISS Portal', '内部持仓系统'],
+      scopeValidation: validation,
+    }) as never,
+    new Set(),
+  );
+  assert.equal(result.passed, true);
+
+  const legacy = { ...validation };
+  delete legacy.scopeFingerprint;
+  const legacyResult = evaluateInvestigationScopeGate(
+    investigation({ scopeValidation: legacy }) as never,
+    new Set(),
+  );
+  assert.equal(legacyResult.passed, false);
 });
 
 test('material-backed scope passes only with known evidence', () => {
