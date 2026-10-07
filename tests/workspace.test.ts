@@ -13,6 +13,11 @@ const {
   loadWorkspaceContext,
   redactSensitiveUri,
 } = await import('../src/investigation/workspace.js');
+const {
+  loadInvestigation,
+  saveInvestigation,
+  newInvestigation,
+} = await import('../src/investigation/store.js');
 
 test('redactSensitiveUri never persists database credentials', () => {
   const redacted = redactSensitiveUri(
@@ -53,4 +58,38 @@ test('workspace keeps the confirmed Mission Contract after reload', async () => 
     'data-flow',
     'data-model',
   ]);
+});
+
+
+test('concurrent investigation saves merge facts instead of losing the other snapshot', async () => {
+  const name = 'concurrent-save';
+  await newInvestigation(name, {
+    userPrompt: '并发保存测试',
+    goal: '验证并发保存不会覆盖另一份调查结果',
+  });
+
+  const first = await loadInvestigation(name);
+  const second = await loadInvestigation(name);
+  const makeEvidence = (id: string, source: string) => ({
+    id,
+    type: 'documentation' as const,
+    investigationId: name,
+    discoveryRunId: 'run-1',
+    source,
+    collectedAt: '2026-10-08T00:00:00.000Z',
+  });
+
+  first.evidence.push(makeEvidence('ev-1', 'source-1'));
+  second.evidence.push(makeEvidence('ev-2', 'source-2'));
+
+  await Promise.all([
+    saveInvestigation(first),
+    saveInvestigation(second),
+  ]);
+
+  const merged = await loadInvestigation(name);
+  assert.deepEqual(
+    merged.evidence.map((item) => item.id).sort(),
+    ['ev-1', 'ev-2'],
+  );
 });
