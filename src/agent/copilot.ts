@@ -112,11 +112,6 @@ interface McpAuthRequestParam {
   serverUrl: string;
   reason: string;
 }
-interface UserInputRequestParam {
-  question: string;
-  choices?: string[];
-  allowFreeform?: boolean;
-}
 interface PreToolUseParam {
   toolName: string;
   toolArgs: unknown;
@@ -456,7 +451,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * ask_user 必须由宿主提供异步 handler。
      * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
      */
-    onUserInputRequest: async (request: UserInputRequestParam) => {
+    onUserInputRequest: async (request) => {
       pendingUserInputWaits += 1;
       startUserInputWaitTimeout();
       try {
