@@ -25,7 +25,7 @@ metadata:
 
 ## 第一次进入 Investigation
 
-先在当前 working directory 建立结构图：
+Investigation 进入代码仓库后，宿主运行时会先确保当前 working directory 有一份可查询的 Graphify 结构图。第一次没有 graph 时生成，正式 Discovery 会刷新已有 graph。Skill 自己负责在源码明显变化后按需刷新：
 
 ~~~bash
 graphify extract . --code-only --no-viz
@@ -45,7 +45,7 @@ graphify update . --no-viz
 
 ## 调查方式
 
-Graphify MCP 已作为 'graphify-structural-analysis' 注入当前 Copilot Session。优先使用：
+Graphify MCP 已作为 'graphify-structural-analysis' 注入当前 Agent Runtime。进入 structural-analysis 后，它是第一项结构调查动作；常规 grep / view / bash 只能用于后续源码核对：
 
 - 'query_graph'：按自然语言问题找相关节点和边
 - 'get_node' / 'get_neighbors'：查看一个对象及其直接关系
@@ -81,6 +81,8 @@ Graphify
 不得因为 Graphify 给出了某条 INFERRED 或路径，就把它直接写成 supported、verified 的业务事实。
 
 如果 Graphify 与 Evidence 冲突，以 Evidence 为准，并把冲突作为下一步调查对象。
+
+运行时会检查 structural-analysis 是否先使用 Graphify；如果先调用 grep / glob / view / bash，系统会要求先完成 Graphify 结构查询。精确文本、文件发现、Git 操作等没有进入 structural-analysis 时仍直接使用常规工具。
 
 ## 控制范围
 
