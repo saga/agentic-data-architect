@@ -75,7 +75,7 @@ Task Cache 只用于 Investigation 临时工作，不参与 Global media reuse�
 - 远程 URL 过期或 CORS/网络失败时，头像仍有本地副本可用；
 - Global 修改不会自动覆盖已有 Task override。
 
-代价是增加一个本机 `yt-dlp` 依赖，并需要维护 Global Cache 的磁盘生命周期。
+代价是增加一个本机 `yt-dlp` 依赖，并需要维护 Global Cache 的磁盘生命周期。当前实现对 Global Media Cache 设置 512 MB 总预算，按最近访问时间优先保留，并在本地缓存写入后自动清理超额旧文件。
 
 ## Rejected Alternatives
 
@@ -101,3 +101,12 @@ Rejected。会破坏 ADR-013 的 Isolation，导致一个 Investigation 的配�
 - ADR-004：本地数据存储边界
 - ADR-013：Global Config 与 Task Override 分层
 - ADR-016：API Contract ownership 与 View Model
+
+
+### 6. Local avatar ownership
+
+本地上传的秘书头像只属于当前 Investigation，不再复制到 `.workspace/shared/assistant/default.*` 形成另一条“全局默认头像”路径。跨 Investigation 的远程头像继续由 Global Config + Global Media Cache 管理。
+
+### 7. Remote binding safety
+
+项目默认是个人本机 Agent，Web 服务默认只允许 loopback binding。非 loopback `HOST` 必须显式设置 `ALLOW_REMOTE_HOST=true`，避免默认 Allow All 与远程暴露组合形成意外的高权限网络入口。
