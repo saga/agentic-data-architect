@@ -16,6 +16,9 @@
 5. `/journey` 是现有路由入口，但返回的就是 canonical `WorkflowSnapshot`；它不是第二套 Journey response，也不承担兼容语义。
 6. Workflow node、actor、status、route 等核心枚举由 canonical contract 定义。
 
+
+运行态可视化与历史回放只使用 `WorkflowSnapshot.events` 重建 `JourneyExecution`，不得自行维护第二套执行历史。动画属于 UI projection，不改变 Workflow Definition 或 runtime truth。
+
 ## Consequences
 
 - Workflow Editor、Context Panel 和 transition 使用同一运行状态。
