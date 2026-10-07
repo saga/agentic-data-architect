@@ -43,13 +43,14 @@ CodeBuddy 通过 `@tencent-ai/agent-sdk` 的 `query()` 使用：
 
 - Investigation workspace 作为 `cwd`；
 - 当前模型；
-- `bypassPermissions` 与宿主 Mission Action Gate；
+- `bypassPermissions` 仅用于安全的 Investigation capability allowlist；产品层 `allow_all` 不能扩大 CodeBuddy capability；宿主 Mission Action Gate 仍负责业务动作边界；
+- built-in tools 仅允许 `Read` / `Glob` / `Grep` / `AskUserQuestion` / `Skill`；禁止 `Write` / `Edit` / `Bash` / `Task` 等宿主修改/执行能力；
 - Investigation MCP 和 Graphify MCP；
 - 现有 Workbench custom tools 通过 CodeBuddy SDK `createSdkMcpServer` / `tool` 暴露为 in-process MCP，不复制业务 tool implementation；
 - `query({ resume: sessionId })` 用于同一 Runtime/model 的连续阶段；
 - 由宿主组合的 Mission / system / Workflow prompt；system prompt 使用 SDK `systemPrompt`，而不是把宿主规则伪装成用户消息。
 
-SDK 的默认 filesystem isolation 保持，不自动加载用户或项目的 CodeBuddy settings；避免第二套 Skills / MCP / permission source 改变本项目控制边界。
+SDK 的默认 filesystem isolation 保持，不自动加载用户或项目的 CodeBuddy settings；另外由应用层显式限制 built-in tool 和 workspace path，避免第二套 Skills / MCP / permission source 改变本项目控制边界。完整 authority boundary 见 ADR-031。
 
 ### 4. CodeBuddy model configuration
 
