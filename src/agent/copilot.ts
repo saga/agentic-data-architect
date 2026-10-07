@@ -57,8 +57,9 @@ export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
   if (starting) return starting;
   starting = (async () => {
-    // 所有 Investigation 共用这个应用自己的 Copilot 运行目录，具体 Session 再由 SDK 按 sessionId 分目录保存。
-    const copilotBaseDirectory = path.join(config.workspaceDir, 'copilot');
+    // Copilot SDK 的运行数据与 Investigation workspace 分开，避免 SDK 自己的日志/状态被当成调查目录。
+    const copilotBaseDirectory = path.join(config.dataDir, 'copilot');
+
     await fs.mkdir(copilotBaseDirectory, { recursive: true });
 
     const c = new CopilotClient({
