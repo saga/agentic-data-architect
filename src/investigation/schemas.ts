@@ -328,6 +328,7 @@ export const InvestigationControlBaseSchema = z.object({
 
 const ControlHistoryEntrySchema = z.object({
   version: z.number().int().positive(),
+  globalVersion: z.number().int().positive(),
   updatedAt: z.string().min(1),
   reason: z.string(),
   snapshot: InvestigationControlBaseSchema,
