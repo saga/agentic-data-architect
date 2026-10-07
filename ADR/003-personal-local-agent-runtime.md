@@ -17,8 +17,8 @@
 - 当前可用 runtime 包括 Copilot SDK、CodeBuddy SDK 和 OpenCode Run；
 - runtime 只负责模型会话、工具执行和 provider-specific execution，不拥有 Investigation 的业务状态；
 - OpenCode model 统一通过官方 `opencode run` headless CLI 执行，不直接通过 `opencode serve` HTTP API 驱动模型；
-- capability Skill 由 Agent 根据任务自动发现；
-- Workflow Skill 只有在用户明确选择工作路线后才作为当前路线预加载；
+- capability Skill 由 Agent 根据任务自动发现：Copilot 使用 `skillDirectories`，CodeBuddy / OpenCode 使用当前 workspace 下的标准 `.agents/skills` bridge；
+- Workflow Skill 只有在用户明确选择工作路线后才作为当前路线预加载；非 Copilot Runtime 只暴露当前 Workflow，避免多条路线同时进入 Agent 的 Skill catalog。
 - 用户主动接入的额外 MCP 才写入 Investigation control。
 
 配置页用于调整 Investigation 的输入和用户选择，而不是让用户每次手工组装一个 Agent。
