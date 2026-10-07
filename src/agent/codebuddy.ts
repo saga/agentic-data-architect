@@ -22,7 +22,7 @@ import * as z from 'zod';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requestAgentUserInput } from './user-input-bridge.js';
 import { createLocalDataTools } from './local-data-tools.js';
-import type { AskInput } from './copilot.js';
+import type { AskInput } from './ask-input.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
 
