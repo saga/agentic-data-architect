@@ -416,6 +416,9 @@ export async function getJourneySnapshot(
   name: string,
   workflowId: WorkflowId,
 ): Promise<JourneySnapshot> {
+  // Definition、layout、execution 和 deterministic auto-advance 必须作为一个只读视图读取。
+  // saveJourneyDefinition 同样持有这个锁，因此不会在五份文件更新到一半时读到混合版本。
+  return withWorkspaceContextLock(name, async () => {
   const active = await loadActiveJourney(name, workflowId);
   const execution = await loadJourneyExecution(name, active.definition, active.version);
   const facts = await buildJourneyFacts(name);
@@ -432,20 +435,13 @@ export async function getJourneySnapshot(
       !== JSON.stringify(execution.pendingInteraction ?? null);
 
   if (executionChanged) {
-    const persisted = await withWorkspaceContextLock(name, async () => {
-      const latest = await loadJourneyExecution(name, active.definition, active.version);
-      if (
-        latest.currentNodeId !== execution.currentNodeId
-        || latest.workflowVersion !== execution.workflowVersion
-      ) {
-        return false;
-      }
+    const latest = await loadJourneyExecution(name, active.definition, active.version);
+    if (
+      latest.currentNodeId === execution.currentNodeId
+      && latest.workflowVersion === execution.workflowVersion
+    ) {
       await fs.mkdir(journeyDir(name), { recursive: true });
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), state.execution);
-      return true;
-    });
-
-    if (persisted) {
       await appendDeterministicAdvanceEvents(name, execution, state.execution);
     }
   }
@@ -466,6 +462,7 @@ export async function getJourneySnapshot(
       stages: state.stages,
     },
     events,
+  });
   });
 }
 
