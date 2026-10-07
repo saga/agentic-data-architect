@@ -27,7 +27,7 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 - 持续 Investigation session 和可恢复 Copilot session
 - `.workspace/<session>/context.json` 持久化 goal、scope、evidence、claims、findings、unknowns 等调查状态
 - `.workspace/conversations.db` 持久化 user / assistant / system 消息，并使用 SQLite FTS5 建立全文索引
-- Copilot SDK 从 `skills/` 发现和加载 Skill；每个 Investigation 通过 `control.json` 选择启用哪些 Skill，未选择的 Skill 会显式禁用
+- Copilot SDK 从 `skills/` 自动发现 capability Skill；当前 Investigation 只通过 `workflow` 选择一条 Workflow Skill，其它 Workflow Skill 会被禁用，不能通过 `control.json` 再组装一套 Skill enable list
 - 金融领域检查放在 `skills/financial-data-review/`，其中 deterministic 检查放在 `scripts/review.mjs`
 - `.workspace/shared/index.json` 和共享研究资料
 - 本地 SQL / PostgreSQL / Snowflake discovery
@@ -85,7 +85,7 @@ UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查�
 - 工作方式
 - 版本历史
 
-Skill 可以保存本次 Investigation 的运行参数。MCP 可以配置连接方式、URL / command、args、允许使用的 tools 和 headers。MCP 工具每次真正执行时的 input 仍由 Agent 根据任务决定，不作为静态配置。
+Task Control 保存本次 Investigation 的研究参数和显式 Agent override。Capability Skill 不进入 Task enable list；Workflow Skill 由 `workflow` 状态决定。MCP 可以配置连接方式、URL / command、args、允许使用的 tools 和 headers，MCP 工具每次真正执行时的 input 仍由 Agent 根据任务决定。
 
 工作方式属于危险操作：目标路线可以选择，但只有明确输入确认语句后才真正切换。
 
@@ -210,7 +210,7 @@ Data Architecture Assessment 当前由 `src/workflow/assessment.ts` 生成轻量
 ### Modernization Journey
 
 工作地图现在既是导航视图，也是 Investigation Workflow 的编辑入口。当前实现：
-- 主对话区继续使用 `context.journeyPlan.routes` 作为 Agent 的临时调查建议；这些建议不直接改变 Workflow 状态。
+- 主对话区继续使用 `context.journeyPlan.routes` 作为 Agent 的临时调查建议；这些建议不直接改变 Workflow 状态。真正的 Workflow runtime 只由 `WorkflowSnapshot.execution` 表示，Modernization / Assessment artifact 不再保存自己的 Journey state。
 - 完整工作地图使用 AntV X6 展示 Workflow Definition、执行状态、分支和结构问题。
 - 工作地图可以直接拖拽节点、添加步骤、连接/重新连接分支、编辑节点和分支属性，并通过 AI 提出 Workflow Patch。
 - 右侧栏使用 Ant Design Tabs，在“属性”和“AI”之间切换，避免属性表单与 AI 对话同时挤占空间。
@@ -254,7 +254,7 @@ skills/legacy-modernization/SKILL.md
 - Agent：根据证据选择调查动作并解释结果。
 - Human：确认业务定义、范围和例外。
 
-Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评。当前 Gate 不使用任意 lineage 百分比或 Unknown 数量阈值；Source-of-Truth 候选、Semantic Candidate 也只是调查辅助。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；Legacy Modernization 的完整方案通过 `GET /api/sessions/:name/modernization` 提供，Data Architecture Assessment 的评估结果通过 `GET /api/sessions/:name/assessment` 提供。
+Journey 状态由 `src/workflow/journey.ts` 根据确定性事实计算，不依赖 Agent 自评；Mission Progress、Workflow completion、Result Gate 共用 `src/workflow/derived-state.ts` 的 canonical evaluator。当前 Gate 不使用任意 lineage 百分比或 Unknown 数量阈值；Source-of-Truth 候选、Semantic Candidate 也只是调查辅助。当前路线通过 `GET /api/sessions/:name/journey` 提供给 UI；Legacy Modernization 的完整方案通过 `GET /api/sessions/:name/modernization` 提供，Data Architecture Assessment 的评估结果通过 `GET /api/sessions/:name/assessment` 提供。
 
 Markdown Workflow 的基本检查可以运行：
 
