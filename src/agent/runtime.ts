@@ -19,6 +19,18 @@ function runtimeFromModel(model: string | undefined): AgentRuntime | undefined {
   return undefined;
 }
 
+function runtimeLabel(value: AgentRuntime): string {
+  return value === 'codebuddy-sdk' ? 'CodeBuddy' : value === 'copilot-sdk' ? 'Copilot' : 'OpenCode';
+}
+
+function resolvedModelCallName(input: AskInput): string {
+  if (input.modelCallName?.trim()) return input.modelCallName.trim();
+  if (input.responseSchema) return '结构化判断';
+  if (input.purpose === 'review') return '辅助判断';
+  if (input.purpose === 'journey-map') return '生成工作地图';
+  return '主调查';
+}
+
 function isQuotaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /\b(?:quota|rate[-\s]?limit|resource\s+exhausted|credits?\s+(?:exhausted|depleted))\b/i.test(message)
@@ -202,9 +214,41 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
     const model = attempt.model;
     if (!model) continue;
 
+    const callName = resolvedModelCallName(input);
+    const runtimeName = runtimeLabel(attempt.runtime);
+    const callStartedAt = Date.now();
+    input.onTrajectory?.({
+      type: 'status',
+      name: callName + '正在调用模型',
+      status: 'started',
+      model,
+      details: { runtime: attempt.runtime, purpose: input.purpose ?? 'investigation', ...(input.responseSchema ? { structuredOutput: true } : {}) },
+    });
+
     try {
-      return await executeRuntime(attempt.runtime, input, model);
+      const result = await executeRuntime(attempt.runtime, input, model);
+      if (attempt.runtime !== 'copilot-sdk') {
+        input.onTrajectory?.({
+          type: 'model_call',
+          name: callName + '（' + runtimeName + '）',
+          status: 'completed',
+          durationMs: Math.max(0, Date.now() - callStartedAt),
+          model,
+          details: {},
+        });
+      }
+      return result;
     } catch (error) {
+      if (attempt.runtime !== 'copilot-sdk') {
+        input.onTrajectory?.({
+          type: 'model_call',
+          name: callName + '（' + runtimeName + '）',
+          status: 'failed',
+          durationMs: Math.max(0, Date.now() - callStartedAt),
+          model,
+          details: {},
+        });
+      }
       if (!isQuotaError(error) || index === attempts.length - 1) {
         throw error;
       }
