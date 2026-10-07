@@ -19,6 +19,7 @@ import {
   RequestValidationError,
   UserInputResponseBodySchema,
   UpdateConfigBodySchema,
+  UpdateGlobalConfigBodySchema,
   UpdateAgentModelBodySchema,
   UpdateMissionBodySchema,
   UpdateWorkflowBodySchema,
@@ -353,6 +354,13 @@ app.get('/api/health', (_req, res) => {
   /** 返回工作台级 Global Agent 配置；与任何 Investigation 无关。 */
   app.get('/api/config/global', async (_req, res) => {
     res.json(GlobalConfigurationResponseSchema.parse({ configuration: await loadGlobalConfiguration() }));
+  });
+
+  /** 更新工作台级 Global Agent 默认配置；Task Override 不会被强制修改。 */
+  app.put('/api/config/global', async (req, res) => {
+    const body = parseRequest(UpdateGlobalConfigBodySchema, req.body);
+    const configuration = await updateGlobalConfiguration(body.agent);
+    res.json(GlobalConfigurationResponseSchema.parse({ configuration }));
   });
 
   /** 解析远程图片/视频并预热 Global Cache。 */
