@@ -61,14 +61,16 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
 
   const metaRaw = await readOptional(reportMetadataFile(name));
   if (metaRaw === null) {
-    return ReportArtifactStateSchema.parse({ status: 'stale' });
+    // Older workspaces may contain a valid report.md without provenance metadata.
+    // Keep that report readable, but mark it stale until regeneration publishes metadata.
+    return ReportArtifactStateSchema.parse({ status: 'stale', markdown });
   }
 
   let metadata: ReportMetadata;
   try {
     metadata = ReportMetadataSchema.parse(JSON.parse(metaRaw));
   } catch {
-    return ReportArtifactStateSchema.parse({ status: 'error' });
+    return ReportArtifactStateSchema.parse({ status: 'error', markdown });
   }
 
   const investigation = await loadInvestigation(name);
