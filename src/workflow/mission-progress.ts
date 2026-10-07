@@ -286,6 +286,7 @@ export async function buildMissionProgress(
     findings: investigation.findings,
   });
   const derived = evaluateDerivedState({
+    goal: investigation.goal || investigation.userPrompt,
     currentState: signals.currentState,
     estateColumnCount: signals.estateColumnCount,
     sourceOfTruthCandidateCount: signals.sourceOfTruthCount,
