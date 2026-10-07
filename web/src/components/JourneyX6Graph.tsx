@@ -677,8 +677,8 @@ export function JourneyX6Graph({
         name: 'block',
         width: selected ? 10 : 8,
         height: selected ? 7 : 6,
-        fill: stroke,
-        stroke,
+        fill: style.stroke,
+        stroke: style.stroke,
       });
       cell.attr('line/strokeDasharray', active ? '10 7' : kind === 'retry' ? '7 5' : undefined);
       cell.setProp('className', active ? 'journey-flow-edge-active' : '');
