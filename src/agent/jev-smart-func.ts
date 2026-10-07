@@ -14,6 +14,7 @@
  */
 import * as z from 'zod';
 import { askAgentWithFallback } from './runtime.js';
+import type { AskInput } from './copilot.js';
 import { config } from '../config.js';
 
 /** 有界分类问题：从明确的候选项里选一个。 */
@@ -93,7 +94,8 @@ export interface MissionAlignmentInput {
   candidate: string;
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;
+  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 /** Mission 行动前检查结果；只回答“这个动作该不该现在做”。 */
@@ -119,7 +121,8 @@ export interface MissionActionInput {
   };
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;
+  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 /** Unknown 不再只是文字；结构化判断明确它是否影响 Mission，以及谁能解决。 */
@@ -141,7 +144,8 @@ export interface MissionUnknownInput {
   unknowns: string[];
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;
+  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 export interface JevSmartFuncInput {
@@ -159,7 +163,8 @@ export interface JevSmartFuncInput {
   /** 这次判断在人类可读轨迹中的名称。 */
   modelCallName?: string;
   /** 让 Smart Function 在正确的工作目录运行；默认使用应用 workspace。 */
-  workingDirectory?: string;
+  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 const probabilitySchema = z.array(
@@ -800,6 +805,7 @@ export async function jevSmartFunc(
     model: input.model ?? config.model,
     modelCallName: input.modelCallName,
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
+    onTrajectory: input.onTrajectory,
     autoContinuationTurns: 0,
     responseSchema,
   });
