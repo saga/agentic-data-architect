@@ -57,7 +57,7 @@ test('outer investigation failures are persisted as detailed trajectory errors',
   const workflow = await fs.readFile(new URL('../src/workflow/ask.ts', import.meta.url), 'utf8');
   assert.match(workflow, /type: 'error'/);
   assert.match(workflow, /name: 'Investigation 执行失败：' \+ message/);
-  assert.match(workflow, /stack: error\.stack/);
+  assert.match(workflow, /Stack:\\n' \+ error\.stack/);
   assert.match(workflow, /await trajectoryWrite/);
   assert.match(workflow, /investigation\.execution_failed/);
 });
