@@ -60,7 +60,8 @@ export function respondToAgentUserInput(
   if (!entry || entry.sessionName !== sessionName || entry.turnId !== turnId) return false;
   const value = answer.trim();
   if (!value) return false;
-  if (!wasFreeform && !entry.choices.includes(value)) return false;
+  if (wasFreeform && !entry.allowFreeform) return false;
+  if (!wasFreeform && entry.choices.length > 0 && !entry.choices.includes(value)) return false;
 
   pending.delete(requestId);
   entry.onAnswered?.({ answer: value, wasFreeform });
