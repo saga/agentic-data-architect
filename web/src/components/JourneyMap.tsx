@@ -172,15 +172,17 @@ export function JourneyMap(props: JourneyMapProps) {
                   {dirty ? <Tag color="orange">有未保存修改</Tag> : null}
                   <Tag
                     color={
-                      snapshot.execution.status === 'waiting' ? 'blue' : undefined
+                      replayMode
+                        ? 'purple'
+                        : snapshot.execution.status === 'waiting' ? 'blue' : undefined
                     }
                   >
-                    {snapshot.execution.status === 'waiting'
-                      ? '等待人工'
-                      : snapshot.execution.status === 'completed'
-                        ? '已完成'
-                        : false
-                          ? '已停止'
+                    {replayMode
+                      ? '回放中'
+                      : snapshot.execution.status === 'waiting'
+                        ? '等待人工'
+                        : snapshot.execution.status === 'completed'
+                          ? '已完成'
                           : '运行中'}
                   </Tag>
                 </Flex>
@@ -382,7 +384,7 @@ export function JourneyMap(props: JourneyMapProps) {
             <Flex align="center" gap={8} wrap>
               <Text strong>{displayedNode?.title ?? currentStage?.title ?? '当前步骤'}</Text>
               <Tag variant="filled">
-                {completedCount}/
+                {(displayedExecution?.completedNodeIds.length ?? completedCount)}/
                 {Math.max(
                   currentDefinition?.nodes.length ?? 0,
                   1,
@@ -396,7 +398,11 @@ export function JourneyMap(props: JourneyMapProps) {
 
             <Space size={12}>
               <Text type="secondary">Cmd/Ctrl + S 保存</Text>
-              {snapshot.execution.status === 'completed' ? (
+              {replayMode ? (
+                <Tag color="purple" variant="filled">
+                  正在回放历史轨迹
+                </Tag>
+              ) : snapshot.execution.status === 'completed' ? (
                 <Tag color="green" variant="filled">
                   这条路线已经走完
                 </Tag>
