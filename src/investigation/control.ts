@@ -217,6 +217,7 @@ function resolveTaskConfiguration(task: TaskConfiguration, global: GlobalConfigu
     agent,
     history: task.history.map((entry) => ({
       version: entry.version,
+      globalVersion: entry.globalVersion,
       updatedAt: entry.updatedAt,
       reason: entry.reason,
       snapshot: {
