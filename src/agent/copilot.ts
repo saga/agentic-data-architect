@@ -10,7 +10,15 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
-import { assertGraphifyRuntimeAvailable, buildGraphifyMcpServer, prepareGraphifyEnvironment } from '../adapters/graphify.js';
+import {
+  assertGraphifyRuntimeAvailable,
+  buildGraphifyMcpServer,
+  ensureGraphifyGraph,
+  GRAPHIFY_MCP_NAME,
+  isGraphifyTool,
+  prepareGraphifyEnvironment,
+  GRAPHIFY_SELECTION_INSTRUCTION,
+} from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
@@ -444,10 +452,11 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
   const graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
+  let graphifyRuntime: Awaited<ReturnType<typeof ensureGraphifyGraph>> | undefined;
   if (graphifyEnabled) {
-    // 把项目 .venv/bin 放进 PATH，让 Skill 中的 graphify 命令与 MCP 使用同一份依赖。
     prepareGraphifyEnvironment();
     assertGraphifyRuntimeAvailable();
+    graphifyRuntime = await ensureGraphifyGraph(workingDirectory, false);
   }
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
@@ -465,6 +474,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // 当前自动续跑阶段；onPreToolUse 会读取它，不需要把 execution 泄漏到 SDK Session 状态。
   let currentExecution = 0;
   let missionActionReviewedExecution = -1;
+  let graphifyRequiredExecution = -1;
+  let graphifyUsedExecution = -1;
 
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
@@ -491,25 +502,63 @@ export async function askCopilot(input: AskInput): Promise<string> {
       });
       return { kind: 'cancelled' as const };
     },
-    ...(input.missionActionGate ? {
+    ...((input.missionActionGate || graphifyEnabled) ? {
       hooks: {
-        /**
-         * 第一项实质工具动作执行前做一次 Mission Action Review。
-         *
-         * 同一阶段后续的 grep / view / bash 等操作不重复调用模型；
-         * 阶段结束后再由 Stage Gate 检查实际产物，避免额外成本变成另一种循环。
-         */
         onPreToolUse: async (toolInput: PreToolUseParam) => {
+          const argsText = (() => {
+            try { return JSON.stringify(toolInput.toolArgs ?? ''); } catch { return String(toolInput.toolArgs ?? ''); }
+          })();
+
+          if (graphifyEnabled && toolInput.toolName === 'skill' && /structural-analysis/i.test(argsText)) {
+            graphifyRequiredExecution = currentExecution;
+            graphifyUsedExecution = -1;
+            input.onTrajectory?.({
+              type: 'status',
+              name: '已启用结构分析，先查看代码关系',
+              status: 'started',
+              details: { execution: currentExecution, capability: GRAPHIFY_MCP_NAME },
+            });
+            return;
+          }
+
+          if (graphifyEnabled && isGraphifyTool({
+            toolName: toolInput.toolName,
+            mcpServerName: (toolInput.toolArgs as Record<string, unknown> | undefined)?.mcpServerName,
+            mcpToolName: (toolInput.toolArgs as Record<string, unknown> | undefined)?.mcpToolName,
+          })) {
+            graphifyUsedExecution = currentExecution;
+          }
+
+          if (graphifyEnabled
+            && graphifyRequiredExecution === currentExecution
+            && graphifyUsedExecution !== currentExecution
+            && /^(grep|glob|view|bash)$/i.test(toolInput.toolName)
+            && !/graphify/i.test(argsText)) {
+            input.onTrajectory?.({
+              type: 'status',
+              name: '先用 Graphify 查看代码关系',
+              status: 'info',
+              details: { execution: currentExecution, blockedTool: toolInput.toolName },
+            });
+            return {
+              permissionDecision: 'deny',
+              permissionDecisionReason: '这次问题需要先用 Graphify 查看代码关系。',
+              additionalContext: [
+                '这次问题已经进入结构分析。',
+                '先调用 Graphify 找到调用链、依赖、上下游或路径，再使用 grep/view/bash 核对原始源码。',
+                '不要用多个文本搜索替代 Graphify 的结构查询。',
+              ].join('\\n'),
+            };
+          }
+
           if (!shouldCheckMissionAction(toolInput.toolName)) return;
           if (missionActionReviewedExecution === currentExecution) return;
-
           const decision = await input.missionActionGate?.({
             execution: currentExecution,
             toolName: toolInput.toolName,
             toolArgs: toolInput.toolArgs,
           });
           if (!decision) return;
-
           if (decision.allowed) {
             missionActionReviewedExecution = currentExecution;
             input.onTrajectory?.({
@@ -524,18 +573,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
             });
             return { permissionDecision: 'allow' };
           }
-
           input.onTrajectory?.({
             type: 'status',
             name: 'Mission 行动被拦截',
             status: 'info',
-            details: {
-              execution: currentExecution,
-              toolName: toolInput.toolName,
-              reason: decision.reason,
-            },
+            details: { execution: currentExecution, toolName: toolInput.toolName, reason: decision.reason },
           });
-
           return {
             permissionDecision: 'deny',
             permissionDecisionReason: decision.reason,
@@ -543,7 +586,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
               '这个工具动作被 Mission Action Gate 拦截。',
               '不要重复执行同一个动作，也不要为了完成“继续调查”而随便换一个无关工具。',
               '重新回到 Mission，选择直接服务某个尚未解决交付物、且现在确有必要的动作。',
-            ].join('\n'),
+            ].join('\\n'),
           };
         },
       },
@@ -845,6 +888,20 @@ export async function askCopilot(input: AskInput): Promise<string> {
       },
     });
   });
+  if (graphifyRuntime) {
+    input.onTrajectory?.({
+      type: 'status',
+      name: 'Graphify 结构图已准备好',
+      status: 'completed',
+      details: {
+        capability: GRAPHIFY_MCP_NAME,
+        graphPath: graphifyRuntime.graphPath,
+        ...(graphifyRuntime.packageVersion ? { packageVersion: graphifyRuntime.packageVersion } : {}),
+        ...(graphifyRuntime.graphHash ? { graphHash: graphifyRuntime.graphHash } : {}),
+      },
+    });
+    input.onStatus?.('代码结构已经准备好；需要看调用关系时，助手会先使用 Graphify。');
+  }
   const offToolStart = session.on('tool.execution_start', (e) => {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : toolName;
@@ -852,7 +909,17 @@ export async function askCopilot(input: AskInput): Promise<string> {
     toolCallCount += 1;
     trajectoryToolStarts.set(toolCallId, { startedAt, name: toolName || '工具调用' });
     markActivity('tool_call', '正在调用工具 ' + (toolName || '工具'));
-    input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
+    const graphifyToolCall = isGraphifyTool({
+      toolName,
+      mcpServerName: e.data.mcpServerName,
+      mcpToolName: e.data.mcpToolName,
+    });
+    if (graphifyToolCall) graphifyUsedExecution = currentExecution;
+    input.onStatus?.(
+      graphifyToolCall
+        ? '助手正在用 Graphify 查看代码结构，请稍候…'
+        : toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…',
+    );
     void runRecorder?.write('tool_call', {
       toolCallId,
       toolName,
