@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Tag, Typography } from 'antd';
-import { CopyOutlined, FileTextOutlined, LoadingOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
+import { CopyOutlined, FileTextOutlined, LoadingOutlined, NodeIndexOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import type { ExecutionStatus, SessionData } from '../app/types';
 
 const { Text } = Typography;
@@ -13,6 +13,7 @@ export function InvestigationTopbar(props: {
   executionStatusText: (status: ExecutionStatus) => string;
   onCopyConversation: () => void;
   onOpenResults: () => void;
+  onOpenJourney: () => void;
   onOpenTrajectory: () => void;
   onOpenConfig: () => void;
   onOpenUnknowns: () => void;
@@ -42,6 +43,9 @@ export function InvestigationTopbar(props: {
           </Button>
           <Button type="text" size="small" icon={<FileTextOutlined />} onClick={props.onOpenResults}>
             调查结果
+          </Button>
+          <Button type="text" size="small" icon={<NodeIndexOutlined />} onClick={props.onOpenJourney}>
+            工作地图
           </Button>
           <Button type="text" size="small" icon={<ToolOutlined />} onClick={props.onOpenTrajectory}>
             Agent 轨迹
