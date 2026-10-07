@@ -400,9 +400,11 @@ export function InvestigationChatPanel(props: {
                     value: model.id,
                     label: model.id === 'auto'
                       ? 'Auto（自动选择模型）'
-                      : model.runtime === 'opencode' || model.id.startsWith('opencode:')
-                        ? (model.name || model.id) + '（本机）'
-                        : model.name || model.id,
+                      : model.runtime === 'codebuddy' || model.id.startsWith('codebuddy:')
+                        ? (model.name || model.id) + '（CodeBuddy）'
+                        : model.runtime === 'opencode' || model.id.startsWith('opencode:')
+                          ? (model.name || model.id) + '（OpenCode）'
+                          : model.name || model.id,
                   }))}
                   onChange={(model) =>
                     void props.updateModelSettings(
