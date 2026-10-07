@@ -139,8 +139,13 @@ async function executeRuntime(
       return askCodeBuddy(adapted, model);
     case 'copilot-sdk':
       return askCopilot(adapted);
-    case 'opencode-run':
-      return askOpenCode({ ...adapted, model });
+    case 'opencode-run': {
+      const workingDirectory = adapted.workingDirectory;
+      if (!workingDirectory) {
+        throw new Error('OpenCode 运行时需要 workingDirectory。');
+      }
+      return askOpenCode({ ...adapted, model, workingDirectory });
+    }
   }
 }
 
