@@ -26,6 +26,7 @@ import {
 } from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
+import { appendAuditEvent } from '../investigation/control.js';
 import * as z from 'zod';
 
 export interface OpenCodeModelOption {
@@ -456,6 +457,25 @@ async function consumeOpenCodeEvents(
           // 只记录、不 throw：本轮成败以 message 接口的返回为准；
           // 这里抛错只会变成后台任务的 unhandled rejection 崩掉服务进程。
           readerState.sessionError = message;
+          console.error('[opencode] Provider session error.', {
+            investigationName: input.investigationName,
+            turnId: input.turnId,
+            sessionId,
+            error: message,
+          });
+          if (input.investigationName) {
+            void appendAuditEvent(input.investigationName, {
+              actor: 'system',
+              action: 'agent.provider.error',
+              summary: 'OpenCode Provider 返回执行错误。',
+              details: { turnId: input.turnId, sessionId, error: message },
+            }).catch((auditError) => {
+              console.error('[opencode] Failed to persist provider error audit.', {
+                investigationName: input.investigationName,
+                error: auditError,
+              });
+            });
+          }
           input.onStatus?.('OpenCode 这次遇到问题：' + message);
           input.onTrajectory?.({
             type: 'error',
