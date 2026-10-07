@@ -173,10 +173,10 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
 
   add(
     '阶段成果与 Mission 对齐',
-    input.missionAlignment?.aligned ?? true,
+    input.missionAlignment?.aligned === true,
     input.missionAlignment
       ? input.missionAlignment.reason
-      : 'Smart Function 暂时不可用；本项不单独阻断，继续由确定性结果判断。',
+      : 'Mission Alignment 暂时不可用；这个检查无法通过。',
   );
 
   add(
