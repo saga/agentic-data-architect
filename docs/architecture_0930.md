@@ -505,11 +505,11 @@ Agent 不把整个聊天历史重新塞进每轮 prompt；当前实现只按问�
 
 早期设计阶段的仓库很小，但当前 `main` 已经完成 V1.1 Current-State Discovery 可靠闭环。后续设计必须以当前实现为基线，而不是继续按最初的 skeleton 假设来设计。
 
-我还针对 8 个方向做了资料检索，并重点核查了 AWS、EY、Databricks、dbt、Snowflake、OpenLineage、EDM Council/FIBO，以及复杂企业中的参考数据、主数据、effective-dated 数据实践。比较明显的一条主线是：
+我还针对 8 个方向做了资料检索，并重点核查了公开云架构、legacy modernization、数据建模、lineage、semantic layer 和 effective-dated data 实践。比较明显的一条主线是：
 
 > **这个项目不应该做成“会聊天的 Data Architect”，而应该做成一个以 Evidence、Metadata、Lineage、Data Profiling 和 Deterministic Validation 为基础，由 AI Agent 负责理解、推理、设计和解释的 Data Modernization Workbench。**
 
-EY 在 2026 年公开的 legacy ETL AI 实践已经非常接近这个方向：先重建 data flow，再解析异构代码，再让 LLM 理解业务逻辑，最后用独立 validation engine 检查 AI 输出，而不是让 LLM 直接“猜”整个系统。（公开行业实践资料）
+公开的 legacy ETL AI 实践已经非常接近这个方向：先重建 data flow，再解析异构代码，再让 LLM 理解业务逻辑，最后用独立 validation engine 检查 AI 输出，而不是让 LLM 直接“猜”整个系统。（公开行业实践资料）
 
 ---
 
@@ -624,7 +624,7 @@ Finding / Design / Explanation
 Deterministic validation
 ```
 
-EY 2026 年公开的 legacy ETL AI 方法就是类似结构：inventory → code extraction → parsing → data-flow reconstruction → LLM interpretation → quality validation → documentation。（公开行业实践资料）
+公开的 legacy ETL AI 方法就是类似结构：inventory → code extraction → parsing → data-flow reconstruction → LLM interpretation → quality validation → documentation。（公开行业实践资料）
 
 这比“RAG + ChatGPT 问数据”重要得多。
 
@@ -2763,11 +2763,10 @@ Evidence
                  Human Decision
 ```
 
-这套结构和当前行业实践的交集比较大：AWS 强调 progressive discovery、metadata 和 high-confidence assessment；EY 已经把 legacy ETL 的 AI 分析做成“flow reconstruction + parsing + LLM interpretation + validation”；Databricks/OpenLineage 强调可追踪的 lineage；dbt/Snowflake 都把 business semantics 往数据建模层推进；行业参考 vocabulary 则可以提供机器可读的业务语义参考。([AWS Documentation][12])
+这套结构和当前行业实践的交集比较大：公开云架构资料强调 progressive discovery、metadata 和 high-confidence assessment；公开的 legacy ETL AI 实践采用“flow reconstruction + parsing + LLM interpretation + validation”；数据 lineage 标准强调可追踪 lineage；数据建模工具普遍把 business semantics 往数据建模层推进；行业参考 vocabulary 则可以提供机器可读的业务语义参考。([AWS Documentation][12])
 
 对于你的场景，**第一优先级不是做“最聪明的 Data Architect Agent”，而是先把 `Evidence → Metadata Graph → Deterministic Analysis → Agent Reasoning → Validation` 这条链做扎实**。一旦这条链成立，Data Analyst、Data Architect、Migration Architect 其实都可以只是不同的工作模式，而不需要再堆很多 Agent。
 
-[1]: https://www.ey.com/en_ch/insights/ai/ai-etl-analysis-automation?utm_source=chatgpt.com "From days to minutes: AI-powered logic analysis of legacy ETL | EY - Switzerland"
 [2]: https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-application-portfolio-assessment-migration/portfolio-discovery-initial-planning.html?utm_source=chatgpt.com "Discovery acceleration and initial planning - AWS Prescriptive Guidance"
 [3]: https://openlineage.io/docs/spec/facets/?utm_source=chatgpt.com "Facets & Extensibility | OpenLineage"
 
