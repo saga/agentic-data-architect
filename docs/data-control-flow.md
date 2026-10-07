@@ -538,7 +538,11 @@ control update locks
 高并发生产服务
 ~~~
 
-### 13.3 Copilot session 不是业务事务
+### 13.3 Agent session 不是业务事务
+
+不同 Runtime（Copilot、CodeBuddy、OpenCode）的 session 都只属于模型运行上下文；业务正确性不能依赖 provider session。本机 workspace 还会为 CodeBuddy / OpenCode 建立标准 `.agents/skills` bridge，让 capability Skill 与当前 Workflow Skill 的可见性保持一致。
+
+### 13.4 Provider-specific: Copilot session
 
 Copilot session 可以 resume、disconnect、abort 或丢失。
 
