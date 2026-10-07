@@ -93,7 +93,6 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
 
   const dataTruthReady = currentStateReady
     && dataSourceReady
-    && dataModelReady
     && transformationReady
     && coverage!.sqlParseFailures === 0
     && !hasAny(input.highGapKinds, ['source-of-truth', 'data_quality']);
