@@ -66,6 +66,8 @@ Web JSON client 的 `getJson` 必须要求 runtime schema。允许裸泛型返�
 
 ### 6. Operational boundaries
 
+Investigation turn 在提交阶段必须重新校验 Mission / Scope identity；旧 turn 不得覆盖新的任务或范围状态。
+
 Report 与 Assessment artifact 的生成按 Investigation 串行化，避免 version 竞争。
 
 Global Media Cache 是有边界的本机运行资源，总预算为 512 MB；超额时按最近访问时间优先淘汰旧文件。
