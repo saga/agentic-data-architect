@@ -191,13 +191,17 @@ export async function answerQuestion(
   liveHeartbeat.unref?.();
   let companionTimer: ReturnType<typeof setTimeout> | undefined;
   let trajectoryWrite: Promise<void> = Promise.resolve();
+  let trajectoryWriteError: unknown;
   type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
   const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
     trajectoryWrite = trajectoryWrite
       .then(async () => {
         await appendTrajectoryEvent(investigationName, { ...event, turnId, details: event.details ?? {} });
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        trajectoryWriteError ??= error;
+        emitStatus('调查过程记录保存失败，当前结果不会当成可靠的已保存结果。');
+      });
   };
   let lastExecution = 0;
   try {
@@ -464,6 +468,7 @@ export async function answerQuestion(
     });
 
     let sessionPersistence: Promise<void> = Promise.resolve();
+    let sessionPersistenceError: unknown;
     // The execution number belongs to the current turn, while each stage callback receives it locally.
     // Keep the last completed execution for the final analysis artifact.
 
@@ -500,7 +505,10 @@ export async function answerQuestion(
             control.version,
             control.agent.runtime,
           ))
-          .catch(() => undefined);
+          .catch((error) => {
+            sessionPersistenceError ??= error;
+            emitStatus('助手的继续执行信息没有保存成功，这一轮结果不会当成可以安全继续的结果。');
+          });
       },
       workingDirectory: workspaceRoot(inv.name),
       model: control.agent.model,
@@ -803,6 +811,18 @@ export async function answerQuestion(
     });
     await sessionPersistence;
     await trajectoryWrite;
+    if (sessionPersistenceError) {
+      throw new Error(
+        '本轮结果已经生成，但继续执行所需的会话信息没有保存成功，请重新执行。'
+        + '（' + (sessionPersistenceError instanceof Error ? sessionPersistenceError.message : String(sessionPersistenceError)) + '）',
+      );
+    }
+    if (trajectoryWriteError) {
+      throw new Error(
+        '本轮调查过程没有完整保存，因此这次结果不能作为可靠结果返回。'
+        + '（' + (trajectoryWriteError instanceof Error ? trajectoryWriteError.message : String(trajectoryWriteError)) + '）',
+      );
+    }
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
     const graphifyAfter = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
@@ -967,6 +987,12 @@ export async function answerQuestion(
       details: { claimCount: claims.length, unknownCount: parsed.unknowns.length, routeCount: parsed.routeOptions.length, followUpCount: parsed.followUpQuestions.length },
     });
     await trajectoryWrite;
+    if (trajectoryWriteError) {
+      throw new Error(
+        '本轮调查过程没有完整保存，因此这次结果不能作为可靠结果返回。'
+        + '（' + (trajectoryWriteError instanceof Error ? trajectoryWriteError.message : String(trajectoryWriteError)) + '）',
+      );
+    }
     finishConversationTurn(turnId, 'completed', JSON.stringify(result));
     return result;
   } catch (error) {
