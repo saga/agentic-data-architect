@@ -481,8 +481,8 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 export async function askCopilot(input: AskInput): Promise<string> {
   // Runtime selection is explicit at the orchestration layer; retain model-prefix
   // routing here only for legacy direct callers.
-  // OpenCode 是显式选择的第二运行时。模型 ID 使用 opencode:<provider>/<model>，
-  // 因此不需要再增加一套并行的 runtime 配置字段；同一个 Investigation 仍然只记录一个 model。
+  // Runtime selection is normally handled by runtime.ts; this model-prefix routing
+  // remains only for legacy/direct callers that enter askCopilot itself.
   const workingDirectory = input.workingDirectory ?? process.cwd();
   const journeyMapPurpose = input.purpose === 'journey-map';
   const reviewerPurpose = input.purpose === 'review';
