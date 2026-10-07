@@ -15,7 +15,7 @@ const pageLoadingFallback = (
 );
 
 export function InvestigationPageRouter({ controller }: { controller: InvestigationController }) {
-  const { page, active, current, navigatePage, changeWorkflow, loadSession } = controller;
+  const { page, active, current, globalConfiguration, navigatePage, changeWorkflow, loadSession, updateGlobalConfiguration } = controller;
 
   if (page === 'config' && active && current) {
     return (
@@ -24,6 +24,9 @@ export function InvestigationPageRouter({ controller }: { controller: Investigat
           <InvestigationConfigPage
             sessionName={active}
             control={current.control}
+            globalConfiguration={globalConfiguration}
+            onGlobalSaved={() => loadSession(active)}
+            onUpdateGlobalConfiguration={updateGlobalConfiguration}
             workflow={current.context.workflow ?? ''}
             onBack={() => navigatePage('chat')}
             onWorkflowChange={async (workflow) => {
