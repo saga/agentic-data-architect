@@ -282,6 +282,7 @@ export async function answerQuestion(
             prompt: buildAssistantCompanionPrompt(control.agent.personality, activity, companionMemories),
             systemPrompt: '这是人格陪伴层。只生成一句自然、克制的陪伴性话语，不做任务分析，不调用工具，不汇报顶部状态，也不输出角色名或标题。',
             model: control.agent.model,
+            modelCallName: '生成陪伴提示',
             workingDirectory: workspaceRoot(investigationName),
             purpose: 'review',
           });
@@ -517,6 +518,7 @@ export async function answerQuestion(
       },
       workingDirectory: workspaceRoot(inv.name),
       model: control.agent.model,
+      modelCallName: '执行当前调查',
       ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
       ...(inv.workflow ? { workflowSkill: inv.workflow } : {}),
       platformCapabilities: control.agent.platformCapabilities,
@@ -879,6 +881,7 @@ export async function answerQuestion(
       try {
         const rendered = await askAgentWithFallback({
           prompt: buildAssistantAnswerPrompt(control.agent.personality, taskAnswer, relationshipMemories),
+          modelCallName: '整理最终回答',
           systemPrompt: [
             '你是最终回答渲染器，不是任务 Agent。',
             '只负责表达，不得调查、调用工具、重新判断任务或修改事实、结论、不确定性和建议。',
