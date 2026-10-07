@@ -1,12 +1,31 @@
-# 项目架构审查报告
+# 项目架构审查报告（2026-10-07 基线审查）
 
-审查日期：2026-10-07　范围：`src/`（74 文件）、`web/src/`（25 文件）、`skills/`、`tests/`、`ADR/`
-代码规模：38,846 行 TS/TSX + 2,498 行 CSS，2877 次提交，29 条 ADR
-基线：`npm test` 182 个测试全过（`# pass 182 / # fail 0`）
-**全程只读，未修改任何仓库文件。**
+审查日期：2026-10-07　范围：`src/`、`web/src/`、`skills/`、`tests/`、`ADR/`
+**这是 2026-10-07 早期审查的历史快照，不代表当前 `main`；文中代码行号、代码规模和测试数量均以当时基线为准。**
+后续实现已针对其中部分问题进行了修复；当前 `main` 的规范以 ADR 和实际代码为准。
 
 ---
 
+## 2026-10-07 后续修复状态
+
+这份报告形成于本轮 runtime durability / Stop / CodeBuddy sandbox 修复之前，因此原文中的“严重问题”和“建议顺序”不能直接当作当前 `main` 的状态。
+
+| 原问题 | 当前 main | 当前状态 |
+|---|---|---|
+| 1. 只读 SQL 校验返回被净化 SQL | 已解决 | `assertReadOnly` 只负责校验，查询执行使用原始 SQL。 |
+| 2. `.workspace/copilot` 与 Investigation 冲突 | 已解决 | Copilot Runtime 数据位于 `DATA_DIR/copilot`。 |
+| 3. workspace context lock 不可重入 | 已解决 | 当前 lock 使用 owner-aware `AsyncLocalStorage`。 |
+| 4. Workflow Skill 名单漏掉 `current-data-architecture` | 已解决 | `WORKFLOW_SKILL_NAMES` 当前包含四条 Workflow。 |
+| 5. 头像读取路径越界 | 已解决 | avatar endpoint 对解析后的路径执行 workspace boundary 检查。 |
+| 6. Workflow 版本变化后旧 Agent Session 未失效 | 已解决 | 保存/重置 Workflow 时清理 Runtime-neutral 和 legacy session reference。 |
+| 7. Control 初始化并发竞争 | 已解决 | Global / Task configuration initialization 使用独立 init lock。 |
+| 8. 三 Runtime 逻辑重复、边界漂移 | 仍存在 | Runtime 层已抽出，但 provider-specific adapter 之间仍有交叉依赖和行为差异。 |
+| 9. 持久化路径静默吞错 | 部分解决 | 关键 turn / trajectory 路径已有保护，但仍有零散 `catch {}` 需要继续治理。 |
+| 10. quota error 识别过宽 | 已解决 | 当前只接受明确 quota / rate-limit / resource exhausted / 429 语义。 |
+| 11. Skill DSL 禁止字段缺少机器校验 | 仍存在 | parser/lint 还需要把禁用字段和扩展语法进一步变成确定性 lint failure。 |
+| 12. Workflow 阶段可被 Agent 口头推进 | 仍需专项处理 | 已有 `completeWhen` 的节点使用确定性条件；无 `completeWhen` 节点仍需要统一 completion policy。 |
+| Server restart / SSE / Stop durability | 已解决 | ADR-030 已定义 turn draft、graceful shutdown、startup recovery、transport recovery 和显式 Stop。 |
+| CodeBuddy Investigation 可修改宿主仓库 | 已解决 | ADR-031 已定义 built-in allowlist、二次 deny 和 workspace path boundary。 |
 ## 摘要
 
 架构骨架是健康的：ADR 分层清晰，Mission/Scope/Stage/Report 四道 Gate 落到了服务端确定性条件，Evidence-first 的意图贯穿，Skill 的五章节 Contract 100% 齐备，15 个 `completeWhen` 全部命中代码常量。29 条 ADR 里的状态边界（ADR-027/028/029）设计得相当扎实。
