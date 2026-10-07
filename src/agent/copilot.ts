@@ -1205,8 +1205,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
         )) {
           try {
             await session.abort();
-          } catch {
-            /* ignore */
+          } catch (abortError) {
+            console.warn('[copilot] Failed to abort the session after a watchdog timeout.', abortError);
           }
         }
         throw error;
@@ -1520,8 +1520,8 @@ async function resumeOrCreate(
       if ((await c.getSessionMetadata(sessionId)) === undefined) {
         return c.createSession(sessionConfig);
       }
-    } catch {
-      /* preserve the original resume error */
+    } catch (metadataError) {
+      console.warn('[copilot] Unable to verify the existing session while recovering it; preserving the original resume error.', metadataError);
     }
     throw e;
   }
