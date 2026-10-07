@@ -14,7 +14,7 @@
 - 单用户；
 - 本机 workspace 隔离；
 - Agent runtime 通过统一的 provider/runtime abstraction 接入；
-- 当前可用 runtime 包括 Copilot CLI 和 OpenCode；
+- 当前可用 runtime 包括 Copilot SDK、CodeBuddy SDK 和 OpenCode Run；
 - runtime 只负责模型会话、工具执行和 provider-specific execution，不拥有 Investigation 的业务状态；
 - OpenCode model 统一通过官方 `opencode run` headless CLI 执行，不直接通过 `opencode serve` HTTP API 驱动模型；
 - capability Skill 由 Agent 根据任务自动发现；
@@ -24,6 +24,7 @@
 配置页用于调整 Investigation 的输入和用户选择，而不是让用户每次手工组装一个 Agent。
 
 OpenCode 的 `opencode serve` 可以继续用于本机模型发现等辅助能力，但不属于 Investigation 的模型执行链。
+Runtime 的首选选择、quota fallback 和运行时 session 边界由 ADR-028 统一定义。
 由于 CLI 没有独立的 system-prompt 参数，本项目当前把原有 system prompt 与 Mission / Workflow instruction 一起组成 CLI message；不因此引入临时 Agent 配置文件或第二套 prompt runtime。
 
 如果未来改成多人共享服务，必须重新设计 workspace isolation、工具/MCP allowlist、credentials 和权限边界，不能直接继承本 ADR 的本机信任模型。
