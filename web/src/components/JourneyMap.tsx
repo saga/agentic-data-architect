@@ -1,5 +1,7 @@
+import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
+  Slider,
   Empty,
   Flex,
   Space,
@@ -15,11 +17,77 @@ import {
   UndoOutlined,
 } from '@ant-design/icons';
 
+import type { WorkflowExecution, WorkflowRunEvent } from './journey-map-types.js';
 import { JourneyMapInspector } from './JourneyMapInspector.js';
 import { JourneyX6Graph } from './JourneyX6Graph.js';
 import { useJourneyWorkflowEditor } from './useJourneyWorkflowEditor.js';
 
 const { Text } = Typography;
+
+function replayExecutionAt(definition: { id: string; start: string }, events: WorkflowRunEvent[], index: number): WorkflowExecution {
+  const execution: WorkflowExecution = {
+    workflowId: definition.id,
+    workflowVersion: 0,
+    runId: events[0]?.runId ?? 'replay',
+    currentNodeId: definition.start,
+    completedNodeIds: [],
+    status: 'active',
+  };
+
+  for (const event of events.slice(0, index)) {
+    if (event.workflowVersion > 0) execution.workflowVersion = event.workflowVersion;
+    if (event.nodeId) execution.currentNodeId = event.nodeId;
+    switch (event.type) {
+      case 'node-started':
+        execution.status = 'active';
+        break;
+      case 'node-completed': {
+        if (event.nodeId && !execution.completedNodeIds.includes(event.nodeId)) {
+          execution.completedNodeIds.push(event.nodeId);
+        }
+        const nextNodeId = event.data && 'nextNodeId' in event.data ? event.data.nextNodeId : undefined;
+        if (nextNodeId) execution.currentNodeId = nextNodeId;
+        execution.status = 'active';
+        break;
+      }
+      case 'node-waiting':
+        execution.status = 'waiting';
+        if (event.data && 'nodeId' in event.data) execution.currentNodeId = event.data.nodeId;
+        if (event.data && 'id' in event.data) {
+          execution.pendingInteraction = {
+            id: event.data.id,
+            nodeId: event.data.nodeId,
+            reason: event.data.reason,
+            requestedAt: event.data.requestedAt,
+          };
+        }
+        break;
+      case 'node-failed':
+        execution.status = 'active';
+        break;
+      case 'workflow-completed':
+        execution.status = 'completed';
+        break;
+      default:
+        break;
+    }
+    if (event.type !== 'node-waiting' && execution.status !== 'waiting') delete execution.pendingInteraction;
+  }
+  return execution;
+}
+
+function replayEventLabel(event: WorkflowRunEvent): string {
+  switch (event.type) {
+    case 'workflow-started': return '开始执行';
+    case 'node-started': return '进入步骤';
+    case 'node-completed': return '完成步骤';
+    case 'node-waiting': return '等待人工';
+    case 'node-failed': return '步骤失败';
+    case 'workflow-completed': return '执行完成';
+    case 'transition-rejected': return '转换被拒绝';
+    default: return event.type;
+  }
+}
 
 export interface JourneyMapProps {
   /** 从完整工作页返回调查对话。 */
@@ -38,6 +106,9 @@ export interface JourneyMapProps {
  */
 export function JourneyMap(props: JourneyMapProps) {
   const editor = useJourneyWorkflowEditor();
+  const [replayMode, setReplayMode] = useState(false);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
   const {
     snapshot,
     fetching,
@@ -80,6 +151,40 @@ export function JourneyMap(props: JourneyMapProps) {
     onNodeMoved,
     fitViewRequest,
   } = editor;
+
+  const replayEvents = useMemo(
+    () => snapshot?.events.filter((event) => event.runId === snapshot.execution.runId) ?? [],
+    [snapshot?.events, snapshot?.execution.runId],
+  );
+  const replayExecution = useMemo(
+    () => snapshot && replayEvents.length
+      ? replayExecutionAt(snapshot.definition, replayEvents, replayIndex)
+      : undefined,
+    [snapshot, replayEvents, replayIndex],
+  );
+  const replayEvent = replayEvents[Math.max(0, Math.min(replayIndex - 1, replayEvents.length - 1))];
+
+  useEffect(() => {
+    if (!replayMode || !replayPlaying || replayEvents.length === 0) return;
+    const timer = window.setInterval(() => {
+      setReplayIndex((current) => {
+        if (current >= replayEvents.length) {
+          setReplayPlaying(false);
+          return current;
+        }
+        return current + 1;
+      });
+    }, 650);
+    return () => window.clearInterval(timer);
+  }, [replayMode, replayPlaying, replayEvents.length]);
+
+  useEffect(() => {
+    setReplayIndex(0);
+    setReplayPlaying(false);
+    setReplayMode(false);
+  }, [snapshot?.execution.runId]);
+
+  const displayedExecution = replayMode ? replayExecution : snapshot?.execution;
 
   return (
     <div className="journey-map-page">
@@ -181,6 +286,20 @@ export function JourneyMap(props: JourneyMapProps) {
                 恢复内置
               </Button>
               <Button
+                size="small"
+                disabled={replayEvents.length === 0}
+                onClick={() => {
+                  setReplayMode((enabled) => {
+                    const next = !enabled;
+                    setReplayPlaying(false);
+                    if (next) setReplayIndex(0);
+                    return next;
+                  });
+                }}
+              >
+                {replayMode ? '退出回放' : '运行回放'}
+              </Button>
+              <Button
                 type="primary"
                 size="small"
                 icon={<SaveOutlined />}
@@ -223,7 +342,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 selectedNodeId={selectedNode?.id}
                 selectedEdgeId={selectedEdge?.id}
                 fitViewRequest={fitViewRequest}
-                execution={snapshot.execution}
+                execution={displayedExecution}
                 onNodeClick={onNodeClick}
                 onEdgeClick={onEdgeClick}
                 onBlankClick={clearSelection}
@@ -264,6 +383,60 @@ export function JourneyMap(props: JourneyMapProps) {
               applyHumanWorkflowTransition={applyHumanWorkflowTransition}
             />
           </div>
+
+          {replayMode && replayEvents.length ? (
+            <div className="journey-map-replay-bar">
+              <Flex align="center" gap={8} wrap>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    if (replayIndex >= replayEvents.length) {
+                      setReplayIndex(0);
+                      setReplayPlaying(true);
+                    } else {
+                      setReplayPlaying((playing) => !playing);
+                    }
+                  }}
+                >
+                  {replayPlaying ? '暂停' : replayIndex >= replayEvents.length ? '重播' : '播放'}
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setReplayPlaying(false);
+                    setReplayIndex(0);
+                  }}
+                >
+                  回到开始
+                </Button>
+                <Text strong>运行轨迹</Text>
+                <Text type="secondary">{replayIndex}/{replayEvents.length}</Text>
+              </Flex>
+              <Slider
+                min={0}
+                max={replayEvents.length}
+                value={replayIndex}
+                onChange={(value) => {
+                  setReplayPlaying(false);
+                  setReplayIndex(value);
+                }}
+                tooltip={{
+                  formatter: (value) => {
+                    if (!value || value <= 0) return '开始';
+                    const event = replayEvents[value - 1];
+                    return event
+                      ? replayEventLabel(event) + ' · ' + new Date(event.timestamp).toLocaleTimeString()
+                      : undefined;
+                  },
+                }}
+              />
+              <Text type="secondary">
+                {replayEvent
+                  ? replayEventLabel(replayEvent) + ' · ' + (replayEvent.nodeId ?? '工作流')
+                  : '从真实运行事件回放'}
+              </Text>
+            </div>
+          ) : null}
 
           <footer className="journey-map-page-footer">
             <Flex align="center" gap={8} wrap>
