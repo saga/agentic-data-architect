@@ -5,6 +5,7 @@ import {
   ApiErrorSchema,
   ArtifactReviewContractSchema,
   ArtifactLifecycleStatusSchema,
+  ReportArtifactStateSchema,
   ArchitectureAssessmentResponseSchema,
   ModernizationResponseSchema,
   ConversationTurnSummarySchema,
@@ -121,6 +122,22 @@ test('conversation turn summary is a shared transport contract', () => {
   assert.equal(turn.status, 'completed');
 });
 
+
+test('report read contract carries lifecycle state instead of transport-specific inference', () => {
+  assert.equal(
+    ReportArtifactStateSchema.parse({
+      status: 'current',
+      markdown: '# report',
+      generatedAt: '2026-10-07T08:00:00.000Z',
+      reviewStatus: 'pass',
+    }).status,
+    'current',
+  );
+  assert.equal(
+    ReportArtifactStateSchema.parse({ status: 'stale' }).status,
+    'stale',
+  );
+});
 
 test('artifact lifecycle exposes one shared contract for all result types', () => {
   assert.equal(ArtifactLifecycleStatusSchema.parse('missing'), 'missing');
