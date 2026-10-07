@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as z from 'zod';
 import { buildOpenCodeCliPrompt, parseOpenCodeModel } from '../src/agent/opencode.js';
 
 test('OpenCode CLI prompt preserves system instructions before the user task', () => {
@@ -34,10 +35,11 @@ test('OpenCode CLI prompt includes structured-output guidance when schema is sup
     '',
     false,
     false,
-    undefined,
+    z.object({ answer: z.string() }),
   );
 
-  assert.doesNotMatch(prompt, /JSON Schema/);
+  assert.match(prompt, /JSON Schema/);
+  assert.match(prompt, /"answer"/);
 });
 
 test('OpenCode model references are converted to CLI provider/model format', () => {
