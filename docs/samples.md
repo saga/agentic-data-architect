@@ -1,12 +1,12 @@
-https://github.com/IBM/application-modernization-javaee-quarkus
+公共 legacy Java modernization 示例仓库 A
 
 https://github.com/aws-samples/aws-mainframe-modernization-carddemo
 
 https://github.com/Azure-Samples/Legacy-Modernization-Agents
 
-https://github.com/ibm-self-serve-assets/ibm-bob-java-modernization-struts-to-springboot-react
+公共 Java modernization 示例仓库 B
 
-https://github.com/IBM/example-health-jee-openshift
+公共 Java enterprise 示例仓库 C
 
 https://github.com/kpostreich/m2m-ws-sample
 
