@@ -14,7 +14,7 @@
  */
 import * as z from 'zod';
 import { askAgentWithFallback } from './runtime.js';
-import type { AskInput } from './copilot.js';
+import type { AskInput } from './ask-input.js';
 import { config } from '../config.js';
 
 /** 有界分类问题：从明确的候选项里选一个。 */
