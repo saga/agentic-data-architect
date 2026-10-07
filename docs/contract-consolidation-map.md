@@ -9,13 +9,13 @@
 | WorkflowId | shared API Contract | Session / Workflow API | shared type |
 | Mission Contract | Investigation domain + shared API Contract | /mission | shared type |
 | Mission Progress | deterministic evaluator | Session / Mission API | shared type |
-| Stage Checkpoint | Stage Gate + Trajectory | /results + runtime event | Result View |
+| Stage Checkpoint | Stage Gate + Trajectory | runtime event / Result page projection | Result View |
 | Execution Status | runtime Contract | /execution | shared type |
 | SSE Event | runtime Contract | /messages/stream | common SSE client |
 | Trajectory Event / Response | runtime Contract | /trajectory | Trajectory View |
 | WorkflowSnapshot | workflow runtime | /workflow | Workflow / Journey UI |
-| Result View Model | result API Contract | /results | Result page only |
-| Report | Report artifact | /results + /report | Result projection |
+| Result View Model | UI projection assembled from canonical resources | Result page | Result page only |
+| Report | Report artifact | /report | Result page projection |
 | Modernization Plan | modernization domain model | /results + /modernization | Result projection |
 | Assessment Plan | assessment domain model | /results + /assessment | Result projection |
 | Configuration | Control persistence model + API View | /config | Config projection |
@@ -45,7 +45,7 @@ WorkflowSnapshot 是唯一 workflow runtime resource；Trajectory 是历史 runt
 
 ### Result
 
-`/results` 是 Result 页面唯一聚合 resource。它只读取已经生成的 artifact；生成使用显式 action endpoint。
+Result 页面是 UI 聚合 projection，不建立新的 `/results` canonical resource。它只读取已经生成的 canonical resources；生成使用显式 action endpoint。
 
 ## 3. Artifact lifecycle
 
