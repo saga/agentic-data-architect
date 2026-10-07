@@ -99,10 +99,6 @@ export interface JourneyFacts {
   lineageEdgeCount?: number;
   assessmentPlanExists?: boolean;
   blockingValidationTotal: number;
-  estateColumnCount?: number;
-  sourceOfTruthCandidateCount?: number;
-  lineageEdgeCount?: number;
-
 }
 
 export type JourneyRoute = SharedJourneyRoute;
