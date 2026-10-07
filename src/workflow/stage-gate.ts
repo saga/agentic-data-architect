@@ -106,8 +106,11 @@ export function snapshotInvestigationForStageGate(
 /**
  * 确定性判断本阶段是否形成值得留下的阶段成果。
  *
- * 注意：parsed.answer 的文字质量不会决定 Gate 是否通过。
- * answer 写得再漂亮，但没有真实调查状态变化，仍然失败。
+ * 注意：parsed.answer 的文字质量不会单独决定 Gate 是否通过。
+ * 但本阶段可以通过两类方式证明确实做了工作：
+ * 1. 形成新的 Evidence / Finding / Discovery / 结构化成果；
+ * 2. 基于已有有效 Evidence 形成新的、有证据支撑的分析结论。
+ * 这样不会把“只重新描述已有内容”误当成阶段成果，同时也不会把真正的分析结果漏掉。
  */
 export function evaluateInvestigationStageGate(input: StageGateInput): StageGateResult {
   const checks: StageGateCheck[] = [];
