@@ -5,6 +5,7 @@
  * 这里只做纯函数计算，不做 I/O，不创建 Artifact，不推进 Workflow。
  */
 export interface DerivedStateInput {
+  goal: string;
   currentState: {
     coverage: {
       sqlFiles: number;
@@ -65,7 +66,7 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   const coverage = input.currentState?.coverage;
   const currentStateAvailable = Boolean(coverage && coverage.datasets > 0);
 
-  // Source-of-Truth candidate 是“还需要判断”的信号，不是已确认事实。
+  // Source-of-Truth candidate 是待确认事实，不能直接当成 data-source 已完成。
   const dataSourceReady = currentStateAvailable && input.sourceOfTruthCandidateCount === 0;
 
   const dataFlowReady = currentStateAvailable
@@ -73,22 +74,27 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
 
   const dataModelReady = currentStateAvailable && input.estateColumnCount > 0;
 
-  // 没有 SQL 时，Transformation 对当前 Investigation 没有额外阻塞意义。
+  // 当前范围没有 SQL 时，不需要为了“转换”虚构一条 SQL 完成条件。
   const transformationReady = currentStateAvailable
-    && (coverage!.sqlFiles === 0
-      || (coverage!.sqlParsedStatements > 0 && coverage!.sqlParseFailures === 0));
+    && (
+      coverage!.sqlFiles === 0
+      || (coverage!.sqlParsedStatements > 0 && coverage!.sqlParseFailures === 0)
+    );
 
   const currentStateReady = currentStateAvailable
     && !hasAny(input.highGapKinds, ['discovery', 'lineage']);
 
-  // Current Data Architecture 可以明确保留 Source-of-Truth unknown；
-  // unknown 会进入报告，但不应让“现状已经讲清楚”永远无法完成。
+  // “Current Data Architecture”允许保留业务上尚未确认的候选项；
+  // 真正要求数据真相时，由 dataTruthReady 单独收紧。
   const currentDataArchitectureReady = currentStateReady
     && dataFlowReady
     && dataModelReady
     && transformationReady;
 
   const dataTruthReady = currentStateReady
+    && dataSourceReady
+    && dataModelReady
+    && transformationReady
     && coverage!.sqlParseFailures === 0
     && !hasAny(input.highGapKinds, ['source-of-truth', 'data_quality']);
 
@@ -97,24 +103,26 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   const mappingReady = Boolean(modernization && modernization.mappingCount > 0);
   const validationReady = Boolean(
     modernization
-    && modernization.blockingValidationTotal > 0
-    && modernization.blockingValidationReady >= modernization.blockingValidationTotal,
+      && modernization.blockingValidationTotal > 0
+      && modernization.blockingValidationReady >= modernization.blockingValidationTotal,
   );
 
+  // Assessment 是一种“有效结果”，零个 Finding 也是合法结果；不能把它当成失败。
   const findingsReady = input.findingsCount > 0 || Boolean(input.assessment?.exists);
+
   const assessment = input.assessment;
   const assessmentFindingsReady = Boolean(assessment?.exists);
   const assessmentRecommendationReady = Boolean(
     assessment
-    && (assessment.findingsCount === 0 || assessment.recommendationCount > 0),
+      && (assessment.findingsCount === 0 || assessment.recommendationCount > 0),
   );
   const assessmentRoadmapReady = Boolean(
     assessmentRecommendationReady
-    && (assessment!.recommendationCount === 0 || assessment!.roadmapCount > 0),
+      && (!assessment || assessment.recommendationCount === 0 || assessment.roadmapCount > 0),
   );
 
   return {
-    goalReady: input.scopeReady,
+    goalReady: input.goal.trim().length > 0,
     scopeReady: input.scopeReady,
     currentStateAvailable,
     dataSourceReady,
