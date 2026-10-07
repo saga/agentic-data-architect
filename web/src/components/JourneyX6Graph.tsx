@@ -35,6 +35,19 @@ export interface JourneyX6GraphProps {
   onConnect: (connection: GraphConnection) => Promise<void>;
   onReconnect: (edgeId: string, connection: GraphConnection) => Promise<void>;
   onDeleteSelected: (cellId: string, kind: 'node' | 'edge') => void;
+  execution?: import('./journey-map-types.js').WorkflowExecution;
+}
+
+function activeExecutionEdgeId(
+  edges: FlowEdge[],
+  execution?: import('./journey-map-types.js').WorkflowExecution,
+): string | undefined {
+  if (!execution || execution.status !== 'active' || !execution.currentNodeId) return undefined;
+  const completed = new Set(execution.completedNodeIds);
+  const incoming = edges
+    .filter((edge) => edge.target === execution.currentNodeId && completed.has(edge.source))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return incoming[0]?.id;
 }
 
 /**
@@ -64,7 +77,10 @@ export function JourneyX6Graph({
   onConnect,
   onReconnect,
   onDeleteSelected,
+  execution,
 }: JourneyX6GraphProps) {
+  const executionOverlayRef = useRef<SVGSVGElement>(null);
+  const executionTokenRef = useRef<SVGCircleElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const minimapRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -90,6 +106,11 @@ export function JourneyX6Graph({
     onReconnect,
     onDeleteSelected,
   };
+
+  const activeExecutionEdgeIdValue = useMemo(
+    () => activeExecutionEdgeId(edges, execution),
+    [edges, execution?.status, execution?.currentNodeId, execution?.completedNodeIds],
+  );
 
   const structureKey = useMemo(
     () =>
@@ -279,6 +300,7 @@ export function JourneyX6Graph({
           const kind: JourneyEdgeKind =
             edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
           const selected = edge.id === selectedEdgeId;
+          const active = edge.id === activeExecutionEdgeIdValue;
 
           const style = {
             success: {
@@ -305,6 +327,7 @@ export function JourneyX6Graph({
 
           const edgeConfig = {
             id: edge.id,
+            className: active ? 'journey-flow-edge-active' : undefined,
             shape: 'edge',
             source: {
               cell: edge.source,
@@ -662,6 +685,7 @@ export function JourneyX6Graph({
       if (!cell?.isEdge()) continue;
 
       const selected = edge.id === selectedEdgeId;
+      const active = edge.id === activeExecutionEdgeIdValue;
       const kind: JourneyEdgeKind =
         edge.data?.kind ?? classifyJourneyEdge(edge.data?.outcome);
       const stroke =
@@ -695,7 +719,8 @@ export function JourneyX6Graph({
         fill: stroke,
         stroke,
       });
-      cell.attr('line/strokeDasharray', kind === 'retry' ? '7 5' : undefined);
+      cell.attr('line/strokeDasharray', active ? '10 7' : kind === 'retry' ? '7 5' : undefined);
+      cell.setProp('className', active ? 'journey-flow-edge-active' : '');
 
       // retry 使用显式回线，节点拖动/自动排版后也要同步回线的折点。
       if (kind === 'retry') {
@@ -730,7 +755,106 @@ export function JourneyX6Graph({
       }
     }
 
-  }, [nodes, edges, selectedNodeId, selectedEdgeId]);
+  }, [nodes, edges, selectedNodeId, selectedEdgeId, activeExecutionEdgeIdValue]);
+
+  /**
+   * Magpie 风格的执行覆盖层：不重画 X6 Edge，而是让一个小 token 沿 X6 的真实 SVG path 移动。
+   * 因为位置通过 screen CTM 计算，缩放、平移和拖动节点时 token 会继续跟随真实路径。
+   */
+  useEffect(() => {
+    const graph = graphRef.current;
+    const container = containerRef.current;
+    const overlay = executionOverlayRef.current;
+    const token = executionTokenRef.current;
+    if (!graph || !container || !overlay || !token || !activeExecutionEdgeIdValue) {
+      if (overlay && token) token.setAttribute('visibility', 'hidden');
+      return;
+    }
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hidden = () => document.hidden;
+    let raf = 0;
+    const startedAt = performance.now();
+    const duration = 1100;
+
+    const findPath = (): SVGPathElement | null => {
+      const cell = graph.getCellById(activeExecutionEdgeIdValue);
+      if (!cell?.isEdge()) return null;
+      const view = graph.findViewByCell(cell);
+      if (!view) return null;
+      return (
+        (view.container.querySelector('.x6-edge-line') as SVGPathElement | null)
+        || (view.container.querySelector('path') as SVGPathElement | null)
+      );
+    };
+
+    const hideToken = () => token.setAttribute('visibility', 'hidden');
+
+    if (reducedMotion) {
+      const path = findPath();
+      if (path) {
+        const length = path.getTotalLength();
+        const point = path.getPointAtLength(length);
+        const matrix = path.getScreenCTM();
+        const rect = container.getBoundingClientRect();
+        if (matrix) {
+          const client = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+          token.setAttribute('cx', String(client.x - rect.left));
+          token.setAttribute('cy', String(client.y - rect.top));
+          token.removeAttribute('visibility');
+        } else {
+          hideToken();
+        }
+      } else {
+        hideToken();
+      }
+      return;
+    }
+
+    const frame = (timestamp: number) => {
+      if (hidden()) {
+        token.setAttribute('visibility', 'hidden');
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+
+      const path = findPath();
+      if (!path || !path.isConnected) {
+        token.setAttribute('visibility', 'hidden');
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+
+      try {
+        const length = path.getTotalLength();
+        const progress = ((timestamp - startedAt) % duration) / duration;
+        const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - ((-2 * progress + 2) ** 2) / 2;
+        const point = path.getPointAtLength(length * eased);
+        const matrix = path.getScreenCTM();
+        if (!matrix) {
+          hideToken();
+        } else {
+          const client = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+          const rect = container.getBoundingClientRect();
+          token.setAttribute('cx', String(client.x - rect.left));
+          token.setAttribute('cy', String(client.y - rect.top));
+          token.removeAttribute('visibility');
+        }
+      } catch {
+        hideToken();
+      }
+
+      raf = requestAnimationFrame(frame);
+    };
+
+    raf = requestAnimationFrame(frame);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      hideToken();
+    };
+  }, [activeExecutionEdgeIdValue]);
 
   /** 只处理 editor 明确发出的 fit 请求；普通拖动不会触发缩放。 */
   useEffect(() => {
@@ -748,7 +872,20 @@ export function JourneyX6Graph({
 
   return (
     <>
-      <div ref={containerRef} className="journey-x6-graph-container" />
+      <div ref={containerRef} className="journey-x6-graph-container">
+        <svg
+          ref={executionOverlayRef}
+          className="journey-flow-execution-overlay"
+          aria-hidden="true"
+        >
+          <circle
+            ref={executionTokenRef}
+            className="journey-flow-execution-token"
+            r="5"
+            visibility="hidden"
+          />
+        </svg>
+      </div>
       <div ref={minimapRef} className="journey-x6-minimap" aria-hidden="true" />
       <div className="journey-x6-controls">
         <button
