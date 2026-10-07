@@ -651,6 +651,9 @@ export const ExecutionStatusSchema = z.object({
 }).strict();
 export type ExecutionStatus = z.infer<typeof ExecutionStatusSchema>;
 
+export const AgentRuntimeSchema = z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']);
+export type AgentRuntime = z.infer<typeof AgentRuntimeSchema>;
+
 export const CheckpointSchema = TrajectoryCheckpointSchema;
 export const ApiErrorSchema = z.object({
   code: z.string().min(1),
@@ -1082,9 +1085,6 @@ export const OpenCodeStatusSchema = z.object({
   error: z.string().optional(),
 }).strict();
 export type OpenCodeStatus = z.infer<typeof OpenCodeStatusSchema>;
-
-export const AgentRuntimeSchema = z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']);
-export type AgentRuntime = z.infer<typeof AgentRuntimeSchema>;
 
 export const CopilotModelOptionSchema = z.object({
   id: z.string().min(1),
