@@ -28,10 +28,10 @@ let client: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
-const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
-const AGENT_EXECUTION_TIMEOUT = /^Timeout after \d+ms waiting for agent execution$/;
-const USER_INPUT_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for user input$/;
-const PERMISSION_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for permission$/;
+const TURN_TIMEOUT = /^(?:Timeout after \d+ms waiting for session\.idle|等待运行结果超过 \d+ms。)$/;
+const AGENT_EXECUTION_TIMEOUT = /^(?:Timeout after \d+ms waiting for agent execution|助手执行超过 \d+ms，已停止本轮调查。)$/;
+const USER_INPUT_WAIT_TIMEOUT = /^(?:Timeout after \d+ms waiting for user input|等待你的回答超过 \d+ms，这次操作已停止。)$/;
+const PERMISSION_WAIT_TIMEOUT = /^(?:Timeout after \d+ms waiting for permission|等待你确认操作超过 \d+ms，这次操作已停止。)$/;
 const WORKFLOW_SKILL_NAMES = [
   'legacy-modernization',
   'current-data-architecture',
