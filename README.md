@@ -91,7 +91,7 @@ sequenceDiagram
 
 ## 本机 OpenCode / 本地模型
 
-工作台支持把本机 OpenCode 作为第二个 Agent Runtime。OpenCode 用 `opencode serve` 提供 HTTP API，工作台会读取它当前已经配置的 provider / model，并显示在主对话区的“模型”菜单里。
+工作台同时支持三种 Agent Runtime：Copilot SDK、CodeBuddy SDK 和 OpenCode Run。OpenCode 的 `opencode serve` 只用于读取本机已经配置的 provider / model 并显示在“模型”菜单里；正式 Investigation execution 使用 `opencode run`。
 
 启动本机 OpenCode：
 
@@ -142,7 +142,7 @@ opencode:ollama/<model>
 opencode:openai/<model>
 ~~~
 
-这里的模型选择按 Investigation 保存，下一轮执行即可切换。OpenCode 当前 provider/model 列表来自本机 Server；执行使用 Session API，过程通过 SSE 事件回传。OpenCode 官方 JS/TS SDK 本质上也是这个本机 HTTP Server 的类型安全客户端；当前项目先直接调用同一组 HTTP API，减少额外依赖，不改变 Runtime 边界。
+这里的模型选择按 Investigation 保存，下一轮执行即可切换。OpenCode 当前 provider/model 列表来自本机 `opencode serve`；正式模型执行使用 `opencode run` headless CLI，工作台只负责传入任务上下文、接收结构化运行事件和保存 Investigation 结果。
 
 注意：OpenCode 是独立 Runtime，它的工具、MCP 和权限由 OpenCode 本身管理；本项目仍负责 Mission、Evidence、Stage Gate 和 Investigation 结果持久化。
 
@@ -382,7 +382,7 @@ CSV / JSON / JSONL
   → 原始输入
 ~~~
 
-Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件，并通过 local_catalog、local_describe、local_sample、local_profile、local_query 完成结构查看、抽样、profiling 和只读 SQL 分析。
+Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件，并通过 `local_catalog`、`local_register_dataset`、`local_describe`、`local_sample`、`local_profile`、`local_transform`、`local_export_parquet`、`local_explain`、`local_reconcile`、`local_query` 完成登记、结构查看、抽样、profiling、只读 SQL 分析、分析表生成、Parquet 导出、执行计划和对账。
 
 上传 CSV / JSON / JSONL / Parquet 后会自动进入 Dataset Registry。文件变化会产生新的 dataset version，分析结果会保存为 Evidence，因此后续回答可以回溯到具体数据文件和 SHA-256。
 ## Structural Analysis
@@ -397,7 +397,7 @@ Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件
 “这个 legacy 系统哪些节点最关键？”
 ~~~
 
-Graphify 是平台级 structural-analysis capability，通过 MCP 注入当前 Copilot Session；第一次调查时由 Skill 运行本地、确定性的结构扫描。当前 Control version 会固定 Graphify capability version，turn audit 记录实际 package version、MCP command 和 graph SHA-256。Graphify 的结果只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。目录 Discovery 同时为源文件建立 `source_file` Evidence，Agent 定位文件后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
+Graphify 是平台级 structural-analysis capability，通过 MCP 注入当前 Agent Runtime；第一次调查时由 Skill 运行本地、确定性的结构扫描。当前 Control version 会固定 Graphify capability version，turn audit 记录实际 package version、MCP command 和 graph SHA-256。Graphify 的结果只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。目录 Discovery 同时为源文件建立 `source_file` Evidence，Agent 定位文件后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
 
 ## Semantic Context
 
