@@ -606,7 +606,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   let eventReaderTask: Promise<void> | undefined;
   // reader 抛错只记录、不外泄：.catch 必须在创建当时就挂上，等主流程跑完再挂，
   // 中间任何一次事件失败都会先触发 unhandledRejection 崩进程。
-  const readerState: { sessionError?: string } = {};
+  const readerState: { sessionError?: string; graphifyUsed?: boolean } = {};
   const reportReaderCrash = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     readerState.sessionError = readerState.sessionError ?? message;
