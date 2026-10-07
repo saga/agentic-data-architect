@@ -429,18 +429,36 @@ export async function appendAuditEvent(
   return full;
 }
 
-/** 读取最近的审计事件；损坏或不符合当前 Schema 的行会被忽略。 */
-export async function readAuditEvents(name: string, limit = 50): Promise<AuditEvent[]> {
-  try {
-    const text = await fs.readFile(auditFile(name), 'utf8');
-    const rows = text.split('\n').filter(Boolean).slice(-Math.max(1, Math.min(limit, 500)));
-    return rows.reverse()
-      .map((row) => AuditEventSchema.safeParse(JSON.parse(row)))
-      .filter((result): result is { success: true; data: AuditEvent } => result.success)
-      .map((result) => result.data);
-  } catch {
-    return [];
+export class AuditDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuditDataError';
   }
+}
+
+/** 读取最近的审计事件；损坏的 durable record 必须显式暴露，不能伪装成“没有记录”。 */
+export async function readAuditEvents(name: string, limit = 50): Promise<AuditEvent[]> {
+  let text: string;
+  try {
+    text = await fs.readFile(auditFile(name), 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+
+  const rows = text.split('\n').filter((row) => row.trim()).slice(-Math.max(1, Math.min(limit, 500)));
+  const events: AuditEvent[] = [];
+  for (const [index, row] of rows.reverse().entries()) {
+    try {
+      const parsed = AuditEventSchema.parse(JSON.parse(row));
+      events.push(parsed);
+    } catch (error) {
+      throw new AuditDataError(
+        '审计记录中有一条无法读取的内容（第 ' + String(index + 1) + ' 条）。请先检查 audit.jsonl，再查看审计记录。',
+      );
+    }
+  }
+  return events;
 }
 
 /** 把用户配置转换成模型可读的任务约束 Prompt，并明确它不是 Evidence。 */
