@@ -70,7 +70,7 @@ metadata:
 ## 输入校验
 正式调查前必须通过 Mission Gate 和 Scope Validation。没有用户确认的任务目的、期望结果或范围时，只能整理候选内容，不能开始正式调查。
 ## 输出
-每个有效调查 turn 至少留下一个中间分析记录到 artifacts/analysis/turn-*.md；Investigation 完成后还必须有 reports/report.md。
+每个有效调查 turn 至少留下一个中间分析记录到 `artifacts/analysis/<sequence>-<turnId>.md`；当前实现使用四位序号，例如 `0001-<turnId>.md`。Investigation 完成后还必须有 `reports/report.md`。
 ## 输出与验证
 中间记录必须对应本次用户问题和实际产生的资料；最终报告只能来自已经保存的调查结果。
 Stage Gate、Scope Gate、Mission Completion 和 Report Gate 都不能被 Agent 的自然语言完成声明绕过。
