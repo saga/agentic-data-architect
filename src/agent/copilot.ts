@@ -32,7 +32,12 @@ const TURN_TIMEOUT = /^Timeout after \d+ms waiting for session\.idle$/;
 const AGENT_EXECUTION_TIMEOUT = /^Timeout after \d+ms waiting for agent execution$/;
 const USER_INPUT_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for user input$/;
 const PERMISSION_WAIT_TIMEOUT = /^Timeout after \d+ms waiting for permission$/;
-const WORKFLOW_SKILL_NAMES = ['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'];
+const WORKFLOW_SKILL_NAMES = [
+  'legacy-modernization',
+  'current-data-architecture',
+  'financial-ai-native-architecture',
+  'data-architecture-assessment',
+];
 
 // Keep the host tool surface intentionally small; the CLI-like runtime provides
 // ambient Copilot skills and built-in MCPs, while the workbench adds only tools it needs.
