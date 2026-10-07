@@ -50,22 +50,14 @@ export async function getText(url: string, init?: RequestInit): Promise<string> 
   return response.text();
 }
 
-export async function getJson<T>(url: string, init?: RequestInit): Promise<T>;
-export async function getJson<T>(url: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T>;
 export async function getJson<T>(
   url: string,
-  schemaOrInit?: z.ZodType<T> | RequestInit,
+  schema: z.ZodType<T>,
   init?: RequestInit,
 ): Promise<T> {
-  const looksLikeSchema = typeof schemaOrInit === 'object'
-    && schemaOrInit !== null
-    && 'parse' in schemaOrInit
-    && typeof (schemaOrInit as { parse?: unknown }).parse === 'function';
-  const schema = looksLikeSchema ? schemaOrInit as z.ZodType<T> : undefined;
-  const requestInit = schema ? init : schemaOrInit as RequestInit | undefined;
-  const response = await request(url, requestInit);
+  const response = await request(url, init);
   const data: unknown = await response.json();
-  return schema ? schema.parse(data) : data as T;
+  return schema.parse(data);
 }
 
 export async function consumeSse(
