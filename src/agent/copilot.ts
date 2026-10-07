@@ -271,6 +271,16 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 
 /** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/本地数据工具和执行白名单。 */
 export async function askCopilot(input: AskInput): Promise<string> {
+  const workingDirectory = input.workingDirectory ?? process.cwd();
+  const journeyMapPurpose = input.purpose === 'journey-map';
+  const reviewerPurpose = input.purpose === 'review';
+  const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
+  const investigationName = input.investigationName ?? path.basename(workingDirectory);
+  const selectedModel = input.model ?? config.model;
+  const workflowInstruction = isolatedPurpose
+    ? ''
+    : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
+
   // Runtime selection is explicit at the orchestration layer; retain model-prefix
   // routing here only for legacy direct callers.
   const c = await getClient();
@@ -476,7 +486,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // Local data tools are app-owned and remain constrained by Dataset Registry + DuckDB guards.
     ...(isolatedPurpose ? {} : { tools: createLocalDataTools(path.basename(workingDirectory)) }),
     availableTools: isolatedPurpose ? new ToolSet() : WORKBENCH_TOOLS,
-      ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+      ...(Object.keys(mcpServers).length
+      ? { mcpServers: mcpServers as CreateSessionConfig['mcpServers'] }
+      : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
