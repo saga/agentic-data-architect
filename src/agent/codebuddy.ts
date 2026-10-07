@@ -17,6 +17,7 @@ import {
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import { config } from '../config.js';
+import * as z from 'zod';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
 import { createLocalDataTools } from './local-data-tools.js';
@@ -191,6 +192,7 @@ async function runCodeBuddyQuery(
   graphifyRequired: boolean,
 ): Promise<CodeBuddyQueryResult> {
   const graphifyUsedRef = { value: false };
+  let missionActionReviewed = false;
 
   const queryOptions = {
     model,
@@ -206,6 +208,12 @@ async function runCodeBuddyQuery(
       input.systemPrompt,
       graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
       workflowInstruction,
+      ...(input.responseSchema
+        ? [
+            '输出必须是严格合法的 JSON，且必须符合下面的 JSON Schema；不要输出 Markdown 代码围栏或额外说明。',
+            JSON.stringify(z.toJSONSchema(input.responseSchema)),
+          ]
+        : []),
     ].filter(Boolean).join('\n\n'),
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(input.sessionId ? { resume: input.sessionId } : {}),
@@ -263,7 +271,11 @@ async function runCodeBuddyQuery(
         };
       }
 
-      if (input.missionActionGate && !['AskUserQuestion', 'Skill'].includes(toolName)) {
+      if (
+        input.missionActionGate
+        && !missionActionReviewed
+        && !['AskUserQuestion', 'Skill'].includes(toolName)
+      ) {
         const review = await input.missionActionGate({
           execution,
           toolName,
@@ -275,6 +287,7 @@ async function runCodeBuddyQuery(
             message: review.reason,
           };
         }
+        missionActionReviewed = true;
       }
 
       return {
