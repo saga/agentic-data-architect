@@ -192,6 +192,13 @@ export const GRAPHIFY_SELECTION_INSTRUCTION = [
 ].join('\n');
 
 /** 判断一次工具调用是否已经使用 Graphify；兼容 Copilot MCP 字段和规范化工具名。 */
+const STRUCTURAL_PROMPT_PATTERN =
+  /(调用链|调用关系|依赖关系|依赖图|上下游|数据流|血缘|路径|结构枢纽|结构节点|子系统|组件关系|模块关系|连接关系|从哪里来|被谁调用|call\\s*graph|dependenc(?:y|ies)\\s*(graph|chain)?|upstream|downstream|lineage|data\\s*flow|shortest\\s*path|subsystem|hub|module\\s+relationship|component\\s+relationship)/iu;
+
+export function requiresGraphifyFirst(prompt: string): boolean {
+  return STRUCTURAL_PROMPT_PATTERN.test(prompt);
+}
+
 export function isGraphifyTool(input: {
   toolName?: unknown;
   mcpServerName?: unknown;
