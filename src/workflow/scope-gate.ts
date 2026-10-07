@@ -8,6 +8,7 @@
  * 3. 已保存的 ScopeValidation 仍然与当前字段一致，并且来源可以追溯到用户或真实 Evidence。
  */
 import { loadInvestigation, saveInvestigation, type Investigation } from '../investigation/store.js';
+import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import type { AgentIntake } from '../investigation/schemas.js';
 
 export interface ScopeGateCheck {
@@ -106,7 +107,7 @@ export function evaluateInvestigationScopeGate(
     '已确认内容与当前范围一致',
     snapshotMatches,
     validation
-      ? '确认时保存的目标、范围、系统与当前值' + (snapshotMatches ? '一致。' : '不一致，需要重新确认。')
+      ? '确认时保存的目标、范围、系统和 Scope identity 与当前值' + (snapshotMatches ? '一致。' : '不一致，需要重新确认。')
       : '没有可比较的确认记录。',
   );
 
@@ -219,6 +220,7 @@ export async function persistAgentIntake(
     source,
     userConfirmed: intake.userConfirmed,
     evidenceIds,
+    scopeFingerprint: computeScopeFingerprint({ scope, systems }),
     validatedAt: new Date().toISOString(),
   };
   await saveInvestigation(inv);
@@ -243,6 +245,7 @@ export function createUserScopeValidation(
     source: 'user' as const,
     userConfirmed: true,
     evidenceIds: [],
+    scopeFingerprint: computeScopeFingerprint({ scope: cleanScope, systems: cleanSystems }),
     validatedAt: new Date().toISOString(),
   };
 }
