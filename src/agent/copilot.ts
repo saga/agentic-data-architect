@@ -138,7 +138,7 @@ export interface AskInput {
     premiumRequestCost?: number;
     details?: Record<string, unknown>;
   }) => void;
-  /** When provided, the same resumable Copilot session is reused across turns/processes. */
+  /** When provided, the same resumable Agent session is reused only for the same Runtime/model. */
   sessionId?: string;
   workingDirectory?: string;
   /** 当前 Investigation 首选 Runtime；未指定时由 runtime 层按模型引用或全局默认推断。 */
