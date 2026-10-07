@@ -6,7 +6,7 @@
 
 ### 1. 你给的这个岗位到底在做什么
 
-[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210793254?utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 这个岗位最值得注意的不是传统的 OLTP/OLAP 建模，而是 JD 明确写了：
 
@@ -103,7 +103,7 @@
 
 例如：
 
-[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210777306?utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 这个岗位要求直接做：
 
@@ -168,7 +168,7 @@ Action
 
 这个岗位尤其值得看：
 
-[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791991/?location=New+York%25252525252525252C+United+States&locationId=300000020657200&locationLevel=state&mode=location&utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 它负责的是 **Agent Builder Platform**。
 
@@ -197,11 +197,11 @@ JD 里面直接要求：
 
 例如 另一家大型企业 最近的：
 
-[某大型企业公开岗位说明](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer-vice-president/287/100430300208?utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 以及：
 
-[某大型企业公开岗位说明](https://jobs.citi.com/job/irving/lead-agentic-ai-engineer/287/100779011472?utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 JD 中出现了非常明显的一套技术栈：
 
@@ -250,7 +250,7 @@ Business Workflow
 
 某大型企业 最近还有：
 
-[某大型企业公开岗位说明](https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210791476?utm_source=chatgpt.com)
+**某大型企业公开岗位说明**
 
 这类岗位不一定天天写 Agent，而是：
 
