@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { WorkflowRunEvent } from '../web/src/components/journey-map-types.js';
 import { replayExecutionAt, replayEventLabel } from '../web/src/components/journey-map-replay.js';
 
 const definition = { id: 'workflow-1', start: 'discover' };
-const events = [
+const events: WorkflowRunEvent[] = [
   {
     id: 'e1',
     runId: 'run-1',
@@ -64,10 +65,10 @@ const events = [
     type: 'workflow-completed',
     timestamp: '2026-10-07T04:00:05.000Z',
   },
-] as const;
+];
 
 test('replayExecutionAt reconstructs workflow state from recorded events', () => {
-  assert.deepEqual(replayExecutionAt(definition, events as never[], 0), {
+  assert.deepEqual(replayExecutionAt(definition, events, 0), {
     workflowId: 'workflow-1',
     workflowVersion: 0,
     runId: 'run-1',
@@ -90,8 +91,8 @@ test('replayExecutionAt reconstructs workflow state from recorded events', () =>
 });
 
 test('replayEventLabel uses human-readable runtime events', () => {
-  assert.equal(replayEventLabel(events[0] as never), '开始执行');
-  assert.equal(replayEventLabel(events[2] as never), '完成步骤');
-  assert.equal(replayEventLabel(events[4] as never), '等待人工');
-  assert.equal(replayEventLabel(events[5] as never), '执行完成');
+  assert.equal(replayEventLabel(events[0]), '开始执行');
+  assert.equal(replayEventLabel(events[2]), '完成步骤');
+  assert.equal(replayEventLabel(events[4]), '等待人工');
+  assert.equal(replayEventLabel(events[5]), '执行完成');
 });
