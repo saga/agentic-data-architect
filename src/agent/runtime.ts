@@ -171,9 +171,10 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
     let model: string;
     try {
       model = await resolveModelForRuntime(runtime, input.model);
-    } catch {
-      // Resolution failure for a fallback runtime should not obscure a later runtime.
-      if (runtime === selectedRuntime) throw;
+    } catch (error) {
+      // Resolution failure for the selected runtime must surface; a fallback runtime
+      // may be unavailable and can simply be skipped.
+      if (runtime === selectedRuntime) throw error;
       continue;
     }
     attempts.push({ runtime, model });
