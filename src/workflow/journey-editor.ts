@@ -288,7 +288,7 @@ async function loadCustomActive(
     );
   }
   if (parsed.definition.id !== workflowId) {
-    throw new Error('自定义 Workflow id 必须与当前工作方式一致：' + workflowId);
+    throw new Error('自定义工作方式的标识必须和当前选择保持一致：' + workflowId);
   }
 
   const rawLayout = await readJson<unknown>(journeyFile(name, LAYOUT_FILE));
@@ -943,7 +943,7 @@ export async function applyAgentWorkflowTransition(
           .map((item) => item.name + '：' + item.detail)
           .join('；');
         throw new Error(
-          'Workflow Gate 未通过，当前阶段不能完成。'
+          '这一阶段还不能完成，请先补齐当前步骤要求的结果。'
           + (failed ? ' ' + failed : ''),
         );
       }
