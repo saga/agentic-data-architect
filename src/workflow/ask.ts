@@ -3,6 +3,7 @@
  *
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
+import { randomUUID } from 'node:crypto';
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { askAgentWithFallback } from '../agent/runtime.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
@@ -91,7 +92,7 @@ export async function answerQuestion(
     selectedGuidance?: string;
     onReasoningDelta?: (delta: string) => void;
     /** 阶段小结完成后立即推送给主聊天区。 */
-    onCheckpoint?: (checkpoint: AgentCheckpoint & { turnId: string; execution: number; createdAt: string }) => void;
+    onCheckpoint?: (checkpoint: AgentCheckpoint & { id: string; turnId: string; timestamp: string; execution: number }) => void;
     /** 长任务中偶尔显示给用户的 Soul 陪伴性提示，不写入持久化对话。 */
     onCompanionNote?: (note: string) => void;
   },
@@ -653,23 +654,32 @@ export async function answerQuestion(
         // 只有 Script Gate 通过，才能生成 checkpoint。Agent 返回的 checkpoint 字段不参与决定。
         if (gate.passed) {
           const checkpoint = buildStageCheckpoint(stageGateInput, gate);
-          const createdAt = new Date().toISOString();
+          // SSE 和 trajectory 共用同一份 checkpoint 事件体：id/timestamp 在这里生成一次，
+          // 两边看到的是同一条记录。字段必须贴着 TrajectoryCheckpointSchema，
+          // 多一个（createdAt/gatePassed）少一个（id/timestamp）都会被 strict schema 拦下。
+          // gate 通过本身就是 gatePassed=true，不需要再写一个冗余字段。
+          const checkpointEvent = {
+            id: randomUUID(),
+            turnId,
+            timestamp: new Date().toISOString(),
+            execution,
+            ...checkpoint,
+          };
           recordTrajectory({
             type: 'checkpoint',
             name: '阶段小结：' + checkpoint.title,
             status: 'completed',
             details: {
-              execution,
-              gatePassed: true,
-              ...checkpoint,
+              execution: checkpointEvent.execution,
+              title: checkpointEvent.title,
+              summary: checkpointEvent.summary,
+              confirmed: checkpointEvent.confirmed,
+              evidenceIds: checkpointEvent.evidenceIds,
+              unknowns: checkpointEvent.unknowns,
+              ...(checkpointEvent.nextStep !== undefined ? { nextStep: checkpointEvent.nextStep } : {}),
             },
           });
-          options?.onCheckpoint?.({
-            ...checkpoint,
-            turnId,
-            execution,
-            createdAt,
-          });
+          options?.onCheckpoint?.(checkpointEvent);
           emitStatus('阶段小结：' + checkpoint.title);
           requestCompanionNote('阶段成果已经形成，接下来继续把剩余问题处理干净。');
         }
