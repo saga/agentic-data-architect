@@ -44,32 +44,6 @@ export interface ParsedJourney {
  * 这些字段属于应用状态，而不是 Markdown DSL。Workflow 只保存 completeWhen 的名字，
  * 这里才决定这个名字如何映射到真实事实。这样增加业务事实时，不需要继续增加 DSL 字段。
  */
-export interface ModernizationDerivedFacts {
-  targetComponentCount: number;
-  mappingCount: number;
-  validationCount: number;
-  blockingValidationReady: number;
-  blockingValidationTotal: number;
-}
-
-/** Modernization 相关完成语义的唯一确定性解释器。 */
-export function deriveModernizationFacts(input: {
-  targetStatus: string;
-  targetComponentCount: number;
-  mappingStatuses: string[];
-  validationStatuses: Array<{ status: string; blocking: boolean }>;
-}): ModernizationDerivedFacts {
-  return {
-    targetComponentCount: input.targetStatus === 'draft' ? 0 : input.targetComponentCount,
-    mappingCount: input.mappingStatuses.filter((status) => status === 'reviewed' || status === 'approved').length,
-    validationCount: input.validationStatuses.length,
-    blockingValidationReady: input.validationStatuses.filter(
-      (item) => item.blocking && item.status === 'passed',
-    ).length,
-    blockingValidationTotal: input.validationStatuses.filter((item) => item.blocking).length,
-  };
-}
-
 export interface JourneyFacts {
   /** 用户明确给出的本次调查目标；为空时通常不能自动完成 intake。 */
   goal: string;
@@ -91,14 +65,17 @@ export interface JourneyFacts {
   unknowns: string[];
   /** 高严重度缺口类型，用来阻止关键调查阶段过早通过。 */
   highGapKinds: string[];
+  targetStatus?: string;
   targetComponentCount: number;
-  mappingCount: number;
-  blockingValidationReady: number;
+  mappingStatuses: string[];
+  validationStatuses: Array<{ status: string; blocking: boolean }>;
   estateColumnCount?: number;
   sourceOfTruthCandidateCount?: number;
   lineageEdgeCount?: number;
   assessmentPlanExists?: boolean;
-  blockingValidationTotal: number;
+  assessmentFindingCount?: number;
+  assessmentRecommendationCount?: number;
+  assessmentRoadmapCount?: number;
 }
 
 export type JourneyRoute = SharedJourneyRoute;
