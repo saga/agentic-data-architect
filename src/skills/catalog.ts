@@ -56,7 +56,7 @@ function unquote(value: string): string {
 export function parseSkillManifest(markdown: string, filePath = 'SKILL.md'): SkillManifest {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown);
   if (!match) {
-    throw new Error(filePath + ' 缺少有效的 frontmatter（--- ... ---）。');
+    throw new Error(filePath + ' 缺少有效的文件头（--- ... ---）。请检查 Skill 文件格式。');
   }
 
   const lines = (match[1] ?? '').split(/\r?\n/);
