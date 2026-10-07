@@ -156,6 +156,14 @@ export async function runReport(
   const snapshot = source.snapshot;
   assertMissionGate(investigation.mission);
   assertInvestigationArtifactSourceScope(source);
+  const modernizationResult = source.investigation.workflow === 'legacy-modernization'
+    ? await readModernizationArtifact(name, source)
+    : { status: 'blocked' as const, plan: null };
+  const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
+  const assessmentResult = source.investigation.workflow === 'data-architecture-assessment'
+    ? await readArchitectureAssessmentArtifact(name)
+    : { status: 'blocked' as const, plan: null };
+  const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
   await assertInvestigationReportGate(name, {
     investigation: {
       ...source.investigation,
@@ -167,14 +175,7 @@ export async function runReport(
     },
     snapshot: source.snapshot,
   });
-  const modernizationResult = source.investigation.workflow === 'legacy-modernization'
-    ? await readModernizationArtifact(name, source)
-    : { status: 'blocked' as const, plan: null };
-  const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
-  const assessmentResult = source.investigation.workflow === 'data-architecture-assessment'
-    ? await readArchitectureAssessmentArtifact(name)
-    : { status: 'blocked' as const, plan: null };
-  const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
+
   const existingRaw = await readOptional(reportMetadataFile(name));
   let nextVersion = 1;
   if (existingRaw) {
