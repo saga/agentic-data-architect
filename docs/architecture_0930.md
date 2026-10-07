@@ -260,7 +260,7 @@ Data Architecture Assessment
     → 排出实施顺序
 ~~~
 
-三条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；必要时给出 0～3 个下一步候选。用户点击候选后，前端发送结构化 routeId，服务端从当前候选中解析并执行；也可以完全忽略候选，直接输入自己的问题。
+四条 Workflow 都只固定“大阶段”。Workflow 更像导航地图，而不是唯一道路：Agent 在阶段内部自由调查、使用工具和反复验证；必要时给出 0～3 个下一步候选。用户点击候选后，前端发送结构化 routeId，服务端从当前候选中解析并执行；也可以完全忽略候选，直接输入自己的问题。
 
 当前 UI 不提供首页上的普通 Workflow 下拉切换。工作方式属于 Investigation 的重要持久化状态：只有在“调查配置 → 工作方式”的明确调整区选择目标、输入确认语句后才执行切换。这样可以保持工作方式灵活，但避免一次误点击就改变本次调查的导航语义。
 
@@ -273,7 +273,7 @@ Financial AI-Native Architecture 的 Skill 重点覆盖：
 - LangSmith tracing / evaluation
 - point-in-time research、Evidence 和 deterministic validation
 
-不要把三条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
+不要把四条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
 
 ## Data Architecture Assessment Workflow
 
@@ -399,7 +399,7 @@ UI 通过独立的 `/investigations/:name/trajectory` 页面查看完整调查�
 
 ### Memory
 
-`agentic-data-architect` 已经把 transcript、Investigation state、discovery/artifacts 和 Copilot session 分开保存；但目前没有独立的 application-owned archive summary 和统一 cursor pagination。
+`agentic-data-architect` 已经把 transcript、Investigation state、discovery/artifacts 和 Agent session 分开保存；但目前没有独立的 application-owned archive summary 和统一 cursor pagination。
 
 这不是“没有保存历史”，而是“还没有把长期历史整理成稳定的 Agent Memory 层”。完整 transcript 应永久保留；Archive 只是对旧记录的压缩导航，不能替代原始记录。
 
@@ -2887,9 +2887,9 @@ Agent Turn
 - Skill 中的内置 SKILL.md 不被 UI 直接修改。
 - 用户修改当前 Investigation 时，创建 Investigation 级自定义 Workflow。X6 只编辑这份 Investigation 草稿，不修改内置 Skill。
 - Markdown 保存流程语义，X6 canvas layout 单独保存，execution 单独保存。
-- Apply 前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
+- 保存前必须经过服务端 Schema、Graph 和 Runtime 语义验证。
 - Agent 只能从当前节点选择已经存在的 outcome，不能自己发明 Workflow 分支。
-- Workflow version 改变后清除 Copilot session，避免继续使用旧的流程上下文。
+- Workflow version 改变后清除 Agent session，避免继续使用旧的流程上下文。
 
 ### V1.7 Workflow DSL 收敛
 
