@@ -29,7 +29,7 @@ function controlFile(name: string): string {
 
 /** Global configuration lives outside any Investigation, so it follows the installation rather than a task. */
 function globalConfigFile(): string {
-  return path.join(config.legacyDataDir, 'global-config.json');
+  return path.join(config.dataDir, 'global-config.json');
 }
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
