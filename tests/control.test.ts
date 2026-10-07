@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
-import { toCopilotMcpServers, type InvestigationControl } from '../src/investigation/control.js';
+import { AuditDataError, readAuditEvents, toCopilotMcpServers, type InvestigationControl } from '../src/investigation/control.js';
 
 function control(): InvestigationControl {
   return {
@@ -61,6 +61,29 @@ test('disabled MCP servers are not exposed to Copilot', () => {
   assert.deepEqual(toCopilotMcpServers(current), {});
 });
 
+
+test('malformed audit records are surfaced instead of treated as missing', async () => {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const config = await import('../src/config.js');
+  const workspace = path.join(config.config.workspaceDir, 'control-audit-test');
+  await fs.mkdir(workspace, { recursive: true });
+  await fs.writeFile(
+    path.join(workspace, 'audit.jsonl'),
+    JSON.stringify({
+      id: 'audit-1',
+      timestamp: new Date().toISOString(),
+      actor: 'system',
+      action: 'test',
+      summary: 'valid',
+    }) + '\n' + '{this is not valid json}\n',
+    'utf8',
+  );
+  await assert.rejects(
+    () => readAuditEvents('control-audit-test', 10),
+    (error: unknown) => error instanceof AuditDataError,
+  );
+});
 
 test('Investigation control schema rejects invalid MCP settings', async () => {
   const { InvestigationControlSchema } = await import('../src/investigation/schemas.js');
