@@ -7,8 +7,8 @@
 
 当前工作台需要同时支持三种本机 Agent execution 方式：
 
-1. CodeBuddy Agent SDK
-2. GitHub Copilot SDK
+1. GitHub Copilot SDK
+2. CodeBuddy Agent SDK
 3. OpenCode run headless CLI
 
 它们的 provider、认证、session 和工具实现不同，但 Investigation 不应该知道这些 runtime 的内部细节。尤其在某个 runtime 的 quota/usage 被耗尽时，用户不应该因为 provider 限额而重新手工选择。
@@ -19,8 +19,8 @@
 
 `InvestigationControl.agent.runtime` 保存本次 Investigation 的首选 Runtime：
 
-- `codebuddy-sdk`
 - `copilot-sdk`
+- `codebuddy-sdk`
 - `opencode-run`
 
 Runtime 与 `agent.model` 分开。Model 不再隐含 Runtime；旧的 `codebuddy:` / `opencode:` model 引用仅用于兼容已有模型选择与 UI 展示。
