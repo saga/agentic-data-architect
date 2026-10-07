@@ -129,8 +129,20 @@ export async function ensureGraphifyGraph(
       maxBuffer: 8 * 1024 * 1024,
     });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error('Graphify ' + action + ' 没有成功完成：' + detail);
+    const value = error && typeof error === 'object'
+      ? error as { message?: unknown; stdout?: unknown; stderr?: unknown }
+      : undefined;
+    const detail = value?.message && typeof value.message === 'string'
+      ? value.message
+      : String(error);
+    const commandOutput = [
+      typeof value?.stdout === 'string' ? value.stdout.trim() : '',
+      typeof value?.stderr === 'string' ? value.stderr.trim() : '',
+    ].filter(Boolean).join('\\n');
+    throw new Error(
+      'Graphify ' + action + ' 没有成功完成：' + detail
+      + (commandOutput ? '\\nGraphify 输出：\\n' + commandOutput.slice(-3000) : ''),
+    );
   }
 
   const metadata = await getGraphifyRuntimeMetadata(workingDirectory);
@@ -138,6 +150,36 @@ export async function ensureGraphifyGraph(
     throw new Error('Graphify 已执行，但没有生成可以查询的结构图。请检查 Graphify 输出。');
   }
   return metadata;
+}
+
+/**
+ * 尝试准备当前 Investigation 的结构图。
+ *
+ * Graphify 是可选能力：命令存在但本轮建图失败时，不能让整个 Agent turn 失败；
+ * Runtime 会改用常规源码工具继续调查，并把这次降级记录到轨迹。
+ */
+export async function tryEnsureGraphifyGraph(
+  workingDirectory: string,
+  refresh = false,
+): Promise<{
+  available: boolean;
+  metadata: GraphifyRunMetadata;
+  error?: string;
+}> {
+  try {
+    const metadata = await ensureGraphifyGraph(workingDirectory, refresh);
+    return {
+      available: metadata.status === 'available' && Boolean(metadata.graphHash),
+      metadata,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      available: false,
+      metadata: await getGraphifyRuntimeMetadata(workingDirectory),
+      error: detail,
+    };
+  }
 }
 
 /** 给 Agent 的结构分析选择规则；具体工具名仍由 Copilot/OpenCode 的 MCP 层提供。 */
@@ -265,7 +307,7 @@ export async function getGraphifyRuntimeMetadata(workingDirectory: string): Prom
   const packageVersion = graphifyPackageVersion(command);
   return {
     enabled: true,
-    status: 'available',
+    status: hash ? 'available' : 'missing',
     command,
     ...(packageVersion ? { packageVersion } : {}),
     graphPath,
