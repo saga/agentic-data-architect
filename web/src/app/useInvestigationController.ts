@@ -496,7 +496,16 @@ export function useInvestigationController() {
 
   /** 把当前对话复制成可直接留档的文本；每条消息都带说话人和时间，避免导出后分不清是谁说的。 */
   const modelOptions = useMemo(() => {
-    const values = [...availableModels];
+    const runtime = current?.control.agent.runtime;
+    const scoped = availableModels.filter((item) => {
+      if (!runtime) return true;
+      if (runtime === 'codebuddy-sdk') return item.runtime === 'codebuddy' || item.id.startsWith('codebuddy:');
+      if (runtime === 'opencode-run') return item.runtime === 'opencode' || item.id.startsWith('opencode:');
+      return item.runtime !== 'codebuddy' && item.runtime !== 'opencode'
+        && !item.id.startsWith('codebuddy:')
+        && !item.id.startsWith('opencode:');
+    });
+    const values = [...scoped];
     if (current?.control.agent.model && !values.some((item) => item.id === current.control.agent.model)) {
       values.unshift({
         id: current.control.agent.model,
@@ -507,7 +516,7 @@ export function useInvestigationController() {
       });
     }
     return values.sort((a, b) => a.id === 'auto' ? -1 : b.id === 'auto' ? 1 : a.name.localeCompare(b.name));
-  }, [availableModels, current?.control.agent.model]);
+  }, [availableModels, current?.control.agent.model, current?.control.agent.runtime]);
 
   const updateModelSettings = async (model: string, autoTier: AutoTier | null) => {
     if (!active || !current || modelSaving || loading) return;
