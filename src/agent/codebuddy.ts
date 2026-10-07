@@ -23,6 +23,7 @@ import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../w
 import { requestAgentUserInput } from './user-input-bridge.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import type { AskInput } from './ask-input.js';
+import { appendAuditEvent } from '../investigation/control.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
 
@@ -621,6 +622,27 @@ export async function askCodeBuddy(
       }
     } else {
       graphifyEnabled = false;
+      console.warn('[codebuddy] Graphify preparation failed; falling back to source tools.', {
+        investigationName: input.investigationName,
+        turnId: input.turnId,
+        error: graphifyPreparation.error,
+      });
+      if (input.investigationName) {
+        void appendAuditEvent(input.investigationName, {
+          actor: 'system',
+          action: 'agent.graphify.preparation_failed',
+          summary: 'Graphify 准备失败，CodeBuddy 已降级到源码工具。',
+          details: {
+            turnId: input.turnId,
+            ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
+          },
+        }).catch((auditError) => {
+          console.error('[codebuddy] Failed to persist Graphify preparation failure audit.', {
+            investigationName: input.investigationName,
+            error: auditError,
+          });
+        });
+      }
       input.onStatus?.(
         '结构分析工具这次没有生成可用结果，助手改用源码工具继续调查。'
         + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
