@@ -73,7 +73,6 @@ test('OpenCode registers the platform Graphify MCP in the current workspace', as
         type: 'local',
         command: [
           '/opt/graphify-mcp',
-          '--graph',
           '/tmp/session/graphify-out/graph.json',
         ],
         cwd: '/tmp/session',
