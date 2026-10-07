@@ -98,6 +98,7 @@ test('material-backed scope passes only with known evidence', () => {
     source: 'materials' as const,
     userConfirmed: false,
     evidenceIds: ['ev-001'],
+    scopeFingerprint: createUserScopeValidation('替换老的投票工作流', ['Proxy Voting'], ['ISS Portal'])?.scopeFingerprint,
     validatedAt: new Date().toISOString(),
   };
 
