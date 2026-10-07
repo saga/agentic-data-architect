@@ -25,7 +25,6 @@ export function InvestigationPageRouter({ controller }: { controller: Investigat
             sessionName={active}
             control={current.control}
             globalConfiguration={globalConfiguration}
-            onGlobalSaved={() => loadSession(active)}
             onUpdateGlobalConfiguration={updateGlobalConfiguration}
             workflow={current.context.workflow ?? ''}
             onBack={() => navigatePage('chat')}
