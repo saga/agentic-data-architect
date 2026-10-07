@@ -466,13 +466,30 @@ async function runCodeBuddyQuery(
               ? resultRecord.error
               : undefined;
             if (toolFailed) {
-              console.error('[codebuddy] Tool execution failed.', {
-                investigationName: input.investigationName,
+              const toolFailureDetails = {
                 turnId: input.turnId,
                 execution,
                 tool: toolName,
-                error: toolError,
+                ...(toolError ? { error: toolError } : {}),
+              };
+              console.error('[codebuddy] Tool execution failed.', {
+                investigationName: input.investigationName,
+                ...toolFailureDetails,
               });
+              if (input.investigationName) {
+                void appendAuditEvent(input.investigationName, {
+                  actor: 'system',
+                  action: 'agent.tool.failed',
+                  summary: 'CodeBuddy 工具调用失败。',
+                  details: toolFailureDetails,
+                }).catch((auditError) => {
+                  console.error('[codebuddy] Failed to persist tool failure audit.', {
+                    investigationName: input.investigationName,
+                    tool: toolName,
+                    error: auditError,
+                  });
+                });
+              }
             }
             input.onTrajectory?.({
               type: 'tool_result',
