@@ -92,3 +92,39 @@ export async function createRunRecorder(name: string, metadata: Record<string, u
     },
   };
 }
+
+
+const reasoningWriteChains = new Map<string, Promise<void>>();
+
+export function appendReasoningLog(
+  name: string,
+  turnId: string,
+  delta: string,
+): void {
+  const value = delta.trim();
+  if (!value) return;
+  const key = name + ':' + turnId;
+  const previous = reasoningWriteChains.get(key) ?? Promise.resolve();
+  const file = path.join(workspaceRoot(name), 'runs', 'reasoning.jsonl');
+  const record = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    turnId,
+    delta,
+  }) + '\n';
+  const next = previous
+    .then(async () => {
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      await fs.appendFile(file, record, 'utf8');
+    })
+    .catch((error) => {
+      console.error('[reasoning-log] Failed to persist reasoning delta', {
+        sessionName: name,
+        turnId,
+        error,
+      });
+    })
+    .finally(() => {
+      if (reasoningWriteChains.get(key) === next) reasoningWriteChains.delete(key);
+    });
+  reasoningWriteChains.set(key, next);
+}
