@@ -9,7 +9,8 @@
  * Graphify 本身是 Python 工具，因此这里不引入其内部实现或 Python API。
  * 运行时只依赖它提供的 graphify-mcp CLI。
  */
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +19,9 @@ import type { GraphifyRunMetadata } from '../evidence/types.js';
 export type { GraphifyRunMetadata } from '../evidence/types.js';
 
 export const GRAPHIFY_MCP_NAME = 'graphify-structural-analysis';
+const execFileAsync = promisify(execFile);
+
+const GRAPHIFY_CLI_TIMEOUT_MS = 120_000;
 
 export interface GraphifyMcpServer {
   name: typeof GRAPHIFY_MCP_NAME;
@@ -67,6 +71,100 @@ export function prepareGraphifyEnvironment(): string | undefined {
 }
 
 /** 找到 Graphify MCP executable；显式配置优先，没有则寻找项目 .venv / PATH。 */
+/** 找到和 graphify-mcp 属于同一 Python 环境的 Graphify CLI。 */
+export function resolveGraphifyCliCommand(): string | undefined {
+  if (!config.graphifyEnabled) return undefined;
+
+  const mcp = resolveGraphifyMcpCommand();
+  if (mcp) {
+    const candidate = path.join(
+      path.dirname(mcp),
+      process.platform === 'win32' ? 'graphify.exe' : 'graphify',
+    );
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  return commandExists('graphify') ? 'graphify' : undefined;
+}
+
+/**
+ * 确保当前 Investigation 的 structural graph 真正存在。
+ *
+ * 第一次使用时生成 graph；Discovery 需要刷新时调用 refresh=true。
+ * 这里直接执行 Graphify CLI，而不是只记录“Graphify 可用”，这样后续 MCP 查询有真实图可读。
+ */
+export async function ensureGraphifyGraph(
+  workingDirectory: string,
+  refresh = false,
+): Promise<GraphifyRunMetadata> {
+  const capturedAt = new Date().toISOString();
+  if (!config.graphifyEnabled) {
+    return { enabled: false, status: 'disabled', capturedAt };
+  }
+
+  prepareGraphifyEnvironment();
+  const cli = resolveGraphifyCliCommand();
+  if (!cli) {
+    throw new Error(
+      'Graphify 已启用，但本机没有找到 Graphify。请先执行 uv sync；如果这次调查不需要结构分析，再关闭 GRAPHIFY_ENABLED。',
+    );
+  }
+
+  const graphPath = graphifyGraphPath(workingDirectory);
+  const graphExists = await fs.access(graphPath).then(() => true).catch(() => false);
+  if (!refresh && graphExists) return getGraphifyRuntimeMetadata(workingDirectory);
+
+  const action = graphExists ? 'update' : 'extract';
+  const args = graphExists
+    ? ['update', path.resolve(workingDirectory), '--no-viz']
+    : ['extract', path.resolve(workingDirectory), '--code-only', '--no-viz'];
+
+  try {
+    await execFileAsync(cli, args, {
+      cwd: path.resolve(workingDirectory),
+      env: process.env,
+      timeout: GRAPHIFY_CLI_TIMEOUT_MS,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error('Graphify ' + action + ' 没有成功完成：' + detail);
+  }
+
+  const metadata = await getGraphifyRuntimeMetadata(workingDirectory);
+  if (metadata.status !== 'available' || !metadata.graphHash) {
+    throw new Error('Graphify 已执行，但没有生成可以查询的结构图。请检查 Graphify 输出。');
+  }
+  return metadata;
+}
+
+/** 给 Agent 的结构分析选择规则；具体工具名仍由 Copilot/OpenCode 的 MCP 层提供。 */
+export const GRAPHIFY_SELECTION_INSTRUCTION = [
+  '当前代码库已经准备好 Graphify 结构分析能力。',
+  '遇到调用链、依赖关系、上下游、路径、结构枢纽、子系统边界或代码/SQL 对象关系问题时，先使用 Graphify，再用源码工具核对原始内容。',
+  '不要用 grep/find/view/bash 反复模拟 Graphify 能直接回答的结构关系。',
+  '精确字符串、文件发现、Git diff 和已知文件读取仍直接使用常规工具。',
+  'Graphify 只提供结构导航；正式结论必须回到源码、SQL、metadata 或 Evidence。',
+].join('\n');
+
+/** 判断一次工具调用是否已经使用 Graphify；兼容 Copilot MCP 字段和规范化工具名。 */
+export function isGraphifyTool(input: {
+  toolName?: unknown;
+  mcpServerName?: unknown;
+  mcpToolName?: unknown;
+}): boolean {
+  const values = [input.toolName, input.mcpServerName, input.mcpToolName]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.toLowerCase());
+  return values.some((value) =>
+    value === GRAPHIFY_MCP_NAME
+    || value.startsWith(GRAPHIFY_MCP_NAME + '_')
+    || value.startsWith(GRAPHIFY_MCP_NAME + '.')
+    || value === 'graphify'
+    || value.startsWith('graphify_'),
+  );
+}
+
 /** 当 Graphify 已启用时要求 MCP executable 必须存在；避免服务“正常启动但能力其实失效”。 */
 export function requireGraphifyMcpCommand(): string {
   const command = resolveGraphifyMcpCommand();
