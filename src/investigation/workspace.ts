@@ -54,6 +54,7 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
 }
 
 const contextWriteLocks = new Map<string, Promise<void>>();
+const workspaceInitializationLocks = new Map<string, Promise<void>>();
 const sharedIndexWriteLocks = new Map<string, Promise<void>>();
 const contextLockOwners = new AsyncLocalStorage<Set<string>>();
 const sharedIndexLockOwners = new AsyncLocalStorage<boolean>();
@@ -192,54 +193,72 @@ export async function ensureWorkspace(name: string, seed: WorkspaceSeed = {}): P
     ),
   ]);
 
-  // Creation of the shared index is serialized with later read-modify-write updates,
-  // so the first uploaded/shared artifact cannot be lost by a concurrent initializer.
+  // Shared index 有独立的全局锁；这里不能和单个 Investigation 的 context lock 混用，
+  // 否则两个 Session 同时首次启动时会出现跨资源的锁依赖。
   await ensureSharedIndex();
 
-  const fp = contextFile(name);
+  // “目录存在”与“context.json 已存在”是两个不同状态。
+  // 多个 API/Tool 可能同时第一次访问同一 Investigation；如果这里不做二次串行化，
+  // 两个请求都会看到 ENOENT，然后后写入者会把先写入者的初始 seed 静默覆盖掉。
+  const previous = workspaceInitializationLocks.get(root) ?? Promise.resolve();
+  let release!: () => void;
+  const queued = previous.catch(() => undefined).then(
+    () => new Promise<void>((resolve) => { release = resolve; }),
+  );
+  workspaceInitializationLocks.set(root, queued);
+  await previous.catch(() => undefined);
+
   try {
-    await fs.access(fp);
-    return root;
-  } catch {
-    const now = new Date().toISOString();
-    const context: WorkspaceContext = {
-      schemaVersion: 3,
-      name,
-      userPrompt: seed.userPrompt ?? seed.goal ?? '',
-      workflow: seed.workflow ?? null,
-      // 创建 Investigation 时没有单独的 goal 输入，因此第一句任务描述就是 goal。
-      goal: seed.goal?.trim() || seed.userPrompt?.trim() || '',
-      scope: seed.scope ?? [],
-      systems: seed.systems ?? [],
-      questions: [],
-      discoveryRuns: [],
-      evidence: [],
-      claims: [],
-      findings: [],
-      unknowns: [],
-      importantInformation: [],
-      inputs: [],
-      updatedAt: now,
-    };
-    if (context.userPrompt || context.goal || context.scope.length || context.systems.length) {
-      context.inputs.push({
-        id: 'input-001',
-        kind: 'user_prompt',
-        capturedAt: now,
-        title: 'Session initialization',
-        content: JSON.stringify({
-          userPrompt: context.userPrompt,
-          goal: context.goal,
-          scope: context.scope,
-          systems: context.systems,
-        }, null, 2),
+    const fp = contextFile(name);
+    try {
+      await fs.access(fp);
+      return root;
+    } catch {
+      const now = new Date().toISOString();
+      const context: WorkspaceContext = {
+        schemaVersion: 3,
+        name,
+        userPrompt: seed.userPrompt ?? seed.goal ?? '',
+        workflow: seed.workflow ?? null,
+        // 创建 Investigation 时没有单独的 goal 输入，因此第一句任务描述就是 goal。
+        goal: seed.goal?.trim() || seed.userPrompt?.trim() || '',
+        scope: seed.scope ?? [],
+        systems: seed.systems ?? [],
+        questions: [],
+        discoveryRuns: [],
+        evidence: [],
+        claims: [],
+        findings: [],
+        unknowns: [],
+        importantInformation: [],
+        inputs: [],
+        updatedAt: now,
+      };
+      if (context.userPrompt || context.goal || context.scope.length || context.systems.length) {
+        context.inputs.push({
+          id: 'input-001',
+          kind: 'user_prompt',
+          capturedAt: now,
+          title: 'Session initialization',
+          content: JSON.stringify({
+            userPrompt: context.userPrompt,
+            goal: context.goal,
+            scope: context.scope,
+            systems: context.systems,
+          }, null, 2),
           important: true,
-      });
+        });
+      }
+      const validatedContext = WorkspaceContextSchema.parse(context);
+      await writeJsonAtomic(fp, validatedContext);
+      await fs.writeFile(transcriptFile(name), '# Investigation Session ' + name + '\n\n');
+      return root;
     }
-    const validatedContext = WorkspaceContextSchema.parse(context);
-    await writeJsonAtomic(fp, validatedContext);
-    await fs.writeFile(transcriptFile(name), '# Investigation Session ' + name + '\n\n');
-    return root;
+  } finally {
+    release();
+    if (workspaceInitializationLocks.get(root) === queued) {
+      workspaceInitializationLocks.delete(root);
+    }
   }
 }
 
