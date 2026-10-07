@@ -5,7 +5,7 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import { assertInvestigationArtifactSourceScope, captureInvestigationArtifactSource } from '../investigation/artifact-source.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
-import { writeJsonAtomic } from '../investigation/workspace.js';
+import { withWorkspaceContextLock, writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { assertMissionGate } from './mission-gate.js';
@@ -102,6 +102,7 @@ function dedupe(values: string[]): string[] { return [...new Set(values.filter(B
 
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
+  return withWorkspaceContextLock(name, async () => {
   const source = await captureInvestigationArtifactSource(name);
   const inv = source.investigation;
   const snapshot = source.snapshot;
@@ -134,10 +135,29 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 
   const recommendations = dedupe(findings.map((finding) => finding.recommendation));
   const highFindingIds = findings.filter((finding) => finding.severity === 'high').map((finding) => finding.id);
+  const foundationalFindingIds = findings
+    .filter((finding) => ['missing_lineage', 'semantic_conflict', 'data_quality_issue', 'identifier_fragmentation'].some((type) =>
+      inv.findings.find((item) => item.id === finding.id)?.type === type))
+    .map((finding) => finding.id);
   const roadmap = [
-    { id: 'assessment-roadmap:stabilize', title: '先处理高风险问题', objective: '先处理会阻塞业务、风险控制、数据可信度或后续架构工作的高风险问题。', findingIds: highFindingIds },
-    { id: 'assessment-roadmap:standardize', title: '再统一数据和治理基础', objective: '把关键定义、owner、数据质量、lineage、权限和接口规则整理成可以持续维护的机制。', findingIds: findings.map((finding) => finding.id).filter((id) => ['missing_lineage','semantic_conflict','data_quality_issue','identifier_fragmentation'].some((type) => inv.findings.find((item) => item.id === id)?.type === type)) },
-    { id: 'assessment-roadmap:target', title: '最后推进目标架构', objective: '在高风险问题和基础治理稳定后，再实施架构重构、平台替换或 AI/Data Product 能力。', findingIds: findings.map((finding) => finding.id) },
+    ...(highFindingIds.length ? [{
+      id: 'assessment-roadmap:stabilize',
+      title: '先处理高风险问题',
+      objective: '先处理会阻塞业务、风险控制或数据可信度的高风险问题。',
+      findingIds: highFindingIds,
+    }] : []),
+    ...(foundationalFindingIds.length ? [{
+      id: 'assessment-roadmap:foundation',
+      title: '再补基础能力',
+      objective: '统一关键定义、数据质量、lineage、权限和接口规则，让后续改进有稳定基础。',
+      findingIds: foundationalFindingIds,
+    }] : []),
+    ...(findings.length ? [{
+      id: 'assessment-roadmap:improve',
+      title: '按影响逐步改进',
+      objective: '按问题影响、依赖和实施难度逐项落地已经确认的改进建议，不预设必须更换目标架构。',
+      findingIds: findings.map((finding) => finding.id),
+    }] : []),
   ];
 
   const plan: ArchitectureAssessmentPlan = ArchitectureAssessmentPlanSchema.parse({
@@ -152,6 +172,7 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
   await fs.mkdir(reportsDir(name), { recursive: true });
   await writeJsonAtomic(outputPath, plan);
   return { plan, path: outputPath };
+  });
 }
 
 /** 读取评估 Artifact，并明确区分 missing / stale / current / error。 */
