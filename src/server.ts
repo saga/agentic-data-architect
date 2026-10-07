@@ -158,10 +158,10 @@ import {
   listPendingCopilotPermissions,
   listPendingCopilotUserInputs,
   respondToCopilotPermission,
-  respondToCopilotUserInput,
   stopClient,
 } from './agent/copilot.js';
 import { listOpenCodeModels, abortOpenCodeTurn } from './agent/opencode.js';
+import { listPendingAgentUserInputs, respondToAgentUserInput } from './agent/user-input-bridge.js';
 import {
   appendAuditEvent,
   AuditDataError,
@@ -652,7 +652,7 @@ app.post('/api/sessions', async (req, res) => {
       return;
     }
     const pendingPermissions = listPendingCopilotPermissions(name);
-    const pendingUserInputs = listPendingCopilotUserInputs(name);
+    const pendingUserInputs = listPendingAgentUserInputs(name);
     const state = active.phase === 'committing'
       ? 'committing'
       : pendingPermissions.length > 0
@@ -762,17 +762,17 @@ app.post('/api/sessions', async (req, res) => {
   /** 返回当前 Investigation 的 Agent 待回答问题。 */
   app.get('/api/sessions/:name/user-inputs', async (req, res) => {
     const name = sessionKey(req.params.name);
-    res.json(UserInputsResponseSchema.parse({ requests: listPendingCopilotUserInputs(name) }));
+    res.json(UserInputsResponseSchema.parse({ requests: listPendingAgentUserInputs(name) }));
   });
 
   /** 把用户回答交回 ask_user；Agent 会从等待的 Promise 继续执行。 */
   app.post('/api/sessions/:name/user-inputs/respond', async (req, res) => {
     const name = sessionKey(req.params.name);
     const body = parseRequest(UserInputResponseBodySchema, req.body);
-    const pending = listPendingCopilotUserInputs(name).find(
+    const pending = listPendingAgentUserInputs(name).find(
       (item) => item.turnId === body.turnId && item.requestId === body.requestId,
     );
-    const handled = respondToCopilotUserInput(name, body.turnId, body.requestId, body.answer, body.wasFreeform);
+    const handled = respondToAgentUserInput(name, body.turnId, body.requestId, body.answer, body.wasFreeform);
     if (!handled) {
       res.status(404).json(ApiErrorSchema.parse({
         code: 'USER_INPUT_NOT_FOUND',
