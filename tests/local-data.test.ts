@@ -20,6 +20,10 @@ test('local SQL only permits read-only single statements', () => {
     validateLocalReadOnlySql('select count(*) from raw.ds_demo'),
     'select count(*) from raw.ds_demo',
   );
+  assert.equal(
+    validateLocalReadOnlySql("SELECT a FROM raw.ds_demo WHERE name = 'Alice';"),
+    "SELECT a FROM raw.ds_demo WHERE name = 'Alice'",
+  );
   assert.throws(
     () => validateLocalReadOnlySql('delete from raw.ds_demo'),
     /只允许执行 SELECT 或 WITH|不允许/,
