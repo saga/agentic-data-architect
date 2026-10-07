@@ -83,6 +83,9 @@ export interface JourneyFacts {
     datasets: number;
     semanticAssets: number;
     parseFailures: number;
+    connectedDatasets?: number;
+    sqlFiles?: number;
+    sqlParsedStatements?: number;
   } | null;
   /** 当前仍未解决的未知项，主要供 Agent 和 UI 导航使用。 */
   unknowns: string[];
@@ -96,6 +99,10 @@ export interface JourneyFacts {
   lineageEdgeCount?: number;
   assessmentPlanExists?: boolean;
   blockingValidationTotal: number;
+  estateColumnCount?: number;
+  sourceOfTruthCandidateCount?: number;
+  lineageEdgeCount?: number;
+
 }
 
 export type JourneyRoute = SharedJourneyRoute;
@@ -309,11 +316,22 @@ export function isJourneyCompletionConditionSatisfied(
 }
 
 function conditionPassed(condition: string | undefined, facts: JourneyFacts): boolean {
+  const coverage = facts.currentState
+    ? {
+        sqlFiles: facts.currentState.sqlFiles ?? 0,
+        sqlParsedStatements: facts.currentState.sqlParsedStatements ?? 0,
+        sqlParseFailures: facts.currentState.parseFailures,
+        datasets: facts.currentState.datasets,
+        connectedDatasets: facts.currentState.connectedDatasets ?? 0,
+        semanticAssets: facts.currentState.semanticAssets,
+      }
+    : null;
   const derived = evaluateDerivedState({
-    currentState: facts.currentState,
+    goal: facts.goal,
+    currentState: coverage ? { coverage } : null,
     estateColumnCount: facts.estateColumnCount ?? 0,
     sourceOfTruthCandidateCount: facts.sourceOfTruthCandidateCount ?? 0,
-    lineageEdgeCount: facts.lineageEdgeCount ?? facts.currentState?.datasets ?? 0,
+    lineageEdgeCount: facts.lineageEdgeCount ?? 0,
     findingsCount: facts.findingCount ?? 0,
     scopeReady: facts.scopeReady === true,
     highGapKinds: facts.highGapKinds,
@@ -324,9 +342,9 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
       blockingValidationReady: facts.blockingValidationReady,
       blockingValidationTotal: facts.blockingValidationTotal,
     },
-    assessment: facts.assessmentPlanExists || facts.findingCount !== undefined
+    assessment: facts.assessmentPlanExists !== undefined
       ? {
-          exists: facts.assessmentPlanExists === true || facts.findingCount !== undefined,
+          exists: facts.assessmentPlanExists,
           findingsCount: facts.findingCount ?? 0,
           recommendationCount: facts.recommendationCount ?? 0,
           roadmapCount: facts.roadmapItemCount ?? 0,
