@@ -686,7 +686,10 @@ export async function askCodeBuddy(
               input.investigationName,
               input.workflowSkill,
               finalAnswer,
-              { persistModernizationResult: false },
+              {
+                persistModernizationResult: false,
+                ...(stageGate?.passed === true ? { stageValidationPassed: true } : {}),
+              },
             )
           : { applied: false, error: undefined, execution: undefined };
 
