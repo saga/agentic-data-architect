@@ -16,9 +16,9 @@ import { createUserScopeValidation } from './workflow/scope-gate.js';
 /** CLI init 命令：创建一个新的 Investigation，并解析最基础的 goal/scope/system 参数。 */
 async function cmdInit(args: string[]): Promise<void> {
   const [name, ...rest] = args;
-  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow legacy-modernization|financial-ai-native-architecture|data-architecture-assessment]');
+  if (!name) throw new Error('usage: init <name> [--prompt "..."] [--goal "..."] [--scope a,b] [--system s1,s2] [--workflow current-data-architecture|legacy-modernization|financial-ai-native-architecture|data-architecture-assessment]');
   let userPrompt = '';
-  let workflow: WorkflowId = 'legacy-modernization';
+  let workflow: WorkflowId = null;
   const inv = newInvestigation(name, userPrompt, workflow);
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--prompt') { userPrompt = rest[++i] ?? ''; inv.userPrompt = userPrompt; }
@@ -27,8 +27,8 @@ async function cmdInit(args: string[]): Promise<void> {
     if (rest[i] === '--system') inv.systems = (rest[++i] ?? '').split(',').filter(Boolean);
     if (rest[i] === '--workflow') {
       const value = rest[++i] as WorkflowId;
-      if (!['legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'].includes(value)) {
-        throw new Error('workflow 只能是 legacy-modernization、financial-ai-native-architecture 或 data-architecture-assessment');
+      if (!['current-data-architecture', 'legacy-modernization', 'financial-ai-native-architecture', 'data-architecture-assessment'].includes(value)) {
+        throw new Error('workflow 只能是 current-data-architecture、legacy-modernization、financial-ai-native-architecture 或 data-architecture-assessment');
       }
       workflow = value;
       inv.workflow = value;
