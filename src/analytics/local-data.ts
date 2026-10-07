@@ -349,7 +349,11 @@ export async function discoverLocalDatasets(sessionName: string): Promise<LocalD
     let entries: import('node:fs').Dirent[];
     try {
       entries = await fs.readdir(directory, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      console.warn('[local-data] Unable to scan directory; skipping it.', {
+        directory,
+        error,
+      });
       return;
     }
 
@@ -373,8 +377,12 @@ export async function discoverLocalDatasets(sessionName: string): Promise<LocalD
   for (const relative of candidates.slice(0, 200)) {
     try {
       await registerLocalDataset(sessionName, relative);
-    } catch {
-      // 一个损坏或正在上传的文件不能让整个本地数据目录失效。
+    } catch (error) {
+      console.warn('[local-data] Unable to register a discovered dataset; continuing with the rest.', {
+        sessionName,
+        relativePath: relative,
+        error,
+      });
     }
   }
 
@@ -1192,11 +1200,21 @@ export async function localQuery(sessionName: string, sql: string, limit = 1000)
 }
 
 /** 停止服务时释放 DuckDB connections，并关闭 Dataset Registry 所在的 SQLite 连接。 */
-export function closeLocalAnalytics(): void {
-  for (const pending of engines.values()) {
-    void pending.then((engine) => engine.connection.disconnectSync()).catch(() => undefined);
-  }
+export async function closeLocalAnalytics(): Promise<void> {
+  const pendingEngines = [...engines.values()];
   engines.clear();
+
+  const closeResults = await Promise.allSettled(
+    pendingEngines.map(async (pending) => {
+      const engine = await pending;
+      engine.connection.disconnectSync();
+    }),
+  );
+  for (const result of closeResults) {
+    if (result.status === 'rejected') {
+      console.error('[local-data] Failed to close DuckDB connection during shutdown.', result.reason);
+    }
+  }
   registryDb?.close();
   registryDb = undefined;
   registryPath = undefined;
