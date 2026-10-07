@@ -78,7 +78,7 @@ export async function requestAgentUserInput(
   onTrajectory?: (event: {
     type: 'user_input_requested' | 'user_input_completed' | 'status';
     name: string;
-    status?: 'started' | 'completed' | 'waiting' | 'info';
+    status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
     durationMs?: number;
     details?: Record<string, unknown>;
   }) => void,
