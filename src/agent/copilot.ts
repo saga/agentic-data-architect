@@ -489,7 +489,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // Local data tools are app-owned and remain constrained by Dataset Registry + DuckDB guards.
     ...(isolatedPurpose ? {} : { tools: createLocalDataTools(path.basename(workingDirectory)) }),
     availableTools: isolatedPurpose ? new ToolSet() : WORKBENCH_TOOLS,
-      ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+      ...(Object.keys(mcpServers).length
+      ? { mcpServers: mcpServers as NonNullable<CreateSessionConfig['mcpServers']> }
+      : {}),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   };
 
