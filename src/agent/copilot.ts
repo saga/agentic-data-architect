@@ -1437,7 +1437,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
         workflowInstruction: currentWorkflowInstruction,
       });
       if (execution > 0) {
-        input.onStatus?.(`Agent 已完成前一阶段，正在自主继续调查（第 ${execution + 1} 阶段）…`);
+        input.onStatus?.(`助手已完成前一阶段，正在自主继续调查（第 ${execution + 1} 阶段）…`);
         input.onTrajectory?.({
           type: 'status',
           name: `自主继续调查 #${execution}`,
@@ -1659,7 +1659,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       type: 'error',
       name: timedOut
         ? timeoutLabel
-        : 'Agent 执行失败',
+        : '助手执行失败',
       status: 'failed',
       details: {
         error: errorMessage,
