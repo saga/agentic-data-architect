@@ -169,7 +169,12 @@ export async function registerOpenCodeGraphifyMcp(
     try {
       const existing = await existingResponse.json() as Record<string, { status?: string }>;
       const current = existing[graphify.name];
-      if (current && ['connected', 'connecting', 'pending'].includes(String(current.status ?? '').toLowerCase())) {
+      const currentStatus = typeof current?.status === 'string'
+        ? current.status
+        : current?.status && typeof current.status === 'object' && 'status' in current.status
+          ? String((current.status as { status?: unknown }).status ?? '')
+          : '';
+      if (['connected', 'connecting', 'pending'].includes(currentStatus.toLowerCase())) {
         return;
       }
     } catch {
