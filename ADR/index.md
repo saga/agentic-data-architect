@@ -55,3 +55,5 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 这些附录只是历史参考，**不是规范文本**。真正具有架构约束力的是 ADR 正文中的 Context、Decision、Consequences 和 Rejected alternatives。
 
 因此，阅读 ADR 时先看正文；需要理解“为什么会做出这个决定”或追溯设计演进时，再阅读附录。
+
+| [ADR-026](./026-canonical-derived-state-and-result-boundaries.md) | Canonical Derived State 统一 Mission、Workflow、Gate 的完成语义，并分离 Assessment / Modernization Artifact 与 Workflow runtime | Accepted |
