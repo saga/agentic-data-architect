@@ -7,6 +7,7 @@
  * owner of Mission / Evidence / Workflow state.
  */
 import { createSdkMcpServer, query, tool as codeBuddyTool, AbortError } from '@tencent-ai/agent-sdk';
+import path from 'node:path';
 import {
   GRAPHIFY_MCP_NAME,
   GRAPHIFY_SELECTION_INSTRUCTION,
@@ -99,7 +100,7 @@ interface WorkbenchToolLike {
  *
  * 业务 tool implementation 仍只有一份；CodeBuddy 只是换了 Runtime adapter。
  */
-function buildCodeBuddyWorkbenchServer(sessionName: string): unknown {
+function buildCodeBuddyWorkbenchServer(sessionName: string): ReturnType<typeof createSdkMcpServer> {
   const tools = createLocalDataTools(sessionName) as unknown as WorkbenchToolLike[];
   const serverTools = tools.map((item) =>
     (codeBuddyTool as unknown as (definition: {
@@ -115,7 +116,8 @@ function buildCodeBuddyWorkbenchServer(sessionName: string): unknown {
     }),
   );
 
-  return createSdkMcpServer('workbench', {
+  return createSdkMcpServer({
+    name: 'workbench',
     tools: serverTools as never[],
   });
 }
@@ -174,7 +176,7 @@ async function runCodeBuddyQuery(
       : 'default' as const,
     // SDK defaults to no filesystem settings; Workbench explicitly supplies all
     // tools/configuration it wants, so user/project .codebuddy files cannot alter it.
-    settingSources: [] as const,
+    settingSources: [],
     systemPrompt: [
       input.missionPrompt,
       input.systemPrompt,
@@ -207,7 +209,7 @@ async function runCodeBuddyQuery(
               .filter(Boolean)
             : [];
           const response = await requestAgentUserInput(
-            input.investigationName ?? '',
+            input.investigationName ?? path.basename(input.workingDirectory ?? process.cwd()),
             input.turnId ?? '',
             input.sessionId ?? '',
             {
@@ -260,7 +262,7 @@ async function runCodeBuddyQuery(
 
   const q = query({
     prompt,
-    options: queryOptions as Parameters<typeof query>[0]['options'],
+    options: queryOptions as NonNullable<Parameters<typeof query>[0]['options']>,
   });
 
   let sessionId = '';
@@ -449,7 +451,7 @@ export async function askCodeBuddy(
 
   if (input.purpose !== 'journey-map' && input.purpose !== 'review' && input.investigationName) {
     const workbench = buildCodeBuddyWorkbenchServer(input.investigationName);
-    mcpServers.workbench = workbench.server;
+    mcpServers.workbench = workbench;
   }
 
   if (graphifyEnabled) {
