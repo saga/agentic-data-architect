@@ -98,7 +98,10 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       importantDocuments: [],
     },
     agent: {
-      model: config.model,
+      runtime: config.agentRuntimeDefault,
+      model: config.agentRuntimeDefault === 'codebuddy-sdk'
+        ? 'codebuddy:' + config.codeBuddyDefaultModel
+        : config.model,
       // 本地单用户工作台默认不逐次弹权限确认；需要严格审批时可显式切回 permission。
       permissionMode: 'allow_all',
       autoContinuationTurns: 4,
@@ -206,6 +209,7 @@ function snapshotOf(control: InvestigationControl): Omit<InvestigationControl, '
       importantDocuments: control.research.importantDocuments.map((item) => ({ ...item })),
     },
     agent: {
+      runtime: control.agent.runtime,
       model: control.agent.model,
       ...(control.agent.autoTier ? { autoTier: control.agent.autoTier } : {}),
       permissionMode: control.agent.permissionMode,
@@ -347,6 +351,7 @@ export async function updateInvestigationControl(
 
     const changed: string[] = [];
     if (!sameValue(current.research, control.research)) changed.push('research');
+    if (current.agent.runtime !== control.agent.runtime) changed.push('runtime');
     if (current.agent.systemPrompt.content !== control.agent.systemPrompt.content) changed.push('guidance');
     if (!sameValue(current.agent.mcpServers, control.agent.mcpServers)) changed.push('mcp');
     if (current.agent.model !== control.agent.model) changed.push('model');
