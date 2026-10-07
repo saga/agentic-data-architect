@@ -5,7 +5,6 @@
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
 import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
-import type { ZodType } from 'zod';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,9 +18,9 @@ import {
 } from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
-import type { WorkflowId } from '../investigation/schemas.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
 import { rejectAllPendingAgentUserInputs } from './user-input-bridge.js';
+import type { AskInput } from './ask-input.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -140,24 +139,6 @@ interface PendingCopilotPermission {
 /** 当前进程中等待用户确认的权限请求；权限是临时运行态，不写入 Investigation 状态文件。 */
 const pendingCopilotPermissions = new Map<string, PendingCopilotPermission>();
 
-interface PendingCopilotUserInput {
-  sessionName: string;
-  turnId: string;
-  sessionId: string;
-  requestId: string;
-  question: string;
-  choices: string[];
-  allowFreeform: boolean;
-  requestedAt: string;
-  /** 用户提交答案时记录到当前 Agent 轨迹；不参与待处理请求 API 返回。 */
-  onAnswered?: (response: { answer: string; wasFreeform: boolean }) => void;
-  resolve: (response: { answer: string; wasFreeform: boolean }) => void;
-  reject: (error: Error) => void;
-}
-
-/** Agent 通过 ask_user 提出的待回答问题；和权限一样只存在当前进程的运行态。 */
-const pendingCopilotUserInputs = new Map<string, PendingCopilotUserInput>();
-
 /** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
 export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
   return [...pendingCopilotPermissions.values()]
@@ -188,7 +169,7 @@ export async function respondToCopilotPermission(
     pendingCopilotPermissions.delete(requestId);
     return true;
   } catch (error) {
-    console.warn('[copilot] Failed to abort the active Copilot turn.', error);
+    console.warn('[copilot] Failed to answer the pending permission request.', error);
     return false;
   }
 }
