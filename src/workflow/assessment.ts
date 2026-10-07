@@ -127,10 +127,18 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
     recommendation: recommendationForFinding(finding.type, recommendationRules), evidenceIds: finding.evidenceIds,
   }));
 
-  // deterministic gap analyzer 可能先发现问题、但还没有落成 Finding；这里把它标成待确认项。
-  for (const gap of gaps.slice(0, 20)) {
+  // Gap 表示“当前还需要处理的覆盖缺口”，不等于正式 Finding。
+  // 只有已经带有当前 Investigation Evidence 的 Gap，才可以进入 Assessment 的正式问题列表。
+  for (const gap of gaps.filter((item) => item.evidenceIds.length > 0).slice(0, 20)) {
     if (findings.some((item) => item.id === gap.id)) continue;
-    findings.push({ id: gap.id, title: gap.title, severity: gap.severity, description: gap.description, recommendation: gap.recommendation, evidenceIds: gap.evidenceIds });
+    findings.push({
+      id: gap.id,
+      title: gap.title,
+      severity: gap.severity,
+      description: gap.description,
+      recommendation: gap.recommendation,
+      evidenceIds: gap.evidenceIds,
+    });
   }
 
   const recommendations = dedupe(findings.map((finding) => finding.recommendation));
