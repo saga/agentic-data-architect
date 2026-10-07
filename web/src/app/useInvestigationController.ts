@@ -150,7 +150,7 @@ export function useInvestigationController() {
   const NEW_SESSION_GOAL_SAMPLE = '研究现有项目的数据架构设计，调查data model，data source，vendor input方式，重要的数据转换逻辑';
   const NEW_SESSION_EXPECTED_RESULT_SAMPLE = '生成一份深入浅出，详细的分析报告，分析报告应该包含mermaid形式的架构图、数据流图等等';
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionRuntime, setNewSessionRuntime] = useState<AgentRuntime>('codebuddy-sdk');
+  const [newSessionRuntime, setNewSessionRuntime] = useState<AgentRuntime>('copilot-sdk');
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState(NEW_SESSION_GOAL_SAMPLE);
   const [newSessionExpectedResult, setNewSessionExpectedResult] = useState(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
@@ -1050,7 +1050,7 @@ export function useInvestigationController() {
       setNewSessionGoal(NEW_SESSION_GOAL_SAMPLE);
       setNewSessionExpectedResult(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
       setNewSessionWorkflow(null);
-      setNewSessionRuntime('codebuddy-sdk');
+      setNewSessionRuntime('copilot-sdk');
       await reloadSessions(false);
       navigateToSession(created.context.name);
       // 新建调查先停在配置页；用户完成一次明确的配置保存后，才自动开始首次执行。
