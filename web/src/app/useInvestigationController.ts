@@ -191,6 +191,7 @@ export function useInvestigationController() {
   /** 新建调查 Mission 清晰度校验失败时，等 Session 加载完成再展示具体原因。 */
   const pendingInitialMissionErrorRef = useRef<string | undefined>(undefined);
   const activeTurnRef = useRef<{ key: string; turnId: string; controller: AbortController } | undefined>(undefined);
+  const stopRequestedTurnRef = useRef<string | undefined>(undefined);
   const executionStatusRef = useRef<ExecutionStatus>({
     state: 'idle',
     running: false,
@@ -310,11 +311,14 @@ export function useInvestigationController() {
       if (key === activeRef.current) {
         setExecutionStatus(status);
         if (status.running) {
+          setLoading(true);
           setStreamingAnswer((currentAnswer) =>
             currentAnswer?.key === key ? currentAnswer : { key, content: '' },
           );
           setTurnStatus(executionStatusText(status));
         } else if (previous.running && previous.turnId && !status.running) {
+          setLoading(false);
+          if (activeTurnRef.current?.turnId === previous.turnId) activeTurnRef.current = undefined;
           setStreamingAnswer((currentAnswer) =>
             currentAnswer?.key === key ? undefined : currentAnswer,
           );
@@ -326,22 +330,8 @@ export function useInvestigationController() {
 
       return status;
     } catch {
-      const idle: ExecutionStatus = {
-        state: 'idle',
-        running: false,
-        turnId: null,
-        phase: null,
-        startedAt: null,
-        lastActivityAt: null,
-        lastActivity: null,
-        pendingPermissionCount: 0,
-        pendingUserInputCount: 0,
-      };
-      if (key === activeRef.current) {
-        executionStatusRef.current = idle;
-        setExecutionStatus(idle);
-      }
-      return idle;
+      // Transport failure is not an execution-state transition.
+      return executionStatusRef.current;
     }
   };
   /** 用统一的 live execution state 生成顶部状态文字。 */
@@ -369,6 +359,25 @@ export function useInvestigationController() {
       setTurnStatus(executionStatusText(status) + '，当前问题会在上一轮完成后自动继续。');
       await new Promise((resolve) => window.setTimeout(resolve, 500));
     }
+  };
+
+  /** SSE 断线后等待服务恢复；startup recovery 会把旧 turn 变成 durable aborted message。 */
+  const recoverAfterStreamDisconnect = async (key: string, turnId: string): Promise<boolean> => {
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const status = await loadExecutionStatus(key);
+      if (!status.running || status.turnId !== turnId) {
+        try {
+          await loadSession(key);
+        } catch {
+          await new Promise((resolve) => window.setTimeout(resolve, 800));
+          continue;
+        }
+        return true;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+    }
+    return false;
   };
 
   /** 拉取当前 Agent 正在等待的权限/用户输入请求；这些都是短暂运行态，不写入调查配置。 */
@@ -576,13 +585,31 @@ export function useInvestigationController() {
     const turnId = activeTurn?.turnId ?? executionStatus.turnId;
     if (!key || !turnId) return;
 
-    void request(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ turnId }),
-    }).catch(() => undefined);
+    stopRequestedTurnRef.current = turnId;
+    setError(undefined);
+    setTurnStatus('正在停止本轮调查…');
 
-    activeTurn?.controller.abort();
+    void (async () => {
+      try {
+        await request(`/api/sessions/${encodeURIComponent(key)}/messages/abort`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ turnId }),
+        });
+      } catch {
+        // The SSE connection may already be gone during shutdown.
+      } finally {
+        activeTurn?.controller.abort();
+        if (!activeTurn) {
+          await waitForExecutionIdle(key);
+          try {
+            await loadSession(key);
+          } catch {
+            // The server may need one more poll after the abort completes.
+          }
+        }
+      }
+    })();
   };
 
   /** 处理权限请求；session scope 使用 Copilot SDK 原生的“当前会话继续允许”。 */
@@ -821,20 +848,49 @@ export function useInvestigationController() {
         setTurnStatus('结果已保存，部分内部引用已自动修正。');
       }
     } catch (e) {
-      executionFailed = true;
-      // Failure must not roll the conversation back to the pre-turn snapshot.
-      // Reload the durable conversation so the submitted user message remains visible.
-      if (key && activeRef.current === key) {
+      const stoppedByUser = e instanceof DOMException
+        && e.name === 'AbortError'
+        && stopRequestedTurnRef.current === turnId;
+      executionFailed = !stoppedByUser;
+
+      if (stoppedByUser) {
+        setError(undefined);
+        setTurnStatus('正在停止本轮调查…');
+        await waitForExecutionIdle(key as string);
         try {
-          await loadSession(key);
+          await loadSession(key as string);
         } catch {
-          // Keep the optimistic message if the recovery reload itself fails.
+          // The server may need one more poll after the abort completes.
         }
-      }
-      if (e instanceof DOMException && e.name === 'AbortError') {
-        setError('本轮执行已停止。');
       } else {
-        setError(e instanceof Error ? e.message : '请求失败');
+        const errorText = e instanceof Error ? e.message : '请求失败';
+        const isTransportError =
+          e instanceof TypeError
+          || /Failed to fetch|NetworkError|network error|Load failed/i.test(errorText);
+
+        if (isTransportError) {
+          setError(undefined);
+          setTurnStatus('连接已中断，正在等待服务恢复并检查这次调查是否已经保存…');
+          const recovered = key
+            ? await recoverAfterStreamDisconnect(key as string, turnId)
+            : false;
+          if (recovered) {
+            setError(undefined);
+            setTurnStatus('连接已恢复，这次调查状态已经重新加载。');
+            executionFailed = false;
+          } else {
+            setError('服务暂时不可连接。请重新启动服务；这次调查记录会从服务器恢复，不需要重新提交。');
+          }
+        } else {
+          if (key && activeRef.current === key) {
+            try {
+              await loadSession(key);
+            } catch {
+              // Keep the optimistic message if the recovery reload itself fails.
+            }
+          }
+          setError(errorText);
+        }
       }
     } finally {
       setStreamingAnswer(undefined);
@@ -843,10 +899,13 @@ export function useInvestigationController() {
       setAssistantCompanionNote('');
       setTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
-        : executionFailed
-          ? '这次执行没有完成，详细原因已记录在 Agent 轨迹中。'
-          : '可以继续提问');
+        : stopRequestedTurnRef.current === turnId
+          ? '本轮执行已停止，可以继续提问'
+          : executionFailed
+            ? '这次执行没有完成，详细原因已记录在 Agent 轨迹中。'
+            : '可以继续提问');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
+      if (stopRequestedTurnRef.current === turnId) stopRequestedTurnRef.current = undefined;
       setLoading(false);
     }
   };

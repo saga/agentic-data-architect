@@ -149,6 +149,7 @@ import {
   listConversationMessages,
   listConversationTurns,
   saveConversationMessage,
+  updateConversationTurnDraft,
   searchConversation,
 } from './investigation/conversation.js';
 import {
@@ -1499,6 +1500,18 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         message,
         (delta) => {
           streamedAssistant += delta;
+          try {
+            updateConversationTurnDraft(
+              turnId,
+              [companionNote.trim(), streamedAssistant.trim()].filter(Boolean).join('\n\n'),
+            );
+          } catch (draftError) {
+            console.error('[messages/stream] Failed to persist assistant draft', {
+              sessionName: name,
+              turnId,
+              error: draftError,
+            });
+          }
           send('delta', { delta });
         },
         turnId,
@@ -1510,6 +1523,18 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
           onCheckpoint: (checkpoint) => send('checkpoint', checkpoint),
           onCompanionNote: (note) => {
             companionNote = note;
+            try {
+              updateConversationTurnDraft(
+                turnId,
+                [companionNote.trim(), streamedAssistant.trim()].filter(Boolean).join('\n\n'),
+              );
+            } catch (draftError) {
+              console.error('[messages/stream] Failed to persist companion draft', {
+                sessionName: name,
+                turnId,
+                error: draftError,
+              });
+            }
             send('companion_note', { note });
           },
         },
