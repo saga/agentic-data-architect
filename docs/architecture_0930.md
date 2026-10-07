@@ -340,6 +340,8 @@ Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。空白/
 
 Runtime 与 Model 分开保存。新建 Investigation 时可以指定首选 Runtime；quota / usage exhaustion 发生时，只在本次执行内从当前 Runtime 向后按全局配置 `AGENT_RUNTIME_FALLBACK_ORDER` 自动尝试，成功后不修改 Investigation 的首选 Runtime，也不需要用户确认。
 
+Capability Skill 的 discovery 也保持统一边界：Copilot 使用 SDK 的 `skillDirectories`；CodeBuddy / OpenCode 在当前 Investigation workspace 的 `.agents/skills` 中获得全部 capability 和当前 Workflow Skill，其它 Workflow Skill 不进入当前 Runtime 的 Skill catalog。
+
 默认顺序是：
 
 ~~~text
