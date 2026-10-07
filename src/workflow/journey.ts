@@ -253,10 +253,10 @@ export async function loadWorkflowJourney(workflowId: WorkflowId): Promise<Journ
   const markdown = await fs.readFile(skillPath, 'utf8');
   const manifest = parseSkillManifest(markdown, skillPath);
   if (manifest.name !== workflowId) {
-    throw new Error('Workflow ' + workflowId + ' 对应 Skill 名称不一致：' + manifest.name);
+    throw new Error('工作方式 ' + workflowId + ' 对应的技能名称不一致：' + manifest.name);
   }
   if (manifest.metadata.kind !== 'workflow') {
-    throw new Error('Skill ' + workflowId + ' 的 kind=' + manifest.metadata.kind + '，不能作为 Workflow 加载。');
+    throw new Error('技能 ' + workflowId + ' 的类型不能作为工作方式加载。');
   }
   const result = parseJourneyMarkdown(markdown);
   if (!result.definition || result.issues.length) {
@@ -514,7 +514,7 @@ export function applyJourneyTransition(
   }
 
   const node = definition.nodes.find((item) => item.id === nodeId);
-  if (!node) throw new Error('Workflow 当前节点不存在：' + nodeId);
+  if (!node) throw new Error('当前工作步骤不存在：' + nodeId);
 
   const route = node.routes.find(
     (item) => item.outcome.toLowerCase() === outcome.toLowerCase(),
@@ -526,7 +526,7 @@ export function applyJourneyTransition(
   }
 
   const target = definition.nodes.find((item) => item.id === route.target);
-  if (!target) throw new Error('Workflow target 不存在：' + route.target);
+  if (!target) throw new Error('下一步指向的工作步骤不存在：' + route.target);
 
   const completed = new Set(execution.completedNodeIds);
   if (target.id !== nodeId) completed.add(nodeId);
@@ -694,7 +694,7 @@ export function describeJourneyCurrentNode(
   execution: JourneyExecution,
 ) {
   const node = definition.nodes.find((item) => item.id === execution.currentNodeId);
-  if (!node) throw new Error('Workflow 当前节点不存在：' + execution.currentNodeId);
+  if (!node) throw new Error('当前工作步骤不存在：' + execution.currentNodeId);
 
   return {
     nodeId: node.id,
