@@ -47,6 +47,8 @@ export interface ConversationTurn {
   status: 'running' | 'completed' | 'failed' | 'aborted';
   result?: string;
   error?: string;
+  /** 流式生成中的 assistant/秘书可见草稿，仅用于断线、重启和异常恢复。 */
+  assistantDraft?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,6 +113,7 @@ function getDatabase(): DatabaseSync {
       status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'aborted')),
       result TEXT,
       error TEXT,
+      assistant_draft TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     ) STRICT;
@@ -168,6 +171,11 @@ function getDatabase(): DatabaseSync {
     END;
   `);
 
+  const columns = database.prepare('PRAGMA table_info(conversation_turns)').all() as Array<{ name?: unknown }>;
+  if (!columns.some((column) => column.name === 'assistant_draft')) {
+    database.exec('ALTER TABLE conversation_turns ADD COLUMN assistant_draft TEXT');
+  }
+
   return database;
 }
 
@@ -194,7 +202,7 @@ export function beginConversationTurn(sessionName: string, turnId: string): Conv
     ON CONFLICT(turn_id) DO NOTHING
   `).run(turnId, sessionName, now, now);
   const row = db.prepare(`
-    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    SELECT turn_id, session_name, status, result, error, assistant_draft, created_at, updated_at
     FROM conversation_turns WHERE turn_id = ?
   `).get(turnId) as Record<string, unknown> | undefined;
   if (!row) throw new Error('Conversation turn could not be stored: ' + turnId);
@@ -207,12 +215,35 @@ export function beginConversationTurn(sessionName: string, turnId: string): Conv
     status: row.status as ConversationTurn['status'],
     ...(typeof row.result === 'string' ? { result: row.result } : {}),
     ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    ...(typeof row.assistant_draft === 'string' && row.assistant_draft.trim()
+      ? { assistantDraft: String(row.assistant_draft) }
+      : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
 }
 
 /** 把 running turn 结束为 completed/failed/aborted，并保存结果或错误。 */
+export function updateConversationTurnDraft(turnId: string, draft: string): void {
+  const value = draft.trim();
+  const bounded = value.length > 24000 ? value.slice(0, 24000) + '\n\n[后续内容已截断]' : value;
+  getDatabase().prepare(`
+    UPDATE conversation_turns
+    SET assistant_draft = ?, updated_at = ?
+    WHERE turn_id = ? AND status = 'running'
+  `).run(bounded || null, new Date().toISOString(), turnId);
+}
+
+/** 把已收尾的 turn draft 清掉，避免 transient 内容长期占用 Conversation state。 */
+export function clearConversationTurnDraft(turnId: string): void {
+  getDatabase().prepare(`
+    UPDATE conversation_turns
+    SET assistant_draft = NULL, updated_at = ?
+    WHERE turn_id = ?
+  `).run(new Date().toISOString(), turnId);
+}
+
+/** 把 running turn 结束为 completed/failed/aborted，并同时清理 transient assistant draft。 */
 export function finishConversationTurn(
   turnId: string,
   status: Exclude<ConversationTurn['status'], 'running'>,
@@ -221,28 +252,59 @@ export function finishConversationTurn(
 ): void {
   getDatabase().prepare(`
     UPDATE conversation_turns
-    SET status = ?, result = ?, error = ?, updated_at = ?
+    SET status = ?, result = ?, error = ?, assistant_draft = NULL, updated_at = ?
     WHERE turn_id = ?
   `).run(status, result ?? null, error ?? null, new Date().toISOString(), turnId);
 }
 
-/** 服务启动后把上一次进程遗留的 running turn 标记为 aborted。 */
+/**
+ * 服务启动后恢复上一进程遗留的 running turn。
+ * recovery 不仅改变状态，还必须生成可见的 assistant failure message，
+ * 否则 Server restart 会绕过正常 catch/finally，让 transient SSE 内容永久消失。
+ */
 export function recoverRunningConversationTurns(): number {
-  const result = getDatabase().prepare(`
-    UPDATE conversation_turns
-    SET status = 'aborted',
-        error = 'Server restarted while this turn was running.',
-        updated_at = ?
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT turn_id, session_name, assistant_draft
+    FROM conversation_turns
     WHERE status = 'running'
-  `).run(new Date().toISOString());
-  return Number(result.changes);
-}
+    ORDER BY created_at
+  `).all() as Array<Record<string, unknown>>;
 
+  for (const row of rows) {
+    const turnId = String(row.turn_id);
+    const sessionName = String(row.session_name);
+    const draft = typeof row.assistant_draft === 'string' ? row.assistant_draft.trim() : '';
+    const content = [
+      draft,
+      draft
+        ? '服务刚刚在调查过程中停止了，未完成的这部分内容已经保留下来。你可以继续提问。'
+        : '服务刚刚在调查过程中停止了，这次调查没有完成。你的问题已经保留，可以继续提问。',
+    ].filter(Boolean).join('\n\n');
+
+    saveConversationMessage({
+      id: turnId + ':assistant:failure',
+      sessionName,
+      role: 'assistant',
+      content,
+    });
+    db.prepare(`
+      UPDATE conversation_turns
+      SET status = 'aborted',
+          error = 'Server restarted while this turn was running.',
+          assistant_draft = NULL,
+          updated_at = ?
+      WHERE turn_id = ? AND status = 'running'
+    `).run(new Date().toISOString(), turnId);
+  }
+
+  return rows.length;
+}
 /** 在确认旧 turn 已无人执行后，把它安全终止，释放重试机会。 */
 export function abortStaleConversationTurn(turnId: string, error = 'The previous process did not complete this turn.'): boolean {
   const result = getDatabase().prepare(`
     UPDATE conversation_turns
-    SET status = 'aborted', error = ?, updated_at = ?
+    SET status = 'aborted', error = ?, assistant_draft = NULL, updated_at = ?
     WHERE turn_id = ? AND status = 'running'
   `).run(error, new Date().toISOString(), turnId);
   return Number(result.changes) > 0;
@@ -291,7 +353,7 @@ export function listConversationTurns(sessionName: string, limit = 200): Convers
 /** 查询当前 Investigation 是否存在 running turn。 */
 export function getRunningConversationTurn(sessionName: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
-    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    SELECT turn_id, session_name, status, result, error, assistant_draft, created_at, updated_at
     FROM conversation_turns
     WHERE session_name = ? AND status = 'running'
     ORDER BY updated_at DESC
@@ -304,6 +366,9 @@ export function getRunningConversationTurn(sessionName: string): ConversationTur
     status: row.status as ConversationTurn['status'],
     ...(typeof row.result === 'string' ? { result: row.result } : {}),
     ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    ...(typeof row.assistant_draft === 'string' && row.assistant_draft.trim()
+      ? { assistantDraft: String(row.assistant_draft) }
+      : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -312,7 +377,7 @@ export function getRunningConversationTurn(sessionName: string): ConversationTur
 /** 根据 turnId 获取完整 durable turn 状态。 */
 export function getConversationTurn(turnId: string): ConversationTurn | undefined {
   const row = getDatabase().prepare(`
-    SELECT turn_id, session_name, status, result, error, created_at, updated_at
+    SELECT turn_id, session_name, status, result, error, assistant_draft, created_at, updated_at
     FROM conversation_turns WHERE turn_id = ?
   `).get(turnId) as Record<string, unknown> | undefined;
   if (!row) return undefined;
@@ -322,6 +387,9 @@ export function getConversationTurn(turnId: string): ConversationTurn | undefine
     status: row.status as ConversationTurn['status'],
     ...(typeof row.result === 'string' ? { result: row.result } : {}),
     ...(typeof row.error === 'string' ? { error: row.error } : {}),
+    ...(typeof row.assistant_draft === 'string' && row.assistant_draft.trim()
+      ? { assistantDraft: String(row.assistant_draft) }
+      : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
