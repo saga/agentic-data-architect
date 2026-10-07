@@ -100,9 +100,9 @@ export function appendReasoningLog(
   name: string,
   turnId: string,
   delta: string,
-): void {
+): Promise<void> {
   const value = delta.trim();
-  if (!value) return;
+  if (!value) return Promise.resolve();
   const key = name + ':' + turnId;
   const previous = reasoningWriteChains.get(key) ?? Promise.resolve();
   const file = path.join(workspaceRoot(name), 'runs', 'reasoning.jsonl');
@@ -127,4 +127,5 @@ export function appendReasoningLog(
       if (reasoningWriteChains.get(key) === next) reasoningWriteChains.delete(key);
     });
   reasoningWriteChains.set(key, next);
+  return next;
 }
