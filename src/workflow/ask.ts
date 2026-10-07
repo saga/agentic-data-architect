@@ -188,6 +188,16 @@ export async function answerQuestion(
   }, 15_000);
   liveHeartbeat.unref?.();
   let companionTimer: ReturnType<typeof setTimeout> | undefined;
+  let trajectoryWrite: Promise<void> = Promise.resolve();
+  type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
+  const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
+    trajectoryWrite = trajectoryWrite
+      .then(async () => {
+        await appendTrajectoryEvent(investigationName, { ...event, turnId, details: event.details ?? {} });
+      })
+      .catch(() => undefined);
+  };
+  let lastExecution = 0;
   try {
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
 
@@ -433,19 +443,9 @@ export async function answerQuestion(
       details: { runtime: graphifyBefore, platformCapabilities: control.agent.platformCapabilities },
     });
 
-    let trajectoryWrite: Promise<void> = Promise.resolve();
     let sessionPersistence: Promise<void> = Promise.resolve();
     // The execution number belongs to the current turn, while each stage callback receives it locally.
     // Keep the last completed execution for the final analysis artifact.
-    let lastExecution = 0;
-    type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
-    const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
-      trajectoryWrite = trajectoryWrite
-        .then(async () => {
-          await appendTrajectoryEvent(investigationName, { ...event, turnId, details: event.details ?? {} });
-        })
-        .catch(() => undefined);
-    };
 
     recordTrajectory({ type: 'user_input', name: '用户问题', status: 'info', details: { question } });
 
@@ -923,6 +923,37 @@ export async function answerQuestion(
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const activeFailure = activeInvestigationTurns.get(investigationName);
+    const failureDetails = {
+      error: message,
+      ...(error instanceof Error && error.name ? { errorType: error.name } : {}),
+      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      ...(activeFailure?.lastActivityAt ? { lastActivityAt: activeFailure.lastActivityAt } : {}),
+      ...(activeFailure?.lastActivity ? { lastActivity: activeFailure.lastActivity } : {}),
+      pendingTools: 0,
+      pendingPermissions: 0,
+      pendingUserInputs: 0,
+      assistantTurnEnded: false,
+      sessionIdleObserved: false,
+      modelCallCount: 0,
+    };
+    recordTrajectory({
+      type: 'error',
+      name: 'Investigation 执行失败：' + message,
+      status: 'failed',
+      details: failureDetails,
+    });
+    await trajectoryWrite;
+    await appendAuditEvent(investigationName, {
+      actor: 'system',
+      action: 'investigation.execution_failed',
+      summary: 'Investigation 执行失败，已保存详细错误信息。',
+      details: {
+        turnId,
+        execution: lastExecution,
+        ...failureDetails,
+      },
+    });
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
   } finally {
