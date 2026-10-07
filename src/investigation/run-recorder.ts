@@ -100,6 +100,7 @@ export function appendReasoningLog(
   name: string,
   turnId: string,
   delta: string,
+  source = 'agent',
 ): Promise<void> {
   const value = delta.trim();
   if (!value) return Promise.resolve();
@@ -109,6 +110,7 @@ export function appendReasoningLog(
   const record = JSON.stringify({
     timestamp: new Date().toISOString(),
     turnId,
+    source,
     delta,
   }) + '\n';
   const next = previous
