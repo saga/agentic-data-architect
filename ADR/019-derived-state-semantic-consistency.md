@@ -20,7 +20,7 @@ Mission Progress、Journey Facts、Workflow completion 和 Result summary 都需
 
 ### Canonical evaluator rule
 
-当前实现的唯一 evaluator 为 `src/workflow/derived-state.ts`。它是纯函数，只接收已经持久化的 Investigation facts，输出命名的 derived signals；Mission Progress、Journey completion 和 Report Gate 不再各自解释同一事实。
+当前实现的唯一 evaluator 为 `src/workflow/derived-state.ts`。它是纯函数，只接收已经持久化的 Investigation facts（包括 work-product status），输出命名的 derived signals；Mission Progress、Journey completion、Report Gate 和 Workflow facts 不再各自解释同一事实。`journey.ts` / `mission-progress.ts` 不得再拥有 `deriveModernizationFacts`、`flowReady = ...` 之类第二套完成语义。
 
 
 
