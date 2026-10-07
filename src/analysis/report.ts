@@ -191,6 +191,7 @@ export async function buildReport(
     snapshot: DiscoverySnapshot | null;
     modernization?: Awaited<ReturnType<typeof loadModernizationPlan>> | null;
     assessment?: ArchitectureAssessmentPlan | null;
+    analysisArtifacts?: readonly string[];
   },
 ): Promise<{ markdown: string; path: string }> {
 
