@@ -62,6 +62,39 @@ interface OpenCodePart {
   };
 }
 
+const STRUCTURAL_PROMPT_PATTERN =
+  /(调用链|调用关系|依赖关系|依赖图|上下游|数据流|血缘|路径|结构枢纽|结构节点|子系统|组件关系|模块关系|连接关系|从哪里来|被谁调用|call\s*graph|dependency\s*(graph|chain)|upstream|downstream|lineage|data\s*flow|shortest\s*path|subsystem|hub|module\s+relationship|component\s+relationship)/iu;
+
+const GRAPHIFY_MCP_TOOL_KEYS = [
+  'query_graph',
+  'get_node',
+  'get_neighbors',
+  'get_community',
+  'god_nodes',
+  'graph_stats',
+  'shortest_path',
+].map((tool) => GRAPHIFY_MCP_NAME + '_' + tool);
+
+function requiresGraphifyFirst(prompt: string): boolean {
+  return STRUCTURAL_PROMPT_PATTERN.test(prompt);
+}
+
+function graphifyPreflightTools(): Record<string, boolean> {
+  return {
+    read: false,
+    grep: false,
+    glob: false,
+    bash: false,
+    edit: false,
+    write: false,
+    apply_patch: false,
+    task: false,
+    webfetch: false,
+    websearch: false,
+    ...Object.fromEntries(GRAPHIFY_MCP_TOOL_KEYS.map((tool) => [tool, true])),
+  };
+}
+
 const activeOpenCodeTurns = new Map<string, () => Promise<void>>();
 
 /** 返回并停止当前 OpenCode turn；HTTP Stop API 会复用这个运行态。 */
@@ -343,6 +376,7 @@ async function consumeOpenCodeEvents(
             const toolName = part.tool?.trim() || '工具';
             const status = part.state?.status;
             const graphifyToolCall = isGraphifyTool({ toolName });
+            if (graphifyToolCall) readerState.graphifyUsed = true;
             if (status === 'running') {
               input.onStatus?.(
                 graphifyToolCall
@@ -496,6 +530,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   const graphifyEnabled = input.purpose !== 'journey-map'
     && input.purpose !== 'review'
     && config.graphifyEnabled;
+  const graphifyRequired = graphifyEnabled && requiresGraphifyFirst(input.prompt);
   let graphifyRuntime: Awaited<ReturnType<typeof ensureGraphifyGraph>> | undefined;
   if (graphifyEnabled) {
     // OpenCode 的 MCP 由它自己的 Server 管理，因此必须通过 /mcp 动态注册到当前 workspace。
@@ -584,10 +619,13 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
     eventReaderTask = consumeOpenCodeEvents(eventResponse, input, sessionId, readerState);
     eventReaderTask.catch(reportReaderCrash);
 
-    const maxAutomaticContinuations = Math.min(
+    const requestedAutomaticContinuations = Math.min(
       6,
       Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
     );
+    const maxAutomaticContinuations = graphifyRequired
+      ? Math.min(6, requestedAutomaticContinuations + 1)
+      : requestedAutomaticContinuations;
     let currentPrompt = input.prompt;
     let currentWorkflowInstruction = input.purpose === 'review'
       ? ''
@@ -606,6 +644,18 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
         input.onStatus?.(`OpenCode 已完成前一阶段，正在继续调查（第 ${execution + 1} 阶段）…`);
       }
 
+      const preflight = execution === 0 && graphifyRequired;
+      if (preflight) {
+        input.onStatus?.('正在先用 Graphify 梳理代码结构…');
+        input.onTrajectory?.({
+          type: 'status',
+          name: 'Graphify 结构分析前置检查',
+          status: 'started',
+          model: input.model,
+          details: { execution, reason: 'structural-prompt' },
+        });
+      }
+
       const response = await openCodeFetch(
         '/session/' + encodeURIComponent(sessionId) + '/message',
         {
@@ -613,7 +663,16 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
           signal: transportController.signal,
           body: JSON.stringify({
             model: { providerID: providerId, modelID: modelId },
+            ...(preflight ? { tools: graphifyPreflightTools() } : {}),
             system: [
+              ...(preflight
+                ? [
+                    '这是结构调查的前置步骤。',
+                    '先使用 Graphify MCP 完成结构导航；至少执行一次 Graphify 查询。',
+                    '这一轮不要用 read、grep、glob、bash 或修改工具，也不要先回答用户的问题。',
+                    '完成后只返回你从 Graphify 找到的关键节点/关系，供下一轮继续核实。',
+                  ]
+                : []),
               input.missionPrompt,
               input.systemPrompt,
               graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
@@ -643,6 +702,25 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
         if (readerState.sessionError) throw new Error(readerState.sessionError);
         const detail = JSON.stringify(result).slice(0, 1200);
         throw new Error('OpenCode 没有返回文本答案。' + (detail ? ' 返回内容：' + detail : ''));
+      }
+
+      if (preflight) {
+        const graphifyUsed = Boolean(readerState.graphifyUsed)
+          || (JSON.stringify(result).toLowerCase().includes(GRAPHIFY_MCP_NAME));
+        if (!graphifyUsed) {
+          await abortOpenCodeSession(sessionId);
+          throw new Error('结构调查前置检查失败：OpenCode 没有先使用 Graphify。');
+        }
+        input.onTrajectory?.({
+          type: 'status',
+          name: 'Graphify 结构分析前置检查完成',
+          status: 'completed',
+          model: input.model,
+          details: { execution },
+        });
+        // Graphify preflight is context, not the user's deliverable.
+        currentPrompt = input.prompt;
+        continue;
       }
 
       finalAnswer = extracted.answer;
