@@ -36,7 +36,7 @@
 
 CodeBuddy 仍能完成代码阅读、结构导航、grep、workspace 内 Evidence 整理和用户问答，但不再拥有直接改代码或执行 shell 的能力。
 
-CodeBuddy 平台自身也把普通 NPC 与显式 Work Mode 的权限区分开：默认模式以只读工作为主，Work Mode 才提供代码写入、push、PR 等开发能力。citeturn641627search2turn809562search7
+CodeBuddy 平台自身也把普通 NPC 与显式 Work Mode 的权限区分开：默认模式以只读工作为主，Work Mode 才提供代码写入、push、PR 等开发能力。
 
 ## Rejected alternatives
 
