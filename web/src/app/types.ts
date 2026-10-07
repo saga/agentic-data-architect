@@ -1,3 +1,5 @@
+export type AgentRuntime = 'codebuddy-sdk' | 'copilot-sdk' | 'opencode-run';
+
 import type {
   AuditEvent as SharedAuditEvent,
   ConversationTurnSummary as SharedConversationTurnSummary,
