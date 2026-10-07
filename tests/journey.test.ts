@@ -380,6 +380,7 @@ test('assessment findings gate does not pass from current-state alone', () => {
         parseFailures: 0,
       },
       findingCount: 1,
+      assessmentPlanExists: true,
     },
     initialJourneyExecution(result.definition!),
   );
