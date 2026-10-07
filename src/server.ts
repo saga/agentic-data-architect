@@ -245,62 +245,7 @@ async function createSession(
   const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? null);
   await saveInvestigation(investigation);
 
-  // 新 Investigation 继承工作台最近配置的默认头像，避免每次新建调查都退回机器人图标。
-  // 头像文件仍复制到当前 Investigation，保持现有“每个调查独立资料”的边界。
-  const control = await loadInvestigationControl(key);
-  const defaultAvatarMetaPath = path.join(config.sharedDir, 'assistant', 'default.json');
-  try {
-    const meta = JSON.parse(await fs.readFile(defaultAvatarMetaPath, 'utf8')) as {
-      sourcePath?: string;
-      width?: number;
-      height?: number;
-      mimeType?: string;
-    };
-    if (meta.sourcePath) {
-      const sourcePath = path.resolve(config.sharedDir, meta.sourcePath);
-      const sharedRoot = path.resolve(config.sharedDir);
-      if (sourcePath === sharedRoot || !sourcePath.startsWith(sharedRoot + path.sep)) {
-        throw new Error('默认头像路径无效。');
-      }
-      const avatarId = randomUUID();
-      const extension = path.extname(sourcePath).slice(1).toLowerCase() || 'png';
-      const mimeByExtension: Record<string, string> = {
-        png: 'image/png',
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        webp: 'image/webp',
-        gif: 'image/gif',
-        mp4: 'video/mp4',
-        webm: 'video/webm',
-        mov: 'video/quicktime',
-      };
-      const relativePath = path.posix.join('assistant', 'avatars', avatarId + '.' + extension);
-      const targetPath = path.join(workspaceRoot(key), relativePath);
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.copyFile(sourcePath, targetPath);
-      const inherited = await updateInvestigationControl(
-        key,
-        {
-          research: control.research,
-          agent: {
-            ...control.agent,
-            avatarPath: relativePath,
-            avatarPaths: [relativePath],
-            avatarMimeType: meta.mimeType ?? mimeByExtension[extension] ?? control.agent.avatarMimeType,
-            avatarWidth: Number.isFinite(meta.width) ? Math.max(40, Math.min(800, Math.round(meta.width!))) : control.agent.avatarWidth,
-            avatarHeight: Number.isFinite(meta.height) ? Math.max(40, Math.min(1200, Math.round(meta.height!))) : control.agent.avatarHeight,
-          },
-        },
-        'inherited default assistant avatar',
-      );
-      void inherited;
-    }
-  } catch (error) {
-    // 没有配置默认头像是正常情况；不能因此阻止新调查创建。
-    if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
-    }
-  }
+
 
   await appendAuditEvent(key, {
     actor: 'user',
@@ -1036,7 +981,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }));
   });
 
-  /** 上传当前 Investigation 的秘书头像；每次上传生成独立文件，不覆盖已有头像。 */
+  /** 上传当前 Investigation 的秘书头像；头像只属于当前任务，不再写入共享默认目录。 */
   app.post('/api/sessions/:name/assistant/avatar', upload.single('file'), async (req, res) => {
     const name = sessionKey(routeParam(req.params.name));
     if (!req.file) {
@@ -1078,12 +1023,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     const avatarPath = path.join(root, relativePath);
     await fs.writeFile(avatarPath, req.file.buffer);
 
-    // 同步更新工作台默认头像。之后新建的 Investigation 会继承这张头像。
-    const sharedAvatarDir = path.join(config.sharedDir, 'assistant');
-    await fs.mkdir(sharedAvatarDir, { recursive: true });
-    const sharedAvatarPath = path.join(sharedAvatarDir, 'default.' + extension);
-    const sharedMetaPath = path.join(sharedAvatarDir, 'default.json');
-    await fs.copyFile(avatarPath, sharedAvatarPath);
+
 
     const current = await loadInvestigationControl(name);
     const requestedWidth = Number(req.body?.width);
@@ -1114,16 +1054,6 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       'assistant avatar added',
     );
 
-    await fs.writeFile(
-      sharedMetaPath,
-      JSON.stringify({
-        sourcePath: 'assistant/default.' + extension,
-        mimeType: req.file.mimetype || 'application/octet-stream',
-        width: control.agent.avatarWidth,
-        height: control.agent.avatarHeight,
-      }, null, 2) + '\n',
-      'utf8',
-    );
 
     await appendAuditEvent(name, {
       actor: 'user',
