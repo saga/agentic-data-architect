@@ -25,6 +25,58 @@ import { requestAgentUserInput, type AskInput } from './copilot.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
 
+const CODEBUDDY_SAFE_BUILTIN_TOOLS = [
+  'Read',
+  'Glob',
+  'Grep',
+  'AskUserQuestion',
+  'Skill',
+] as const;
+
+const CODEBUDDY_MUTATING_TOOLS = new Set([
+  'Write',
+  'Edit',
+  'Bash',
+  'NotebookEdit',
+  'Task',
+  'TodoWrite',
+  'TodoRead',
+]);
+
+/** Investigation 只允许只读 built-in tool；MCP workbench/Graphify 由应用自己的工具边界控制。 */
+export function isCodeBuddyToolAllowed(toolName: string): boolean {
+  const normalized = toolName.trim();
+  if (!normalized) return false;
+  if (normalized.startsWith('mcp__')) return true;
+  if (CODEBUDDY_MUTATING_TOOLS.has(normalized)) return false;
+  return CODEBUDDY_SAFE_BUILTIN_TOOLS.includes(
+    normalized as typeof CODEBUDDY_SAFE_BUILTIN_TOOLS[number],
+  );
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+  const rootResolved = path.resolve(root);
+  const candidateResolved = path.resolve(root, candidate);
+  return candidateResolved === rootResolved || candidateResolved.startsWith(rootResolved + path.sep);
+}
+
+/** Read/Glob/Grep 的 path 参数也不能逃出 Investigation workspace。 */
+function codeBuddyToolInputWithinWorkspace(
+  root: string,
+  toolName: string,
+  toolInput: unknown,
+): boolean {
+  if (!['Read', 'Glob', 'Grep'].includes(toolName)) return true;
+  if (!toolInput || typeof toolInput !== 'object') return true;
+  const record = toolInput as Record<string, unknown>;
+  for (const key of ['path', 'filePath', 'file_path', 'directory', 'cwd']) {
+    const value = record[key];
+    if (typeof value !== 'string' || !value.trim()) continue;
+    if (!isPathWithin(root, value)) return false;
+  }
+  return true;
+}
+
 export interface CodeBuddyModelOption {
   id: string;
   name: string;
@@ -194,12 +246,19 @@ async function runCodeBuddyQuery(
   const graphifyUsedRef = { value: false };
   let missionActionReviewed = false;
 
+  const workingDirectory = path.resolve(input.workingDirectory ?? process.cwd());
+  const workspaceDirectory = path.resolve(config.workspaceDir);
+  if (!isPathWithin(workspaceDirectory, workingDirectory)) {
+    throw new Error('CodeBuddy Investigation workspace 必须位于应用管理的 workspace 目录内。');
+  }
+
   const queryOptions = {
     model,
-    cwd: input.workingDirectory ?? process.cwd(),
-    permissionMode: (input.permissionMode ?? 'allow_all') === 'allow_all'
-      ? 'bypassPermissions' as const
-      : 'default' as const,
+    cwd: workingDirectory,
+    // Allow All 只表示安全白名单内的 Investigation 工具免逐次确认，
+    // 不能升级为对宿主文件和 shell 的写权限。
+    permissionMode: 'bypassPermissions' as const,
+    tools: [...CODEBUDDY_SAFE_BUILTIN_TOOLS],
     // SDK defaults to no filesystem settings; Workbench explicitly supplies all
     // tools/configuration it wants, so user/project .codebuddy files cannot alter it.
     settingSources: [],
@@ -222,6 +281,21 @@ async function runCodeBuddyQuery(
       toolName: string,
       toolInput: unknown,
     ) => {
+      if (!isCodeBuddyToolAllowed(toolName)) {
+        return {
+          behavior: 'deny' as const,
+          message: '当前 Investigation 运行时不允许使用可修改代码、执行命令或操作宿主环境的工具。',
+          interrupt: false,
+        };
+      }
+      if (!codeBuddyToolInputWithinWorkspace(workingDirectory, toolName, toolInput)) {
+        return {
+          behavior: 'deny' as const,
+          message: '当前 Investigation 运行时只能访问自己的研究 workspace，不能访问宿主其它目录。',
+          interrupt: false,
+        };
+      }
+
       const graphifyToolCall = isGraphifyTool({ toolName });
       if (graphifyToolCall) graphifyUsedRef.value = true;
 
