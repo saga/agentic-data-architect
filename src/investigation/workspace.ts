@@ -278,12 +278,12 @@ export async function addImportantInformation(name: string, information: string[
   });
 }
 
-/** 把可恢复的 Copilot Session ID 和对应状态版本写回 Workspace。 */
-/** 持久化可恢复的 Copilot Session，并绑定它所对应的 Investigation 配置版本。 */
-export async function setCopilotSessionId(
+/** 持久化可恢复的 Agent Session，并绑定它所对应的 Investigation 配置版本和 Runtime。 */
+export async function setAgentSessionId(
   name: string,
   sessionId: string,
   configurationVersion?: number,
+  runtime?: import('./schemas.js').AgentRuntime,
 ): Promise<void> {
   await withWorkspaceContextLock(name, async () => {
     const context = await loadWorkspaceContext(name);
@@ -291,10 +291,18 @@ export async function setCopilotSessionId(
     if (typeof configurationVersion === 'number') {
       context.copilotConfigurationVersion = configurationVersion;
     }
+    if (runtime) {
+      context.agentSessionId = sessionId;
+      context.agentSessionRuntime = runtime;
+      context.agentConfigurationVersion = configurationVersion;
+    }
     context.updatedAt = new Date().toISOString();
     await writeJsonAtomic(contextFile(name), context);
   });
 }
+
+/** Backward-compatible alias for older callers; new code should use setAgentSessionId. */
+export const setCopilotSessionId = setAgentSessionId;
 
 /** 在同一个 Investigation 的 context.json 中追加一条 Evidence，避免 Agent 工具直接改写状态文件。 */
 export async function appendInvestigationEvidence(
