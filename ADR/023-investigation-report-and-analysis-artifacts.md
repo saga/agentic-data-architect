@@ -24,7 +24,7 @@
 - 说明下一步最值得做什么；
 - 不把内部状态字段、Workflow、Gate、Evidence 等实现术语当成正文语言。
 
-不同 Workflow 可以增加自己的结果部分，但不能省掉这份基础报告。
+不同 Workflow 可以增加自己的结果部分，但不能省掉这份基础报告；Data Architecture Assessment 的 findings、改进建议和实施顺序也必须进入这份统一报告。
 
 ### 2. 调查过程必须保留中间分析产物
 
