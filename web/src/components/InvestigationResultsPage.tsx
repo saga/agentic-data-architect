@@ -43,6 +43,7 @@ function humanizeResultsError(cause: unknown, fallback: string): string {
 export function InvestigationResultsPage(props: {
   sessionName: string;
   onBack: () => void;
+  onOpenJourney: () => void;
   onOpenConfig: () => void;
   onOpenTrajectory: () => void;
 }) {
@@ -123,7 +124,7 @@ export function InvestigationResultsPage(props: {
           <Tag>{workflowLabel}</Tag>
         </Flex>
         <Space>
-          <Button icon={<NodeIndexOutlined />} onClick={() => props.onBack()}>工作地图</Button>
+          <Button icon={<NodeIndexOutlined />} onClick={props.onOpenJourney}>工作地图</Button>
           <Button icon={<SettingOutlined />} onClick={props.onOpenConfig}>调查配置</Button>
           <Button icon={<ToolOutlined />} onClick={props.onOpenTrajectory}>Agent 轨迹</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void load()} loading={loading}>刷新</Button>
