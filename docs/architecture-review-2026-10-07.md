@@ -28,11 +28,11 @@
 | CodeBuddy Investigation 可修改宿主仓库 | 已解决 | ADR-031 已定义 built-in allowlist、二次 deny 和 workspace path boundary。 |
 ## 摘要
 
-架构骨架是健康的：ADR 分层清晰，Mission/Scope/Stage/Report 四道 Gate 落到了服务端确定性条件，Evidence-first 的意图贯穿，Skill 的五章节 Contract 100% 齐备，15 个 `completeWhen` 全部命中代码常量。29 条 ADR 里的状态边界（ADR-027/028/029）设计得相当扎实。
+按当时 2026-10-07 基线来看，架构骨架是健康的：ADR 分层清晰，Mission/Scope/Stage/Report 四道 Gate 落到了服务端确定性条件，Evidence-first 的意图贯穿，Skill 的五章节 Contract 100% 齐备，15 个 `completeWhen` 全部命中代码常量。**当时共有 29 条 ADR；当前 main 已增加到 ADR-031。**
 
-但这套保证**大量依赖调用点的自觉，而不是类型或封装强制**。三个已实测确认的严重问题都出在这个缝隙里，且全都在测试盲区——182 个测试没有一条能捕获它们。
+这份报告下面的严重问题、测试数量和代码行号全部属于当时基线。当前 main 的修复状态以本报告上面的表和 ADR 为准。
 
-最要紧的一条：`validateLocalReadOnlySql` 把「校验用的净化副本」当成「校验后的 SQL」返回，导致所有带字符串条件的本地查询都会执行被挖空引号的语句，其中一类会**静默返回错误数据并写成 Evidence**。这直接反转了 ADR-002 的 Evidence-first 承诺。
+最要紧的一条（当时基线）：`validateLocalReadOnlySql` 把「校验用的净化副本」当成「校验后的 SQL」返回，导致所有带字符串条件的本地查询都会执行被挖空引号的语句，其中一类会**静默返回错误数据并写成 Evidence**。这直接反转了 ADR-002 的 Evidence-first 承诺。
 
 第二条：`.workspace/copilot` 既是 Copilot SDK 的运行目录，又是一个合法的 Investigation 目录，两者路径重合。实测该目录已膨胀到 **214M / 2124 条 evidence**，且用户在 UI 上既建不了也删不了这个假 session。
 
@@ -40,7 +40,7 @@
 
 ---
 
-## 严重（3 条，均已实测复现）
+## 严重问题（2026-10-07 基线，历史记录）
 
 ### 1. `validateLocalReadOnlySql` 返回被破坏的 SQL
 
@@ -338,7 +338,7 @@ AGENTS.md 第 95 行写着「不再增加 `@gate`、`@stop`、`completion`、`vi
 
 ---
 
-## 建议处理顺序
+## 当时建议处理顺序（历史）
 
 | 序 | 事项 | 理由 |
 |---|---|---|
@@ -354,7 +354,7 @@ AGENTS.md 第 95 行写着「不再增加 `@gate`、`@stop`、`completion`、`vi
 
 ## 一句话结论
 
-架构文档和设计意图是这份资产里最扎实的部分，ADR 分层、Gate 落点、Skill Contract 完整度都高于同类项目水平。真正的风险不在设计，而在**设计意图没有下沉成类型约束和机器校验** —— 182 个测试全绿，29 条 ADR 大部分条款正确，但三条严重问题全部落在"靠调用点自觉"的缝隙里，且一条都没被现有测试捕获。
+架构文档和设计意图是这份资产里最扎实的部分，ADR 分层、Gate 落点、Skill Contract 完整度都高于同类项目水平。真正的风险不在设计，而在**设计意图没有下沉成类型约束和机器校验** —— 按当时基线，182 个测试全绿、29 条 ADR 大部分条款正确，但三条严重问题全部落在"靠调用点自觉"的缝隙里，且一条都没被现有测试捕获。
 
 把 ADR-027 的写入口收敛（消灭 `journey-editor.ts:587` 的直接 `writeJsonAtomic`）、把 ADR-013 §4 的 runtime capability 约束从约定提升到类型、把 AGENTS.md 第 95 行的 DSL 禁令从文档变成 lint 规则 —— 这三件事的收益高于任何单点 bug 修复。
 
