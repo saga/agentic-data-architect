@@ -36,32 +36,15 @@
       "岗位说明能证明工作范围，但不能替代具体项目的业务需求。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "Citi、MUFG、Commercebank 等 2026 年 Data Architect 岗位说明都把业务需求到技术架构作为核心工作；Thoughtworks 的 data product 实践也从 use case 开始。",
+    "confidenceBasis": "公开企业岗位与数据架构实践普遍把业务问题、信息需求、范围和交付结果作为 Data Architecture 工作的起点；数据产品实践也强调从 use case 开始。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/mississauga/enterprise-data-architect/287/99075932480",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-16",
-        "sourceConfidence": "high"
-      },
-      {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
-        "sourceConfidence": "high"
-      },
-      {
-        "title": "Enterprise Data Architect",
-        "publisher": "Commerce Bank Careers",
-        "url": "https://commercebank.wd1.myworkdayjobs.com/CommerceJobs/job/MO---St-Louis-County-Central---St-Louis---Clayton-8000-Forsyth-63105/Enterprise-Data-Architect_38115",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-09",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
@@ -70,6 +53,13 @@
         "url": "https://martinfowler.com/articles/designing-data-products.html",
         "sourceType": "practitioner_article",
         "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -111,23 +101,23 @@
       "架构图只是输入之一；不能因为有一张图就认为当前架构已经查清。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "Citi 2026 岗位明确要求分析现有系统和 data flows/lineage；AWS 架构资料把 source、integration、governance、quality 和 consumption 都作为整体架构的一部分。",
+    "confidenceBasis": "公开企业数据架构实践普遍强调先盘清现有系统、数据资产、上下游、数据流、模型和实际运行方式，再设计目标架构。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/mississauga/enterprise-data-architect/287/99075932480",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-16",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Modern Data Architecture",
-        "publisher": "AWS",
-        "url": "https://docs.aws.amazon.com/whitepapers/latest/modern-data-architecture-rationales-on-aws/modern-data-architecture.html",
-        "sourceType": "official_architecture",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
         "sourceConfidence": "high"
       },
       {
@@ -176,32 +166,30 @@
       "岗位描述和实践资料说明常见工作方式，不代表所有组织都使用同名 deliverable。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "EY、RBS、Citi 的 2026 岗位职责都明确覆盖 target / transition / roadmap；Microsoft 的架构采用资料也强调 current-state 到分阶段路线。",
+    "confidenceBasis": "公开企业架构岗位和实践资料普遍覆盖 target、transition、roadmap 与依赖管理；成熟方案需要把当前状态与分阶段落地路径连接起来。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "EY Careers",
-        "url": "https://careers.ey.com/ey/job/Mannheim-Enterprise-Data-Architect-BW-68163/1386832933/",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-15",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Principal Data Enterprise Architect",
-        "publisher": "RBS / NatWest Group",
-        "url": "https://rbs.wd3.myworkdayjobs.com/en-US/NWG_ACQU/job/Principal-Data-Enterprise-Architect_R-00284028",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-22",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/mississauga/enterprise-data-architect/287/99075932480",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-16",
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -245,32 +233,30 @@
       "Semantic View、Glossary、Ontology、Canonical Model 是不同东西，不要因为都叫“语义”就混成一个模型。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "Citi 2026 明确要求 conceptual/logical/physical modeling；MUFG 2026 将 semantic models、metadata、ontologies 分开；Citi Funds 岗位明确把 modeling、governance、lineage 和 core data concepts 放在一起。",
+    "confidenceBasis": "公开企业数据架构实践普遍把 conceptual/logical/physical modeling、business glossary、semantic layer 和 data contracts 放在同一数据设计范围内。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/mississauga/enterprise-data-architect/287/99075932480",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-16",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
         "sourceConfidence": "high"
       },
       {
-        "title": "Lead Funds Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/belfast/lead-funds-data-architect/287/98140797408",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-07-22",
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -316,31 +302,30 @@
       "不要因为当前技术流行就把所有数据都改成 streaming 或 event-driven。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "AWS 官方现代数据架构覆盖数据移动和多种消费方式；MUFG/Citi 岗位明确列出 ETL/ELT、CDC、API、event-driven。",
+    "confidenceBasis": "公开数据架构资料普遍覆盖 ETL/ELT、CDC、API、batch 和 event-driven；选择应由时效、吞吐、可靠性、成本和消费者需求驱动。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Modern Data Architecture",
+        "title": "What Is Data Architecture?",
         "publisher": "AWS",
-        "url": "https://docs.aws.amazon.com/whitepapers/latest/modern-data-architecture-rationales-on-aws/modern-data-architecture.html",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
         "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data Architect",
-        "publisher": "EY Careers",
-        "url": "https://careers.ey.com/ey/job/Mannheim-Enterprise-Data-Architect-BW-68163/1386832933/",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-15",
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -388,19 +373,10 @@
       "治理要求应该和业务风险绑定；不是把每个资产都套同样的控制强度。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "BCBS 239 2026 newsletter、AWS data architecture guidance、Citi/MUFG 2026 岗位说明都把 governance、quality、lineage、ownership 等作为核心工作或架构能力。",
+    "confidenceBasis": "公开企业数据架构实践普遍把 governance、quality、lineage、ownership、metadata 和 access control 作为架构运行控制。",
     "timeSensitivity": "contextual",
     "reviewedAt": "2026-10-01",
     "sources": [
-      {
-        "title": "Implementation of the Principles for effective risk data aggregation and risk reporting",
-        "publisher": "Basel Committee on Banking Supervision",
-        "url": "https://www.bis.org/publications/implementation-principles-effective-risk-data-aggregation-and-risk-reporting-bcbs-239-principles",
-        "sourceType": "regulator",
-        "publishedAt": "2026-01-06",
-        "sourceConfidence": "high",
-        "note": "current newsletter，但明确说明不构成新的监管要求。"
-      },
       {
         "title": "What Is Data Architecture?",
         "publisher": "AWS",
@@ -409,11 +385,18 @@
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -457,24 +440,30 @@
       "架构评审不是给方案打一个总分；评审应该留下可执行的问题和改进路径。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "RBS 2026 明确包含 architecture/design review；MUFG 2026 把 Architecture Review Board 作为架构治理工作。",
+    "confidenceBasis": "公开企业架构实践普遍把 architecture/design review 作为独立工作流，用于检查业务适配、原则一致性、风险和整改顺序。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Principal Data Enterprise Architect",
-        "publisher": "RBS / NatWest Group",
-        "url": "https://rbs.wd3.myworkdayjobs.com/en-US/NWG_ACQU/job/Principal-Data-Enterprise-Architect_R-00284028",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-22",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -519,10 +508,17 @@
       "Data Mesh/Data Product 是架构模式，不是所有组织都需要完整采用。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "Thoughtworks data product article、AWS modern architecture documentation 和 RBS 2026 Data-as-a-Product 职责对 ownership、SLO、discoverability、lifecycle 有收敛。",
+    "confidenceBasis": "公开数据产品实践强调 ownership、SLO、discoverability、quality 和 lifecycle，而不是只定义一个数据表。",
     "timeSensitivity": "stable",
     "reviewedAt": "2026-10-01",
     "sources": [
+      {
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
+        "sourceConfidence": "high"
+      },
       {
         "title": "Designing data products",
         "publisher": "Martin Fowler / Thoughtworks",
@@ -532,45 +528,36 @@
         "sourceConfidence": "high"
       },
       {
-        "title": "Concepts and definitions - Modern Data Architecture Accelerator",
-        "publisher": "AWS",
-        "url": "https://docs.aws.amazon.com/solutions/latest/modern-data-architecture-accelerator/concepts-and-definitions.html",
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
         "sourceType": "official_architecture",
-        "sourceConfidence": "high"
-      },
-      {
-        "title": "Principal Data Enterprise Architect",
-        "publisher": "RBS / NatWest Group",
-        "url": "https://rbs.wd3.myworkdayjobs.com/en-US/NWG_ACQU/job/Principal-Data-Enterprise-Architect_R-00284028",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-22",
         "sourceConfidence": "high"
       }
     ]
   },
   {
-    "id": "financial-lineage-and-ad-hoc-reporting",
-    "title": "金融数据架构尤其要重视 lineage、准确性、完整性和及时性",
-    "kind": "financial-control",
+    "id": "lineage-quality-and-ad-hoc-reporting",
+    "title": "Lineage、准确性、完整性和及时性是重要数据控制",
+    "kind": "principle",
     "status": "active",
-    "summary": "在金融机构风险数据场景，能够从数据来源追到最终使用、确认数据质量，并在压力或临时监管请求下快速得到准确、完整、及时的数据，是持续被关注的实际问题。",
+    "summary": "在复杂企业数据场景，能够从数据来源追到最终使用、确认数据质量，并在临时业务需求下快速得到准确、完整、及时的数据，是持续被关注的实际问题。",
     "appliesTo": [
       "legacy-modernization",
       "financial-ai-native-architecture",
       "data-architecture-assessment"
     ],
     "tags": [
-      "BCBS 239",
-      "risk data",
       "lineage",
+      "data quality",
       "reconciliation",
       "ad hoc reporting",
-      "financial services"
+      "enterprise data"
     ],
     "inputs": [
-      "关键风险数据",
+      "关键数据",
       "来源和转换",
-      "报表/风险指标",
+      "报告/指标",
       "质量和及时性要求"
     ],
     "outputs": [
@@ -584,38 +571,43 @@
       "临时风险/监管问题有可验证的数据准备能力"
     ],
     "cautions": [
-      "BCBS 2026 newsletter 是监管观察与总结，不是新的监管义务；具体适用性仍要看本行监管范围和本地规则。"
+      "不同业务和数据域的控制强度应由实际风险与使用场景决定。"
     ],
     "knowledgeConfidence": "high",
-    "confidenceBasis": "BCBS 2026 current newsletter 直接讨论 accuracy/completeness/timeliness、lineage、legacy/distributed estates 和 ad hoc reporting challenges。",
+    "confidenceBasis": "公开企业数据架构实践普遍强调 lineage、accuracy、completeness、timeliness、quality 和可追溯性，尤其是在来源分散、链路较长的复杂数据环境中。",
     "timeSensitivity": "contextual",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Implementation of the Principles for effective risk data aggregation and risk reporting",
-        "publisher": "Basel Committee on Banking Supervision",
-        "url": "https://www.bis.org/publications/implementation-principles-effective-risk-data-aggregation-and-risk-reporting-bcbs-239-principles",
-        "sourceType": "regulator",
-        "publishedAt": "2026-01-06",
-        "sourceConfidence": "high",
-        "note": "信息性 newsletter，不构成新的 supervisory guidance。"
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
+        "sourceConfidence": "high"
       },
       {
-        "title": "Lead Funds Data Architect",
-        "publisher": "Citi Careers",
-        "url": "https://jobs.citi.com/job/belfast/lead-funds-data-architect/287/98140797408",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-07-22",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
   },
   {
-    "id": "financial-source-authority-is-contextual",
-    "title": "金融数据来源的权威性要看上下文",
-    "kind": "financial-control",
+    "id": "source-authority-is-contextual",
+    "title": "数据来源的权威性要看上下文",
+    "kind": "principle",
     "status": "active",
-    "summary": "不要把所有来源排成一条固定的“权威排行榜”。监管文件、会计准则、公司披露、内部业务定义、市场规则、行业实践和分析观点解决的是不同问题；判断可信度时还要看 jurisdiction、适用范围、时间和 claim 类型。",
+    "summary": "不要把所有来源排成一条固定的“权威排行榜”。规范、外部资料、系统记录、内部业务定义、操作规则和分析观点解决的是不同问题；判断可信度时要看适用范围、时间、来源类型和 claim 类型。",
     "appliesTo": [
       "legacy-modernization",
       "financial-ai-native-architecture",
@@ -624,10 +616,9 @@
     "tags": [
       "authority",
       "source",
-      "jurisdiction",
+      "applicability",
       "valid time",
-      "business definition",
-      "FIBO"
+      "business definition"
     ],
     "inputs": [
       "claim",
@@ -638,7 +629,7 @@
     ],
     "outputs": [
       "source authority context",
-      "time/jurisdiction qualifiers",
+      "time/applicability qualifiers",
       "human review when ambiguous"
     ],
     "checks": [
@@ -647,26 +638,33 @@
       "内部业务定义与外部资料发生冲突时明确谁有权决定"
     ],
     "cautions": [
-      "这是项目整理出的通用建模原则，不应被解释为任何单一金融监管机构的完整 source hierarchy。"
+      "这是通用数据建模原则，不代表任何单一行业的完整 source hierarchy。"
     ],
     "knowledgeConfidence": "medium",
-    "confidenceBasis": "FIBO 说明金融业务概念与关系需要行业共识；BCBS 体系体现监管规则有明确适用边界。authority 的多维模型是对这些实践的项目级综合，而非单一标准原文。",
+    "confidenceBasis": "通用数据治理与知识管理实践都要求结合来源类型、适用范围、时间和 claim 类型判断 authority，而不是使用固定的全局权威排序。",
     "timeSensitivity": "contextual",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Financial Industry Business Ontology (FIBO)",
-        "publisher": "EDM Council / OMG",
-        "url": "https://spec.edmcouncil.org/fibo/",
-        "sourceType": "official_standard",
+        "title": "What Is Data Architecture?",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       },
       {
-        "title": "Implementation of the Principles for effective risk data aggregation and risk reporting",
-        "publisher": "Basel Committee on Banking Supervision",
-        "url": "https://www.bis.org/publications/implementation-principles-effective-risk-data-aggregation-and-risk-reporting-bcbs-239-principles",
-        "sourceType": "regulator",
-        "publishedAt": "2026-01-06",
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
+        "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
     ]
@@ -711,22 +709,29 @@
       "这是 architecture practice synthesis；不能从一个 AI job description 推导出所有组织都采用相同 AI readiness checklist。"
     ],
     "knowledgeConfidence": "medium",
-    "confidenceBasis": "MUFG 2026 将 AI-ready data foundations、semantic models、metadata 和 governance 放在同一职责范围；AWS 也把 AI consumption、security、quality、governance 放在数据架构整体中。",
+    "confidenceBasis": "公开企业数据与 AI 架构实践普遍把 AI-ready data foundations、semantic models、metadata、governance、quality 和 lineage 放在同一能力范围内。",
     "timeSensitivity": "contextual",
     "reviewedAt": "2026-10-01",
     "sources": [
       {
-        "title": "Enterprise Data and AI Architect, Vice President",
-        "publisher": "MUFG Careers",
-        "url": "https://mufgub.wd3.myworkdayjobs.com/en-US/MUFG-Careers/job/Enterprise-Data-and-AI-Architect--Vice-President_10077204-WD",
-        "sourceType": "employer_role",
-        "publishedAt": "2026-09-03",
-        "sourceConfidence": "high"
-      },
-      {
         "title": "What Is Data Architecture?",
         "publisher": "AWS",
         "url": "https://aws.amazon.com/what-is/data-architecture/",
+        "sourceType": "official_architecture",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Designing data products",
+        "publisher": "Martin Fowler / Thoughtworks",
+        "url": "https://martinfowler.com/articles/designing-data-products.html",
+        "sourceType": "practitioner_article",
+        "publishedAt": "2024-12-10",
+        "sourceConfidence": "high"
+      },
+      {
+        "title": "Implementation plan adoption",
+        "publisher": "Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/implementation-plan-adoption",
         "sourceType": "official_architecture",
         "sourceConfidence": "high"
       }
