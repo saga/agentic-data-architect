@@ -104,6 +104,16 @@ test('Workflow DSL rejects forbidden blocks and attributes', async () => {
     '## @end done',
   ].join('\n'));
   assert.match(result.issues.join('\n'), /@gate|不支持的 Workflow 字段/);
+
+  const conditionalRoute = parseJourneyMarkdown([
+    '## @flow demo',
+    '',
+    '## @task start',
+    '- success -> done when approved',
+    '',
+    '## @end done',
+  ].join('\n'));
+  assert.match(conditionalRoute.issues.join('\n'), /不支持.*连线/);
 });
 
 test('missing Skill kind is rejected', () => {
