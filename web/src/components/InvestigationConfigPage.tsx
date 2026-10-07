@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import ImgCrop from 'antd-img-crop';
 import { getJson } from '../app/api.js';
-import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
+import { Alert, Avatar, Button, Card, Divider, Empty, Flex, Input, InputNumber, Modal, Radio, Select, Space, Tag, Tooltip, Typography, Upload } from 'antd';
 import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SettingOutlined, ToolOutlined, GithubOutlined, HistoryOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
-import type { InvestigationControl, WorkflowId } from '../app/types.js';
+import type { GlobalConfiguration, InvestigationControl, WorkflowId } from '../app/types.js';
 import { workflowOptions } from '../app/workflow-options';
 import {
   ControlResponseSchema,
   OpenCodeStatusSchema,
+  GlobalConfigurationResponseSchema,
 } from '../../../src/api/contracts.js';
 
 export type ConfigPageControl = InvestigationControl;
@@ -26,10 +27,13 @@ async function copyText(value:string):Promise<void>{
 export function InvestigationConfigPage(props:{
   sessionName:string;
   control:ConfigPageControl;
+  globalConfiguration?: GlobalConfiguration;
   workflow:ConfigWorkflow;
   onBack:()=>void;
   onWorkflowChange:(workflow:ConfigWorkflow)=>Promise<void>;
   onSaved:(control:ConfigPageControl)=>Promise<void>|void;
+  onGlobalSaved?:()=>Promise<void>|void;
+  onUpdateGlobalConfiguration:(agent:ConfigPageControl['agent'])=>Promise<GlobalConfiguration>;
 }){
   const [draft,setDraft]=useState<ConfigPageControl>(()=>clone(props.control));
   const [tab,setTab]=useState<'workflow'|'research'|'skills'|'mcp'|'history'>('research');
@@ -193,6 +197,55 @@ export function InvestigationConfigPage(props:{
         </div>}
         {tab==='skills'&&<div className='settings-page'>
           <Title level={4}>Agent 指导</Title>
+          <Card title='配置作用域' className='settings-card'>
+            <Flex justify='space-between' align='center' gap={16} wrap>
+              <div>
+                <Text strong>工作台默认（Global）</Text>
+                <Paragraph type='secondary' style={{margin:'4px 0 0'}}>
+                  Global 配置独立于 Investigation。当前任务没有明确覆盖的 Agent 设置会从这里继承；修改 Global 不会覆盖其它任务自己的 override。
+                </Paragraph>
+              </div>
+              <Tag color='blue'>Global v{props.globalConfiguration?.version ?? '—'}</Tag>
+            </Flex>
+            <Divider style={{margin:'14px 0'}} />
+            <Flex justify='space-between' align='center' gap={16} wrap>
+              <div>
+                <Text strong>本次 Investigation（Task）</Text>
+                <Paragraph type='secondary' style={{margin:'4px 0 0'}}>
+                  任务配置保存在当前 workspace，只记录与 Global 不同的 Agent 设置；研究范围和工作方式始终属于任务级。
+                </Paragraph>
+              </div>
+              <Tag>Task v{props.control.version}</Tag>
+            </Flex>
+            <Text type='secondary' style={{display:'block',marginTop:12}}>
+              配置文件默认位置：Global <code>.data/global-config.json</code> · Task <code>.workspace/{props.sessionName}/control.json</code>。这些路径分别由 <code>DATA_DIR</code> 和 <code>WORKSPACE_DIR</code> 控制。
+            </Text>
+            <Flex justify='space-between' align='center' gap={12} wrap style={{marginTop:14}}>
+              <Text type='secondary'>这里正在编辑的是当前 Task 的有效 Agent 配置。</Text>
+              <Button
+                onClick={() => Modal.confirm({
+                  title:'将当前 Agent 设置保存为工作台默认？',
+                  content:'这会修改 Global 默认配置。没有自行覆盖这些设置的其它 Investigation 会在下次读取配置时继承新默认值。当前任务不会丢失。',
+                  okText:'保存为 Global 默认',
+                  cancelText:'取消',
+                  onOk: async () => {
+                    await props.onUpdateGlobalConfiguration(draft.agent);
+                    await props.onSaved(draft);
+                    await props.onGlobalSaved?.();
+                  },
+                })}
+              >
+                将当前设置设为 Global 默认
+              </Button>
+            </Flex>
+          </Card>
+          <Card title='缓存层级' className='settings-card'>
+            <Flex vertical gap={6}>
+              <Text>Global Cache：<code>.data/cache/media/</code>，跨 Investigation 共享，远程图片/视频解析后的本地副本存这里。</Text>
+              <Text>Task Cache：<code>.workspace/{props.sessionName}/.cache/</code>，只给当前 Investigation 使用，不用于远程头像共享。</Text>
+              <Text type='secondary'>默认目录仅用于说明；实际位置由 <code>DATA_DIR</code> / <code>WORKSPACE_DIR</code> 决定。</Text>
+            </Flex>
+          </Card>
           <Card title='对话显示' className='settings-card'>
              <Paragraph type='secondary'>这个名字只用于对话里的说话人标识和复制出来的聊天记录，不会改变 Agent 的实际角色或权限。</Paragraph>
              <div className='field-label'>助手名称</div>
