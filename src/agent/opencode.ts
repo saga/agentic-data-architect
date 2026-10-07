@@ -106,7 +106,8 @@ export async function abortOpenCodeTurn(turnId: string): Promise<boolean> {
   try {
     await abort();
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('[opencode] Failed to abort the active OpenCode turn.', error);
     return false;
   }
 }
@@ -212,8 +213,8 @@ export async function registerOpenCodeGraphifyMcp(
       if (['connected', 'connecting', 'pending'].includes(currentStatus.toLowerCase())) {
         return;
       }
-    } catch {
-      // 无法读取状态时继续尝试注册，让真正的 MCP API 给出明确结果。
+    } catch (error) {
+      console.warn('[opencode] Unable to read Graphify MCP status; registration will be attempted.', error);
     }
   }
 
@@ -303,7 +304,8 @@ function parseSseBlock(block: string): OpenCodeEvent | undefined {
       event.properties = payload.properties as Record<string, unknown>;
     }
     return event;
-  } catch {
+  } catch (error) {
+    console.warn('[opencode] Ignored a malformed provider SSE event.', error);
     return undefined;
   }
 }
@@ -477,8 +479,8 @@ async function consumeOpenCodeEvents(
 async function abortOpenCodeSession(sessionId: string): Promise<void> {
   try {
     await openCodeFetch('/session/' + encodeURIComponent(sessionId) + '/abort', { method: 'POST' });
-  } catch {
-    // Abort 失败不能覆盖原始的停止错误。
+  } catch (error) {
+    console.warn('[opencode] Failed to abort the provider session after a stop request.', error);
   }
 }
 
@@ -920,7 +922,10 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   let currentWorkflowInstruction = input.purpose === 'review'
     ? ''
     : input.workflowSkill && input.investigationName
-      ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
+      ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch((error) => {
+          console.warn('[opencode] Failed to load Workflow instruction; continuing without it.', error);
+          return '';
+        })
       : '';
   let finalAnswer = '';
 
@@ -1060,7 +1065,10 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       currentWorkflowInstruction = await buildJourneyAgentInstruction(
         input.investigationName,
         input.workflowSkill,
-      ).catch(() => currentWorkflowInstruction);
+      ).catch((error) => {
+        console.warn('[opencode] Failed to refresh Workflow instruction; keeping the previous instruction.', error);
+        return currentWorkflowInstruction;
+      });
     }
   }
 
