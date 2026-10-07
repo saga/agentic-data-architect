@@ -224,11 +224,20 @@ export function InvestigationConfigPage(props:{
               <Button
                 onClick={() => Modal.confirm({
                   title:'将当前 Agent 设置保存为工作台默认？',
-                  content:'这会修改 Global 默认配置。没有自行覆盖这些设置的其它 Investigation 会在下次读取配置时继承新默认值。当前任务不会丢失。',
+                  content:'这会修改 Global 默认配置。没有自行覆盖这些设置的其它 Investigation 会在下次读取配置时继承新默认值。当前任务不会丢失。本地上传的头像文件只属于当前任务，不会被写入 Global 默认。',
                   okText:'保存为 Global 默认',
                   cancelText:'取消',
                   onOk: async () => {
-                    await props.onUpdateGlobalConfiguration(draft.agent);
+                    const globalAgent = clone(draft.agent);
+                    const hasLocalAvatar = globalAgent.avatarSources?.some((item) => !/^https?:\\/\\//i.test(item.src))
+                      || globalAgent.avatarPath && !/^https?:\\/\\//i.test(globalAgent.avatarPath);
+                    if (hasLocalAvatar) {
+                      delete globalAgent.avatarPath;
+                      delete globalAgent.avatarPaths;
+                      delete globalAgent.avatarMimeType;
+                      delete globalAgent.avatarSources;
+                    }
+                    await props.onUpdateGlobalConfiguration(globalAgent);
                     await props.onSaved(draft);
                   },
                 })}
