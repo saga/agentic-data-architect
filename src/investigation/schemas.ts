@@ -136,6 +136,10 @@ export const WorkspaceContextSchema = z.object({
   importantInformation: z.array(z.string()),
   inputs: z.array(WorkspaceInputSchema),
   journeyPlan: JourneyPlanSchema.optional(),
+  /** Runtime-neutral resumable Agent session; legacy copilotSessionId fields remain for backward compatibility. */
+  agentSessionId: z.string().optional(),
+  agentSessionRuntime: AgentRuntimeSchema.optional(),
+  agentConfigurationVersion: z.number().int().positive().optional(),
   copilotSessionId: z.string().optional(),
   copilotConfigurationVersion: z.number().int().positive().optional(),
   updatedAt: z.string().min(1),
