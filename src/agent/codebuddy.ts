@@ -16,6 +16,7 @@ import {
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import type { McpServerSetting } from '../investigation/schemas.js';
+import { buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { AskInput } from './copilot.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
@@ -148,12 +149,14 @@ export async function askCodeBuddy(
     }
   }
 
+  const workflowInstruction = input.workflowSkill && input.investigationName
+    ? await buildJourneyAgentInstruction(input.investigationName, input.workflowSkill).catch(() => '')
+    : '';
+
   const prompt = buildPrompt(
     input,
     input.prompt,
-    input.workflowSkill && input.investigationName
-      ? ''
-      : '',
+    workflowInstruction,
     graphifyEnabled,
   );
 
@@ -192,7 +195,7 @@ export async function askCodeBuddy(
 
   const q = query({
     prompt,
-    options: queryOptions,
+    options: queryOptions as Parameters<typeof query>[0]['options'],
   });
 
   let sessionId = input.sessionId ?? '';
