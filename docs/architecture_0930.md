@@ -215,7 +215,7 @@ Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭
 ---
 ## Data Architect 工作路线
 
-当前有三条明确的 Data Architect 工作路线：
+当前有四条明确的 Data Architect 工作路线：
 
 1. **Legacy Modernization**
    - 适用于已有系统改造、replatform、迁移和切换。
@@ -223,6 +223,8 @@ Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭
    - 适用于从零设计金融服务 AI / 数据平台，例如 Portfolio Research Agent。
 3. **Data Architecture Assessment**
    - 适用于评估已有数据架构：查清当前情况、主要问题、改进建议和实施顺序。
+4. **Current Data Architecture**
+   - 适用于只看清现有系统的数据来源、数据流、数据模型和关键转换。
 
 三条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
 
@@ -334,7 +336,7 @@ Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。空白/
 
 1. **Copilot SDK**：通过 GitHub Copilot SDK 执行。
 2. **CodeBuddy SDK**：通过 `@tencent-ai/agent-sdk` 程序化执行。
-3. **OpenCode Run**：通过官方 `opencode run` headless CLI 执行。
+3. **OpenCode Run**：通过官方 `opencode run` headless CLI 执行；正式 Investigation execution 不直接调用 `opencode serve`，serve 只用于本机模型发现等辅助能力。
 
 Runtime 与 Model 分开保存。新建 Investigation 时可以指定首选 Runtime；quota / usage exhaustion 发生时，只在本次执行内从当前 Runtime 向后按全局配置 `AGENT_RUNTIME_FALLBACK_ORDER` 自动尝试，成功后不修改 Investigation 的首选 Runtime，也不需要用户确认。
 
@@ -489,7 +491,7 @@ UI 使用 Ant Design + Ant Design X；XMarkdown 负责 Markdown、代码、公�
     artifacts/
 ```
 
-`.workspace/<session-name>/context.json` 是当前 Investigation 的状态入口，只保存调查状态，不保存多轮聊天正文。`.workspace/conversations.db` 保存 user / assistant / system 消息，并使用 FTS5 做全文检索。跨 session 可以复用的研究资料统一放在 `.workspace/shared/`，例如 Confluence 页面保存在 `.workspace/shared/confluence/`，并登记到 `.workspace/shared/index.json`。
+.workspace/<session-name>/context.json 是当前 Investigation 的状态入口，只保存调查状态，不保存多轮聊天正文。`.workspace/conversations.db` 保存 user / assistant / system 消息，并使用 FTS5 做全文检索。跨 session 可以复用的研究资料统一放在 `.workspace/shared/`，例如 Confluence 页面保存在 `.workspace/shared/confluence/`，并登记到 `.workspace/shared/index.json`。
 
 Agent 不把整个聊天历史重新塞进每轮 prompt；当前实现只按问题从 FTS5 检索少量相关历史消息，作为补充上下文。
 
@@ -2785,23 +2787,12 @@ Evidence
 目录：
 
 ~~~text
-.data/investigations/<name>/
-  investigation.json
+.workspace/<session-name>/
+  context.json
+  transcript.md
   discovery/
   reports/
-  workspace/
-    context.json
-    inputs/
-    research/
-      github/
-      leanix/
-      confluence/
-      web/
-    sources/
-      github/
-    findings/
-    artifacts/
-    notes/
+  artifacts/
 ~~~
 
 ## context.json 是研究上下文的入口
