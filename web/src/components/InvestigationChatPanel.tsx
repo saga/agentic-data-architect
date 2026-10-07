@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Alert, Button, Card, Flex, Input, Select, Space, Tag, Tooltip, Typography } from 'antd';
 import type { UploadFile } from 'antd';
 import { Attachments, Bubble, Sender, Think } from '@ant-design/x';
-import { FolderOpenOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { FolderOpenOutlined, PaperClipOutlined, StopOutlined } from '@ant-design/icons';
 import { XMarkdown } from '@ant-design/x-markdown';
 import { AssistantActionBar } from './AssistantActionBar';
 import { AssistantAvatar } from './AssistantAvatar';
@@ -467,10 +467,20 @@ export function InvestigationChatPanel(props: {
               />
             </Sender.Header>
           }
-          suffix={(_, { components }) => (
+          suffix={(_, { components }) => props.loading ? (
+            <Button
+              type="primary"
+              danger
+              icon={<StopOutlined />}
+              onClick={props.cancelActiveTurn}
+              aria-label="停止本轮调查"
+            >
+              停止
+            </Button>
+          ) : (
             <components.SendButton
               type="primary"
-              disabled={!props.value.trim() || props.loading || !props.current.context.mission}
+              disabled={!props.value.trim() || !props.current.context.mission}
             />
           )}
         />
