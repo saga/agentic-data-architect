@@ -43,3 +43,32 @@ test('Graphify MCP server exposes only structural read tools', () => {
 });
 
 
+
+
+test('real Graphify runtime builds a structural graph for an Investigation directory', async () => {
+  prepareGraphifyEnvironment();
+  requireGraphifyMcpCommand();
+
+  const root = await mkdtemp(path.join(tmpdir(), 'agentic-graphify-'));
+  try {
+    await writeFile(
+      path.join(root, 'sample.sql'),
+      'create table positions as select security_id from raw_positions;\\n',
+    );
+    await writeFile(
+      path.join(root, 'worker.py'),
+      'def load_positions():\\n    return "positions"\\n',
+    );
+
+    const metadata = await ensureGraphifyGraph(root, true);
+    assert.equal(metadata.status, 'available');
+    assert.equal(metadata.enabled, true);
+    assert.equal(metadata.graphPath, graphifyGraphPath(root));
+    assert.match(metadata.graphHash ?? '', /^[a-f0-9]{64}$/);
+
+    const graph = await readFile(graphifyGraphPath(root), 'utf8');
+    assert.ok(graph.length > 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
