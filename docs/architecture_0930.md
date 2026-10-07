@@ -1,6 +1,6 @@
-# 历史架构基线（V1.7 时代）
+# 历史架构与演进记录
 
-> **文档定位：历史架构基线（2026-09-30 起草，后续多次增补）。** 本文保留架构演进和形成过程，不能作为当前 `main` 的唯一实现说明；如果本文与代码、ADR 或当前运行文档冲突，以 `ADR/index.md`、`README.md`、`docs/implementation.md` 和 `docs/data-control-flow.md` 为准。文中“当前”通常指该段落形成时的实现快照。
+> **文档定位：历史架构与演进记录（2026-09-30 起草，后续多次增补）。** 本文保留架构演进和形成过程，不能作为当前 `main` 的唯一实现说明；如果本文与代码、ADR 或当前运行文档冲突，以 `ADR/index.md`、`README.md`、`docs/implementation.md` 和 `docs/data-control-flow.md` 为准。文中“当前”通常指该段落形成时的实现快照。
 
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
