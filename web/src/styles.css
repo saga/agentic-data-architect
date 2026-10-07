@@ -2355,6 +2355,37 @@ body {
   flex: 0 0 auto;
 }
 
+.journey-map-replay-bar {
+  display: grid;
+  grid-template-columns: auto auto minmax(220px, 1fr) minmax(180px, 0.8fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid #e9edf3;
+  background: #fbfcfe;
+  flex: 0 0 auto;
+}
+
+.journey-map-replay-bar .ant-slider {
+  margin: 6px 10px;
+}
+
+@media (max-width: 900px) {
+  .journey-map-replay-bar {
+    grid-template-columns: auto auto 1fr;
+  }
+
+  .journey-map-replay-bar .ant-slider {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 4px 8px 0;
+  }
+
+  .journey-map-replay-bar > .ant-typography:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .journey-map-page .journey-map-validation-panel {
   margin: 8px 14px;
 }
