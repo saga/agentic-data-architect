@@ -70,8 +70,7 @@ export function prepareGraphifyEnvironment(): string | undefined {
   return graphifyMcp;
 }
 
-/** 找到 Graphify MCP executable；显式配置优先，没有则寻找项目 .venv / PATH。 */
-/** 找到和 graphify-mcp 属于同一 Python 环境的 Graphify CLI。 */
+/** 找到 Graphify CLI / MCP executable；显式配置优先，没有则寻找项目 .venv / PATH。 */
 export function resolveGraphifyCliCommand(): string | undefined {
   if (!config.graphifyEnabled) return undefined;
 
@@ -112,7 +111,10 @@ export async function ensureGraphifyGraph(
 
   const graphPath = graphifyGraphPath(workingDirectory);
   const graphExists = await fs.access(graphPath).then(() => true).catch(() => false);
-  if (!refresh && graphExists) return getGraphifyRuntimeMetadata(workingDirectory);
+  if (!refresh && graphExists) {
+    const metadata = await getGraphifyRuntimeMetadata(workingDirectory);
+    if (metadata.status === 'available' && metadata.graphHash) return metadata;
+  }
 
   const action = graphExists ? 'update' : 'extract';
   const args = graphExists
