@@ -85,7 +85,7 @@ export type JourneySnapshot = z.infer<typeof WorkflowSnapshotSchema>;
  * 只比较 currentNodeId 会留下典型的 ABA race，因此这里同时比较 version、status、
  * completedNodeIds 和 pendingInteraction，确保旧 transition 不能覆盖中间发生过的状态。
  */
-function sameJourneyExecution(left: JourneyExecution, right: JourneyExecution): boolean {
+export function sameJourneyExecution(left: JourneyExecution, right: JourneyExecution): boolean {
   return left.workflowId === right.workflowId
     && left.workflowVersion === right.workflowVersion
     && left.runId === right.runId
