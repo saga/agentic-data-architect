@@ -182,7 +182,7 @@ function routeParam(value: string | string[]): string {
 function sessionKey(name: string): string {
   const safe = path.basename(name);
   if (!name || safe !== name || name === '.' || name === '..') {
-    throw new Error('Invalid session name');
+    throw new RequestValidationError('Session 名称不合法，请使用单层目录名。');
   }
   return safe;
 }
@@ -216,6 +216,9 @@ async function listSessions(): Promise<SessionSummary[]> {
     if (!entry.isDirectory() || entry.name === 'shared') continue;
     try {
       const context = await loadWorkspaceContext(entry.name);
+      if (context.name !== entry.name) {
+        continue;
+      }
       const conversation = getConversationSummary(entry.name);
       result.push({
         key: entry.name,
@@ -225,8 +228,8 @@ async function listSessions(): Promise<SessionSummary[]> {
         userPrompt: context.userPrompt ?? '',
         updatedAt: conversation.lastMessageAt ?? context.updatedAt,
       });
-    } catch {
-      // Ignore malformed/non-session directories in the UI list.
+    } catch (error) {
+      console.error('读取 Session 列表中的目录失败：', entry.name, error);
     }
   }
   return result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
