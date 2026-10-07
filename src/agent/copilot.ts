@@ -112,6 +112,11 @@ interface McpAuthRequestParam {
   serverUrl: string;
   reason: string;
 }
+interface UserInputRequestParam {
+  question: string;
+  choices?: string[];
+  allowFreeform?: boolean;
+}
 interface PreToolUseParam {
   toolName: string;
   toolArgs: unknown;
