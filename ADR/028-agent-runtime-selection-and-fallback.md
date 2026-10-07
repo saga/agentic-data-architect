@@ -45,7 +45,9 @@ CodeBuddy 通过 `@tencent-ai/agent-sdk` 的 `query()` 使用：
 - 当前模型；
 - `bypassPermissions` 与宿主 Mission Action Gate；
 - Investigation MCP 和 Graphify MCP；
-- 由宿主组合的 Mission / system / Workflow prompt。
+- 现有 Workbench custom tools 通过 CodeBuddy SDK `createSdkMcpServer` / `tool` 暴露为 in-process MCP，不复制业务 tool implementation；
+- `query({ resume: sessionId })` 用于同一 Runtime/model 的连续阶段；
+- 由宿主组合的 Mission / system / Workflow prompt；system prompt 使用 SDK `systemPrompt`，而不是把宿主规则伪装成用户消息。
 
 SDK 的默认 filesystem isolation 保持，不自动加载用户或项目的 CodeBuddy settings；避免第二套 Skills / MCP / permission source 改变本项目控制边界。
 
@@ -68,7 +70,7 @@ Workspace 使用 runtime-neutral Agent session slot：
 
 旧 `copilotSessionId` / `copilotConfigurationVersion` 保留兼容，但新 Runtime 不得把自己的 session 当作 Copilot session 使用。
 
-Session 必须与 Runtime 和 Control version 一致才能恢复；发生 Runtime/Configuration 变化时必须从新 session 开始。
+Session 必须与 Runtime 和 Control version 一致才能恢复；同一 Runtime/model 的阶段继续执行使用 SDK `resume`，发生 Runtime/Configuration/model 变化时必须从新 session 开始。
 
 ## Consequences
 
