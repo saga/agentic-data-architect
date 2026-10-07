@@ -19,11 +19,11 @@
 | 5. 头像读取路径越界 | 已解决 | avatar endpoint 对解析后的路径执行 workspace boundary 检查。 |
 | 6. Workflow 版本变化后旧 Agent Session 未失效 | 已解决 | 保存/重置 Workflow 时清理 Runtime-neutral 和 legacy session reference。 |
 | 7. Control 初始化并发竞争 | 已解决 | Global / Task configuration initialization 使用独立 init lock。 |
-| 8. 三 Runtime 逻辑重复、边界漂移 | 仍存在 | Runtime 层已抽出，但 provider-specific adapter 之间仍有交叉依赖和行为差异。 |
-| 9. 持久化路径静默吞错 | 部分解决 | 关键 turn / trajectory 路径已有保护，但仍有零散 `catch {}` 需要继续治理。 |
+| 8. 三 Runtime 逻辑重复、边界漂移 | 主要问题已解决 | Copilot→OpenCode、CodeBuddy→OpenCode/Copilot 的直接依赖已移除；共享 Agent input、用户输入桥和 Graphify 判定已下沉到独立模块。Runtime 仍保留必要的 provider-specific execution 差异。 |
+| 9. 持久化路径静默吞错 | 主要路径已解决 | turn failure message、trajectory、运行记录、DuckDB shutdown 和可选 runtime diagnostics 已不再静默丢失；故意的 best-effort 缓存/兼容读取仍保留显式日志或正常降级。 |
 | 10. quota error 识别过宽 | 已解决 | 当前只接受明确 quota / rate-limit / resource exhausted / 429 语义。 |
-| 11. Skill DSL 禁止字段缺少机器校验 | 仍存在 | parser/lint 还需要把禁用字段和扩展语法进一步变成确定性 lint failure。 |
-| 12. Workflow 阶段可被 Agent 口头推进 | 仍需专项处理 | 已有 `completeWhen` 的节点使用确定性条件；无 `completeWhen` 节点仍需要统一 completion policy。 |
+| 11. Skill DSL 禁止字段缺少机器校验 | 已解决 | parser/lint 现在拒绝未知 block、非法字段、重复字段、出口后的字段和未知 completeWhen；已有回归测试覆盖。 |
+| 12. Workflow 阶段可被 Agent 口头推进 | 已解决 | 有 `completeWhen` 的节点仍由 deterministic evaluator 判断；没有 `completeWhen` 的 Agent task 必须先通过 Stage Gate 才允许 success transition。 |
 | Server restart / SSE / Stop durability | 已解决 | ADR-030 已定义 turn draft、graceful shutdown、startup recovery、transport recovery 和显式 Stop。 |
 | CodeBuddy Investigation 可修改宿主仓库 | 已解决 | ADR-031 已定义 built-in allowlist、二次 deny 和 workspace path boundary。 |
 ## 摘要
