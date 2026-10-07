@@ -151,17 +151,27 @@ export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
   return global;
 }
 
-/** 把任务真正改动的字段保存为 sparse override；未改动的 inherited field 不会被旧 Global 值污染。 */
+/** 读取 Task 的原始 sparse override；不能从 Effective Config 反推，因为 Global 变化后无法区分继承值和显式覆盖值。 */
+async function loadStoredTaskConfiguration(name: string): Promise<TaskConfiguration | null> {
+  try {
+    return TaskConfigurationSchema.parse(JSON.parse(await fs.readFile(controlFile(name), 'utf8')));
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+/** 把任务真正改动的字段保存为 sparse override；只基于持久化 override 做增删。 */
 function mergeTaskAgentOverrides(
+  currentOverrides: TaskConfiguration['agent'],
   currentAgent: InvestigationControl['agent'],
   nextAgent: InvestigationControl['agent'],
   globalAgent: InvestigationControl['agent'],
 ): TaskConfiguration['agent'] {
-  const overrides = extractTaskAgentOverrides(currentAgent, globalAgent) as Record<string, unknown>;
+  const overrides = clone(currentOverrides) as Record<string, unknown>;
 
   for (const key of Object.keys(nextAgent) as Array<keyof InvestigationControl['agent']>) {
     if (key === 'platformCapabilities') continue;
-
     if (sameValue(currentAgent[key], nextAgent[key])) continue;
 
     if (sameValue(nextAgent[key], globalAgent[key])) {
@@ -305,6 +315,7 @@ export async function updateInvestigationControl(
 ): Promise<InvestigationControl> {
   return withControlUpdateLock(name, async () => {
     const current = await loadInvestigationControl(name);
+    const storedTask = await loadStoredTaskConfiguration(name);
     const global = await loadGlobalConfiguration();
     const now = new Date().toISOString();
 
@@ -350,7 +361,7 @@ export async function updateInvestigationControl(
       updatedAt: now,
       research: nextResearch,
       // Only task-specific deviations are persisted. Everything else follows Global.
-      agent: mergeTaskAgentOverrides(current.agent, effectiveAgent, global.agent),
+      agent: mergeTaskAgentOverrides(storedTask?.agent ?? {}, current.agent, effectiveAgent, global.agent),
       history: [
         ...current.history.map((entry) => ({
           version: entry.version,
