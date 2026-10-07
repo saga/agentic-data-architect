@@ -23,11 +23,10 @@ export interface DerivedStateInput {
   scopeReady: boolean;
   highGapKinds: readonly string[];
   modernization?: {
+    targetStatus: string;
     targetComponentCount: number;
-    mappingCount: number;
-    validationCount: number;
-    blockingValidationReady: number;
-    blockingValidationTotal: number;
+    mappingStatuses: readonly string[];
+    validationStatuses: readonly { status: string; blocking: boolean }[];
   } | null;
   assessment?: {
     exists: boolean;
@@ -50,8 +49,13 @@ export interface DerivedStateSignals {
   dataTruthReady: boolean;
   investigationReady: boolean;
   targetArchitectureReady: boolean;
+  targetComponentCount: number;
   mappingReady: boolean;
+  mappingCount: number;
   validationReady: boolean;
+  validationCount: number;
+  blockingValidationReady: number;
+  blockingValidationTotal: number;
   findingsReady: boolean;
   assessmentCurrentStateReady: boolean;
   assessmentFindingsReady: boolean;
@@ -100,12 +104,27 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
     && !hasAny(input.highGapKinds, ['source-of-truth', 'data_quality']);
 
   const modernization = input.modernization;
-  const targetArchitectureReady = Boolean(modernization && modernization.targetComponentCount > 0);
-  const mappingReady = Boolean(modernization && modernization.mappingCount > 0);
+  const targetComponentCount = modernization?.targetComponentCount ?? 0;
+  const mappingCount = modernization
+    ? modernization.mappingStatuses.filter((status) => status === 'reviewed' || status === 'approved').length
+    : 0;
+  const validationCount = modernization?.validationStatuses.length ?? 0;
+  const blockingValidationReady = modernization
+    ? modernization.validationStatuses.filter((item) => item.blocking && item.status === 'passed').length
+    : 0;
+  const blockingValidationTotal = modernization
+    ? modernization.validationStatuses.filter((item) => item.blocking).length
+    : 0;
+  const targetArchitectureReady = Boolean(
+    modernization
+      && modernization.targetStatus !== 'draft'
+      && targetComponentCount > 0,
+  );
+  const mappingReady = Boolean(modernization && mappingCount > 0);
   const validationReady = Boolean(
     modernization
-      && modernization.blockingValidationTotal > 0
-      && modernization.blockingValidationReady >= modernization.blockingValidationTotal,
+      && blockingValidationTotal > 0
+      && blockingValidationReady >= blockingValidationTotal,
   );
 
   // Assessment 是一种“有效结果”，零个 Finding 也是合法结果；不能把它当成失败。
@@ -135,8 +154,13 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
     dataTruthReady,
     investigationReady: currentStateReady,
     targetArchitectureReady,
+    targetComponentCount,
     mappingReady,
+    mappingCount,
     validationReady,
+    validationCount,
+    blockingValidationReady,
+    blockingValidationTotal,
     findingsReady,
     assessmentCurrentStateReady: currentDataArchitectureReady,
     assessmentFindingsReady,
