@@ -924,12 +924,17 @@ export async function answerQuestion(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const activeFailure = activeInvestigationTurns.get(investigationName);
+    const detailedError = [
+      message,
+      error instanceof Error && error.name && error.name !== 'Error' ? '错误类型：' + error.name : '',
+      error instanceof Error && error.stack && error.stack !== message ? 'Stack:\n' + error.stack : '',
+    ].filter(Boolean).join('\n\n');
     const failureDetails = {
-      error: message,
-      ...(error instanceof Error && error.name ? { errorType: error.name } : {}),
-      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      error: detailedError,
+      elapsedMs: Math.max(0, Date.now() - new Date(turnStartedAt).getTime()),
       ...(activeFailure?.lastActivityAt ? { lastActivityAt: activeFailure.lastActivityAt } : {}),
       ...(activeFailure?.lastActivity ? { lastActivity: activeFailure.lastActivity } : {}),
+      ...(activeFailure?.lastActivity ? { lastActivityType: activeFailure.phase } : {}),
       pendingTools: 0,
       pendingPermissions: 0,
       pendingUserInputs: 0,
