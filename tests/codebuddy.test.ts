@@ -31,7 +31,7 @@ test('CodeBuddy model normalization accepts runtime-prefixed models', () => {
 });
 
 test('CodeBuddy deployment defaults are configuration driven', () => {
-  assert.equal(config.codeBuddyDefaultModel, 'Glm-5.3-flash');
+  assert.equal(config.codeBuddyDefaultModel, 'glm-5.3-flash');
   assert.deepEqual(config.codeBuddyModelAllowlist, [
     'glm-5.3-flash',
     'deepseek-v4.1-flash',

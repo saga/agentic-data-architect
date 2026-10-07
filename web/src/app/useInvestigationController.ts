@@ -5,6 +5,7 @@ import { ApiRequestError, consumeSse, getJson, request } from './api';
 import { workflowOptions } from './workflow-options';
 import {
   AnswerSummarySchema,
+  ControlResponseSchema,
   GlobalConfigurationResponseSchema,
   CreateSessionResponseSchema,
   ExecutionStatusSchema,
