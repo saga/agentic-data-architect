@@ -71,6 +71,14 @@ async function main(): Promise<void> {
   });
 
   const server = createHttpServer(app);
+  const localHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+  if (!config.allowRemoteHost && !localHosts.has(config.host)) {
+    throw new Error(
+      '个人本机 Agent 默认只能监听本机地址。当前 HOST=' + config.host
+      + '；如确实需要远程访问，请显式设置 ALLOW_REMOTE_HOST=true。',
+    );
+  }
+
   server.listen(config.port, config.host, () => {
     console.log(
       'Agentic Data Architect Web UI: http://'
