@@ -30,8 +30,9 @@ function sameMission(
   // Mission 的 identity 不看确认时间和版本号；这些只是元数据，不代表任务本身变了。
   // 但 deliverable 契约属于任务本身的一部分，只改一个交付物也必须让旧 Claim / Finding 失效，
   // 与修改 purpose / expectedResult 的处理保持一致。
-  return Boolean(left && right)
-    && left.purpose === right.purpose
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.purpose === right.purpose
     && left.expectedResult === right.expectedResult
     && JSON.stringify(left.deliverables.map((item) => ({
       id: item.id,
