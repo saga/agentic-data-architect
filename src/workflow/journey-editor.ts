@@ -33,7 +33,7 @@ import { isCurrentStateOnlyScope, runInvestigationScopeGate } from './scope-gate
 import { assertMissionGate, isMissionWorkflowTargetAllowed } from './mission-gate.js';
 import { buildMissionProgress } from './mission-progress.js';
 import type { WorkflowId } from '../investigation/schemas.js';
-import { isJourneyCompletionConditionSatisfied } from './journey.js';
+import { isAgentWorkflowCompletionAllowed } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
 import {
   applyJourneyTransition,
@@ -904,17 +904,23 @@ export async function applyAgentWorkflowTransition(
 
     if (transition.outcome === 'success' && currentNode) {
       const facts = await buildJourneyFacts(name);
-      if (currentNode.completeWhen) {
-        if (!isJourneyCompletionConditionSatisfied(currentNode.completeWhen, facts)) {
+      const completionAllowed = isAgentWorkflowCompletionAllowed(
+        currentNode,
+        facts,
+        options.stageValidationPassed === true,
+      );
+      if (!completionAllowed) {
+        if (currentNode.completeWhen) {
           throw new Error(
-            '当前步骤的完成条件还没有满足，不能由 Agent 自行宣布完成：'
+            '当前步骤的完成条件还没有满足，不能由助手自己宣布完成：'
               + ' completeWhen=' + currentNode.completeWhen,
           );
         }
-      } else if (currentNode.actor === 'agent' && options.stageValidationPassed !== true) {
-        throw new Error(
-          '当前步骤没有直接的确定性完成条件，必须先通过阶段成果检查，不能只根据助手自己的回答推进。',
-        );
+        if (currentNode.actor === 'agent') {
+          throw new Error(
+            '当前步骤没有直接的完成条件，必须先通过阶段成果检查才能继续。',
+          );
+        }
       }
     }
 
