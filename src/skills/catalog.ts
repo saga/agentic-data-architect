@@ -63,6 +63,7 @@ export function parseSkillManifest(markdown: string, filePath = 'SKILL.md'): Ski
   let name = '';
   let description = '';
   let kind: string | undefined;
+  const unsupportedFields: string[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? '';
@@ -104,10 +105,25 @@ export function parseSkillManifest(markdown: string, filePath = 'SKILL.md'): Ski
           kind = unquote(kindMatch[1] ?? '');
           continue;
         }
-        index -= 1;
-        break;
+        if (/^\s*[A-Za-z][A-Za-z0-9_-]*\s*:/.test(nested)) {
+          const field = /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*:/.exec(nested)?.[1];
+          if (field) unsupportedFields.push(field);
+        }
+        continue;
       }
+      continue;
     }
+
+    if (/^\s*[A-Za-z][A-Za-z0-9_-]*\s*:/.test(line)) {
+      const field = /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*:/.exec(line)?.[1];
+      if (field) unsupportedFields.push(field);
+    }
+  }
+
+  if (unsupportedFields.length) {
+    throw new Error(
+      filePath + ' 包含不支持的 frontmatter 字段：' + [...new Set(unsupportedFields)].join('、') + '。',
+    );
   }
 
   return SkillManifestSchema.parse({
