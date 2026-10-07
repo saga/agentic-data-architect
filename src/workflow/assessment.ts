@@ -193,6 +193,10 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 /** 读取评估 Artifact，并明确区分 missing / stale / current / error。 */
 export async function readArchitectureAssessmentArtifact(
   name: string,
+  source?: {
+    investigation: Awaited<ReturnType<typeof import('../investigation/store.js').loadInvestigation>>;
+    snapshot: DiscoverySnapshot | null;
+  },
 ): Promise<{ status: ArtifactLifecycleStatus; plan: ArchitectureAssessmentPlan | null }> {
   let plan: ArchitectureAssessmentPlan;
   try {
@@ -205,8 +209,8 @@ export async function readArchitectureAssessmentArtifact(
     return { status: ArtifactLifecycleStatusSchema.parse('error'), plan: null };
   }
 
-  const inv = await loadInvestigation(name);
-  const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const inv = source?.investigation ?? await loadInvestigation(name);
+  const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
   if (!isDiscoverySnapshotCompatible(inv, snapshot)) {
     return { status: ArtifactLifecycleStatusSchema.parse('stale'), plan: null };
   }
