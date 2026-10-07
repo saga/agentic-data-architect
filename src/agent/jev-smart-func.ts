@@ -807,9 +807,9 @@ export async function jevSmartFunc(
     systemPrompt,
     purpose: 'review',
     model: input.model ?? config.model,
-    modelCallName: input.modelCallName,
+    ...(input.modelCallName ? { modelCallName: input.modelCallName } : {}),
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
-    onTrajectory: input.onTrajectory,
+    ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
     autoContinuationTurns: 0,
     responseSchema,
   });
