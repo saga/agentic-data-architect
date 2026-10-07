@@ -43,7 +43,7 @@ async function cmdInit(args: string[]): Promise<void> {
 async function cmdDiscover(args: string[]): Promise<void> {
   const [name, ...rest] = args;
   if (!name) throw new Error('usage: discover <name> [--path ./dir] [--database URL] [--schema S] [--profile]');
-  if (!(await investigationExists(name))) throw new Error('session 不存在：' + name + '（直接 npm run start ' + name + ' 开始）');
+  if (!(await investigationExists(name))) throw new Error('找不到这个调查：' + name + '。可以先运行 npm run start ' + name + ' 创建它。');
   const opts: { path?: string; database?: string; schema?: string; profile?: boolean } = {};
   const maybePath = rest[0];
   if (maybePath !== undefined && !maybePath.startsWith('--')) { opts.path = maybePath; rest.shift(); }
@@ -74,7 +74,7 @@ async function cmdAsk(args: string[]): Promise<void> {
 async function cmdModernize(args: string[]): Promise<void> {
   const [name] = args;
   if (!name) throw new Error('usage: modernize <name>');
-  if (!(await investigationExists(name))) throw new Error('session 不存在：' + name);
+  if (!(await investigationExists(name))) throw new Error('找不到这个调查：' + name + '。');
   const result = await buildModernizationPlan(name);
   console.log(JSON.stringify(result.plan, null, 2));
   console.error('written: ' + result.path);
