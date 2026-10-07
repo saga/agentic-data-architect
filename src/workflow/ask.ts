@@ -140,6 +140,24 @@ export async function answerQuestion(
     throw new Error('助手正在处理上一轮问题，请等它完成，或先点击“停止”。');
   }
 
+  // Durable running 只表示“上一次执行没有完成”，不表示当前进程仍然有 Agent
+  // 在执行。进程内 live turn 才是唯一可信的运行态；没有 live owner 的 running
+  // turn 必须先回收，避免把一次新的“继续”永久卡在旧 turn 上。
+  const persistedRunning = getRunningConversationTurn(investigationName);
+  if (persistedRunning) {
+    const liveOwner =
+      activeInvestigationTurns.get(investigationName)?.turnId === persistedRunning.turnId
+      || hasActiveCopilotTurn(persistedRunning.turnId);
+    if (liveOwner) {
+      throw new Error('助手正在处理上一轮问题，请等它完成，或先点击“停止”。');
+    }
+
+    if (persistedRunning.turnId !== turnId) {
+      abortStaleConversationTurn(persistedRunning.turnId);
+    }
+    // 同一个 stale turnId 直接重新认领执行；新的 turnId 则在上面的回收后创建。
+  }
+
   let turn;
   try {
     turn = beginConversationTurn(investigationName, turnId);
@@ -158,9 +176,8 @@ export async function answerQuestion(
     if (sameTurnActive) {
       throw new Error('This investigation already has an active turn.');
     }
-    if (abortStaleConversationTurn(turn.turnId)) {
-      throw new Error('上一进程中未完成的这次请求已经被终止，原有内容已保留。请重新发送一个新问题。');
-    }
+    // 到这里的 running turn 必然是本进程没有 live owner 的旧 turn。
+    // 不再把 stale recovery 当成一次失败；允许当前请求继续执行并完成这个 turn。
   }
 
   if (turn.status === 'failed' || turn.status === 'aborted') {
