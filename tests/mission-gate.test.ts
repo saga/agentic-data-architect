@@ -29,7 +29,7 @@ test('mission gate rejects vague confirmed text instead of trusting confirmation
 });
 
 test('mission gate rejects a persisted contract whose deliverables no longer match its text', () => {
-  const purpose = '理解 IBM 老系统当前的数据架构，为 replatform 提供依据。';
+  const purpose = '理解某大型企业老系统当前的数据架构，为 replatform 提供依据。';
   const expectedResult = '拿到当前 Data Source、Data Flow、Data Model。';
   const result = evaluateMissionGate({
     version: 1,
@@ -53,10 +53,10 @@ test('mission gate rejects a persisted contract whose deliverables no longer mat
 test('mission gate accepts a confirmed mission with observable deliverables', () => {
   const mission = {
     version: 1 as const,
-    purpose: '理解 IBM 老系统当前的数据架构，为 replatform 提供依据。',
+    purpose: '理解某大型企业老系统当前的数据架构，为 replatform 提供依据。',
     expectedResult: '拿到当前 Data Source、Data Flow、Data Model，并形成 replatform 方案。',
     deliverables: inferMissionDeliverables(
-      '理解 IBM 老系统当前的数据架构，为 replatform 提供依据。',
+      '理解某大型企业老系统当前的数据架构，为 replatform 提供依据。',
       '拿到当前 Data Source、Data Flow、Data Model，并形成 replatform 方案。',
     ),
     status: 'confirmed' as const,
@@ -80,10 +80,10 @@ test('deliverable inference stays conservative and falls back to a custom result
 test('Mission boundary blocks Workflow stages that are not part of the requested result', () => {
   const mission = {
     version: 1 as const,
-    purpose: '理解 IBM 老系统当前的数据架构，为后续判断提供依据。',
+    purpose: '理解某大型企业老系统当前的数据架构，为后续判断提供依据。',
     expectedResult: '只需要当前 Data Source、Data Flow 和 Data Model。',
     deliverables: inferMissionDeliverables(
-      '理解 IBM 老系统当前的数据架构，为后续判断提供依据。',
+      '理解某大型企业老系统当前的数据架构，为后续判断提供依据。',
       '只需要当前 Data Source、Data Flow 和 Data Model。',
     ),
     status: 'confirmed' as const,
