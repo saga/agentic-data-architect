@@ -20,7 +20,7 @@ import {
   GRAPHIFY_MCP_NAME,
   GRAPHIFY_SELECTION_INSTRUCTION,
   buildGraphifyMcpServer,
-  ensureGraphifyGraph,
+  tryEnsureGraphifyGraph,
   isGraphifyTool,
 } from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
@@ -887,13 +887,27 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
-  const graphifyEnabled = input.purpose !== 'journey-map'
+  let graphifyEnabled = input.purpose !== 'journey-map'
     && input.purpose !== 'review'
     && config.graphifyEnabled;
   let graphifyServer: Awaited<ReturnType<typeof buildGraphifyMcpServer>> | undefined;
   if (graphifyEnabled) {
-    await ensureGraphifyGraph(input.workingDirectory, false);
-    graphifyServer = buildGraphifyMcpServer(input.workingDirectory);
+    const graphifyPreparation = await tryEnsureGraphifyGraph(input.workingDirectory, false);
+    if (graphifyPreparation.available) {
+      graphifyServer = buildGraphifyMcpServer(input.workingDirectory);
+    } else {
+      graphifyEnabled = false;
+      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onTrajectory?.({
+        type: 'status',
+        name: '结构分析工具不可用，已继续调查',
+        status: 'info',
+        details: {
+          capability: GRAPHIFY_MCP_NAME,
+          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
+        },
+      });
+    }
   }
 
   let sessionId = '';
