@@ -1460,7 +1460,10 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
 
     // SSE is the browser's live execution channel. answerQuestion commits the
     // durable result before the final "completed" event is sent.
+    // If execution fails, the catch path persists whatever the secretary already showed.
     let finished = false;
+    let streamedAssistant = '';
+    let companionNote = '';
     const send = (event: SseEvent['event'], data: unknown) => {
       if (finished || res.writableEnded) return;
       const payload = SseEventSchema.parse({ event, data });
@@ -1479,7 +1482,10 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       const result = await answerQuestion(
         name,
         message,
-        (delta) => send('delta', { delta }),
+        (delta) => {
+          streamedAssistant += delta;
+          send('delta', { delta });
+        },
         turnId,
         (status) => send('status', { status }),
         {
@@ -1487,7 +1493,10 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
           ...(body.guided && !selectedRoute ? { selectedGuidance: message } : {}),
           onReasoningDelta: (delta) => send('reasoning', { delta }),
           onCheckpoint: (checkpoint) => send('checkpoint', checkpoint),
-          onCompanionNote: (note) => send('companion_note', { note }),
+          onCompanionNote: (note) => {
+            companionNote = note;
+            send('companion_note', { note });
+          },
         },
       );
       send('completed', result);
@@ -1502,6 +1511,31 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         stack: error instanceof Error ? error.stack : undefined,
         error,
       });
+
+      // A failed Agent turn is still a conversation turn. The user message is already
+      // durable; preserve secretary notes / partial output as a durable assistant message
+      // before closing SSE, so reload/finally cannot erase what the user saw.
+      const failureContent = [
+        companionNote.trim(),
+        streamedAssistant.trim(),
+        '这次调查没有完成，我已经保留刚才已经得到的内容。你可以直接继续提问；详细错误信息显示在这里。',
+      ].filter(Boolean).join('\n\n');
+      try {
+        saveConversationMessage({
+          id: turnId + ':assistant:failure',
+          sessionName: name,
+          role: 'assistant',
+          content: failureContent,
+        });
+        await appendTranscript(name, 'assistant', failureContent);
+      } catch (persistenceError) {
+        console.error('[messages/stream] Failed to persist assistant failure message', {
+          sessionName: name,
+          turnId,
+          error: persistenceError,
+        });
+      }
+
       send('error', { error: message });
       finished = true;
       res.end();
