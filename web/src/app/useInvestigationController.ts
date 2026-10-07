@@ -312,13 +312,6 @@ export function useInvestigationController() {
         setExecutionStatus(status);
         if (status.running) {
           setLoading(true);
-          if (status.turnId && (!activeTurnRef.current || activeTurnRef.current.turnId !== status.turnId)) {
-            activeTurnRef.current = {
-              key,
-              turnId: status.turnId,
-              controller: new AbortController(),
-            };
-          }
           setStreamingAnswer((currentAnswer) =>
             currentAnswer?.key === key ? currentAnswer : { key, content: '' },
           );
