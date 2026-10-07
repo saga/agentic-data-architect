@@ -41,6 +41,34 @@ Investigation 的聊天界面同时存在两种状态：
    - server 必须先完成失败 assistant message 的 durable write，再发送 SSE error 并结束 stream；
    - 这样浏览器在收到错误并重新加载 conversation 时，已经能够看到失败消息。
 
+### Conversation 生命周期
+
+```mermaid
+sequenceDiagram
+    participant UI as Web UI
+    participant S as Server
+    participant A as Agent
+    participant DB as Conversation DB
+
+    UI->>S: 发送用户消息
+    S->>DB: 持久化 user message
+    S->>A: 执行 Agent
+    A-->>S: delta / companion_note
+    S-->>UI: SSE 实时内容
+
+    alt Agent 成功
+        A-->>S: final answer
+        S->>DB: 持久化 assistant answer
+        S-->>UI: completed
+    else Agent 失败
+        S->>DB: 持久化 assistant failure message
+        S->>DB: 追加 transcript
+        S-->>UI: error
+        UI->>S: 重新加载 conversation
+        S-->>UI: durable assistant failure message
+    end
+```
+
 6. **任何 recovery path 都不得把 durable assistant message 删除或回滚。**
    - 前端 catch / finally 可以清理 streaming state；
    - 但清理 streaming state 不能影响已经持久化的 conversation；
