@@ -63,6 +63,25 @@ test('Global changes flow into inheriting tasks but never overwrite task overrid
   assert.equal(b2.agent.model, 'new-global-model');
 });
 
+test('editing a Task after Global changes does not materialize inherited values as overrides', async () => {
+  const b = await loadInvestigationControl('task-b');
+  const storedBefore = JSON.parse(await fs.readFile(path.join(process.env.WORKSPACE_DIR!, 'task-b', 'control.json'), 'utf8'));
+  assert.equal('model' in storedBefore.agent, false);
+
+  await updateGlobalConfiguration({ model: 'global-after-change' });
+  const inherited = await loadInvestigationControl('task-b');
+  assert.equal(inherited.agent.model, 'global-after-change');
+
+  await updateInvestigationControl('task-b', {
+    research: inherited.research,
+    agent: { ...inherited.agent, personality: 'edited after global change' },
+  }, 'edit after global change');
+
+  const storedAfter = JSON.parse(await fs.readFile(path.join(process.env.WORKSPACE_DIR!, 'task-b', 'control.json'), 'utf8'));
+  assert.equal(storedAfter.agent.personality, 'edited after global change');
+  assert.equal('model' in storedAfter.agent, false);
+});
+
 test.after(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
