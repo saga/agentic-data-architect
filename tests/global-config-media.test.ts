@@ -33,6 +33,8 @@ test('remote media resolves through yt-dlp and stores cache outside investigatio
   assert.match(media, /best\[ext=mp4\]\/best/);
   assert.match(media, /config\.dataDir, 'cache', 'media'/);
   assert.match(media, /getCachedRemoteMedia/);
+  assert.match(media, /isSupportedSocialMediaPage\(normalizedSource\)/);
+  assert.match(media, /\/video\//i);
   assert.match(server, /\/api\/global\/media\/resolve/);
   assert.match(server, /\/api\/global\/media\/:cacheKey/);
   assert.match(server, /Accept-Ranges/);
