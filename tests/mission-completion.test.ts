@@ -10,7 +10,7 @@ import type { MissionProgress } from '../src/workflow/mission-progress.js';
 
 const mission: MissionContract = {
   version: 1,
-  purpose: '理解 IBM 老系统当前的数据架构，为 replatform 决策提供依据。',
+  purpose: '理解某大型企业老系统当前的数据架构，为 replatform 决策提供依据。',
   expectedResult: '形成当前 Data Source、Data Flow、Data Model 的可靠说明。',
   deliverables: [
     {
