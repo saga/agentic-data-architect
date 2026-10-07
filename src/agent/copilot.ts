@@ -271,6 +271,77 @@ export function respondToCopilotUserInput(
   return true;
 }
 
+/**
+ * 供其它 Agent Runtime 复用的宿主用户输入桥。
+ * CodeBuddy/OpenCode 不拥有自己的前端交互队列时，也必须进入同一 pending user-input API。
+ */
+export async function requestAgentUserInput(
+  sessionName: string,
+  turnId: string,
+  sessionId: string,
+  request: UserInputRequestParam,
+  onStatus?: (status: string) => void,
+  onTrajectory?: (event: {
+    type: 'user_input_requested' | 'user_input_completed' | 'status';
+    name: string;
+    status?: 'started' | 'completed' | 'waiting' | 'info';
+    durationMs?: number;
+    details?: Record<string, unknown>;
+  }) => void,
+): Promise<{ answer: string; wasFreeform: boolean }> {
+  const requestId = randomUUID();
+  const requestedAt = new Date().toISOString();
+  onStatus?.('Agent 正在等待你的回答。');
+  onTrajectory?.({
+    type: 'user_input_requested',
+    name: '等待你的回答',
+    status: 'waiting',
+    details: {
+      requestId,
+      waitingOn: 'user_input',
+      question: request.question,
+      choices: request.choices ?? [],
+      waitTimeoutMs: config.userInputWaitTimeoutMs,
+    },
+  });
+
+  return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      pendingCopilotUserInputs.delete(requestId);
+      reject(new Error(`Timeout after ${config.userInputWaitTimeoutMs}ms waiting for user input`));
+    }, config.userInputWaitTimeoutMs);
+    timeoutId.unref?.();
+
+    pendingCopilotUserInputs.set(requestId, {
+      sessionName,
+      turnId,
+      sessionId,
+      requestId,
+      question: request.question,
+      choices: request.choices ?? [],
+      allowFreeform: request.allowFreeform !== false,
+      requestedAt,
+      onAnswered: ({ answer, wasFreeform }) => {
+        clearTimeout(timeoutId);
+        onTrajectory?.({
+          type: 'user_input_completed',
+          name: '用户输入已提供',
+          status: 'completed',
+          durationMs: Math.max(0, Date.now() - Date.parse(requestedAt)),
+          details: {
+            requestId,
+            question: request.question,
+            answer: redactTrajectoryValue(answer),
+            wasFreeform,
+          },
+        });
+      },
+      resolve,
+      reject,
+    });
+  });
+}
+
 /** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
 export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
   return [...pendingCopilotPermissions.values()]
