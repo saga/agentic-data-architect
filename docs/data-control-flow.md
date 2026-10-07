@@ -42,8 +42,8 @@ flowchart LR
     Context[(context.json)]
     Control[(control.json)]
     Audit[(audit.jsonl)]
-    Copilot[GitHub Copilot SDK]
-    Session[(Copilot Session)]
+    Runtime[Agent Runtime<br/>Copilot / CodeBuddy / OpenCode]
+    Session[(Agent Session)]
     Workspace[Investigation Workspace]
     DuckDB[(local.duckdb)]
     Dataset[(SQLite local_datasets)]
@@ -55,10 +55,10 @@ flowchart LR
     API --> Context
     API --> Control
     API --> Audit
-    API --> Copilot
-    Copilot --> DuckDB
+    API --> Runtime
+    Runtime --> DuckDB
     DuckDB --> Dataset
-    Copilot --> Session
+    Runtime --> Session
 
     Context -.->|sessionId + configVersion| API
     Control -.->|Research / Skills / MCP / Prompt| API
@@ -86,7 +86,7 @@ sequenceDiagram
     participant K as control.json
     participant A as audit.jsonl
     participant W as Workflow
-    participant CP as Copilot SDK
+    participant RT as Agent Runtime
 
     U->>API: POST /messages/stream {message, turnId}
     API->>T: create turn = running
@@ -102,17 +102,17 @@ sequenceDiagram
     W->>M: FTS search relevant history
     W->>W: build question context/prompt
 
-    W->>CP: create/resume Copilot session
-    CP-->>W: sessionId
+    W->>RT: create/resume Agent session
+    RT-->>W: sessionId
     W->>C: keep sessionId + configurationVersion in memory
 
     loop assistant deltas
-        CP-->>W: assistant.message_delta
+        RT-->>W: assistant.message_delta
         W-->>API: delta
         API-->>U: SSE delta
     end
 
-    CP-->>W: final response
+    RT-->>W: final response
     W->>W: parse structured answer
     W->>W: create claims / unknowns
     W->>C: merge and atomically save Investigation
