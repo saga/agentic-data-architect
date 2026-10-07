@@ -59,6 +59,21 @@ test('Graphify fallback explains that source tools will continue the investigati
 });
 
 
+test('Agent runtime adapters do not import each other', async () => {
+  const copilot = await fs.readFile(new URL('../src/agent/copilot.ts', import.meta.url), 'utf8');
+  const codebuddy = await fs.readFile(new URL('../src/agent/codebuddy.ts', import.meta.url), 'utf8');
+  const opencode = await fs.readFile(new URL('../src/agent/opencode.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(copilot, /from ['"]\.\/opencode\.js['"]/);
+  assert.doesNotMatch(copilot, /from ['"]\.\/codebuddy\.js['"]/);
+  assert.doesNotMatch(codebuddy, /from ['"]\.\/copilot\.js['"]/);
+  assert.doesNotMatch(codebuddy, /from ['"]\.\/opencode\.js['"]/);
+  assert.doesNotMatch(opencode, /from ['"]\.\/copilot\.js['"]/);
+  assert.doesNotMatch(opencode, /from ['"]\.\/codebuddy\.js['"]/);
+  assert.match(copilot, /ask-input\.js/);
+  assert.match(codebuddy, /user-input-bridge\.js/);
+  assert.match(opencode, /adapters\/graphify\.js/);
+});
+
 test('user-facing runtime errors do not expose common internal control terms', async () => {
   const files = [
     '../src/server.ts',
