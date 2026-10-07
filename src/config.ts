@@ -48,7 +48,7 @@ const envConfig = EnvSchema.parse(process.env);
 export const config = {
   workspaceDir: path.resolve(envConfig.WORKSPACE_DIR),
   sharedDir: path.resolve(envConfig.WORKSPACE_DIR, 'shared'),
-  legacyDataDir: path.resolve(envConfig.DATA_DIR),
+  dataDir: path.resolve(envConfig.DATA_DIR),
   skillsDir: path.resolve(envConfig.SKILLS_DIR),
   knowledgeDir: path.resolve(envConfig.KNOWLEDGE_DIR),
   githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
