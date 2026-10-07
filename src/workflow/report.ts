@@ -259,6 +259,13 @@ export async function runReport(
   });
 
   if (review.availability !== 'completed' || review.status !== 'pass') {
+    options.onTrajectory?.({
+      type: 'status',
+      name: '生成最终报告没有通过检查',
+      status: 'failed',
+      durationMs: Math.max(0, Date.now() - startedAt),
+      details: { operation: 'report_generation', reviewStatus: review.status, availability: review.availability },
+    });
     await withWorkspaceContextLock(name, async () => {
       const failurePath = path.join(
         reportsDir(name),
