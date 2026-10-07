@@ -11,7 +11,6 @@ import { workflowOptions } from '../app/workflow-options';
 import {
   ControlResponseSchema,
   OpenCodeStatusSchema,
-  GlobalConfigurationResponseSchema,
 } from '../../../src/api/contracts.js';
 
 export type ConfigPageControl = InvestigationControl;
@@ -32,7 +31,6 @@ export function InvestigationConfigPage(props:{
   onBack:()=>void;
   onWorkflowChange:(workflow:ConfigWorkflow)=>Promise<void>;
   onSaved:(control:ConfigPageControl)=>Promise<void>|void;
-  onGlobalSaved?:()=>Promise<void>|void;
   onUpdateGlobalConfiguration:(agent:ConfigPageControl['agent'])=>Promise<GlobalConfiguration>;
 }){
   const [draft,setDraft]=useState<ConfigPageControl>(()=>clone(props.control));
@@ -231,7 +229,6 @@ export function InvestigationConfigPage(props:{
                   onOk: async () => {
                     await props.onUpdateGlobalConfiguration(draft.agent);
                     await props.onSaved(draft);
-                    await props.onGlobalSaved?.();
                   },
                 })}
               >
