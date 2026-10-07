@@ -545,13 +545,13 @@ export async function answerQuestion(
         if (!review) {
           recordTrajectory({
             type: 'status',
-            name: 'Mission 行动检查不可用，暂停执行',
+            name: '这一步暂时无法执行，已经暂停',
             status: 'failed',
             details: { execution, toolName },
           });
           return {
             allowed: false,
-            reason: 'Mission Action Review 暂不可用，无法确认这个动作是否直接、必要地服务当前 Mission；暂不执行。',
+            reason: '助手暂时无法确认这一步是否有助于完成当前任务，因此先停在这里。',
           };
         }
 
@@ -666,7 +666,7 @@ export async function answerQuestion(
           });
           recordTrajectory({
             type: 'status',
-            name: completion.completed ? 'Mission Completion 检查通过' : 'Mission Completion 检查未通过',
+            name: completion.completed ? '已确认可以结束这次调查' : '还不能结束这次调查',
             status: completion.completed ? 'completed' : 'info',
             details: { execution, completion },
           });
@@ -674,7 +674,7 @@ export async function answerQuestion(
           if (!completion.completed) {
             return {
               passed: false,
-              error: 'Mission Completion Gate 未通过：' + completion.reason,
+              error: '还不能结束这次调查：' + completion.reason,
             };
           }
         }
@@ -1017,7 +1017,7 @@ export async function answerQuestion(
     };
     recordTrajectory({
       type: 'error',
-      name: 'Investigation 执行失败：' + message,
+      name: '这次调查没有完成：' + message,
       status: 'failed',
       details: failureDetails,
     });
@@ -1026,7 +1026,7 @@ export async function answerQuestion(
       await appendAuditEvent(investigationName, {
         actor: 'system',
         action: 'investigation.execution_failed',
-        summary: 'Investigation 执行失败，已保存详细错误信息。',
+        summary: '这次调查没有完成，详细错误已经保存到执行记录。',
         details: {
           turnId,
           execution: lastExecution,
