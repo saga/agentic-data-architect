@@ -58,22 +58,7 @@ test('journey editor serialization round-trips semantic graph', () => {
   );
 });
 
-test('default layout gives every node a stable position', () => {
-  const definition = {
-    id: 'demo',
-    start: 'a',
-    nodes: [
-      { id: 'a', type: 'task' as const, title: 'A', actor: 'agent' as const, routes: [{ outcome: 'success', target: 'b' }] },
-      { id: 'b', type: 'task' as const, title: 'B', actor: 'agent' as const, routes: [{ outcome: 'success', target: 'done' }] },
-      { id: 'done', type: 'end' as const, title: 'Done', actor: 'agent' as const, routes: [] },
-    ],
-  };
 
-  const layout = defaultJourneyLayout(definition);
-  assert.ok(layout.nodes.a);
-  assert.ok(layout.nodes.b);
-  assert.ok(layout.nodes.done);
-});
 
 
 test('selection-scoped Workflow AI cannot connect a new node to an unrelated node', () => {

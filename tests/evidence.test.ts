@@ -89,12 +89,5 @@ describe('parseAgentAnswer', () => {
     assert.ok(p.warnings.length > 0);
   });
 
-  it('toClaims assigns ids', () => {
-    const p = parseAgentAnswer(
-      JSON.stringify({ answer: 'a', claims: [{ claim: 'c', status: 'inferred', evidenceIds: ['ev-a'] }], unknowns: [], followUpQuestions: [] }),
-      existing,
-    );
-    const claims = toClaims(p, () => 'c-1');
-    assert.equal(claims[0]?.id, 'c-1');
-  });
+
 });

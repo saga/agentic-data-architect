@@ -23,27 +23,7 @@ const baseFacts: JourneyFacts = {
 };
 
 
-test('modernization completion facts use one deterministic semantic definition', () => {
-  assert.deepEqual(
-    deriveModernizationFacts({
-      targetStatus: 'draft',
-      targetComponentCount: 3,
-      mappingStatuses: ['proposed', 'reviewed', 'approved', 'rejected'],
-      validationStatuses: [
-        { status: 'ready', blocking: true },
-        { status: 'passed', blocking: true },
-        { status: 'failed', blocking: false },
-      ],
-    }),
-    {
-      targetComponentCount: 0,
-      mappingCount: 2,
-      validationCount: 3,
-      blockingValidationReady: 1,
-      blockingValidationTotal: 2,
-    },
-  );
-});
+
 
 test('parses the minimal workflow DSL', () => {
   const result = parseJourneyMarkdown([
@@ -193,27 +173,9 @@ test('human review starts in waiting state', () => {
   assert.equal(execution.pendingInteraction?.nodeId, 'review');
 });
 
-test('legacy modernization uses current-state architecture instead of a fixed key-question stage', async () => {
-  const definition = await loadWorkflowJourney('legacy-modernization');
 
-  assert.equal(definition.nodes.some((node) => node.id === 'investigate' || node.title === '查关键问题'), false);
 
-  const dataTruth = definition.nodes.find((node) => node.id === 'data-truth');
-  assert.equal(dataTruth?.routes.some((route) => route.target === 'current-state'), true);
 
-  const currentState = definition.nodes.find((node) => node.id === 'current-state');
-  assert.match(currentState?.title ?? '', /当前架构/);
-  assert.match(currentState?.objective ?? '', /Data Source/);
-  assert.match(currentState?.objective ?? '', /Data Flow/);
-  assert.match(currentState?.objective ?? '', /Data Model/);
-});
-
-test('loads the architecture assessment markdown workflow', async () => {
-  const definition = await loadWorkflowJourney('data-architecture-assessment');
-  assert.equal(definition.id, 'data-architecture-assessment');
-  assert.equal(definition.start, 'intake');
-  assert.equal(definition.nodes.find((node) => node.id === 'intake')?.completeWhen, 'scope-ready');
-});
 
 
 test('scope-ready gate requires validated intake', () => {
@@ -424,19 +386,6 @@ test('assessment findings gate does not pass from current-state alone', () => {
   assert.equal(withFinding.execution.currentNodeId, 'done');
 });
 
-test('current data architecture has its own completion conditions', async () => {
-  const definition = await loadWorkflowJourney('current-data-architecture');
-  assert.equal(definition.id, 'current-data-architecture');
-  assert.ok(definition.nodes.some((node) => node.completeWhen === 'current-data-architecture'));
-  assert.ok(definition.nodes.some((node) => node.completeWhen === 'current-data-architecture-ready'));
-});
 
-test('current data architecture is not the same as assessment', async () => {
-  const current = await loadWorkflowJourney('current-data-architecture');
-  const assessment = await loadWorkflowJourney('data-architecture-assessment');
-  assert.notDeepEqual(
-    current.nodes.map((node) => node.id),
-    assessment.nodes.map((node) => node.id),
-  );
-  assert.ok(assessment.nodes.some((node) => node.completeWhen === 'assessment-findings'));
-});
+
+

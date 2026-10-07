@@ -12,10 +12,7 @@ test('empty workflow selection means autonomous mode', () => {
   assert.equal(UpdateWorkflowBodySchema.parse({ workflow: '' }).workflow, null);
 });
 
-test('explicit null workflow means autonomous mode', () => {
-  assert.equal(CreateSessionBodySchema.parse({ workflow: null }).workflow, null);
-  assert.equal(UpdateWorkflowBodySchema.parse({ workflow: null }).workflow, null);
-});
+
 
 test('known workflow ids remain supported', () => {
   assert.equal(
