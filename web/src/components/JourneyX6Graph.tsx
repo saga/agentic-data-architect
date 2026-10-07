@@ -814,7 +814,7 @@ export function JourneyX6Graph({
     const frame = (timestamp: number) => {
       if (hidden()) {
         token.setAttribute('visibility', 'hidden');
-        raf = requestAnimationFrame(frame);
+        raf = 0;
         return;
       }
 
@@ -849,9 +849,20 @@ export function JourneyX6Graph({
       raf = requestAnimationFrame(frame);
     };
 
+    const onVisibilityChange = () => {
+      if (!document.hidden && !raf) {
+        raf = requestAnimationFrame(frame);
+      } else if (document.hidden) {
+        hideToken();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     raf = requestAnimationFrame(frame);
     return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       hideToken();
     };
   }, [activeExecutionEdgeIdValue]);
