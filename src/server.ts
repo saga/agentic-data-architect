@@ -144,6 +144,7 @@ import {
   loadInvestigationControl,
   loadGlobalConfiguration,
   readAuditEvents,
+  updateGlobalConfiguration,
   updateInvestigationControl
 } from './investigation/control.js';
 
