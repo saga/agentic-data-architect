@@ -63,6 +63,21 @@ test('rejects dangling nodes and dead-end nodes', () => {
   assert.ok(result.issues.some((issue) => issue.includes('orphan')));
 });
 
+test('unknown completeWhen is rejected by Workflow validation', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> step',
+    '',
+    '## @task step',
+    'completeWhen: made-up-condition',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\n'));
+  assert.ok(result.definition);
+  assert.ok(validateJourneyDefinition(result.definition!).some((issue) => issue.includes('未知的 completeWhen')));
+});
+
 test('deterministic retry self-loop does not mark the node completed', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
