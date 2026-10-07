@@ -6,10 +6,14 @@ import { workspaceRoot, writeJsonAtomic } from './workspace.js';
 /**
  * 本地 Investigation 原始运行录制器。
  *
- * 目的不是替代 trajectory，而是保留一次真实运行中足够完整的输入/输出，
- * 方便事后分析 Agent 为什么偏离目标。文件只写本机 .workspace，不进入 Git。
- * 普通 events.jsonl 不记录模型隐藏推理正文；思考过程单独写入 reasoning.jsonl，避免混入操作事件。assistant response、tool 参数/结果、
- * user input 和每次 sendAndWait prompt 都会记录。
+ * 这里保存的是“运行事实”，不是第二套业务状态：
+ * - events.jsonl 记录模型请求、工具调用、工具结果、用户输入和运行结束状态；
+ * - reasoning.jsonl 单独保存秘书/Agent 的可展示 reasoning delta，避免和操作事件混在一起；
+ * - manifest.json 记录一次原始运行的生命周期、耗时和最终状态。
+ *
+ * 写入必须保持串行且可观察。尤其 reasoning 不是可有可无的 UI 缓存：
+ * 如果持久化失败，上层应该知道这次运行无法满足完整审计要求，而不能悄悄当成成功。
+ * 记录内容会做明显凭证字段脱敏，但不会为了“安全”把普通代码、参数和分析结果一起删掉。
  */
 export interface RunCloseResult {
   status: 'completed' | 'failed' | 'aborted';
@@ -113,21 +117,27 @@ export function appendReasoningLog(
     source,
     delta,
   }) + '\n';
+  // 队列本身即使前一条写入失败也不能被“毒死”，否则后续 reasoning 永远不会再尝试；
+  // 但当前这一次 append 必须把错误返回给调用方，让 answerQuestion 决定是否停止本轮。
   const next = previous
+    .catch(() => undefined)
     .then(async () => {
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.appendFile(file, record, 'utf8');
     })
     .catch((error) => {
-      console.error('[reasoning-log] Failed to persist reasoning delta', {
+      console.error('[reasoning-log] Failed to persist reasoning delta.', {
         sessionName: name,
         turnId,
+        source,
         error,
       });
-    })
-    .finally(() => {
-      if (reasoningWriteChains.get(key) === next) reasoningWriteChains.delete(key);
+      throw error;
     });
-  reasoningWriteChains.set(key, next);
+  let queued: Promise<void>;
+  queued = next.catch(() => undefined).finally(() => {
+    if (reasoningWriteChains.get(key) === queued) reasoningWriteChains.delete(key);
+  });
+  reasoningWriteChains.set(key, queued);
   return next;
 }
