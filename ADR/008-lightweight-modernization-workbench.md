@@ -23,7 +23,7 @@ Modernization work products 作为轻量、可验证的结构化对象保存。
 
 不自动填充未经调查的 target component、mapping 或 architecture decision。
 
-Artifact 生命周期保持简单：可以处于 draft / proposed / validated / approved 等明确状态，但“结构有效”“语义审核通过”和“业务批准”不是同一个条件。
+Artifact 生命周期保持简单，并按对象区分状态语义：Work Product 使用 `draft / in_review / approved / rejected`；Mapping 使用 `proposed / reviewed / approved / rejected`；Validation Check 使用 `planned / ready / passed / failed / blocked`。结构有效、独立语义审核通过和业务批准不是同一个条件。
 
 Workflow/Journey 只负责编排高层路线和人工确认，不实现通用 BPM/ETL workflow engine。
 
