@@ -70,7 +70,7 @@ function extractJson(raw: string): unknown {
   } catch {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('AI 没有返回可识别的工作地图。');
+    if (start < 0 || end <= start) throw new Error('助手没有返回可识别的工作地图。请重试；如果连续发生，请查看执行轨迹。');
     return JSON.parse(text.slice(start, end + 1));
   }
 }
@@ -173,7 +173,7 @@ export async function generateJourneyFlow(
     : snapshot.definition;
 
   if (currentDefinition.id !== workflowId) {
-    throw new Error('AI 使用的工作地图与当前工作方式不一致，请刷新后重试。');
+    throw new Error('生成的工作地图和当前选择的工作方式不一致。请刷新页面后重试。');
   }
 
   const raw = await askCopilot({
@@ -194,7 +194,7 @@ export async function generateJourneyFlow(
     parsed = JourneyAiOutputSchema.parse(extractJson(raw));
   } catch (error) {
     throw new Error(
-      error instanceof Error ? error.message : 'AI 返回的工作地图修改格式不正确，请重试。',
+      error instanceof Error ? error.message : '助手返回的工作地图修改格式不正确，请重试。',
     );
   }
 
@@ -205,23 +205,23 @@ export async function generateJourneyFlow(
     nextDefinition = applyJourneyWorkflowChanges(currentDefinition, changes);
   } catch (error) {
     throw new Error(
-      error instanceof Error ? error.message : 'AI 修改无法应用到当前工作地图。',
+      error instanceof Error ? error.message : '这次工作地图修改无法应用到当前内容。请刷新后重试。',
     );
   }
 
   if (nextDefinition.id !== workflowId) {
-    throw new Error('AI 不能把当前 Workflow 修改成另一个工作方式。');
+    throw new Error('不能把当前工作方式改成另一种工作方式。请先选择要使用的工作方式，再生成修改。');
   }
 
   const issues = validateJourneyDefinition(nextDefinition);
   if (issues.length) {
-    throw new Error('AI 生成的工作地图还不能使用：\n' + issues.join('\n'));
+    throw new Error('生成的工作地图还有问题，暂时不能使用：\n' + issues.join('\n'));
   }
 
   const canonicalChanges = diffJourneyWorkflowDefinitions(currentDefinition, nextDefinition);
   return {
     definition: nextDefinition,
-    message: parsed.message?.trim() || 'AI 已提出一版工作地图修改，请检查变更后应用。',
+    message: parsed.message?.trim() || '助手已经提出一版工作地图修改，请先检查变更，再决定是否应用。',
     changes: canonicalChanges,
     summary: canonicalChanges.map(describeJourneyWorkflowChange),
   };
