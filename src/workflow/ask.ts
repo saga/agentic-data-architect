@@ -66,6 +66,14 @@ export function getActiveInvestigationTurn(investigationName: string): ActiveInv
   return activeInvestigationTurns.get(investigationName) ?? null;
 }
 
+/** 返回当前进程持有的全部 active turn；Server shutdown 必须先停止这些 turn，再关闭 HTTP/DB。 */
+export function listActiveInvestigationTurns(): Array<ActiveInvestigationTurn & { investigationName: string }> {
+  return [...activeInvestigationTurns.entries()].map(([investigationName, turn]) => ({
+    investigationName,
+    ...turn,
+  }));
+}
+
 /** 请求取消指定 Investigation 的当前 turn；commit 阶段故意拒绝取消，避免留下半提交状态。 */
 export function requestAbort(investigationName: string, turnId: string): boolean {
   const active = activeInvestigationTurns.get(investigationName);
