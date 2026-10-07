@@ -140,6 +140,10 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.after.discoveryRunCount - input.before.discoveryRunCount,
   );
   const scopeValidated = Boolean(input.after.scopeValidatedAt);
+  const scopeValidationChanged = Boolean(
+    input.after.scopeValidatedAt
+    && input.after.scopeValidatedAt !== input.before.scopeValidatedAt,
+  );
 
   const persistedWorkProductChanged = input.persistedWorkProductChanged === true;
   const advancedDeliverables = deliverableAdvanced(
@@ -150,7 +154,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     newEvidenceIds.length > 0
     || newFindingIds.length > 0
     || newDiscoveryRuns > 0
-    || scopeValidated
+    || scopeValidationChanged
     || persistedWorkProductChanged;
 
   add(
@@ -190,7 +194,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
       '新增 Evidence=' + String(newEvidenceIds.length),
       '新增 Finding=' + String(newFindingIds.length),
       '新增 Discovery=' + String(newDiscoveryRuns),
-      '新增范围确认=' + (scopeValidated ? '1' : '0'),
+      '新增范围确认=' + (scopeValidationChanged ? '1' : '0'),
       '结构化成果更新=' + (persistedWorkProductChanged ? '1' : '0'),
       '有 Evidence 的 Claim=' + String(evidenceBackedClaims.length),
     ].join('，'),
