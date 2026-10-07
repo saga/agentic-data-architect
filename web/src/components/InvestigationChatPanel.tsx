@@ -396,6 +396,8 @@ export function InvestigationChatPanel(props: {
                   disabled={props.modelSaving || props.loading}
                   showSearch
                   optionFilterProp="label"
+                  popupMatchSelectWidth={false}
+                  styles={{ popup: { root: { maxWidth: 320 } } }}
                   options={props.modelOptions.map((model) => ({
                     value: model.id,
                     label: model.id === 'auto'
@@ -422,6 +424,8 @@ export function InvestigationChatPanel(props: {
                       variant="borderless"
                       value={props.current.control.agent.autoTier ?? ''}
                       disabled={props.modelSaving || props.loading}
+                      popupMatchSelectWidth={false}
+                      styles={{ popup: { root: { maxWidth: 320 } } }}
                       options={[
                         { value: '', label: '默认' },
                         { value: 'efficiency', label: '省资源' },
