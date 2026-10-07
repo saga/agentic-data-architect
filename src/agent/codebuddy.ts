@@ -464,7 +464,7 @@ export async function askCodeBuddy(
   input: AskInput & { runtime?: AgentRuntime },
   model: string,
 ): Promise<string> {
-  const graphifyEnabled = input.purpose !== 'journey-map'
+  let graphifyEnabled = input.purpose !== 'journey-map'
     && input.purpose !== 'review'
     && Boolean(input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis')?.enabled ?? true);
 
@@ -490,6 +490,7 @@ export async function askCodeBuddy(
         };
       }
     } else {
+      graphifyEnabled = false;
       input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
       input.onTrajectory?.({
         type: 'status',
