@@ -163,6 +163,20 @@ export async function registerOpenCodeGraphifyMcp(
   const graphify = buildGraphifyMcpServer(workingDirectory, commandOverride);
   if (!graphify) return;
 
+  // OpenCode Server 按 workspace 维护 MCP 状态；同一 Investigation 的后续 turn 不应重复注册同名 server。
+  const existingResponse = await openCodeFetch('/mcp', { method: 'GET' }, workingDirectory);
+  if (existingResponse.ok) {
+    try {
+      const existing = await existingResponse.json() as Record<string, { status?: string }>;
+      const current = existing[graphify.name];
+      if (current && ['connected', 'connecting', 'pending'].includes(String(current.status ?? '').toLowerCase())) {
+        return;
+      }
+    } catch {
+      // 无法读取状态时继续尝试注册，让真正的 MCP API 给出明确结果。
+    }
+  }
+
   const response = await openCodeFetch(
     '/mcp',
     {
