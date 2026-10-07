@@ -223,7 +223,7 @@ export function beginConversationTurn(sessionName: string, turnId: string): Conv
   };
 }
 
-/** 把 running turn 结束为 completed/failed/aborted，并保存结果或错误。 */
+/** 持久化 running turn 当前已经对用户可见的 assistant/秘书内容，供断线和重启恢复。 */
 export function updateConversationTurnDraft(turnId: string, draft: string): void {
   const value = draft.trim();
   const bounded = value.length > 24000 ? value.slice(0, 24000) + '\n\n[后续内容已截断]' : value;
