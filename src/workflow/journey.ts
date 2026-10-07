@@ -49,10 +49,6 @@ export interface JourneyFacts {
   goal: string;
   /** Scope Gate 是否已经确认 Goal / Scope / Systems。 */
   scopeReady?: boolean;
-  /** Architecture Assessment 使用的确定性计数；Legacy 路线不需要填。 */
-  findingCount?: number;
-  recommendationCount?: number;
-  roadmapItemCount?: number;
   currentState: {
     datasets: number;
     semanticAssets: number;
