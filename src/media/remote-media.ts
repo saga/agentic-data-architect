@@ -39,19 +39,6 @@ function cacheKeyFor(source: string): string {
   return createHash('sha256').update(source).digest('hex');
 }
 
-function extensionForMime(mimeType?: string): string {
-  switch (mimeType?.split(';', 1)[0].trim().toLowerCase()) {
-    case 'image/jpeg': return '.jpg';
-    case 'image/png': return '.png';
-    case 'image/webp': return '.webp';
-    case 'image/gif': return '.gif';
-    case 'video/mp4': return '.mp4';
-    case 'video/webm': return '.webm';
-    case 'video/quicktime': return '.mov';
-    default: return '.bin';
-  }
-}
-
 async function ensureCacheRoot(): Promise<void> {
   await fs.mkdir(mediaCacheRoot(), { recursive: true });
 }
@@ -77,6 +64,22 @@ function looksLikeDirectMedia(source: string, kind: RemoteMediaKind): boolean {
   }
 }
 
+function mimeFromMediaUrl(value: string): string | undefined {
+  try {
+    const pathname = new URL(value).pathname.toLowerCase();
+    if (/\\.(png|jpe?g|webp|gif|avif)$/.test(pathname)) {
+      return pathname.endsWith('.png') ? 'image/png'
+        : pathname.endsWith('.webp') ? 'image/webp'
+          : pathname.endsWith('.gif') ? 'image/gif'
+            : 'image/jpeg';
+    }
+    if (/\\.(webm)$/.test(pathname)) return 'video/webm';
+    if (/\\.(mov|m4v)$/.test(pathname)) return 'video/quicktime';
+    if (/\\.(mp4)$/.test(pathname)) return 'video/mp4';
+  } catch {}
+  return undefined;
+}
+
 async function resolveWithYtDlp(source: string, kind: RemoteMediaKind): Promise<{ remoteUrl?: string; mimeType?: string }> {
   if (kind !== 'video' && !isSupportedSocialMediaPage(source)) return {};
   try {
@@ -96,7 +99,7 @@ async function resolveWithYtDlp(source: string, kind: RemoteMediaKind): Promise<
       },
     );
     const remoteUrl = stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
-    return remoteUrl ? { remoteUrl, mimeType: 'video/mp4' } : {};
+    return remoteUrl ? { remoteUrl, ...(mimeFromMediaUrl(remoteUrl) ? { mimeType: mimeFromMediaUrl(remoteUrl) } : {}) } : {};
   } catch {
     return {};
   }
