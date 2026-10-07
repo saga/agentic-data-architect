@@ -20,9 +20,9 @@ const EnvSchema = z.object({
   /** Ordered runtime fallback chain; a selected runtime starts at its own position. */
   AGENT_RUNTIME_FALLBACK_ORDER: z.string().default('copilot-sdk,codebuddy-sdk,opencode-run'),
   /** Ordered CodeBuddy model filter; the first model is the default unless overridden explicitly. */
-  CODEBUDDY_MODEL_ALLOWLIST: z.string().default('Glm-5.3-flash,DeepSeek-V4.1-flash,Space-Bunny'),
+  CODEBUDDY_MODEL_ALLOWLIST: z.string().default('glm-5.3-flash,deepseek-v4.1-flash,space-bunny'),
   /** Default CodeBuddy model. Must normally be present in CODEBUDDY_MODEL_ALLOWLIST. */
-  CODEBUDDY_DEFAULT_MODEL: z.string().default('Glm-5.3-flash'),
+  CODEBUDDY_DEFAULT_MODEL: z.string().default('glm-5.3-flash'),
   /** 是否允许工作台发现并使用本机 OpenCode Server。默认开启发现，不代表自动切换。 */
   OPENCODE_ENABLED: z.enum(['true', 'false']).default('true'),
   /** OpenCode Server 地址；默认使用 opencode serve 的本机地址。 */

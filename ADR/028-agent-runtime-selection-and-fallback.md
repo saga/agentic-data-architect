@@ -58,7 +58,7 @@ CodeBuddy 模型不在代码中 hardcode。
 - `CODEBUDDY_MODEL_ALLOWLIST`：控制可见、可选择的模型及其顺序；
 - `CODEBUDDY_DEFAULT_MODEL`：默认模型。
 
-当前默认值是 `Glm-5.3-flash`，然后 `DeepSeek-V4.1-flash`、`Space-Bunny`；这些值属于部署配置，不属于架构常量。
+当前默认值是 `glm-5.3-flash`，然后 `deepseek-v4.1-flash`、`space-bunny`；这些值属于部署配置，不属于架构常量。
 
 ### 5. Session boundary
 
