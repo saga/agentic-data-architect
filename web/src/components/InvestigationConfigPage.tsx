@@ -229,8 +229,8 @@ export function InvestigationConfigPage(props:{
                   cancelText:'取消',
                   onOk: async () => {
                     const globalAgent = clone(draft.agent);
-                    const hasLocalAvatar = globalAgent.avatarSources?.some((item) => !/^https?:\\/\\//i.test(item.src))
-                      || globalAgent.avatarPath && !/^https?:\\/\\//i.test(globalAgent.avatarPath);
+                    const hasLocalAvatar = globalAgent.avatarSources?.some((item) => !/^https?:\/\//i.test(item.src))
+                      || globalAgent.avatarPath && !/^https?:\/\//i.test(globalAgent.avatarPath);
                     if (hasLocalAvatar) {
                       delete globalAgent.avatarPath;
                       delete globalAgent.avatarPaths;
