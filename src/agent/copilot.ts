@@ -263,7 +263,8 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
   try {
     await active.abort();
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('[copilot] Failed to abort the active Copilot turn.', error);
     return false;
   }
 }
@@ -617,14 +618,14 @@ export async function askCopilot(input: AskInput): Promise<string> {
     });
   }, 15_000);
 
+  if (input.shouldAbort?.()) {
+    await session.abort();
+    throw new Error('Turn aborted.');
+  }
   try {
-    if (input.shouldAbort?.()) {
-      await session.abort();
-      throw new Error('Turn aborted.');
-    }
     await session.rpc.skills.reload();
-  } catch {
-    // Skill reload is best-effort; session creation still works on older runtimes.
+  } catch (error) {
+    console.warn('[copilot] Skill reload failed; continuing with the existing session state.', error);
   }
 
   const usageBefore = await getSessionUsageMetrics(session);
@@ -1162,7 +1163,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * 运行时仍保留 6 次自动续跑的硬上限，防止配置异常导致无限循环；UI 正常
      * 只提供这个范围内的选项。
      */
-    const autoContinuationTurns = Math.min(6, Math.max(0, Math.round(input.autoContinuationTurns ?? 2)));
+    const autoContinuationTurns = Math.min(6, Math.max(0, Math.round(input.autoContinuationTurns ?? 0)));
     let finalContent = '';
     let continuationPrompt = input.prompt;
     let currentWorkflowInstruction = workflowInstruction;
@@ -1317,13 +1318,13 @@ export async function askCopilot(input: AskInput): Promise<string> {
               investigationName,
               input.workflowSkill,
             );
-          } catch {
-            // 下一阶段的工作提示是辅助上下文；如果读取失败，仍可依靠原有 Session 上下文继续。
+          } catch (error) {
+            console.warn('[copilot] Failed to refresh Workflow instruction; continuing with the existing instruction.', error);
           }
         }
 
         const shouldContinueMission = missionNeedsContinuation
-          ?? (input.shouldContinueMission ? await input.shouldContinueMission() : true);
+          ?? (input.shouldContinueMission ? await input.shouldContinueMission() : false);
         if (!shouldContinueMission) {
           input.onStatus?.('Mission 需要的交付物已经覆盖，停止自动续跑。');
           input.onTrajectory?.({
@@ -1454,8 +1455,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
     if (timedOut) {
       try {
         await session.abort();
-      } catch {
-        /* ignore */
+      } catch (error) {
+        console.warn('[copilot] Failed to abort the timed-out session.', error);
       }
     }
     throw e;
@@ -1467,8 +1468,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
         ...(runOutcome.error ? { error: runOutcome.error } : {}),
       });
       await runRecorder?.close(runOutcome);
-    } catch {
-      // 运行记录失败不能覆盖 Agent 已经完成的业务结果。
+    } catch (error) {
+      console.error('[copilot] Failed to persist runtime execution record.', error);
     }
     clearInterval(heartbeat);
     if (executionWatchdogId !== undefined) clearInterval(executionWatchdogId);
@@ -1511,8 +1512,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
     offUsageInfo();
     try {
       await session.disconnect();
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[copilot] Failed to disconnect the Copilot session.', error);
     }
   }
 }
