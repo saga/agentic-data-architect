@@ -77,6 +77,24 @@ type JourneyMeta = z.infer<typeof JourneyMetaSchema>;
 
 export type JourneySnapshot = z.infer<typeof WorkflowSnapshotSchema>;
 
+/**
+ * 比较两个 Workflow Execution 快照是否仍然代表同一个“可提交前状态”。
+ *
+ * Agent 计算 transition 与真正落盘之间存在天然的异步窗口：模型调用、Gate、
+ * 用户操作都可能让 execution 先发生一次变化，再回到同一个 currentNodeId。
+ * 只比较 currentNodeId 会留下典型的 ABA race，因此这里同时比较 version、status、
+ * completedNodeIds 和 pendingInteraction，确保旧 transition 不能覆盖中间发生过的状态。
+ */
+function sameJourneyExecution(left: JourneyExecution, right: JourneyExecution): boolean {
+  return left.workflowId === right.workflowId
+    && left.workflowVersion === right.workflowVersion
+    && left.runId === right.runId
+    && left.currentNodeId === right.currentNodeId
+    && left.status === right.status
+    && JSON.stringify(left.completedNodeIds) === JSON.stringify(right.completedNodeIds)
+    && JSON.stringify(left.pendingInteraction ?? null) === JSON.stringify(right.pendingInteraction ?? null);
+}
+
 function journeyDir(name: string): string {
   return path.join(workspaceRoot(name), JOURNEY_DIR);
 }
@@ -977,10 +995,7 @@ export async function applyAgentWorkflowTransition(
         latestActive.version,
       );
 
-      if (
-        latest.currentNodeId !== execution.currentNodeId
-        || latest.workflowVersion !== execution.workflowVersion
-      ) {
+      if (!sameJourneyExecution(latest, execution)) {
         throw new Error('Workflow 在 Agent 执行期间发生变化，本次 transition 不再适用。');
       }
 
@@ -1098,11 +1113,7 @@ export async function applyHumanWorkflowTransition(
       }
 
       const latest = await loadJourneyExecution(name, latestActive.definition, latestActive.version);
-      if (
-        latest.currentNodeId !== execution.currentNodeId
-        || latest.workflowVersion !== execution.workflowVersion
-        || latest.status !== execution.status
-      ) {
+      if (!sameJourneyExecution(latest, execution)) {
         throw new Error('执行状态已经变化，请刷新页面后重新处理。');
       }
 
