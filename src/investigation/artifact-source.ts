@@ -1,4 +1,6 @@
-import { loadInvestigation, loadLatestSnapshot, type Investigation } from './store.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { loadInvestigation, loadLatestSnapshot, reportsDir, type Investigation } from './store.js';
 import { assertDiscoverySnapshotCompatible } from './artifact-provenance.js';
 import { evaluateInvestigationScopeGate, ScopeGateError } from '../workflow/scope-gate.js';
 import type { DiscoverySnapshot } from '../workflow/discover.js';
@@ -6,6 +8,7 @@ import type { DiscoverySnapshot } from '../workflow/discover.js';
 export interface InvestigationArtifactSource {
   readonly investigation: Investigation;
   readonly snapshot: DiscoverySnapshot | null;
+  readonly analysisArtifacts: readonly string[];
 }
 
 /**
@@ -16,7 +19,21 @@ export async function captureInvestigationArtifactSource(name: string): Promise<
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
   assertDiscoverySnapshotCompatible(investigation, snapshot);
-  return Object.freeze({ investigation, snapshot });
+
+  const analysisRoot = path.join(reportsDir(name), '..', 'artifacts', 'analysis');
+  let analysisArtifacts: string[] = [];
+  try {
+    analysisArtifacts = (await fs.readdir(analysisRoot, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .map((entry) => entry.name)
+      .sort();
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
+      throw error;
+    }
+  }
+
+  return Object.freeze({ investigation, snapshot, analysisArtifacts });
 }
 
 export function assertInvestigationArtifactSourceScope(source: InvestigationArtifactSource): void {
