@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Divider, Empty, Flex, Modal, Space, Table, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined, NodeIndexOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
-import { ApiRequestError, getJson, getText } from '../app/api.js';
+import { ApiRequestError, getJson } from '../app/api.js';
 import {
   ReportRegenerateResponseSchema,
+  ReportArtifactStateSchema,
   TrajectoryCheckpointDetailsSchema,
   TrajectoryResponseSchema,
   ModernizationResponseSchema,
@@ -63,20 +64,22 @@ export function InvestigationResultsPage(props: {
     try {
       const sessionPath = '/api/sessions/' + encodeURIComponent(props.sessionName);
       const [reportResult, trajectoryData, sessionData, modernizationData] = await Promise.all([
-        getText(sessionPath + '/report')
-          .then((markdown) => ({ markdown, error: undefined as ApiRequestError | undefined }))
-          .catch((cause) => {
-            if (cause instanceof ApiRequestError && (cause.status === 404 || cause.status === 409)) {
-              return { markdown: undefined, error: cause };
-            }
-            throw cause;
-          }),
+        getJson(sessionPath + '/report', ReportArtifactStateSchema),
         getJson(sessionPath + '/trajectory?limit=5000', TrajectoryResponseSchema),
         getJson(sessionPath, SessionDataSchema),
         getJson(sessionPath + '/modernization', ModernizationResponseSchema),
       ]);
       const reportPayload = reportResult.markdown;
-      const reportUnavailableReason = reportResult.error?.apiError.error;
+      const reportUnavailableReason =
+        reportResult.status === 'missing'
+          ? '正式报告还没有生成。'
+          : reportResult.status === 'stale'
+            ? '正式报告对应的调查成果已经变化，需要重新生成。'
+            : reportResult.status === 'blocked'
+              ? '正式报告还没有通过独立质量审核。'
+              : reportResult.status === 'error'
+                ? '正式报告的保存数据有问题，需要重新生成。'
+                : undefined;
 
       const unique = new Map<string, Checkpoint>();
       for (const event of trajectoryData.events) {
