@@ -108,6 +108,11 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       findings: inv.findings,
       unknowns: inv.unknowns,
       importantInformation: inv.importantInformation,
+      ...(inv.agentSessionId ? { agentSessionId: inv.agentSessionId } : {}),
+      ...(inv.agentSessionRuntime ? { agentSessionRuntime: inv.agentSessionRuntime } : {}),
+      ...(typeof inv.agentConfigurationVersion === 'number'
+        ? { agentConfigurationVersion: inv.agentConfigurationVersion }
+        : {}),
       ...(inv.copilotSessionId ? { copilotSessionId: inv.copilotSessionId } : {}),
       ...(typeof inv.copilotConfigurationVersion === 'number'
         ? { copilotConfigurationVersion: inv.copilotConfigurationVersion }
