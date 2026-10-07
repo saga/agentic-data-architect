@@ -803,7 +803,7 @@ app.post('/api/sessions', async (req, res) => {
       if (error instanceof AuditDataError) {
         res.status(500).json(ApiErrorSchema.parse({
           code: 'AUDIT_DATA_INVALID',
-          error: error.message,
+          error: formatUserFacingError(error),
         }));
         return;
       }
@@ -1286,7 +1286,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json(ApiErrorSchema.parse({
           code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : 'SCOPE_REQUIRED',
-          error: error.message,
+          error: formatUserFacingError(error),
           details: { checks: error.result.checks },
         }));
         return;
@@ -1318,7 +1318,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       if (error instanceof ScopeGateError || error instanceof MissionGateError) {
         res.status(409).json(ApiErrorSchema.parse({
           code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : 'SCOPE_REQUIRED',
-          error: error.message,
+          error: formatUserFacingError(error),
           details: { checks: error.result.checks },
         }));
         return;
@@ -1346,7 +1346,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
         res.status(409).json(ApiErrorSchema.parse({
           code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : error instanceof ReportGateError ? 'REPORT_PRECONDITION_FAILED' : 'SCOPE_REQUIRED',
-          error: error.message,
+          error: formatUserFacingError(error),
           details: { checks: error.result.checks },
         }));
         return;
@@ -1354,7 +1354,7 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
       if (error instanceof ReportQualityGateError) {
         res.status(409).json(ApiErrorSchema.parse({
           code: error.review.availability === 'unavailable' ? 'REPORT_REVIEW_UNAVAILABLE' : 'REPORT_REVIEW_FAILED',
-          error: error.message,
+          error: formatUserFacingError(error),
         }));
         return;
       }
@@ -1616,7 +1616,7 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     if (error instanceof ScopeGateError || error instanceof MissionGateError || error instanceof ReportGateError) {
       res.status(409).json(ApiErrorSchema.parse({
         code: error instanceof MissionGateError ? 'MISSION_REQUIRED' : error instanceof ScopeGateError ? 'SCOPE_REQUIRED' : 'REPORT_PRECONDITION_FAILED',
-        error: error.message,
+        error: formatUserFacingError(error),
         details: { checks: error.result.checks },
       }));
       return;
