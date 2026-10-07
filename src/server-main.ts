@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   await import('./agent/copilot-permission-bridge.js');
   const { createApp } = await import('./server.js');
   const { closeConversationStore, recoverRunningConversationTurns } = await import('./investigation/conversation.js');
-  const { getActiveInvestigationTurn, listActiveInvestigationTurns, requestAbort } = await import('./workflow/ask.js');
+  const { getActiveInvestigationTurn, listActiveInvestigationTurns, requestAbort, waitForInvestigationTurnsToFinish } = await import('./workflow/ask.js');
   const { closeLocalAnalytics } = await import('./analytics/local-data.js');
   const { abortCopilotTurn, stopClient } = await import('./agent/copilot.js');
   const { abortCodeBuddyTurn } = await import('./agent/codebuddy.js');
@@ -105,6 +105,10 @@ async function main(): Promise<void> {
         abortOpenCodeTurn(turn.turnId),
       ]);
     }));
+
+    // q.interrupt()/runtime abort only requests cancellation; wait for the workflow's
+    // catch/finally to finish its durable turn write before closing SQLite.
+    await waitForInvestigationTurnsToFinish(15_000);
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
