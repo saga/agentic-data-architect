@@ -222,7 +222,7 @@ Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭
 1. **Legacy Modernization**
    - 适用于已有系统改造、replatform、迁移和切换。
 2. **Financial AI-Native Architecture**
-   - 适用于从零设计金融服务 AI / 数据平台，例如 Portfolio Research Agent。
+   - 适用于从零设计复杂企业 AI / 数据平台，例如业务研究 Agent。
 3. **Data Architecture Assessment**
    - 适用于评估已有数据架构：查清当前情况、主要问题、改进建议和实施顺序。
 4. **Current Data Architecture**
@@ -455,7 +455,7 @@ Skill
   └─ scripts/   deterministic domain procedure
 ~~~
 
-金融领域的 Position、Security、Price、Research 检查不再硬编码在 discovery workflow；由 `financial-data-review` Skill 按需驱动脚本执行。这样新增其它行业/业务领域时，不需要改核心 Agent workflow。
+复杂业务领域的核心实体、参考数据、指标和研究检查不再硬编码在 discovery workflow；由 `financial-data-review` Skill 按需驱动脚本执行。这样新增其它行业/业务领域时，不需要改核心 Agent workflow。
 
 平台安全边界仍然由代码负责：Skill 不能绕过 Evidence 校验、read-only SQL guard 或状态持久化规则。
 ## 当前交互与 Workspace
@@ -505,7 +505,7 @@ Agent 不把整个聊天历史重新塞进每轮 prompt；当前实现只按问�
 
 早期设计阶段的仓库很小，但当前 `main` 已经完成 V1.1 Current-State Discovery 可靠闭环。后续设计必须以当前实现为基线，而不是继续按最初的 skeleton 假设来设计。
 
-我还针对 8 个方向做了资料检索，并重点核查了 AWS、EY、Databricks、dbt、Snowflake、OpenLineage、EDM Council/FIBO，以及投资管理领域的 Security Master、IBOR、point-in-time 数据实践。比较明显的一条主线是：
+我还针对 8 个方向做了资料检索，并重点核查了 AWS、EY、Databricks、dbt、Snowflake、OpenLineage、EDM Council/FIBO，以及复杂企业中的参考数据、主数据、effective-dated 数据实践。比较明显的一条主线是：
 
 > **这个项目不应该做成“会聊天的 Data Architect”，而应该做成一个以 Evidence、Metadata、Lineage、Data Profiling 和 Deterministic Validation 为基础，由 AI Agent 负责理解、推理、设计和解释的 Data Modernization Workbench。**
 
@@ -996,11 +996,11 @@ Constraints
 12. Define transitional architecture
 ```
 
-当前 JPMorgan 的 Senior Lead Data Architect 职位描述也非常接近这个范围：逻辑/物理模型、3NF/维度模型、semantic foundations、schema evolution、lineage、validation、security、auditability 都属于同一个 data architecture 工作域。([JPMC][4])
+当前大型企业公开的 Senior Lead Data Architect 职位描述也非常接近这个范围：逻辑/物理模型、3NF/维度模型、semantic foundations、schema evolution、lineage、validation、security、auditability 都属于同一个 data architecture 工作域。（公开企业岗位资料）
 
 ---
 
-# 九、金融服务场景必须建立自己的 Domain Model
+# 九、复杂业务场景必须建立自己的 Domain Model
 
 这是这个项目区别于普通 Data Architecture Agent 的核心。
 
@@ -1065,14 +1065,14 @@ Security
   └── Research
 ```
 
-FIBO 很适合作为这个 Agent 的外部参考 vocabulary，而不是强行成为你的最终物理模型。FIBO 本身就是面向金融行业概念及其关系的机器可读 ontology，EDM Council 还提供了由 FIBO 衍生的 Financial Industry Business Data Model。([EDM Council][5])
+行业参考 vocabulary 很适合作为这个 Agent 的外部参考，而不是强行成为最终物理模型。它用于帮助统一概念和关系，不直接生成最终数据库模型。
 
 设计上应该是：
 
 ```text
-FIBO
+Industry reference vocabulary
    ↓ reference vocabulary
-Firm business ontology
+Enterprise business ontology
    ↓
 Current legacy model
    ↓ mapping
@@ -1082,7 +1082,7 @@ Target domain model
 而不是：
 
 ```text
-FIBO
+Industry reference vocabulary
  ↓
 直接生成数据库
 ```
@@ -1149,7 +1149,7 @@ Is this dataset:
 
 ---
 
-# 十一、Security Master 不能只是一个普通维表
+# 十一、Reference Data Hub 不能只是一个普通维表
 
 金融数据分析中经常存在：
 
@@ -1185,7 +1185,7 @@ Portfolio position
 - delisted instruments
 ```
 
-业界的 Security Master 产品普遍采用 centralized reference-data model，并把多供应商数据统一到 canonical identifier / reference-data 层。([GoldenSource][7])
+业界的 Reference Data Hub 产品普遍采用 centralized reference-data model，并把多供应商数据统一到 canonical identifier / reference-data 层。([GoldenSource][7])
 
 所以 Agent 发现：
 
@@ -1207,12 +1207,12 @@ Risk:
 Cross-source joins depend on implicit mapping.
 
 Recommendation:
-Introduce / strengthen canonical Security Master.
+Introduce / strengthen canonical Reference Data Hub.
 
 Target:
 External Identifier
         ↓
-Security Master
+Reference Data Hub
         ↓
 Canonical Security ID
         ↓
@@ -1221,15 +1221,15 @@ all downstream domains
 
 ---
 
-# 十二、Position / IBOR 也是一个关键分析模式
+# 十二、Canonical Snapshot 也是一个关键分析模式
 
 Portfolio Management 系统中，Position 经常是最核心的数据对象之一。
 
-行业实践中，IBOR 通常被设计为提供统一、及时的 position view；例如一些 buy-side 架构把 transaction、reference data、corporate action 等汇聚后形成 position，并供 front office、risk、performance、reporting 等消费者使用。([CRD][8])
+行业实践中，统一快照通常被设计为提供及时、一致的 canonical view；例如一些 buy-side 架构把 transaction、reference data、business event 等汇聚后形成 position，并供 业务运营、风险控制、分析和报告 等消费者使用。([CRD][8])
 
 但这里有一个重要原则：
 
-> **Agent 可以识别 IBOR pattern，但不能默认某个系统就是 IBOR。**
+> **Agent 可以识别 canonical snapshot pattern，但不能默认某个系统就是 canonical source。**
 
 Agent 应该通过证据判断：
 
@@ -1565,7 +1565,7 @@ Legacy Position Calculation
 Unused Historical Report Table
 → Retire
 
-Security Master
+Reference Data Hub
 → Rebuild / Consolidate
 
 Research Dataset
@@ -1608,7 +1608,7 @@ New
 
 ```text
 Wave 1
-Security Master
+Reference Data Hub
 
 Wave 2
 Prices
@@ -2031,11 +2031,11 @@ What assumptions were applied?
 
 ---
 
-# 二十七、Evidence Pack 是金融服务场景很重要的一层
+# 二十七、Evidence Pack 是复杂企业场景很重要的一层
 
 例如最后要回答：
 
-> 为什么建议 Security Master 从三个系统合并成一个？
+> 为什么建议 Reference Data Hub 从三个系统合并成一个？
 
 Evidence Pack 应该包含：
 
@@ -2763,18 +2763,18 @@ Evidence
                  Human Decision
 ```
 
-这套结构和当前行业实践的交集比较大：AWS 强调 progressive discovery、metadata 和 high-fidelity assessment；EY 已经把 legacy ETL 的 AI 分析做成“flow reconstruction + parsing + LLM interpretation + validation”；Databricks/OpenLineage 强调可追踪的 lineage；dbt/Snowflake 都把 business semantics 往数据建模层推进；FIBO 则可以给金融领域提供机器可读的业务语义参考。([AWS Documentation][12])
+这套结构和当前行业实践的交集比较大：AWS 强调 progressive discovery、metadata 和 high-fidelity assessment；EY 已经把 legacy ETL 的 AI 分析做成“flow reconstruction + parsing + LLM interpretation + validation”；Databricks/OpenLineage 强调可追踪的 lineage；dbt/Snowflake 都把 business semantics 往数据建模层推进；行业参考 vocabulary 则可以提供机器可读的业务语义参考。([AWS Documentation][12])
 
 对于你的场景，**第一优先级不是做“最聪明的 Data Architect Agent”，而是先把 `Evidence → Metadata Graph → Deterministic Analysis → Agent Reasoning → Validation` 这条链做扎实**。一旦这条链成立，Data Analyst、Data Architect、Migration Architect 其实都可以只是不同的工作模式，而不需要再堆很多 Agent。
 
 [1]: https://www.ey.com/en_ch/insights/ai/ai-etl-analysis-automation?utm_source=chatgpt.com "From days to minutes: AI-powered logic analysis of legacy ETL | EY - Switzerland"
 [2]: https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-application-portfolio-assessment-migration/portfolio-discovery-initial-planning.html?utm_source=chatgpt.com "Discovery acceleration and initial planning - AWS Prescriptive Guidance"
 [3]: https://openlineage.io/docs/spec/facets/?utm_source=chatgpt.com "Facets & Extensibility | OpenLineage"
-[4]: https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210793254?utm_source=chatgpt.com "Senior Lead Data Architect: Information Architecture - JPMC Candidate Experience page Careers"
-[5]: https://edmcouncil.org/financial-industry-business-ontology/?utm_source=chatgpt.com "Financial Industry Business Ontology - EDM Council"
+
+
 [6]: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7183438&utm_source=chatgpt.com "<p>Point-In-Time Data Integrity in Quantitative Equity Research </p> <div> A Reproducible Framework for Eliminating Look-Ahead Bias </div> by Arthur Wang :: SSRN"
 [7]: https://www.thegoldensource.com/reference-data/?utm_source=chatgpt.com "GoldenSource Reference Data Solutions and Compliance - GoldenSource"
-[8]: https://www.crd.com/solutions/charles-river-ibor/?utm_source=chatgpt.com "IBOR – Cash and Position Management (IBOR) | Charles River Development"
+
 [9]: https://docs.snowflake.com/en/user-guide/views-semantic/semantic-view-yaml-spec?utm_source=chatgpt.com "YAML specification for semantic views | Snowflake Documentation"
 [10]: https://openlineage.io/docs/spec/facets/job-facets/lineage/?utm_source=chatgpt.com "Lineage Job Facet | OpenLineage"
 [11]: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-portfolio-playbook/discovery.html?utm_source=chatgpt.com "Task 1: Performing the initial discovery - AWS Prescriptive Guidance"
