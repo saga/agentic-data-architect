@@ -15,6 +15,14 @@ const EnvSchema = z.object({
   KNOWLEDGE_DIR: z.string().default('knowledge'),
   GITHUB_TOKEN: z.string().optional(),
   COPILOT_MODEL: z.string().default('auto'),
+  /** Default Agent Runtime for newly created Investigations. */
+  AGENT_RUNTIME_DEFAULT: z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']).default('codebuddy-sdk'),
+  /** Ordered runtime fallback chain; a selected runtime starts at its own position. */
+  AGENT_RUNTIME_FALLBACK_ORDER: z.string().default('codebuddy-sdk,copilot-sdk,opencode-run'),
+  /** Ordered CodeBuddy model filter; the first model is the default unless overridden explicitly. */
+  CODEBUDDY_MODEL_ALLOWLIST: z.string().default('Glm-5.3-flash,DeepSeek-V4.1-flash,Space-Bunny'),
+  /** Default CodeBuddy model. Must normally be present in CODEBUDDY_MODEL_ALLOWLIST. */
+  CODEBUDDY_DEFAULT_MODEL: z.string().default('Glm-5.3-flash'),
   /** 是否允许工作台发现并使用本机 OpenCode Server。默认开启发现，不代表自动切换。 */
   OPENCODE_ENABLED: z.enum(['true', 'false']).default('true'),
   /** OpenCode Server 地址；默认使用 opencode serve 的本机地址。 */
@@ -54,6 +62,14 @@ export const config = {
   knowledgeDir: path.resolve(envConfig.KNOWLEDGE_DIR),
   githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
   model: envConfig.COPILOT_MODEL,
+  agentRuntimeDefault: envConfig.AGENT_RUNTIME_DEFAULT,
+  agentRuntimeFallbackOrder: envConfig.AGENT_RUNTIME_FALLBACK_ORDER.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+  codeBuddyModelAllowlist: envConfig.CODEBUDDY_MODEL_ALLOWLIST.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+  codeBuddyDefaultModel: envConfig.CODEBUDDY_DEFAULT_MODEL.trim(),
   openCodeEnabled: envConfig.OPENCODE_ENABLED === 'true',
   openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\/+$/, ''),
   openCodeUsername: envConfig.OPENCODE_SERVER_USERNAME?.trim() || undefined,
