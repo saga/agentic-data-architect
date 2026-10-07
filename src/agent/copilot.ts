@@ -21,7 +21,6 @@ import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
-import { askOpenCode, isOpenCodeModel, type OpenCodeAskInput } from './opencode.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
@@ -87,8 +86,8 @@ export async function stopClient(): Promise<void> {
   if (client) {
     try {
       await client.stop();
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[copilot] Agent client stop failed during shutdown.', error);
     }
     client = null;
   }
@@ -120,96 +119,6 @@ interface PreToolUseParam {
   toolName: string;
   toolArgs: unknown;
 }
-interface UserInputRequestParam {
-  question: string;
-  choices?: string[] | undefined;
-  allowFreeform?: boolean | undefined;
-}
-
-/** 一次 Agent 执行所需的全部输入，以及流式输出、状态、Session 持久化和取消回调。 */
-export interface AskInput {
-  prompt: string;
-  systemPrompt: string;
-  /** 记录本轮可展示的 Agent 执行轨迹；不包含思维链正文。 */
-  onTrajectory?: (event: {
-    type: 'user_input' | 'turn_start' | 'assistant_turn_start' | 'assistant_turn_end' | 'intent' | 'model_call' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission' | 'permission_completed' | 'user_input_requested' | 'user_input_completed' | 'compaction' | 'session_idle' | 'session_error' | 'context_changed' | 'turn_end' | 'error' | 'checkpoint' | 'stage_gate' | 'status';
-    name: string;
-    status?: 'started' | 'completed' | 'failed' | 'waiting' | 'info';
-    durationMs?: number;
-    model?: string;
-    inputTokens?: number;
-    outputTokens?: number;
-    premiumRequestCost?: number;
-    details?: Record<string, unknown>;
-  }) => void;
-  /** When provided, the same resumable Agent session is reused only for the same Runtime/model. */
-  sessionId?: string;
-  workingDirectory?: string;
-  /** Investigation workspace name; when omitted, adapters derive it from workingDirectory. */
-  investigationName?: string;
-  /** 当前 Investigation 首选 Runtime；未指定时由 runtime 层按模型引用或全局默认推断。 */
-  runtime?: import('../investigation/schemas.js').AgentRuntime;
-  /** 当前 Investigation 使用的模型；默认 Auto。 */
-  model?: string;
-  /** 这次模型调用在人类可读轨迹中的名称。 */
-  modelCallName?: string;
-  /** model=auto 时的路由偏好。 */
-  autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
-  /** 自动续跑时每一轮都重新注入的最高优先级 Mission 文本。 */
-  missionPrompt?: string;
-  /**
-   * 自动续跑前刷新 Mission；用于重新计算当前交付物覆盖。
-   * Mission 本身仍由 Workspace 持久化状态提供，刷新失败时继续使用上一份。
-   */
-  refreshMissionPrompt?: () => string | Promise<string>;
-  /**
-   * 判断 Mission 是否还有未覆盖的必需交付物。
-   * 这是停止自动续跑的确定性导航条件，不替代 Workflow Gate。
-   */
-  shouldContinueMission?: () => boolean | Promise<boolean>;
-  /**
-   * 在每个自动续跑阶段的第一个实质工具动作执行前做一次 Mission 语义检查。
-   * 不是权限边界，也不对每个工具调用重复跑模型；后续由 Stage Gate 兜底。
-   */
-  missionActionGate?: (input: {
-    execution: number;
-    toolName: string;
-    toolArgs: unknown;
-  }) => Promise<{ allowed: boolean; reason: string; targetDeliverableId?: string | null }>;
-  /** 思考过程流式片段；实时展示仍由上层处理，完整内容另行写入运行记录。 */
-  onReasoningDelta?: (delta: string) => void;
-  /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
-  onStageResult?: (result: { content: string; execution: number }) =>
-    void | Promise<void | { passed?: boolean; error?: string }>;
-  /** 在 Workflow transition / Gate 前同步保存本阶段形成的 Intake，避免 Gate 读取到旧的 Scope。 */
-  onBeforeWorkflowTransition?: (result: { content: string; execution: number }) => Promise<void>;
-  /** 正常调查会绑定 Workflow；工作地图 AI 不绑定调查 Workflow。 */
-  workflowSkill?: WorkflowId;
-  /** 工作地图 AI 使用独立的最小 Agent 能力，不带数据分析工具。 */
-  purpose?: 'investigation' | 'journey-map' | 'review';
-  skillDirectories?: string[];
-  /** Platform capabilities are fixed by the Control snapshot for this turn. */
-  platformCapabilities?: ReadonlyArray<{ name: string; version: number; enabled: boolean }>;
-  /** 当前 Investigation 的 Agent 权限模式；未显式指定时默认 Allow All。 */
-  permissionMode?: 'permission' | 'allow_all';
-  mcpServers?: NonNullable<CreateSessionConfig['mcpServers']>;
-  onDelta?: (delta: string) => void;
-  onStatus?: (status: string) => void;
-  onSessionId?: (sessionId: string) => void;
-  turnId?: string;
-  shouldAbort?: () => boolean;
-  /** 本轮 Agent 结束后最多自动再推进多少阶段；0 表示不自动续跑。 */
-  autoContinuationTurns?: number;
-  /**
-   * 当前 sendAndWait 的结构化输出 Schema。Schema 仅对本次发送生效，
-   * 不改变普通调查 Agent 的输出协议。
-   */
-  responseSchema?: ZodType;
-}
-
-// turnId → 当前 Copilot session。用于 Stop、重复请求检测和执行生命周期管理。
-const activeSessions = new Map<string, { sessionId: string; abort: () => Promise<void> }>();
-
 interface PendingCopilotPermission {
   sessionName: string;
   turnId: string;
@@ -251,105 +160,6 @@ interface PendingCopilotUserInput {
 /** Agent 通过 ask_user 提出的待回答问题；和权限一样只存在当前进程的运行态。 */
 const pendingCopilotUserInputs = new Map<string, PendingCopilotUserInput>();
 
-/** 返回当前 Investigation 的待回答问题，供主对话区直接显示。 */
-export function listPendingCopilotUserInputs(sessionName: string): Array<Omit<PendingCopilotUserInput, 'resolve' | 'reject'>> {
-  return [...pendingCopilotUserInputs.values()]
-    .filter((item) => item.sessionName === sessionName)
-    .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
-    .map(({ resolve: _resolve, reject: _reject, onAnswered: _onAnswered, ...item }) => ({ ...item }));
-}
-
-/** 把用户在前端填写的答案交回给 Copilot 的 ask_user handler。 */
-export function respondToCopilotUserInput(
-  sessionName: string,
-  turnId: string,
-  requestId: string,
-  answer: string,
-  wasFreeform: boolean,
-): boolean {
-  const pending = pendingCopilotUserInputs.get(requestId);
-  if (!pending || pending.sessionName !== sessionName || pending.turnId !== turnId) return false;
-  const value = answer.trim();
-  if (!value) return false;
-  if (!wasFreeform && !pending.choices.includes(value)) return false;
-
-  pendingCopilotUserInputs.delete(requestId);
-  pending.onAnswered?.({ answer: value, wasFreeform });
-  pending.resolve({ answer: value, wasFreeform });
-  return true;
-}
-
-/**
- * 供其它 Agent Runtime 复用的宿主用户输入桥。
- * CodeBuddy/OpenCode 不拥有自己的前端交互队列时，也必须进入同一 pending user-input API。
- */
-export async function requestAgentUserInput(
-  sessionName: string,
-  turnId: string,
-  sessionId: string,
-  request: UserInputRequestParam,
-  onStatus?: (status: string) => void,
-  onTrajectory?: (event: {
-    type: 'user_input_requested' | 'user_input_completed' | 'status';
-    name: string;
-    status?: 'started' | 'completed' | 'waiting' | 'info';
-    durationMs?: number;
-    details?: Record<string, unknown>;
-  }) => void,
-): Promise<{ answer: string; wasFreeform: boolean }> {
-  const requestId = randomUUID();
-  const requestedAt = new Date().toISOString();
-  onStatus?.('助手正在等你的回答。');
-  onTrajectory?.({
-    type: 'user_input_requested',
-    name: '等待你的回答',
-    status: 'waiting',
-    details: {
-      requestId,
-      waitingOn: 'user_input',
-      question: request.question,
-      choices: request.choices ?? [],
-      waitTimeoutMs: config.userInputWaitTimeoutMs,
-    },
-  });
-
-  return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      pendingCopilotUserInputs.delete(requestId);
-      reject(new Error(`等待你的回答超过 ${config.userInputWaitTimeoutMs}ms，这次操作已停止。`));
-    }, config.userInputWaitTimeoutMs);
-    timeoutId.unref?.();
-
-    pendingCopilotUserInputs.set(requestId, {
-      sessionName,
-      turnId,
-      sessionId,
-      requestId,
-      question: request.question,
-      choices: request.choices ?? [],
-      allowFreeform: request.allowFreeform !== false,
-      requestedAt,
-      onAnswered: ({ answer, wasFreeform }) => {
-        clearTimeout(timeoutId);
-        onTrajectory?.({
-          type: 'user_input_completed',
-          name: '用户输入已提供',
-          status: 'completed',
-          durationMs: Math.max(0, Date.now() - Date.parse(requestedAt)),
-          details: {
-            requestId,
-            question: request.question,
-            answer: redactTrajectoryValue(answer),
-            wasFreeform,
-          },
-        });
-      },
-      resolve,
-      reject,
-    });
-  });
-}
-
 /** 返回指定 Investigation 当前等待用户处理的权限请求，供前端轮询显示。 */
 export function listPendingCopilotPermissions(sessionName: string): Array<Omit<PendingCopilotPermission, 'respond'>> {
   return [...pendingCopilotPermissions.values()]
@@ -379,7 +189,8 @@ export async function respondToCopilotPermission(
     await pending.respond(decision);
     pendingCopilotPermissions.delete(requestId);
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('[copilot] Failed to abort the active Copilot turn.', error);
     return false;
   }
 }
@@ -481,52 +292,6 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 export async function askCopilot(input: AskInput): Promise<string> {
   // Runtime selection is explicit at the orchestration layer; retain model-prefix
   // routing here only for legacy direct callers.
-  // Runtime selection is normally handled by runtime.ts; this model-prefix routing
-  // remains only for legacy/direct callers that enter askCopilot itself.
-  const workingDirectory = input.workingDirectory ?? process.cwd();
-  const journeyMapPurpose = input.purpose === 'journey-map';
-  const reviewerPurpose = input.purpose === 'review';
-  const isolatedPurpose = journeyMapPurpose || reviewerPurpose;
-  const investigationName = path.basename(workingDirectory);
-  const selectedModel = input.model ?? config.model;
-  const workflowInstruction = isolatedPurpose ? '' : await buildJourneyAgentInstruction(investigationName, input.workflowSkill ?? null);
-
-  if (isOpenCodeModel(selectedModel)) {
-    return askOpenCode({
-      model: selectedModel,
-      prompt: input.prompt,
-      systemPrompt: input.systemPrompt,
-      workingDirectory,
-      ...(input.missionPrompt !== undefined ? { missionPrompt: input.missionPrompt } : {}),
-      ...(input.turnId !== undefined ? { turnId: input.turnId } : {}),
-      ...(input.onDelta ? { onDelta: input.onDelta } : {}),
-      ...(input.onReasoningDelta ? { onReasoningDelta: input.onReasoningDelta } : {}),
-      ...(input.onStatus ? { onStatus: input.onStatus } : {}),
-      ...(input.onTrajectory
-        ? {
-            onTrajectory: (event: Parameters<NonNullable<OpenCodeAskInput['onTrajectory']>>[0]) =>
-              input.onTrajectory?.({
-                type: event.type,
-                name: event.name,
-                ...(event.status !== undefined ? { status: event.status } : {}),
-                ...(event.model !== undefined ? { model: event.model } : {}),
-                ...(event.details !== undefined ? { details: event.details } : {}),
-              }),
-          }
-        : {}),
-      ...(input.shouldAbort ? { shouldAbort: input.shouldAbort } : {}),
-      ...(input.autoContinuationTurns !== undefined ? { autoContinuationTurns: input.autoContinuationTurns } : {}),
-      ...(input.refreshMissionPrompt ? { refreshMissionPrompt: input.refreshMissionPrompt } : {}),
-      ...(input.shouldContinueMission ? { shouldContinueMission: input.shouldContinueMission } : {}),
-      ...(input.onStageResult ? { onStageResult: input.onStageResult } : {}),
-      ...(input.onBeforeWorkflowTransition ? { onBeforeWorkflowTransition: input.onBeforeWorkflowTransition } : {}),
-      ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
-      ...(input.workflowSkill !== undefined ? { workflowSkill: input.workflowSkill } : {}),
-      ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
-      investigationName,
-    });
-  }
-
   const c = await getClient();
 
   // This application intentionally uses Copilot's default agent. The project
