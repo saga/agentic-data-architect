@@ -1,8 +1,8 @@
 /**
  * OpenCode 本机运行时适配器。
  *
- * 这里不直接依赖 OpenCode SDK，而是调用 `opencode serve` 提供的 HTTP API。
- * 这样项目不需要额外安装一个第二套 SDK，OpenCode 自己负责 provider / model / tools / MCP / 权限。
+ * OpenCode model 统一通过官方 opencode run headless CLI 执行。
+ * 模型发现仍可以读取本机 opencode serve；真正的模型 execution 不再直接调用 Serve API。
  *
  * 模型配置格式：
  *   opencode:<providerID>/<modelID>
@@ -670,6 +670,7 @@ async function runOpenCodeCli(
   let graphifyUsed = false;
   let usage: Record<string, unknown> | undefined;
   let sessionError: string | undefined;
+  let aborted = false;
   let stderr = '';
   let stdoutFallback = '';
   let buffer = '';
@@ -817,6 +818,7 @@ async function runOpenCodeCli(
   })();
 
   const abort = async () => {
+    aborted = true;
     if (!child.killed) child.kill('SIGTERM');
   };
   if (input.turnId) activeOpenCodeTurns.set(input.turnId, abort);
@@ -842,6 +844,7 @@ async function runOpenCodeCli(
   const exit = await exitPromise;
   const answer = answerParts.join('\n').trim();
 
+  if (aborted) throw new Error('Turn aborted.');
   if (sessionError) throw new Error(sessionError);
   if (exit.code !== 0) {
     const detail = stderr.trim() || stdoutFallback.trim();
