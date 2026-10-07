@@ -94,7 +94,8 @@ export interface MissionAlignmentInput {
   candidate: string;
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+  workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
 
 }
 
@@ -121,7 +122,8 @@ export interface MissionActionInput {
   };
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+  workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
 
 }
 
@@ -144,7 +146,8 @@ export interface MissionUnknownInput {
   unknowns: string[];
   context?: string | string[] | Record<string, unknown>;
   model?: string;
-  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+  workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
 
 }
 
@@ -163,7 +166,8 @@ export interface JevSmartFuncInput {
   /** 这次判断在人类可读轨迹中的名称。 */
   modelCallName?: string;
   /** 让 Smart Function 在正确的工作目录运行；默认使用应用 workspace。 */
-  workingDirectory?: string;  onTrajectory?: AskInput['onTrajectory'];
+  workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
 
 }
 
