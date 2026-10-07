@@ -154,7 +154,7 @@ async function runReviewerOnce(
     model: input.model || config.model,
     workingDirectory: workspaceRoot(input.investigationName),
     modelCallName: structured ? '检查最终报告质量' : '再次检查最终报告质量',
-    onTrajectory: input.onTrajectory,
+    ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
     autoContinuationTurns: 0,
     ...(structured ? { responseSchema: ArtifactReviewSchema } : {}),
   });
