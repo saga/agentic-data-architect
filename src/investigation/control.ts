@@ -4,6 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
 import fs from 'node:fs/promises';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
@@ -35,21 +36,30 @@ function globalConfigFile(): string {
 
 const controlUpdateLocks = new Map<string, Promise<void>>();
 let globalConfigLock: Promise<void> = Promise.resolve();
+const controlLockOwners = new AsyncLocalStorage<Set<string>>();
+const taskConfigInitLocks = new Map<string, Promise<void>>();
+let globalConfigInitLock: Promise<void> = Promise.resolve();
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  const owners = controlLockOwners.getStore();
+  if (owners?.has(name)) return operation();
   const previous = controlUpdateLocks.get(name) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const queued = previous.catch(() => undefined).then(() => gate);
   controlUpdateLocks.set(name, queued);
   await previous.catch(() => undefined);
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (controlUpdateLocks.get(name) === queued) controlUpdateLocks.delete(name);
-  }
+  const nextOwners = new Set(owners ?? []);
+  nextOwners.add(name);
+  return controlLockOwners.run(nextOwners, async () => {
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (controlUpdateLocks.get(name) === queued) controlUpdateLocks.delete(name);
+    }
+  });
 }
 
 /** 返回当前 Investigation 的审计日志路径。 */
@@ -145,11 +155,24 @@ export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 
-  const base = defaultControl();
-  const global = buildGlobalConfiguration(base.agent);
-  await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
-  await writeJsonAtomic(globalConfigFile(), global);
-  return global;
+  const previous = globalConfigInitLock;
+  let release!: () => void;
+  globalConfigInitLock = new Promise<void>((resolve) => { release = resolve; });
+  await previous.catch(() => undefined);
+  try {
+    try {
+      return GlobalConfigurationSchema.parse(JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')));
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const base = defaultControl();
+    const global = buildGlobalConfiguration(base.agent);
+    await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
+    await writeJsonAtomic(globalConfigFile(), global);
+    return global;
+  } finally {
+    release();
+  }
 }
 
 /** 读取 Task 的原始 sparse override；不能从 Effective Config 反推，因为 Global 变化后无法区分继承值和显式覆盖值。 */
@@ -282,10 +305,23 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 
-  const base = defaultControl();
-  const task: TaskConfiguration = {
-    schemaVersion: 2,
-    version: 1,
+  const previous = taskConfigInitLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const queued = previous.catch(() => undefined).then(() => new Promise<void>((resolve) => { release = resolve; }));
+  taskConfigInitLocks.set(name, queued);
+  await previous.catch(() => undefined);
+  try {
+    try {
+      const existing = TaskConfigurationSchema.parse(JSON.parse(await fs.readFile(controlFile(name), 'utf8')));
+      return resolveTaskConfiguration(existing, global);
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
+    const base = defaultControl();
+    const task: TaskConfiguration = {
+      schemaVersion: 2,
+      version: 1,
     globalVersion: global.version,
     updatedAt: base.updatedAt,
     research: clone(base.research),
@@ -299,14 +335,18 @@ export async function loadInvestigationControl(name: string): Promise<Investigat
     }],
   };
   await writeJsonAtomic(controlFile(name), task);
-  await appendAuditEvent(name, {
-    actor: 'system',
-    action: 'configuration.created',
-    summary: 'Created task configuration inheriting global defaults.',
-    configurationVersion: 1,
-    details: { globalVersion: global.version },
-  });
-  return resolveTaskConfiguration(task, global);
+    await appendAuditEvent(name, {
+      actor: 'system',
+      action: 'configuration.created',
+      summary: 'Created task configuration inheriting global defaults.',
+      configurationVersion: 1,
+      details: { globalVersion: global.version },
+    });
+    return resolveTaskConfiguration(task, global);
+  } finally {
+    release();
+    if (taskConfigInitLocks.get(name) === queued) taskConfigInitLocks.delete(name);
+  }
 }
 
 /** 串行更新 Research/Agent 配置、递增版本、记录调查说明和 MCP 变化并写审计。 */
