@@ -10,6 +10,7 @@ import type { AgentRuntime } from '../investigation/schemas.js';
 import { askCodeBuddy, normalizeCodeBuddyModel, resolveCodeBuddyModel } from './codebuddy.js';
 import { askCopilot, type AskInput } from './copilot.js';
 import { askOpenCode, listOpenCodeModels } from './opencode.js';
+import { syncRuntimeSkillWorkspace } from '../skills/catalog.js';
 
 function runtimeFromModel(model: string | undefined): AgentRuntime | undefined {
   const value = model?.trim().toLowerCase() ?? '';
@@ -134,6 +135,16 @@ async function executeRuntime(
   model: string,
 ): Promise<string> {
   const adapted = adaptInput(input, runtime, model);
+  if (
+    runtime !== 'copilot-sdk'
+    && adapted.workingDirectory
+    && adapted.purpose !== 'review'
+  ) {
+    await syncRuntimeSkillWorkspace(
+      adapted.workingDirectory,
+      adapted.purpose === 'journey-map' ? undefined : adapted.workflowSkill,
+    );
+  }
   switch (runtime) {
     case 'codebuddy-sdk':
       return askCodeBuddy(adapted, model);
