@@ -86,17 +86,6 @@ function toCodeBuddyMcpServers(
   return result;
 }
 
-function buildPrompt(input: Pick<AskInput, 'missionPrompt' | 'systemPrompt'>, prompt: string, workflowInstruction: string, graphifyEnabled: boolean): string {
-  return [
-    input.missionPrompt,
-    input.systemPrompt,
-    graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
-    workflowInstruction,
-    '当前用户任务：',
-    prompt,
-  ].filter((value): value is string => Boolean(value && value.trim())).join('\n\n');
-}
-
 
 interface WorkbenchToolLike {
   name: string;
@@ -110,10 +99,7 @@ interface WorkbenchToolLike {
  *
  * 业务 tool implementation 仍只有一份；CodeBuddy 只是换了 Runtime adapter。
  */
-function buildCodeBuddyWorkbenchServer(sessionName: string): {
-  server: unknown;
-  toolNames: string[];
-} {
+function buildCodeBuddyWorkbenchServer(sessionName: string): unknown {
   const tools = createLocalDataTools(sessionName) as unknown as WorkbenchToolLike[];
   const serverTools = tools.map((item) =>
     (codeBuddyTool as unknown as (definition: {
@@ -129,12 +115,9 @@ function buildCodeBuddyWorkbenchServer(sessionName: string): {
     }),
   );
 
-  return {
-    server: createSdkMcpServer('workbench', {
-      tools: serverTools as never[],
-    }),
-    toolNames: tools.map((item) => 'mcp__workbench__' + item.name),
-  };
+  return createSdkMcpServer('workbench', {
+    tools: serverTools as never[],
+  });
 }
 
 function errorMessage(error: unknown): string {
@@ -177,6 +160,7 @@ async function runCodeBuddyQuery(
   workflowInstruction: string,
   mcpServers: Record<string, unknown>,
   execution: number,
+  graphifyEnabled: boolean,
   graphifyPreflight: boolean,
   graphifyRequired: boolean,
 ): Promise<CodeBuddyQueryResult> {
@@ -448,8 +432,8 @@ async function runCodeBuddyQuery(
  * 执行 CodeBuddy Agent。
  *
  * CodeBuddy SDK 的 query() 默认是隔离运行环境；本项目显式注入 cwd、MCP、
- * 权限和任务指令。跨阶段续跑由宿主重新组合 Mission/Workflow/上一阶段结果，
- * 不依赖 query() 未公开承诺的 resume 参数。
+ * 权限和任务指令；同一 Runtime/model 的下一阶段通过 query({ resume })
+ * 继续 CodeBuddy Session。
  */
 export async function askCodeBuddy(
   input: AskInput & { runtime?: AgentRuntime },
@@ -529,6 +513,7 @@ export async function askCodeBuddy(
       currentWorkflowInstruction,
       mcpServers,
       execution,
+      graphifyEnabled,
       preflight,
       graphifyRequired,
     );
