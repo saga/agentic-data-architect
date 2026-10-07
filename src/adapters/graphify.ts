@@ -110,7 +110,7 @@ export async function ensureGraphifyGraph(
   }
 
   const graphPath = graphifyGraphPath(workingDirectory);
-  const graphExists = await fs.access(graphPath).then(() => true).catch(() => false);
+  const graphExists = await fs.promises.access(graphPath).then(() => true).catch(() => false);
   if (!refresh && graphExists) {
     const metadata = await getGraphifyRuntimeMetadata(workingDirectory);
     if (metadata.status === 'available' && metadata.graphHash) return metadata;
