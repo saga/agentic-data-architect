@@ -91,22 +91,18 @@ function evaluateDeliverable(
 ): MissionDeliverableProgress {
   const current = signals.currentState;
   const datasets = current?.coverage.datasets ?? 0;
-  const connectedDatasets = current?.coverage.connectedDatasets ?? 0;
   const parsedSql = current?.coverage.sqlParsedStatements ?? 0;
 
   switch (item.id) {
     case 'current-state-architecture': {
-      const sourceReady = datasets > 0;
-      const flowReady = connectedDatasets > 0;
-      const modelReady = signals.estateColumnCount > 0 || (current?.coverage.semanticAssets ?? 0) > 0;
-      const coveredCount = Number(sourceReady) + Number(flowReady) + Number(modelReady) + Number(parsedSql > 0);
+      const hasSomeCoverage = datasets > 0 || parsedSql > 0 || signals.estateColumnCount > 0;
       return covered(
         item,
-        derived.currentDataArchitectureReady ? 'covered' : coveredCount > 0 ? 'in_progress' : 'not_started',
-        '当前架构覆盖 Source=' + (sourceReady ? '是' : '否')
-          + '、Flow=' + (flowReady ? '是' : '否')
-          + '、Model=' + (modelReady ? '是' : '否')
-          + '、Transformation=' + (parsedSql > 0 ? '是' : '否') + '。',
+        derived.currentDataArchitectureReady ? 'covered' : hasSomeCoverage ? 'in_progress' : 'not_started',
+        '当前架构覆盖 Source=' + (derived.currentStateAvailable ? '是' : '否')
+          + '、Flow=' + (derived.dataFlowReady ? '是' : '否')
+          + '、Model=' + (derived.dataModelReady ? '是' : '否')
+          + '、Transformation=' + (derived.transformationReady ? '是' : '否') + '。',
       );
     }
 
