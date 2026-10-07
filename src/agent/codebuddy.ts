@@ -421,7 +421,7 @@ async function runCodeBuddyQuery(
     if (message !== 'Turn aborted.') {
       input.onTrajectory?.({
         type: 'error',
-        name: 'CodeBuddy SDK Agent 失败',
+        name: '助手执行失败',
         status: 'failed',
         model,
         details: {
@@ -438,11 +438,11 @@ async function runCodeBuddyQuery(
 
   if (modelError) throw new Error(modelError);
   if (!answer.trim()) {
-    throw new Error('CodeBuddy SDK 没有返回文本答案。');
+    throw new Error('助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。');
   }
 
   if (graphifyRequired && !graphifyUsedRef.value) {
-    throw new Error('结构调查前置检查失败：CodeBuddy 没有先使用 Graphify。');
+    throw new Error('代码结构分析这一步没有完成，因此无法按要求继续调查。请查看执行轨迹中的 Graphify 错误后重试。');
   }
 
   return {
@@ -498,7 +498,7 @@ export async function askCodeBuddy(
       );
       input.onTrajectory?.({
         type: 'status',
-        name: '结构分析工具不可用，已继续调查',
+        name: '代码结构分析没成功，已改用源码继续查',
         status: 'info',
         details: {
           capability: GRAPHIFY_MCP_NAME,
@@ -529,7 +529,7 @@ export async function askCodeBuddy(
 
     const preflight = execution === 0 && graphifyRequired;
     if (execution > 0) {
-      input.onStatus?.('CodeBuddy 已完成前一阶段，正在继续调查（第 ' + (execution + 1) + ' 阶段）…');
+      input.onStatus?.('助手已完成前一阶段，正在继续调查（第 ' + (execution + 1) + ' 阶段）…');
     }
 
     const prompt = [
@@ -590,7 +590,7 @@ export async function askCodeBuddy(
       stageGate && 'passed' in stageGate && stageGate.passed === false
         ? {
             applied: false,
-            error: stageGate.error ?? 'Stage Gate 未通过，当前 Workflow 保持不变。',
+            error: stageGate.error ?? '这一阶段还不能继续，当前工作方式保持不变。',
             execution: undefined,
           }
         : input.workflowSkill && input.investigationName
@@ -603,7 +603,7 @@ export async function askCodeBuddy(
           : { applied: false, error: undefined, execution: undefined };
 
     if (workflowTransition.error) {
-      input.onStatus?.('CodeBuddy 本阶段没有通过 Workflow Gate，继续补齐结果。');
+      input.onStatus?.('这一阶段的结果还不够，助手正在继续补齐。');
     }
 
     if (execution >= maxAutomaticContinuations) break;
