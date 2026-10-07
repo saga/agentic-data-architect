@@ -112,7 +112,7 @@ export async function answerQuestion(
     onReasoningDelta?: (delta: string) => void;
     /** 阶段小结完成后立即推送给主聊天区。 */
     onCheckpoint?: (checkpoint: AgentCheckpoint & { id: string; turnId: string; timestamp: string; execution: number }) => void;
-    /** 长任务中偶尔显示给用户的 Soul 陪伴性提示，不写入持久化对话。 */
+    /** 长任务中偶尔显示给用户的 Soul 陪伴性提示；当前可见内容会写入 transcript.md，但不进入正式 conversation_messages。 */
     onCompanionNote?: (note: string) => void;
   },
 ): Promise<AnswerSummary> {
@@ -236,8 +236,11 @@ export async function answerQuestion(
   let companionTimer: ReturnType<typeof setTimeout> | undefined;
   let trajectoryWrite: Promise<void> = Promise.resolve();
   let trajectoryWriteError: unknown;
+  // 轨迹事件通常由 appendTrajectoryEvent 统一生成 id/timestamp。
+  // checkpoint 例外：同一条“阶段小结”需要把完全相同的 id/timestamp 同时给
+  // durable trajectory 和 SSE，浏览器才能可靠去重并在实时/刷新两条路径之间对齐。
   type TrajectoryCallbackEvent = NonNullable<AskInput['onTrajectory']> extends (event: infer T) => void ? T : never;
-  const recordTrajectory = (event: TrajectoryCallbackEvent): void => {
+  const recordTrajectory = (event: TrajectoryCallbackEvent & { id?: string; timestamp?: string }): void => {
     trajectoryWrite = trajectoryWrite
       .then(async () => {
         await appendTrajectoryEvent(investigationName, { ...event, turnId, details: event.details ?? {} });
@@ -720,6 +723,11 @@ export async function answerQuestion(
             })
           : null;
 
+        // Smart Function 可能运行数秒甚至更久；在它完成后再确认一次 Mission / Scope。
+        // 不能只在 onBeforeWorkflowTransition 入口检查，否则用户在审核期间修改任务，
+        // 旧 turn 仍可能把旧 Mission 的 checkpoint 写进新的 Investigation 历史。
+        await assertTurnStillCurrent();
+
         const stageGateInput = {
           execution,
           mission,
@@ -801,6 +809,8 @@ export async function answerQuestion(
             ...checkpoint,
           };
           recordTrajectory({
+            id: checkpointEvent.id,
+            timestamp: checkpointEvent.timestamp,
             type: 'checkpoint',
             name: '阶段小结：' + checkpoint.title,
             status: 'completed',
