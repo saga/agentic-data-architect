@@ -10,6 +10,7 @@ import { config } from '../config.js';
 
 const execFileAsync = promisify(execFile);
 const MAX_CACHE_BYTES = 50 * 1024 * 1024;
+const MAX_CACHE_TOTAL_BYTES = 512 * 1024 * 1024;
 
 let ytDlpAvailability: Promise<boolean> | undefined;
 
@@ -51,6 +52,33 @@ function cacheKeyFor(source: string): string {
 
 async function ensureCacheRoot(): Promise<void> {
   await fs.mkdir(mediaCacheRoot(), { recursive: true });
+}
+
+async function enforceCacheBudget(): Promise<void> {
+  const entries = await fs.readdir(mediaCacheRoot(), { withFileTypes: true });
+  const files: Array<{ path: string; size: number; mtimeMs: number }> = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.bin')) continue;
+    try {
+      const file = path.join(mediaCacheRoot(), entry.name);
+      const stat = await fs.stat(file);
+      files.push({ path: file, size: stat.size, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Concurrent cache activity must not make the resolver fail.
+    }
+  }
+
+  let total = files.reduce((sum, item) => sum + item.size, 0);
+  if (total <= MAX_CACHE_TOTAL_BYTES) return;
+
+  files.sort((left, right) => left.mtimeMs - right.mtimeMs);
+  for (const file of files) {
+    if (total <= MAX_CACHE_TOTAL_BYTES) break;
+    await fs.rm(file.path, { force: true });
+    await fs.rm(file.path.replace(/\.bin$/, '.json'), { force: true });
+    total -= file.size;
+  }
 }
 
 function isSupportedSocialMediaPage(source: string): boolean {
@@ -129,6 +157,7 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
         const raw = JSON.parse(await fs.readFile(metadata, 'utf8')) as { mimeType?: unknown };
         if (!mimeType && typeof raw.mimeType === 'string') mimeType = raw.mimeType;
       } catch {}
+      await fs.utimes(target, new Date(), new Date()).catch(() => undefined);
       return { cachePath: target, ...(mimeType ? { mimeType } : {}) };
     }
   } catch {}
@@ -168,6 +197,7 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
       JSON.stringify({ source: remoteUrl, mimeType, sizeBytes: bytes, cachedAt: new Date().toISOString() }, null, 2) + '\n',
       'utf8',
     );
+    await enforceCacheBudget();
     return { cachePath: target, ...(mimeType ? { mimeType } : {}) };
   } catch {
     await fs.rm(temporary, { force: true });
@@ -185,6 +215,7 @@ export async function getCachedRemoteMedia(cacheKey: string): Promise<{ path: st
       const metadata = JSON.parse(await fs.readFile(mediaCacheMetaFile(cacheKey), 'utf8')) as { mimeType?: unknown };
       if (typeof metadata.mimeType === 'string') mimeType = metadata.mimeType;
     } catch {}
+    await fs.utimes(target, new Date(), new Date()).catch(() => undefined);
     return { path: target, sizeBytes: stat.size, ...(mimeType ? { mimeType } : {}) };
   } catch {
     return undefined;
