@@ -119,7 +119,7 @@ export async function answerQuestion(
 
   const reservedTurn = activeInvestigationTurns.get(investigationName);
   if (reservedTurn && reservedTurn.turnId !== turnId) {
-    throw new Error('这个 Investigation 正在处理上一轮问题，请等它完成，或者先点 Stop。');
+    throw new Error('助手正在处理上一轮问题，请等它完成，或先点击“停止”。');
   }
 
   let turn;
@@ -242,10 +242,10 @@ export async function answerQuestion(
       const currentMissionFingerprint = computeMissionFingerprint(latest);
       const currentScopeFingerprint = computeScopeFingerprint(latest);
       if (currentMissionFingerprint !== turnMissionFingerprint) {
-        throw new Error('任务在本轮调查期间发生了变化，当前结果不会覆盖新的任务。请重新开始这一轮调查。');
+        throw new Error('任务目标在本轮执行期间发生了变化，当前结果不会覆盖新的任务。请重新开始这一轮调查。');
       }
       if (currentScopeFingerprint !== turnScopeFingerprint) {
-        throw new Error('调查范围在本轮调查期间发生了变化，当前结果不会覆盖新的范围。请重新开始这一轮调查。');
+        throw new Error('调查范围在本轮执行期间发生了变化，当前结果不会覆盖新的范围。请重新开始这一轮调查。');
       }
       return latest;
     };
