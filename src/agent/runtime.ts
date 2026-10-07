@@ -106,16 +106,17 @@ function adaptInput(
   runtime: AgentRuntime,
   model: string,
 ): AskInput {
+  const preserveSession =
+    runtime === input.runtime
+    && model === input.model;
+
   return {
     ...input,
     runtime,
     model,
-    // A session belongs to one runtime. A quota fallback starts a fresh session
-    // in the next runtime instead of accidentally resuming the previous runtime.
-    ...(runtime !== input.runtime ? { sessionId: undefined } : {}),
-    ...(runtime !== input.runtime ? {
-      onSessionId: (sessionId: string) => input.onSessionId?.(sessionId),
-    } : {}),
+    // A session belongs to one runtime+model selection. A quota fallback starts
+    // a fresh session and never persists that fallback session as the preferred runtime.
+    ...(!preserveSession ? { sessionId: undefined, onSessionId: undefined } : {}),
   };
 }
 
