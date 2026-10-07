@@ -176,7 +176,7 @@ export interface AskInput {
     toolName: string;
     toolArgs: unknown;
   }) => Promise<{ allowed: boolean; reason: string; targetDeliverableId?: string | null }>;
-  /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
+  /** 思考过程流式片段；实时展示仍由上层处理，完整内容另行写入运行记录。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
   onStageResult?: (result: { content: string; execution: number }) =>
