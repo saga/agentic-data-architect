@@ -49,7 +49,6 @@ import {
   type JourneyRunEvent,
   type JourneyState,
 } from './journey.js';
-import { deriveModernizationFacts } from './journey.js';
 
 
 const JOURNEY_DIR = 'workflow';
@@ -320,18 +319,6 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const assessment = context.workflow === 'data-architecture-assessment'
     ? await loadArchitectureAssessmentPlan(name)
     : null;
-  const modernizationFacts = modernization
-    ? deriveModernizationFacts({
-        targetStatus: modernization.targetArchitecture.status,
-        targetComponentCount: modernization.targetArchitecture.components.length,
-        mappingStatuses: modernization.mappings.map((mapping) => mapping.status),
-        validationStatuses: modernization.validationPlan.checks.map((check) => ({
-          status: check.status,
-          blocking: check.blocking,
-        })),
-      })
-    : null;
-
   return {
     goal: context.goal || context.userPrompt,
     scopeReady: context.scopeValidation?.status === 'validated',
@@ -351,20 +338,20 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
       estate: snapshot?.estate ?? null,
       findings: context.findings,
     }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    ...(modernizationFacts ?? {
-      targetComponentCount: 0,
-      mappingCount: 0,
-      validationCount: 0,
-      blockingValidationReady: 0,
-      blockingValidationTotal: 0,
-    }),
+    targetStatus: modernization?.targetArchitecture.status ?? 'draft',
+    targetComponentCount: modernization?.targetArchitecture.components.length ?? 0,
+    mappingStatuses: modernization?.mappings.map((mapping) => mapping.status) ?? [],
+    validationStatuses: modernization?.validationPlan.checks.map((check) => ({
+      status: check.status,
+      blocking: check.blocking,
+    })) ?? [],
     estateColumnCount: snapshot?.estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
     sourceOfTruthCandidateCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
     lineageEdgeCount: snapshot?.lineage?.edges.length ?? snapshot?.estate?.edges.length ?? 0,
     assessmentPlanExists: Boolean(assessment),
-    findingCount: assessment?.findings.length ?? context.findings.length,
-    recommendationCount: assessment?.recommendations.length ?? 0,
-    roadmapItemCount: assessment?.roadmap.length ?? 0,
+    assessmentFindingCount: assessment?.findings.length ?? context.findings.length,
+    assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
+    assessmentRoadmapCount: assessment?.roadmap.length ?? 0,
   };
 }
 
