@@ -4,7 +4,7 @@ import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js
 import { artifactsDir } from '../investigation/workspace.js';
 import { evaluateMissionGate } from './mission-gate.js';
 import { evaluateInvestigationScopeGate } from './scope-gate.js';
-import { calibrateStatus, type EvidenceRef } from '../evidence/types.js';
+import { calibrateStatus, type EvidenceRef, type Finding } from '../evidence/types.js';
 import { isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
 import { evaluateDerivedState } from './derived-state.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
@@ -36,7 +36,7 @@ export interface InvestigationReportGateInput {
   scopeValidation?: { status: string; goal: string; scope: string[]; systems: string[]; source: 'user' | 'materials' | 'mixed'; userConfirmed: boolean; evidenceIds: string[]; validatedAt: string; } | undefined;
   evidence: EvidenceRef[];
   claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
-  findings: Array<{ evidenceIds: string[] }>;
+  findings: Finding[];
   resultArtifactCount?: number;
   workflow?: string | null;
   assessmentPlanAvailable?: boolean;
@@ -98,6 +98,7 @@ export function evaluateInvestigationReportGate(
     findings: investigation.findings,
   });
   const derived = evaluateDerivedState({
+    goal: investigation.goal,
     currentState: snapshot?.currentState ?? null,
     estateColumnCount: snapshot?.estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
     sourceOfTruthCandidateCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
@@ -107,10 +108,10 @@ export function evaluateInvestigationReportGate(
     highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
     assessment: investigation.workflow === 'data-architecture-assessment'
       ? {
-          exists: input.assessmentPlanAvailable === true,
+          exists: investigation.assessmentPlanAvailable === true,
           findingsCount: investigation.findings.length,
-          recommendationCount: input.assessmentRecommendationCount ?? 0,
-          roadmapCount: input.assessmentRoadmapCount ?? 0,
+          recommendationCount: investigation.assessmentRecommendationCount ?? 0,
+          roadmapCount: investigation.assessmentRoadmapCount ?? 0,
         }
       : null,
   });
