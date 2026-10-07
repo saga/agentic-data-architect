@@ -13,7 +13,6 @@ import type { DiscoverySnapshot } from './discover.js';
 import { loadArchitectureAssessmentPlan } from './assessment.js';
 import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
 import { loadModernizationPlan } from './modernization.js';
-import { deriveModernizationFacts } from './journey.js';
 import { evaluateDerivedState } from './derived-state.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
 
@@ -126,11 +125,10 @@ function evaluateDeliverable(
     }
 
     case 'data-flow': {
-      const flowReady = signals.lineageEdgeCount > 0 || connectedDatasets >= 2;
       return covered(
         item,
         derived.dataFlowReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
-        flowReady
+        derived.dataFlowReady
           ? '已经形成可追踪的数据流关系。'
           : datasets > 0
             ? '已经发现数据集，但数据流关系还没有形成。'
@@ -139,11 +137,10 @@ function evaluateDeliverable(
     }
 
     case 'data-model': {
-      const modelReady = datasets > 0 && signals.estateColumnCount > 0;
       return covered(
         item,
         derived.dataModelReady ? 'covered' : datasets > 0 ? 'in_progress' : 'not_started',
-        modelReady
+        derived.dataModelReady
           ? '已经发现数据集和列级结构，可以整理核心实体与关系。'
           : datasets > 0
             ? '已经发现数据集，但列级模型还需要继续整理。'
