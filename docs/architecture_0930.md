@@ -211,7 +211,7 @@ Claim
 ```
 
 Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭。Skill `structural-analysis` 只负责告诉 Agent 何时以及如何使用该能力；真正的 Graphify executable、版本和 graph hash 在 turn audit 中记录。
-详见 `docs/implementation.md`，指标见 `docs/evaluation.md`。
+详见 `docs/implementation.md`，指标见 `docs/ecalculation.md`。
 数据流、控制流、turn 生命周期和并发模型见 `docs/data-control-flow.md`。
 
 ---
@@ -268,8 +268,8 @@ Data Architecture Assessment
 
 Financial AI-Native Architecture 的 Skill 重点覆盖：
 
-- Portfolio Research / Investment Analytics 业务范围
-- Security / Position / Price / FX / Corporate Action / Benchmark 等金融数据
+- Business Domain Research / Investment Analytics 业务范围
+- Security / Entity State / Price / FX / Business Event / Benchmark 等金融数据
 - Snowflake 数据层和 Semantic View
 - LangChain / DeepAgents / Skills / Tools
 - LangSmith tracing / evaluation
@@ -509,7 +509,7 @@ Agent 不把整个聊天历史重新塞进每轮 prompt；当前实现只按问�
 
 > **这个项目不应该做成“会聊天的 Data Architect”，而应该做成一个以 Evidence、Metadata、Lineage、Data Profiling 和 Deterministic Validation 为基础，由 AI Agent 负责理解、推理、设计和解释的 Data Modernization Workbench。**
 
-EY 在 2026 年公开的 legacy ETL AI 实践已经非常接近这个方向：先重建 data flow，再解析异构代码，再让 LLM 理解业务逻辑，最后用独立 validation engine 检查 AI 输出，而不是让 LLM 直接“猜”整个系统。([EY][1])
+EY 在 2026 年公开的 legacy ETL AI 实践已经非常接近这个方向：先重建 data flow，再解析异构代码，再让 LLM 理解业务逻辑，最后用独立 validation engine 检查 AI 输出，而不是让 LLM 直接“猜”整个系统。（公开行业实践资料）
 
 ---
 
@@ -527,7 +527,7 @@ EY 在 2026 年公开的 legacy ETL AI 实践已经非常接近这个方向：�
 
 而是：
 
-> “这是一个已经运行了十年的 Portfolio Management 系统。请分析它现在有哪些数据源、哪些是真正的 source of truth、Position 是怎么计算出来的、Price 和 Corporate Action 从哪里来、哪些 ETL 包含业务逻辑、Research 使用的数据有没有 point-in-time 问题，然后设计迁移到新平台后的模型、source-to-target mapping、转换逻辑和验证方案。”
+> “这是一个已经运行了十年的 Business Operations 系统。请分析它现在有哪些数据源、哪些是真正的 source of truth、Entity State 是怎么计算出来的、Price 和 Business Event 从哪里来、哪些 ETL 包含业务逻辑、Research 使用的数据有没有 point-in-time 问题，然后设计迁移到新平台后的模型、source-to-target mapping、转换逻辑和验证方案。”
 
 这两个问题的复杂度完全不同。
 
@@ -624,7 +624,7 @@ Finding / Design / Explanation
 Deterministic validation
 ```
 
-EY 2026 年公开的 legacy ETL AI 方法就是类似结构：inventory → code extraction → parsing → data-flow reconstruction → LLM interpretation → quality validation → documentation。([EY][1])
+EY 2026 年公开的 legacy ETL AI 方法就是类似结构：inventory → code extraction → parsing → data-flow reconstruction → LLM interpretation → quality validation → documentation。（公开行业实践资料）
 
 这比“RAG + ChatGPT 问数据”重要得多。
 
@@ -642,13 +642,13 @@ Evidence
 
 例如 Agent 说：
 
-> `portfolio_position.position_qty` 的 authoritative source 是 `IBOR_POSITION`.
+> `portfolio_state.position_qty` 的 authoritative source 是 `SYSTEM_A_STATE`.
 
 不能只保存：
 
 ```json
 {
-  "answer": "IBOR_POSITION is the source of truth"
+  "answer": "SYSTEM_A_STATE is the source of truth"
 }
 ```
 
@@ -656,12 +656,12 @@ Evidence
 
 ```json
 {
-  "claim": "IBOR_POSITION is the authoritative position source",
+  "claim": "SYSTEM_A_STATE is the authoritative position source",
   "status": "supported",
   "evidence": [
     {
       "type": "lineage",
-      "source": "IBOR_POSITION",
+      "source": "SYSTEM_A_STATE",
       "target": "PORTFOLIO_POSITION"
     },
     {
@@ -737,8 +737,8 @@ Dataset
 Business Concept
    │
    ├── Security
-   ├── Portfolio
-   ├── Position
+   ├── Business Domain
+   ├── Entity State
    ├── Transaction
    ├── Price
    ├── Benchmark
@@ -748,10 +748,10 @@ Business Concept
 甚至可以做到：
 
 ```text
-portfolio_position.market_value
+portfolio_state.market_value
         │
         ├── derives_from
-        │      ├── position.quantity
+        │      ├── state.quantity
         │      └── security_price.close_price
         │
         ├── transformed_by
@@ -764,7 +764,7 @@ portfolio_position.market_value
         │      └── "Market Value"
         │
         └── consumed_by
-               ├── Portfolio Analytics
+               ├── Business Domain Analytics
                ├── Risk
                └── Performance
 ```
@@ -864,7 +864,7 @@ UNKNOWN:
 - Why is adjusted_price calculated twice?
 - Which job owns FX conversion?
 - Is POSITION table a snapshot or a derived state?
-- Does RESEARCH_FUNDAMENTAL contain restated values?
+- Does ENTITY_REFERENCE contain restated values?
 ```
 
 **Unknown 本身就是结果。**
@@ -905,7 +905,7 @@ Produce evidence-backed result
 
 例如：
 
-> “为什么 Portfolio A 的 NAV 在两个系统里不一样？”
+> “为什么 Business Domain A 的 NAV 在两个系统里不一样？”
 
 Agent 不应该直接生成：
 
@@ -1002,7 +1002,7 @@ Constraints
 
 # 九、复杂业务场景必须建立自己的 Domain Model
 
-这是这个项目区别于普通 Data Architecture Agent 的核心。
+这是这个项目在复杂业务环境中的核心能力。
 
 不能只是：
 
@@ -1012,29 +1012,29 @@ Order
 Product
 ```
 
-而应该理解 Investment / Portfolio Management 的核心实体。
+而应该理解 Investment / Business Operations 的核心实体。
 
 我建议第一版至少支持：
 
 ```text
 Security / Instrument
 Issuer / Entity
-Portfolio
+Business Domain
 Account
-Position
+Entity State
 Transaction
 Order
 Trade
 Cash
 Price
 FX
-Corporate Action
+Business Event
 Benchmark
 Index
-Fundamental
+Reference Attribute
 Estimate
 Research
-Portfolio Performance
+Business Domain Performance
 Risk
 Factor
 Exposure
@@ -1047,9 +1047,9 @@ Issuer
   ↓
 Security
   ↓
-Position
+Entity State
   ↓
-Portfolio
+Business Domain
   ↓
 Performance
 ```
@@ -1059,8 +1059,8 @@ Performance
 ```text
 Security
   ├── Price
-  ├── Corporate Action
-  ├── Fundamental
+  ├── Business Event
+  ├── Reference Attribute
   ├── Benchmark Membership
   └── Research
 ```
@@ -1170,7 +1170,7 @@ Bloomberg security_id
         ↓
 Internal security_id
         ↓
-Portfolio position
+Business Domain position
 ```
 
 并分析：
@@ -1185,7 +1185,7 @@ Portfolio position
 - delisted instruments
 ```
 
-业界的 Reference Data Hub 产品普遍采用 centralized reference-data model，并把多供应商数据统一到 canonical identifier / reference-data 层。([GoldenSource][7])
+业界的 Reference Data Hub 产品普遍采用 centralized reference-data model，并把多供应商数据统一到 canonical identifier / reference-data 层。（公开参考数据实践资料）
 
 所以 Agent 发现：
 
@@ -1223,9 +1223,9 @@ all downstream domains
 
 # 十二、Canonical Snapshot 也是一个关键分析模式
 
-Portfolio Management 系统中，Position 经常是最核心的数据对象之一。
+Business Operations 系统中，Entity State 经常是最核心的数据对象之一。
 
-行业实践中，统一快照通常被设计为提供及时、一致的 canonical view；例如一些 buy-side 架构把 transaction、reference data、business event 等汇聚后形成 position，并供 业务运营、风险控制、分析和报告 等消费者使用。([CRD][8])
+行业实践中，统一快照通常被设计为提供及时、一致的 canonical view；例如一些 buy-side 架构把 transaction、reference data、business event 等汇聚后形成 position，并供 业务运营、风险控制、分析和报告 等消费者使用。（公开数据平台实践资料）
 
 但这里有一个重要原则：
 
@@ -1261,7 +1261,7 @@ Bronze / Silver / Gold 可以作为物理层，但不要把它当作完整逻辑
                         │
           ┌─────────────┼─────────────┐
           │             │             │
-      Research      Portfolio       Risk
+      Research      Business Domain       Risk
           │             │             │
           └─────────────┼─────────────┘
                         │
@@ -1269,7 +1269,7 @@ Bronze / Silver / Gold 可以作为物理层，但不要把它当作完整逻辑
                         │
           ┌─────────────┼─────────────┐
           │             │             │
-     Security       Position      Transaction
+     Security       Entity State      Transaction
        Master
           │             │             │
           └─────────────┼─────────────┘
@@ -1341,11 +1341,11 @@ REPORT
 ```text
 Security
  ↓
-Position
+Entity State
  ↓
 Market Value
  ↓
-Portfolio
+Business Domain
  ↓
 Performance
 ```
@@ -1353,7 +1353,7 @@ Performance
 然后有 mapping：
 
 ```text
-position.market_value
+state.market_value
         ↓
 implements
         ↓
@@ -1406,12 +1406,12 @@ Agent 可以生成候选业务规则：
 ```text
 Potential Business Rule
 
-"Equity Long Position"
+"Equity Long Entity State"
 
 Evidence:
 SQL object X
 Used by:
-Portfolio report Y
+Business Domain report Y
 Frequency:
 Daily
 
@@ -1479,9 +1479,9 @@ OpenLineage 已经提供 Job/Dataset/field-level lineage 的标准化表示，�
 
 | Source           | Target                  | Transformation          | Evidence | Status    |
 | ---------------- | ----------------------- | ----------------------- | -------- | --------- |
-| `LEGACY.POS_QTY` | `position.quantity`     | direct                  | SQL-182  | verified  |
-| `LEGACY.SEC_ID`  | `security.id`           | security master mapping | MAP-41   | supported |
-| `LEGACY.MV`      | `position.market_value` | `qty × price × fx`      | SQL-223  | supported |
+| `LEGACY.POS_QTY` | `state.quantity`     | direct                  | SQL-182  | verified  |
+| `LEGACY.SEC_ID`  | `entity.id`           | security master mapping | MAP-41   | supported |
+| `LEGACY.MV`      | `state.market_value` | `qty × price × fx`      | SQL-223  | supported |
 | `LEGACY.PX_ADJ`  | `price.adjusted`        | corporate-action logic  | PROC-88  | inferred  |
 
 Agent 不应该只生成 target schema。
@@ -1500,7 +1500,7 @@ Validation rule
 
 ```text
 Target:
-position.market_value
+state.market_value
 
 Formula:
 quantity × price × FX
@@ -1550,7 +1550,7 @@ Data quality
 +
 Target fit
 +
-Migration risk
+Migration control
 ```
 
 例如：
@@ -1559,7 +1559,7 @@ Migration risk
 Legacy Pricing Table
 → Replatform
 
-Legacy Position Calculation
+Legacy Entity State Calculation
 → Refactor
 
 Unused Historical Report Table
@@ -1614,10 +1614,10 @@ Wave 2
 Prices
 
 Wave 3
-Positions
+Entity States
 
 Wave 4
-Portfolio Analytics
+Business Domain Analytics
 
 Wave 5
 Research
@@ -1673,7 +1673,7 @@ referential integrity
 
 ```text
 NAV
-Position
+Entity State
 AUM
 Performance
 Cash
@@ -1870,7 +1870,7 @@ human confirmation
 
 ```text
 README:
-"Positions come from IBOR"
+"Entity States come from System A State"
 
 Runtime:
 Actually 23% of reports read LEGACY_POSITION directly.
@@ -1887,16 +1887,16 @@ CONFLICT DETECTED
 
 真正有价值的 modernization work 往往不是：
 
-> “这里有一张 Position 表。”
+> “这里有一张 Entity State 表。”
 
 而是：
 
-> “发现 4 个系统都声称自己提供 Position。”
+> “发现 4 个系统都声称自己提供 Entity State。”
 
 例如：
 
 ```text
-IBOR_POSITION
+SYSTEM_A_STATE
 ACCOUNTING_POSITION
 PORTFOLIO_POSITION
 RISK_POSITION
@@ -1910,7 +1910,7 @@ Finding #17
 Potential Multiple Sources of Truth
 
 Concept:
-Position
+Entity State
 
 Candidates:
 A
@@ -1938,7 +1938,7 @@ Define authoritative position views by use case.
 
 # 二十五、金融场景里，Agent 应该有一组“专用审查问题”
 
-例如 Position：
+例如 Entity State：
 
 ```text
 What is the authoritative source?
@@ -1974,7 +1974,7 @@ Pricing date?
 Revision policy?
 ```
 
-Fundamentals：
+Reference Attributes：
 
 ```text
 Reported or restated?
@@ -1984,7 +1984,7 @@ Knowledge date?
 Restatement history?
 ```
 
-Portfolio：
+Business Domain：
 
 ```text
 Who owns the position?
@@ -2087,13 +2087,13 @@ Status
 
 ```text
 Investigation:
-"Modernize Portfolio Analytics"
+"Modernize Business Domain Analytics"
 
 Questions:
 1. What is the source of position?
 2. How is market value calculated?
 3. Which prices are authoritative?
-4. How is performance calculated?
+4. How is analytics calculated?
 5. Which legacy transformations are still required?
 6. Which data can move unchanged?
 7. Which data needs redesign?
@@ -2304,7 +2304,7 @@ Current-State report
 用户可以问：
 
 ```text
-Where does Position come from?
+Where does Entity State come from?
 ```
 
 Agent 能回答：
@@ -2352,7 +2352,7 @@ source-target mapping
 
 这时候用户可以：
 
-> “把当前 Position architecture modernize。”
+> “把当前 Entity State architecture modernize。”
 
 Agent 输出：
 
@@ -2454,7 +2454,7 @@ point-in-time problems
 
 ### Task 1
 
-> Find the source of truth for Position.
+> Find the source of truth for Entity State.
 
 ### Task 2
 
@@ -2470,7 +2470,7 @@ point-in-time problems
 
 ### Task 5
 
-> Identify data quality risks.
+> Identify data quality controls.
 
 ### Task 6
 
@@ -2577,7 +2577,7 @@ portfolio hierarchy
 
 ```text
 market_value
-performance
+analytics
 FX
 ```
 
@@ -2655,10 +2655,10 @@ Chat with Data Architect
 New Investigation
 
 Goal:
-Modernize Portfolio Analytics
+Modernize Business Domain Analytics
 
 Scope:
-- Position
+- Entity State
 - Security
 - Price
 - Performance
@@ -2667,7 +2667,7 @@ Systems:
 - Legacy Oracle
 - Informatica
 - Bloomberg
-- Portfolio DB
+- Business Domain DB
 - Tableau
 
 [Start Discovery]
@@ -2690,7 +2690,7 @@ Open questions:
 Conflicts:
 7
 
-High-risk findings:
+High-control findings:
 4
 ```
 
@@ -2773,7 +2773,6 @@ Evidence
 
 
 [6]: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7183438&utm_source=chatgpt.com "<p>Point-In-Time Data Integrity in Quantitative Equity Research </p> <div> A Reproducible Framework for Eliminating Look-Ahead Bias </div> by Arthur Wang :: SSRN"
-[7]: https://www.thegoldensource.com/reference-data/?utm_source=chatgpt.com "GoldenSource Reference Data Solutions and Compliance - GoldenSource"
 
 [9]: https://docs.snowflake.com/en/user-guide/views-semantic/semantic-view-yaml-spec?utm_source=chatgpt.com "YAML specification for semantic views | Snowflake Documentation"
 [10]: https://openlineage.io/docs/spec/facets/job-facets/lineage/?utm_source=chatgpt.com "Lineage Job Facet | OpenLineage"
