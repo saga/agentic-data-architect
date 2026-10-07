@@ -24,6 +24,7 @@ export interface MissionCompletionInput {
   unknownReviews?: MissionUnknownReview[] | undefined;
   model?: string;
   workingDirectory?: string;
+  onTrajectory?: import('../agent/jev-smart-func.js').JevSmartFuncInput['onTrajectory'];
 }
 
 export interface MissionCompletionReview {
@@ -146,6 +147,7 @@ export async function reviewMissionCompletion(
       },
       ...(input.model ? { model: input.model } : {}),
       ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+      ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
     });
     const { resultSupported, support } = normalizeMissionCompletion(raw);
     const completed = requiredDeliverablesResolved && resultSupported;
