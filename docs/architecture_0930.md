@@ -350,7 +350,7 @@ Capability Skill 的 discovery 也保持统一边界：Copilot 使用 SDK 的 `s
 Copilot SDK → CodeBuddy SDK → OpenCode Run
 ~~~
 
-CodeBuddy 默认模型和可见模型由 `CODEBUDDY_DEFAULT_MODEL` / `CODEBUDDY_MODEL_ALLOWLIST` 配置，不写死在 Workflow 或 UI。CodeBuddy SDK 默认处于隔离环境，因此本项目显式传入 cwd、MCP、权限策略和任务 prompt，不依赖工作仓库中的 CodeBuddy 配置。
+CodeBuddy 默认模型和可见模型由 `CODEBUDDY_DEFAULT_MODEL` / `CODEBUDDY_MODEL_ALLOWLIST` 配置，不写死在 Workflow 或 UI。CodeBuddy SDK 默认处于隔离环境；本项目另外显式限制 Investigation 的 built-in tools、workspace path 和配置来源，不依赖被调查仓库中的 CodeBuddy 配置。
 
 ## Agent Trajectory / 执行轨迹
 
