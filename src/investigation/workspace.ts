@@ -43,7 +43,8 @@ export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
-// Replace the target in one rename so readers never observe a half-written JSON document.
+// 先完整写入临时文件，再一次 rename 替换目标文件；读取者要么看到旧 JSON，要么看到完整新 JSON，
+// 不会看到只写了一半的内容。
 /** 使用临时文件+rename 原子替换 JSON，避免读取者看到半写入文件。 */
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   const directory = path.dirname(file);
@@ -269,7 +270,7 @@ export async function loadWorkspaceContext(name: string): Promise<WorkspaceConte
   return WorkspaceContextSchema.parse(raw);
 }
 
-// All context mutations must serialize against other mutations in the same session.
+// 同一 Investigation 的所有 context 修改都必须经过同一把锁，避免两个请求基于不同快照互相覆盖。
 /** 向 Workspace inputs 追加一条输入事件，并在同一 Session 锁内原子保存。 */
 export async function appendContextInput(
   name: string,
