@@ -276,8 +276,12 @@ export async function answerQuestion(
     let companionMemories: Array<{ category: string; key: string; value: string }> = [];
     try {
       companionMemories = await getRelevantRelationshipMemories(userVisibleQuestion, 4);
-    } catch {
-      // Relationship Memory 仅用于表达连续感；读取失败不能影响正式调查。
+    } catch (error) {
+      // Relationship Memory 只影响表达方式；读取失败不影响正式调查，但必须留下诊断。
+      console.warn('[relationship-memory] Failed to load optional memories.', {
+        sessionName: investigationName,
+        error,
+      });
     }
     let companionNoteCount = 0;
     let lastCompanionNoteAt = 0;
@@ -314,7 +318,13 @@ export async function answerQuestion(
             details: { error: error instanceof Error ? error.message : String(error) },
           });
         }
-      }).catch(() => undefined);
+      }).catch((error) => {
+        console.warn('[companion-note] Optional companion note failed.', {
+          sessionName: investigationName,
+          turnId,
+          error,
+        });
+      });
     };
 
     companionTimer = setTimeout(() => {
@@ -1089,8 +1099,12 @@ export async function answerQuestion(
           ...failureDetails,
         },
       });
-    } catch {
-      // The original execution error must remain the turn outcome even if diagnostics persistence fails.
+    } catch (diagnosticError) {
+      console.error('[investigation] Failed to persist execution failure audit; original error is preserved.', {
+        sessionName: investigationName,
+        turnId,
+        error: diagnosticError,
+      });
     }
     finishConversationTurn(turnId, /abort/i.test(message) ? 'aborted' : 'failed', undefined, message);
     throw error;
