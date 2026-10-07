@@ -7,21 +7,41 @@ function digest(value: unknown): string {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function normalizeScopeValues(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
+}
+
+/** Scope identity deliberately excludes Mission goal text; Mission and Scope have independent lifecycles. */
+export function computeScopeFingerprint(
+  investigation: Pick<Investigation, 'scope' | 'systems'>,
+): string {
+  return digest({
+    scope: normalizeScopeValues(investigation.scope),
+    systems: normalizeScopeValues(investigation.systems),
+  });
+}
+
+/** Stable Mission identity used to reject stale Agent turns before they commit results. */
+export function computeMissionFingerprint(
+  investigation: Pick<Investigation, 'mission' | 'goal'>,
+): string {
+  return digest({
+    purpose: investigation.mission?.purpose ?? investigation.goal,
+    expectedResult: investigation.mission?.expectedResult ?? '',
+    deliverables: investigation.mission?.deliverables.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      required: item.required,
+    })) ?? [],
+  });
+}
+
 /**
  * Computes the identity of the Investigation state that an artifact was built from.
  * Only deterministic, persisted inputs are included; timestamps that do not change facts
  * are intentionally excluded.
  */
-export function computeScopeFingerprint(
-  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
-): string {
-  return digest({
-    goal: investigation.goal,
-    scope: investigation.scope,
-    systems: investigation.systems,
-  });
-}
-
 export function isDiscoverySnapshotCompatible(
   investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
   snapshot: DiscoverySnapshot | null | undefined,
@@ -52,16 +72,7 @@ export function computeArtifactProvenance(
   snapshot: DiscoverySnapshot | null | undefined,
   artifactVersion: number,
 ): ArtifactProvenance {
-  const missionFingerprint = digest({
-    purpose: investigation.mission?.purpose ?? investigation.goal,
-    expectedResult: investigation.mission?.expectedResult ?? '',
-    deliverables: investigation.mission?.deliverables.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      required: item.required,
-    })) ?? [],
-  });
+  const missionFingerprint = computeMissionFingerprint(investigation);
 
   const scopeFingerprint = computeScopeFingerprint(investigation);
   assertDiscoverySnapshotCompatible(investigation, snapshot);
