@@ -887,7 +887,7 @@ export async function applyAgentWorkflowTransition(
       workflowId === 'data-architecture-assessment'
       && transition.outcome === 'success'
       && currentNode
-      && ['findings', 'recommendation', 'roadmap'].includes(currentNode.id)
+      && ['assessment-findings', 'assessment-recommendation', 'assessment-roadmap'].includes(currentNode.completeWhen ?? '')
     ) {
       try {
         await buildArchitectureAssessmentPlan(name);
