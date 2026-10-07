@@ -17,7 +17,7 @@ async function loadKnowledgeFiles(): Promise<ArchitectureKnowledge[]> {
   const entries: unknown[] = [];
   for (const file of files) {
     const raw = JSON.parse(await fs.readFile(path.join(directory, file), 'utf8')) as unknown;
-    if (!Array.isArray(raw)) throw new Error(`知识库文件必须是数组：${file}`);
+    if (!Array.isArray(raw)) throw new Error(`知识库文件格式不正确：${file} 应该是一个 JSON 数组。请检查文件内容。`);
     entries.push(...raw);
   }
 
