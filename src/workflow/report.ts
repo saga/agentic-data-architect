@@ -112,7 +112,11 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
         reviewStatus = review.availability === 'completed' ? review.status : 'unavailable';
       }
     } catch {
-      // A malformed review must not make a readable report disappear.
+      return ReportArtifactStateSchema.parse({
+        status: 'error',
+        generatedAt: metadata.generatedAt,
+        sourceRevision: metadata.provenance.sourceRevision,
+      });
     }
   }
 
