@@ -11,6 +11,7 @@ import * as z from 'zod';
 import { askAgentWithFallback } from '../agent/runtime.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
+import type { AgentRuntime, MissionContract } from '../investigation/schemas.js';
 import { workspaceRoot, writeJsonAtomic } from '../investigation/workspace.js';
 import {
   ArtifactReviewContractSchema as ArtifactReviewSchema,
@@ -75,7 +76,7 @@ function trimArtifact(value: string, maxChars = 36000): string {
 }
 
 function buildReviewPrompt(input: {
-  goal: string;
+  mission: MissionContract;
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
@@ -84,8 +85,12 @@ function buildReviewPrompt(input: {
   artifactVersion?: number;
 }): string {
   return [
-    '原始用户目标：',
-    input.goal.trim() || '（未设置）',
+    '原始 Mission：',
+    '任务目的：' + input.mission.purpose.trim(),
+    '期望结果：' + input.mission.expectedResult.trim(),
+    '必须交付：',
+    ...input.mission.deliverables.filter((item) => item.required).map((item) =>
+      '- ' + item.title + '：' + item.description),
     '',
     '待审核成果类型：',
     artifactLabel(input.artifactType),
@@ -122,7 +127,9 @@ function buildReviewPrompt(input: {
 async function runReviewerOnce(
   input: {
     investigationName: string;
-    goal: string;
+    mission: MissionContract;
+    runtime: AgentRuntime;
+    model: string;
     artifactType: ReviewArtifactType;
     artifact: string;
     facts?: string;
@@ -141,7 +148,8 @@ async function runReviewerOnce(
     prompt,
     systemPrompt: REVIEWER_SYSTEM_PROMPT,
     purpose: 'review',
-    model: config.model,
+    runtime: input.runtime,
+    model: input.model || config.model,
     workingDirectory: workspaceRoot(input.investigationName),
     autoContinuationTurns: 0,
     ...(structured ? { responseSchema: ArtifactReviewSchema } : {}),
@@ -172,7 +180,9 @@ async function runReviewerOnce(
 
 export async function reviewArtifact(input: {
   investigationName: string;
-  goal: string;
+  mission: MissionContract;
+  runtime: AgentRuntime;
+  model: string;
   artifactType: ReviewArtifactType;
   artifact: string;
   facts?: string;
