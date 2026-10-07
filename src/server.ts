@@ -241,6 +241,10 @@ async function listSessions(): Promise<SessionSummary[]> {
     try {
       const context = await loadWorkspaceContext(entry.name);
       if (context.name !== entry.name) {
+        console.warn('[sessions] Workspace directory and context name differ; skipping the invalid session directory.', {
+          directory: entry.name,
+          contextName: context.name,
+        });
         continue;
       }
       const conversation = getConversationSummary(entry.name);
