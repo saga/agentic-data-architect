@@ -1087,6 +1087,10 @@ export async function answerQuestion(
       }
     }
 
+    // Companion Note 与最终回答共享 transcript.md。等待这里的任务完成，避免出现“最终回答已经写入，
+    // 后台陪伴提示随后才追加”的倒序记录，也避免 SSE 在 completed 之后收到无效的陪伴事件。
+    await companionNoteTask;
+
     const journeyPlan = { version: 1 as const, source: 'agent' as const, generatedAt: new Date().toISOString(), turnId, routes: parsed.routeOptions };
     await updateInvestigationJourneyPlan(investigationName, journeyPlan, inv.workflow);
     await appendAuditEvent(investigationName, {
@@ -1168,6 +1172,9 @@ export async function answerQuestion(
         error: diagnosticError,
       });
     }
+    // 失败路径同样等待已经启动的陪伴任务，确保 transcript 中的可见内容不会在失败提示之后乱序追加。
+    await companionNoteTask;
+
     const failureContent = [
       latestCompanionNote.trim(),
       assistantDraft.trim(),
