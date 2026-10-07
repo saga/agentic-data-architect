@@ -64,19 +64,28 @@ async function resolveOpenCodeModel(requestedModel: string | undefined): Promise
   return models[0].id;
 }
 
-async function resolveCodeBuddyModels(requestedModel: string | undefined): string[] {
-  const requested = requestedModel?.trim() ?? '';
-  const requestedNormalized = requested.toLowerCase().startsWith('codebuddy:')
-    ? requested.slice('codebuddy:'.length)
-    : '';
-  const ordered = [
-    requestedNormalized,
-    config.codeBuddyDefaultModel,
-    ...config.codeBuddyModelAllowlist,
-  ].map((model) => model.trim()).filter(Boolean);
-  return [...new Set(ordered.map((model) => model.toLowerCase()))]
-    .map((normalized) => ordered.find((model) => model.toLowerCase() === normalized)!)
-    .map((model) => 'codebuddy:' + model);
+async function resolveCodeBuddyModels(requestedModel?: string): string[] {
+  const requested = normalizeCodeBuddyModel(requestedModel);
+  const base = [config.codeBuddyDefaultModel, ...config.codeBuddyModelAllowlist]
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  const ordered = [...new Map(
+    base.map((model) => [model.toLowerCase(), model]),
+  ).values()];
+
+  if (!requested || requested.toLowerCase() === 'auto') {
+    return ordered.map((model) => 'codebuddy:' + model);
+  }
+
+  const requestedIndex = ordered.findIndex(
+    (model) => model.toLowerCase() === requested.toLowerCase(),
+  );
+  if (requestedIndex >= 0) {
+    return ordered.slice(requestedIndex).map((model) => 'codebuddy:' + model);
+  }
+
+  return ['codebuddy:' + requested, ...ordered.map((model) => 'codebuddy:' + model)];
 }
 
 async function resolveModelForRuntime(
@@ -107,7 +116,8 @@ function adaptInput(
   model: string,
 ): AskInput {
   const preserveSession =
-    runtime === input.runtime
+    runtime !== 'codebuddy-sdk'
+    && runtime === input.runtime
     && model === input.model;
 
   return {
@@ -146,9 +156,11 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const attempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
 
   for (const runtime of runtimeOrder) {
-    if (runtime === 'codebuddy-sdk' && selectedRuntime === 'codebuddy-sdk') {
+    if (runtime === 'codebuddy-sdk') {
       attempts.push(
-        ...resolveCodeBuddyModels(input.model).map((model) => ({
+        ...resolveCodeBuddyModels(
+          runtime === selectedRuntime ? input.model : undefined,
+        ).map((model) => ({
           runtime,
           model,
         })),
@@ -156,7 +168,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       continue;
     }
 
-    let model: string;
+    let model;
     try {
       model = await resolveModelForRuntime(runtime, input.model);
     } catch {
