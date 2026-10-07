@@ -15,6 +15,12 @@
  * Stage Gate 等业务状态仍然由本项目自己管理。
  */
 import { config } from '../config.js';
+import {
+  GRAPHIFY_MCP_NAME,
+  GRAPHIFY_SELECTION_INSTRUCTION,
+  buildGraphifyMcpServer,
+  ensureGraphifyGraph,
+} from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import * as z from 'zod';
@@ -146,6 +152,42 @@ async function openCodeFetch(
     ...init,
     headers,
   });
+}
+
+/** 把平台内置 Graphify 动态注册到当前 OpenCode workspace，不写入被调查仓库的配置文件。 */
+export async function registerOpenCodeGraphifyMcp(
+  workingDirectory: string,
+  commandOverride?: string,
+): Promise<void> {
+  const graphify = buildGraphifyMcpServer(workingDirectory, commandOverride);
+  if (!graphify) return;
+
+  const response = await openCodeFetch(
+    '/mcp',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        name: graphify.name,
+        config: {
+          type: 'local',
+          command: [graphify.server.command, ...graphify.server.args],
+          cwd: workingDirectory,
+          enabled: true,
+          timeout: 5_000,
+        },
+      }),
+    },
+    workingDirectory,
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      '无法把 Graphify 加入 OpenCode：HTTP '
+      + response.status
+      + (detail ? ' · ' + detail.slice(0, 500) : ''),
+    );
+  }
 }
 
 /** 查询 OpenCode 当前已经配置并连通的 provider/model。allowlist 可显式传入，方便测试；默认读全局配置。 */
@@ -414,6 +456,14 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
+  const graphifyEnabled = input.purpose !== 'journey-map'
+    && input.purpose !== 'review'
+    && config.graphifyEnabled;
+  let graphifyRuntime: Awaited<ReturnType<typeof ensureGraphifyGraph>> | undefined;
+  if (graphifyEnabled) {
+    // OpenCode 的 MCP 由它自己的 Server 管理，因此必须通过 /mcp 动态注册到当前 workspace。
+    graphifyRuntime = await ensureGraphifyGraph(input.workingDirectory, false);
+  }
   const transportController = new AbortController();
   let sessionId = '';
 
@@ -426,6 +476,22 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
     throw new Error('无法连接 OpenCode 事件流：HTTP ' + eventResponse.status);
   }
 
+  if (graphifyEnabled) {
+    await registerOpenCodeGraphifyMcp(input.workingDirectory);
+    input.onTrajectory?.({
+      type: 'status',
+      name: 'Graphify 结构图已接入 OpenCode',
+      status: 'completed',
+      model: input.model,
+      details: {
+        capability: GRAPHIFY_MCP_NAME,
+        graphPath: graphifyRuntime?.graphPath,
+        ...(graphifyRuntime?.packageVersion ? { packageVersion: graphifyRuntime.packageVersion } : {}),
+        ...(graphifyRuntime?.graphHash ? { graphHash: graphifyRuntime.graphHash } : {}),
+      },
+    });
+    input.onStatus?.('代码结构已经准备好；需要看调用关系时，助手会先使用 Graphify。');
+  }
   const sessionResponse = await openCodeFetch(
     '/session',
     {
@@ -513,6 +579,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
             system: [
               input.missionPrompt,
               input.systemPrompt,
+              graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
               currentWorkflowInstruction,
             ].filter(Boolean).join('\n\n'),
             ...(input.responseSchema ? {
