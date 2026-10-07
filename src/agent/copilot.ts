@@ -13,7 +13,7 @@ import { config } from '../config.js';
 import {
   assertGraphifyRuntimeAvailable,
   buildGraphifyMcpServer,
-  ensureGraphifyGraph,
+  tryEnsureGraphifyGraph,
   GRAPHIFY_MCP_NAME,
   isGraphifyTool,
   prepareGraphifyEnvironment,
@@ -527,13 +527,27 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
   const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
-  const graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
+  let graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
-  let graphifyRuntime: Awaited<ReturnType<typeof ensureGraphifyGraph>> | undefined;
+  let graphifyRuntime: Awaited<ReturnType<typeof tryEnsureGraphifyGraph>>['metadata'] | undefined;
   if (graphifyEnabled) {
     prepareGraphifyEnvironment();
     assertGraphifyRuntimeAvailable();
-    graphifyRuntime = await ensureGraphifyGraph(workingDirectory, false);
+    const graphifyPreparation = await tryEnsureGraphifyGraph(workingDirectory, false);
+    graphifyRuntime = graphifyPreparation.metadata;
+    if (!graphifyPreparation.available) {
+      graphifyEnabled = false;
+      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onTrajectory?.({
+        type: 'status',
+        name: '结构分析工具不可用，已继续调查',
+        status: 'info',
+        details: {
+          capability: GRAPHIFY_MCP_NAME,
+          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
+        },
+      });
+    }
   }
   const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
