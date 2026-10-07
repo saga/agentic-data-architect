@@ -131,6 +131,7 @@ import {
   appendTranscript,
   ensureWorkspace,
   loadWorkspaceContext,
+  normalizeInvestigationName,
   workspaceRoot,
 } from './investigation/workspace.js';
 import {
@@ -199,15 +200,15 @@ function routeParam(value: string | string[]): string {
 
 /** 校验 URL 中的 Session 名称，拒绝路径穿越。 */
 function sessionKey(name: string): string {
-  const safe = path.basename(name);
-  if (!name || safe !== name || name === '.' || name === '..') {
+  try {
+    return normalizeInvestigationName(name);
+  } catch {
     throw new RequestValidationError([{
       code: 'custom',
       path: ['name'],
-      message: 'Session 名称只能使用单层目录名。',
+      message: '调查名称只能使用单层目录名。',
     }]);
   }
-  return safe;
 }
 
 /** Session API 的明确 Context Projection；不把 WorkspaceContext persistence schema 暴露给 Web。 */
