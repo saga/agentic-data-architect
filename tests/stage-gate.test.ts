@@ -156,6 +156,7 @@ test('a polished answer alone cannot pass the stage gate', () => {
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     parsed: {
       answer: '已经完成了一轮完整分析，并给出了清晰结论。',
@@ -189,6 +190,7 @@ test('invalid evidence references block the stage gate', () => {
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     missionProgressAfter: {
       covered: 0,
@@ -208,6 +210,7 @@ test('persisted structured work product can form a checkpoint without new eviden
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     missionProgressAfter: {
       covered: 2,
@@ -245,6 +248,7 @@ test('a later real stage can still leave a checkpoint after earlier deliverables
       evidenceIds: ['ev-old', 'ev-next'],
       findingIds: ['finding-old'],
       discoveryRunCount: 2,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     missionProgressBefore: {
       covered: 3,
@@ -300,6 +304,7 @@ test('checkpoint can only be built after the gate passes', () => {
           evidenceIds: ['ev-old'],
           findingIds: ['finding-old'],
           discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
         },
         missionProgressAfter: {
           covered: 0,
@@ -320,6 +325,7 @@ test('checkpoint can only be built after the gate passes', () => {
           evidenceIds: ['ev-old'],
           findingIds: ['finding-old'],
           discoveryRunCount: 1,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
         },
         parsed: {
           answer: '只是写了一段漂亮总结。',
@@ -343,6 +349,7 @@ test('real evidence without deliverable progress still leaves a stage summary', 
       evidenceIds: ['ev-old', 'ev-unrelated'],
       findingIds: ['finding-old'],
       discoveryRunCount: 2,
+      scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     missionProgressBefore: base.missionProgressBefore,
     missionProgressAfter: base.missionProgressBefore,
