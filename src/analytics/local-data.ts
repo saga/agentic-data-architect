@@ -203,7 +203,11 @@ function migrateLocalAnalyticsSchema(db: DatabaseSync): void {
     db.exec('CREATE INDEX IF NOT EXISTS idx_local_analysis_runs_session ON local_analysis_runs(session_name, created_at)');
     db.exec('COMMIT');
   } catch (error) {
-    try { db.exec('ROLLBACK'); } catch { /* ignore rollback failure */ }
+    try {
+      db.exec('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[local-data] SQLite rollback failed after migration error.', rollbackError);
+    }
     throw error;
   }
 }
@@ -606,7 +610,7 @@ class LocalDuckDBEngine {
     let release!: () => void;
     this.queue = new Promise<void>((resolve) => { release = resolve; });
     try {
-      await previous.catch(() => undefined);
+      await previous;
       this.touch();
       return await operation();
     } finally {
@@ -739,8 +743,14 @@ class LocalDuckDBEngine {
         try {
           const reader = await this.connection.runAndReadAll(sql);
           row = (reader.getRowObjectsJson() as Record<string, unknown>[])[0] ?? {};
-        } catch {
-          // Nested/complex data types may not support min/max; keep the useful counts.
+        } catch (error) {
+          // Nested/complex data types may not support min/max; keep the useful counts,
+          // but make the fallback visible in diagnostics.
+          console.debug('[local-data] Profiling min/max fallback used for a complex column.', {
+            sessionName: this.sessionName,
+            column: col,
+            error: error instanceof Error ? error.message : String(error),
+          });
           const fallback = await this.connection.runAndReadAll(`
             SELECT
               count(*) AS row_count,
