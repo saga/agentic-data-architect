@@ -54,7 +54,7 @@ Agent 的自然语言 success、completion 或 self-review 不能单独推进 Wo
 
 Smart Function / semantic judge 可以帮助判断“当前动作与 Mission 是否匹配”“某成果是否回答目标”等语义问题。
 
-它是辅助信号，不取代可以确定性判断的 Gate。
+它是辅助信号，不取代可以确定性判断的 Gate。只有明确声明为可降级的非阻断提示，semantic signal 才可以缺失；一旦某个 Gate 把该 signal 作为必要检查项，signal unavailable 必须 fail-closed，不能自动解释为通过。
 
 Smart Function 失败不能自动等价为 Gate 通过。
 
