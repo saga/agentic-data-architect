@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, Button, Card, Flex, Input, Modal, Select, Space, Tag, Typography } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { workflowOptions } from '../app/workflow-options';
-import type { PendingUserInput } from '../app/types';
+import type { AgentRuntime, PendingUserInput } from '../app/types';
 import type { SessionData, WorkflowId } from '../app/types';
 
 const { Text } = Typography;
@@ -13,12 +13,14 @@ export function InvestigationDialogs(props: {
   loading: boolean;
   newSessionOpen: boolean;
   newSessionName: string;
+  newSessionRuntime: AgentRuntime;
   newSessionGoal: string;
   newSessionExpectedResult: string;
   newSessionWorkflow: WorkflowId | null;
   unknownsOpen: boolean;
   userInputDrafts: Record<string, string>;
   setNewSessionName: (value: string) => void;
+  setNewSessionRuntime: (value: AgentRuntime) => void;
   setNewSessionGoal: (value: string) => void;
   setNewSessionExpectedResult: (value: string) => void;
   setNewSessionWorkflow: (value: WorkflowId | null) => void;
@@ -60,6 +62,22 @@ export function InvestigationDialogs(props: {
               autoSize={{ minRows: 3, maxRows: 6 }}
               style={{ marginTop: 6 }}
             />
+          </div>
+          <div>
+            <Text strong>运行方式</Text>
+            <Select
+              value={props.newSessionRuntime}
+              onChange={(value) => props.setNewSessionRuntime(value as AgentRuntime)}
+              options={[
+                { value: 'codebuddy-sdk', label: 'CodeBuddy SDK' },
+                { value: 'copilot-sdk', label: 'Copilot SDK' },
+                { value: 'opencode-run', label: 'OpenCode Run' },
+              ]}
+              style={{ width: '100%', marginTop: 6 }}
+            />
+            <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+              当前方式配额不足时，系统会按配置顺序自动切换到后面的 Runtime，不需要确认。
+            </Text>
           </div>
           <div>
             <Text strong>期望结果</Text>
