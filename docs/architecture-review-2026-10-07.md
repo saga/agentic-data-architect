@@ -128,9 +128,9 @@ if (!entry.isDirectory() || entry.name === 'shared') continue;
 | `session-state/` | 2.7M | SDK 自己的 |
 | `context.json` | 1.9M | **2124 条 evidence 的真实 context** |
 | `logs/`、`installed-plugins/` | 236K | SDK 自己的 |
-| **合计** | **214M** | 对照正常 session「研究IBM的sample项目数据架构」仅 **124K** |
+| **合计** | **214M** | 对照正常 session「研究某大型企业 sample 项目数据架构」仅 **124K** |
 
-`context.json` 里 `name = "copilot"`，`mission.purpose = "弄清一个IBM java老系统的数据架构"` —— 这是一份正在使用的真实调查，被 SDK 的运行目录污染了。
+`context.json` 里 `name = "copilot"`，`mission.purpose = "弄清一个某大型企业 Java 老系统的数据架构"` —— 这是一份正在使用的真实调查，被 SDK 的运行目录污染了。
 
 **连带问题**：
 
