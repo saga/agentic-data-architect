@@ -27,9 +27,9 @@ function sameMission(
   left: Investigation['mission'],
   right: Investigation['mission'],
 ): boolean {
-  // Mission identity deliberately ignores confirmation timestamp/version metadata.
-  // The deliverable contract itself is part of the identity: changing only a deliverable
-  // must invalidate old claims/findings just like changing purpose or expectedResult.
+  // Mission 的 identity 不看确认时间和版本号；这些只是元数据，不代表任务本身变了。
+  // 但 deliverable 契约属于任务本身的一部分，只改一个交付物也必须让旧 Claim / Finding 失效，
+  // 与修改 purpose / expectedResult 的处理保持一致。
   return Boolean(left && right)
     && left.purpose === right.purpose
     && left.expectedResult === right.expectedResult
@@ -79,7 +79,7 @@ export function newInvestigation(name: string, userPrompt = '', workflow: Invest
   };
 }
 
-/** 返回 Investigation 的工作目录。 */
+/** 返回 Investigation 的工作目录；路径始终经过名称安全校验。 */
 export function investigationRoot(name: string): string {
   return workspaceRoot(name);
 }
