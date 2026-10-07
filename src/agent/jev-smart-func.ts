@@ -156,6 +156,8 @@ export interface JevSmartFuncInput {
   questions: Record<string, JevQuestion>;
   /** 不传则使用应用默认模型。 */
   model?: string;
+  /** 这次判断在人类可读轨迹中的名称。 */
+  modelCallName?: string;
   /** 让 Smart Function 在正确的工作目录运行；默认使用应用 workspace。 */
   workingDirectory?: string;
 }
@@ -534,6 +536,7 @@ export async function reviewMissionAction(
     ]);
 
     const raw = await jevSmartFunc({
+      modelCallName: '检查这一步是否有必要',
       prompt: buildMissionActionPrompt(input),
       context: {
         mission: input.mission,
@@ -670,6 +673,7 @@ export async function reviewUnknownImpact(
     });
 
     const raw = await jevSmartFunc({
+      modelCallName: '检查未知项是否需要继续调查',
       prompt: buildMissionUnknownPrompt(input),
       context: {
         mission: input.mission,
@@ -702,6 +706,7 @@ export async function reviewMissionAlignment(
 ): Promise<MissionAlignmentReview | null> {
   try {
     const raw = await jevSmartFunc({
+      modelCallName: '检查阶段成果是否符合任务',
       prompt: buildMissionAlignmentPrompt(input),
       context: {
         mission: input.mission,
@@ -793,6 +798,7 @@ export async function jevSmartFunc(
     systemPrompt,
     purpose: 'review',
     model: input.model ?? config.model,
+    modelCallName: input.modelCallName,
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
     autoContinuationTurns: 0,
     responseSchema,
