@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { askAgentWithFallback } from '../agent/runtime.js';
+import type { AskInput } from '../agent/copilot.js';
 import { config } from '../config.js';
 import { reportsDir } from '../investigation/store.js';
 import type { AgentRuntime, MissionContract } from '../investigation/schemas.js';
@@ -136,6 +137,7 @@ async function runReviewerOnce(
     artifactHash?: string;
     sourceRevision?: string;
     artifactVersion?: number;
+    onTrajectory?: AskInput['onTrajectory'];
   },
   structured: boolean,
 ): Promise<ArtifactReview> {
@@ -151,6 +153,8 @@ async function runReviewerOnce(
     runtime: input.runtime,
     model: input.model || config.model,
     workingDirectory: workspaceRoot(input.investigationName),
+    modelCallName: structured ? '检查最终报告质量' : '再次检查最终报告质量',
+    onTrajectory: input.onTrajectory,
     autoContinuationTurns: 0,
     ...(structured ? { responseSchema: ArtifactReviewSchema } : {}),
   });
@@ -189,6 +193,7 @@ export async function reviewArtifact(input: {
   artifactHash?: string;
   sourceRevision?: string;
   artifactVersion?: number;
+  onTrajectory?: AskInput['onTrajectory'];
 }): Promise<ArtifactReview> {
   try {
     return await runReviewerOnce(input, true);
