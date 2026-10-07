@@ -82,6 +82,7 @@ export function useInvestigationController() {
   const [modelSaving, setModelSaving] = useState(false);
   const [streamingReasoning, setStreamingReasoning] = useState('');
   const [assistantCompanionNote, setAssistantCompanionNote] = useState('');
+  const assistantCompanionNoteRef = useRef('');
   const [reasoningByMessage, setReasoningByMessage] = useState<Record<string, string>>({});
   // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
@@ -422,6 +423,7 @@ export function useInvestigationController() {
   useEffect(() => {
     setStreamingAnswer(undefined);
     setStreamingReasoning('');
+    assistantCompanionNoteRef.current = '';
     setAssistantCompanionNote('');
     setNextGuidance([]);
     setJourney(undefined);
@@ -635,6 +637,7 @@ export function useInvestigationController() {
     setValue('');
     setNextGuidance([]);
     setStreamingReasoning('');
+    assistantCompanionNoteRef.current = '';
     setAssistantCompanionNote('');
     setLoading(true);
     setTurnStatus('助手正在处理你的问题，请稍候…');
@@ -642,9 +645,11 @@ export function useInvestigationController() {
     const turnId = turnIdOverride ?? crypto.randomUUID();
     const controller = new AbortController();
     let missionBlocked = false;
+    let executionFailed = false;
+    let failureCompanionNote = '';
+    let key = active;
 
     try {
-      let key = active;
       if (!key) {
         const created = await getJson('/api/sessions', CreateSessionResponseSchema, {
           method: 'POST',
@@ -726,7 +731,11 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'companion_note') {
-          if (data.note.trim()) setAssistantCompanionNote(data.note.trim());
+          const note = data.note.trim();
+          if (note) {
+            assistantCompanionNoteRef.current = note;
+            setAssistantCompanionNote(note);
+          }
           return;
         }
         if (event === 'checkpoint') {
@@ -782,18 +791,40 @@ export function useInvestigationController() {
         setTurnStatus('结果已保存，部分内部引用已自动修正。');
       }
     } catch (e) {
+      executionFailed = true;
+      failureCompanionNote = assistantCompanionNoteRef.current;
+      // Failure must not roll the conversation back to the pre-turn snapshot.
+      // Reload the durable conversation so the submitted user message remains visible.
+      if (key && activeRef.current === key) {
+        try {
+          await loadSession(key);
+        } catch {
+          // Keep the optimistic message if the recovery reload itself fails.
+        }
+      }
       if (e instanceof DOMException && e.name === 'AbortError') {
         setError('本轮执行已停止。');
       } else {
         setError(e instanceof Error ? e.message : '请求失败');
       }
+      if (failureCompanionNote && key) {
+        // Keep the secretary's in-progress reminder visible after failure instead of
+        // removing the whole transient assistant bubble in finally.
+        setStreamingAnswer({ key, content: '' });
+        setAssistantCompanionNote(failureCompanionNote);
+      }
     } finally {
-      setStreamingAnswer(undefined);
-      setStreamingReasoning('');
-      setAssistantCompanionNote('');
+      if (!executionFailed || !failureCompanionNote) {
+        setStreamingAnswer(undefined);
+        setStreamingReasoning('');
+        assistantCompanionNoteRef.current = '';
+        setAssistantCompanionNote('');
+      }
       setTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
-        : '可以继续提问');
+        : executionFailed
+          ? '这次执行没有完成，详细原因已记录在 Agent 轨迹中。'
+          : '可以继续提问');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       setLoading(false);
     }
