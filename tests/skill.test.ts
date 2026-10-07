@@ -90,6 +90,22 @@ test('unsupported Skill frontmatter fields are rejected', () => {
     /不支持的 frontmatter 字段：tools/,
   );
 });
+test('Workflow DSL rejects forbidden blocks and attributes', async () => {
+  const { parseJourneyMarkdown } = await import('../src/workflow/journey.js');
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    '',
+    '## @task start',
+    'title: Start',
+    'gate: secret',
+    '@gate foo',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\\n'));
+  assert.match(result.issues.join('\\n'), /@gate|不支持的 Workflow 字段/);
+});
+
 test('missing Skill kind is rejected', () => {
   assert.throws(
     () =>
