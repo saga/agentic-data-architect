@@ -676,7 +676,6 @@ export function useInvestigationController() {
     const controller = new AbortController();
     let missionBlocked = false;
     let executionFailed = false;
-    let failureCompanionNote = '';
     let key = active;
 
     try {
@@ -822,7 +821,6 @@ export function useInvestigationController() {
       }
     } catch (e) {
       executionFailed = true;
-      failureCompanionNote = assistantCompanionNoteRef.current;
       // Failure must not roll the conversation back to the pre-turn snapshot.
       // Reload the durable conversation so the submitted user message remains visible.
       if (key && activeRef.current === key) {
@@ -837,19 +835,11 @@ export function useInvestigationController() {
       } else {
         setError(e instanceof Error ? e.message : '请求失败');
       }
-      if (failureCompanionNote && key) {
-        // Keep the secretary's in-progress reminder visible after failure instead of
-        // removing the whole transient assistant bubble in finally.
-        setStreamingAnswer({ key, content: '' });
-        setAssistantCompanionNote(failureCompanionNote);
-      }
     } finally {
-      if (!executionFailed || !failureCompanionNote) {
-        setStreamingAnswer(undefined);
-        setStreamingReasoning('');
-        assistantCompanionNoteRef.current = '';
-        setAssistantCompanionNote('');
-      }
+      setStreamingAnswer(undefined);
+      setStreamingReasoning('');
+      assistantCompanionNoteRef.current = '';
+      setAssistantCompanionNote('');
       setTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
         : executionFailed
