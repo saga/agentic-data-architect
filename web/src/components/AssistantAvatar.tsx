@@ -87,6 +87,8 @@ export function AssistantAvatar(props: {
     void resolveRemoteSource(source, sourceKind)
       .then((result) => {
         if (cancelled) return;
+        setLoadFailed(false);
+        setUsingCache(false);
         setResolvedMedia(result);
       })
       .catch(() => {
@@ -141,7 +143,14 @@ export function AssistantAvatar(props: {
     <img
       src={url}
       alt={props.control.agent.displayName || '助手头像'}
-      onError={() => setLoadFailed(true)}
+      onError={() => {
+        if (!usingCache && cacheUrl) {
+          setUsingCache(true);
+          setLoadFailed(false);
+        } else {
+          setLoadFailed(true);
+        }
+      }}
       style={{ width, height, objectFit: 'cover', flex: '0 0 auto', borderRadius: 8, display: 'block' }}
     />
   );
