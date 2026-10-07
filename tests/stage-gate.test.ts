@@ -338,6 +338,26 @@ test('a later real stage can still leave a checkpoint after earlier deliverables
   assert.equal(result.shouldContinue, false);
 });
 
+test('checkpoint includes verified evidence-backed claims', () => {
+  const base = input({
+    parsed: {
+      answer: '已通过确定性校验确认该事实。',
+      claims: [{
+        claim: '该事实已经被独立校验。',
+        status: 'verified',
+        evidenceIds: ['ev-new'],
+      }],
+      unknowns: [],
+      followUpQuestions: [],
+      routeOptions: [],
+    },
+  });
+  const gate = evaluateInvestigationStageGate(base);
+  assert.equal(gate.passed, true);
+  const checkpoint = buildStageCheckpoint(base, gate);
+  assert.deepEqual(checkpoint.confirmed, ['该事实已经被独立校验。']);
+});
+
 test('checkpoint can only be built after the gate passes', () => {
   const gateInput = input({ execution: 2 });
   const gate = evaluateInvestigationStageGate(gateInput);
