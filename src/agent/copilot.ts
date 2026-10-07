@@ -151,6 +151,8 @@ export interface AskInput {
   runtime?: import('../investigation/schemas.js').AgentRuntime;
   /** 当前 Investigation 使用的模型；默认 Auto。 */
   model?: string;
+  /** 这次模型调用在人类可读轨迹中的名称。 */
+  modelCallName?: string;
   /** model=auto 时的路由偏好。 */
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
   /** 自动续跑时每一轮都重新注入的最高优先级 Mission 文本。 */
@@ -1240,7 +1242,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       details: Record<string, unknown>;
     } = {
       type: 'model_call',
-      name: '模型调用 #' + modelCallCount,
+      name: (input.modelCallName ? input.modelCallName + ' · ' : '') + '模型调用 #' + modelCallCount,
       status: 'completed',
       details: {},
     };
