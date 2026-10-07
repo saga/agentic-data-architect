@@ -397,6 +397,17 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
   }
 }
 
+
+/** Agent 推进 Workflow 时的统一完成判断：有 completeWhen 就看确定性事实，没有则必须已经通过 Stage Gate。 */
+export function isAgentWorkflowCompletionAllowed(
+  node: Pick<JourneyNode, 'actor' | 'completeWhen'>,
+  facts: JourneyFacts,
+  stageValidationPassed: boolean,
+): boolean {
+  if (node.actor !== 'agent') return false;
+  if (node.completeWhen) return conditionPassed(node.completeWhen, facts);
+  return stageValidationPassed;
+}
 /**
  * 校验 Workflow 图本身，不校验业务结果。
  *
