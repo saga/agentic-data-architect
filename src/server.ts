@@ -608,8 +608,8 @@ app.post('/api/sessions', async (req, res) => {
         policyState: model.policy?.state ?? null,
         runtime: 'copilot' as const,
       })));
-    } catch {
-      // Copilot 登录/服务异常时仍然允许本机 OpenCode 工作。
+    } catch (error) {
+      console.warn('[models] Copilot model discovery failed; other runtimes will still be listed.', error);
     }
 
     try {
@@ -622,8 +622,8 @@ app.post('/api/sessions', async (req, res) => {
         policyState: null,
         runtime: 'codebuddy' as const,
       })));
-    } catch {
-      // CodeBuddy model filter is local configuration; malformed optional entries must not hide other runtimes.
+    } catch (error) {
+      console.warn('[models] CodeBuddy model discovery failed; other runtimes will still be listed.', error);
     }
 
     try {
@@ -636,8 +636,8 @@ app.post('/api/sessions', async (req, res) => {
         policyState: null,
         runtime: 'opencode' as const,
       })));
-    } catch {
-      // OpenCode 未启动很常见；模型菜单仍然可以正常显示其他 runtime。
+    } catch (error) {
+      console.warn('[models] OpenCode model discovery failed; other runtimes will still be listed.', error);
     }
 
     res.json(ModelsResponseSchema.parse({ models }));
