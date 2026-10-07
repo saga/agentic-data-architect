@@ -744,6 +744,15 @@ export const InvestigationControlSchema = z.object({
 }).strict();
 export type InvestigationControl = z.infer<typeof InvestigationControlSchema>;
 
+export const GlobalConfigurationSchema = z.object({
+  schemaVersion: z.literal(1),
+  version: z.number().int().positive(),
+  updatedAt: z.string().min(1),
+  agent: InvestigationControlSchema.shape.agent,
+}).strict();
+export type GlobalConfiguration = z.infer<typeof GlobalConfigurationSchema>;
+
+
 export const ArtifactLifecycleStatusSchema = z.enum(['missing', 'stale', 'current', 'blocked', 'error']);
 export type ArtifactLifecycleStatus = z.infer<typeof ArtifactLifecycleStatusSchema>;
 
