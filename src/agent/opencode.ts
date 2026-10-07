@@ -1021,7 +1021,10 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
               input.investigationName,
               input.workflowSkill,
               finalAnswer,
-              { persistModernizationResult: false },
+              {
+                persistModernizationResult: false,
+                ...(stageGate?.passed === true ? { stageValidationPassed: true } : {}),
+              },
             )
           : { applied: false, error: undefined, execution: undefined };
 
