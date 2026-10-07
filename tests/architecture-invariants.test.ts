@@ -69,7 +69,11 @@ test('user-facing runtime errors do not expose common internal control terms', a
     '../src/workflow/journey-editor.ts',
     '../src/workflow/journey-ai.ts',
   ];
-  const ai = String.fromCharCode(65, 73);\n  const ag = String.fromCharCode(65, 103, 101, 110, 116);\n  const se = String.fromCharCode(83, 101, 115, 115, 105, 111, 110);\n  const wf = String.fromCharCode(87, 111, 114, 107, 102, 108, 111, 119);\n  const patterns = [
+  const ai = String.fromCharCode(65, 73);
+  const ag = String.fromCharCode(65, 103, 101, 110, 116);
+  const se = String.fromCharCode(83, 101, 115, 115, 105, 111, 110);
+  const wf = String.fromCharCode(87, 111, 114, 107, 102, 108, 111, 119);
+  const patterns = [
     ai + ' 没有返回',
     ai + ' 使用的工作地图',
     ag + ' 执行失败',
