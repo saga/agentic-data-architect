@@ -1,11 +1,11 @@
 # OpenCode 本机运行手册
 
-工作台调本机 `opencode serve` 跑 Agent。这里记录已经踩过的坑，
+工作台正式的 Investigation execution 走本机 `opencode run` headless CLI。`opencode serve` 只用于本机模型发现等辅助能力，不属于正式模型执行链。这里记录已经踩过的坑，
 按这个清单配就不会再犯。
 
 ## 启动方式（唯一入口）
 
-不要手动 `opencode serve`，直接：
+正式 Investigation 不要手动用 `opencode serve` 驱动模型，直接：
 
 ```bash
 npm run dev     # 或 npm run start
