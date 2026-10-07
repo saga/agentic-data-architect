@@ -19,7 +19,7 @@ import type { McpServerSetting } from '../investigation/schemas.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
 import { createLocalDataTools } from './local-data-tools.js';
-import type { AskInput } from './copilot.js';
+import { requestAgentUserInput, type AskInput } from './copilot.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
 
@@ -174,6 +174,7 @@ async function runCodeBuddyQuery(
   input: AskInput,
   model: string,
   prompt: string,
+  workflowInstruction: string,
   mcpServers: Record<string, unknown>,
   execution: number,
   graphifyPreflight: boolean,
@@ -205,6 +206,44 @@ async function runCodeBuddyQuery(
     ) => {
       const graphifyToolCall = isGraphifyTool({ toolName });
       if (graphifyToolCall) graphifyUsedRef.value = true;
+
+      if (toolName === 'AskUserQuestion') {
+        const questions = toolInput && typeof toolInput === 'object'
+          && Array.isArray((toolInput as Record<string, unknown>).questions)
+          ? (toolInput as Record<string, unknown>).questions as Array<Record<string, unknown>>
+          : [];
+        const answers: Record<string, string> = {};
+        for (const question of questions) {
+          const textValue = typeof question.question === 'string' ? question.question : '请提供必要信息。';
+          const choices = Array.isArray(question.options)
+            ? question.options
+              .map((option) => option && typeof option === 'object' && typeof (option as Record<string, unknown>).label === 'string'
+                ? (option as Record<string, unknown>).label as string
+                : '')
+              .filter(Boolean)
+            : [];
+          const response = await requestAgentUserInput(
+            input.investigationName ?? '',
+            input.turnId ?? '',
+            input.sessionId ?? '',
+            {
+              question: textValue,
+              choices,
+              allowFreeform: true,
+            },
+            input.onStatus,
+            input.onTrajectory,
+          );
+          answers[textValue] = response.answer;
+        }
+        return {
+          behavior: 'allow' as const,
+          updatedInput: {
+            ...(toolInput && typeof toolInput === 'object' ? toolInput : {}),
+            answers,
+          },
+        };
+      }
 
       if (graphifyPreflight && !graphifyToolCall) {
         return {
@@ -487,6 +526,7 @@ export async function askCodeBuddy(
       input,
       model,
       prompt,
+      currentWorkflowInstruction,
       mcpServers,
       execution,
       preflight,
