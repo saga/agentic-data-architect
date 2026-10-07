@@ -21,7 +21,9 @@ function runtimeFromModel(model: string | undefined): AgentRuntime | undefined {
 
 function isQuotaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /quota|usage\s*limit|rate\s*limit|resource\s*exhausted|credits?\s*(?:exhausted|depleted)|limit\s*(?:reached|exceeded)|HTTP\s*429/i.test(message);
+  return /\b(?:quota|rate[-\s]?limit|resource\s+exhausted|credits?\s+(?:exhausted|depleted))\b/i.test(message)
+    || /\bHTTP\s*429\b/i.test(message)
+    || /\b(?:429|402)\s*[:\-]?\s*(?:quota|credits?|rate|usage)/i.test(message);
 }
 
 function configuredRuntimeOrder(): AgentRuntime[] {
