@@ -141,6 +141,8 @@ export interface AskInput {
   /** When provided, the same resumable Copilot session is reused across turns/processes. */
   sessionId?: string;
   workingDirectory?: string;
+  /** 当前 Investigation 首选 Runtime；未指定时由 runtime 层按模型引用或全局默认推断。 */
+  runtime?: import('../investigation/schemas.js').AgentRuntime;
   /** 当前 Investigation 使用的模型；默认 Auto。 */
   model?: string;
   /** model=auto 时的路由偏好。 */
@@ -398,6 +400,8 @@ export async function abortCopilotTurn(turnId: string): Promise<boolean> {
 
 /** 创建或恢复 Copilot Session，固定本次配置，注入 Skills/MCP/本地数据工具和执行白名单。 */
 export async function askCopilot(input: AskInput): Promise<string> {
+  // Runtime selection is explicit at the orchestration layer; retain model-prefix
+  // routing here only for legacy direct callers.
   // OpenCode 是显式选择的第二运行时。模型 ID 使用 opencode:<provider>/<model>，
   // 因此不需要再增加一套并行的 runtime 配置字段；同一个 Investigation 仍然只记录一个 model。
   const workingDirectory = input.workingDirectory ?? process.cwd();
