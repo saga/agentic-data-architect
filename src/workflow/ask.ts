@@ -74,6 +74,15 @@ export function listActiveInvestigationTurns(): Array<ActiveInvestigationTurn & 
   }));
 }
 
+/** 等待当前 turn 走完 abort/failure/completed finally；超时则让 Server 继续关闭，下一次启动仍可依靠 durable recovery。 */
+export async function waitForInvestigationTurnsToFinish(timeoutMs = 15_000): Promise<boolean> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  while (activeInvestigationTurns.size > 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return activeInvestigationTurns.size === 0;
+}
+
 /** 请求取消指定 Investigation 的当前 turn；commit 阶段故意拒绝取消，避免留下半提交状态。 */
 export function requestAbort(investigationName: string, turnId: string): boolean {
   const active = activeInvestigationTurns.get(investigationName);
