@@ -1385,6 +1385,14 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
     }
 
     const turnId = body.turnId ?? randomUUID();
+    // The user message is durable before Agent execution starts. Even when the Agent
+    // fails during preparation/commit, the conversation must not disappear from the UI.
+    saveConversationMessage({
+      id: turnId + ':user',
+      sessionName: name,
+      role: 'user',
+      content: message,
+    });
 
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -1428,7 +1436,15 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       finished = true;
       res.end();
     } catch (error) {
-      send('error', { error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[messages/stream] Investigation execution failed', {
+        sessionName: name,
+        turnId,
+        message,
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
+      send('error', { error: message });
       finished = true;
       res.end();
     } finally {
