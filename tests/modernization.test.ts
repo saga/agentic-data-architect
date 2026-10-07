@@ -7,6 +7,7 @@ import {
   SourceToTargetMappingSchema,
   TargetArchitectureSchema,
 } from '../src/model/modernization.js';
+import { filterAssessmentGapsForFindings } from '../src/workflow/assessment.js';
 
 describe('Modernization workbench', () => {
   it('turns current-state coverage and findings into explicit gaps', () => {
@@ -144,6 +145,47 @@ describe('Modernization workbench', () => {
   });
 });
 
+
+test('assessment only promotes evidence-backed gaps to formal findings', () => {
+  const gaps = buildModernizationGaps({
+    currentState: {
+      generatedAt: new Date().toISOString(),
+      coverage: {
+        filesScanned: 1,
+        sqlFiles: 1,
+        sqlParsedStatements: 0,
+        sqlParseFailures: 1,
+        datasets: 2,
+        connectedDatasets: 1,
+        datasetLineageConnectionRate: 0.5,
+        columnLineageEdges: 0,
+        semanticAssets: 0,
+        profiledDatasets: 0,
+      },
+      sourceOfTruthCandidates: [],
+      semanticCandidates: [],
+      semanticAssets: [],
+      highValueAssets: [],
+    },
+    estate: null,
+    findings: [{
+      id: 'finding-1',
+      type: 'data_quality_issue',
+      title: '质量问题',
+      description: '有证据支持的质量问题。',
+      severity: 'high',
+      status: 'supported',
+      evidenceIds: ['ev-1'],
+      affectedAssets: ['dataset:position'],
+      createdAt: new Date().toISOString(),
+    }],
+  });
+
+  const formal = filterAssessmentGapsForFindings(gaps);
+  assert.ok(formal.length > 0);
+  assert.equal(formal.every((gap) => gap.evidenceIds.length > 0), true);
+  assert.equal(formal.some((gap) => gap.kind === 'discovery' && gap.evidenceIds.length === 0), false);
+});
 
 test('does not treat empty draft work products as confirmed design', () => {
   const target = TargetArchitectureSchema.parse({
