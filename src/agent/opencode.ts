@@ -1042,7 +1042,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
 
     const shouldContinue = input.shouldContinueMission
       ? await input.shouldContinueMission()
-      : Boolean(stageGate && 'passed' in stageGate ? stageGate.passed !== false : true);
+      : false;
     if (!shouldContinue) break;
 
     if (input.refreshMissionPrompt) {
