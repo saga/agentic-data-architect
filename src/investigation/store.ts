@@ -10,6 +10,7 @@ import {
   contextFile,
   discoveryDir,
   loadWorkspaceContext,
+  normalizeInvestigationName,
   ensureWorkspace,
   workspaceRoot,
   withWorkspaceContextLock,
@@ -32,9 +33,10 @@ function sameMission(
 
 /** 创建一个空的 Investigation 初始状态；不负责写盘。 */
 export function newInvestigation(name: string, userPrompt = '', workflow: Investigation['workflow'] = null): Investigation {
+  const normalizedName = normalizeInvestigationName(name);
   return {
     schemaVersion: 3,
-    name,
+    name: normalizedName,
     userPrompt,
     workflow,
     // 原始输入只作为 Mission 候选，必须经过用户确认后才进入正式执行。
