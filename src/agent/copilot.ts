@@ -151,6 +151,8 @@ export interface AskInput {
   runtime?: import('../investigation/schemas.js').AgentRuntime;
   /** 当前 Investigation 使用的模型；默认 Auto。 */
   model?: string;
+  /** 这次模型调用在人类可读轨迹中的名称。 */
+  modelCallName?: string;
   /** model=auto 时的路由偏好。 */
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
   /** 自动续跑时每一轮都重新注入的最高优先级 Mission 文本。 */
@@ -174,7 +176,7 @@ export interface AskInput {
     toolName: string;
     toolArgs: unknown;
   }) => Promise<{ allowed: boolean; reason: string; targetDeliverableId?: string | null }>;
-  /** 思考过程流式片段；仅供当前前端回答展示，不写入持久化轨迹。 */
+  /** 思考过程流式片段；实时展示仍由上层处理，完整内容另行写入运行记录。 */
   onReasoningDelta?: (delta: string) => void;
   /** 每个 sendAndWait 阶段完成后回调一次；上层可据此提取阶段小结。 */
   onStageResult?: (result: { content: string; execution: number }) =>
@@ -1240,7 +1242,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       details: Record<string, unknown>;
     } = {
       type: 'model_call',
-      name: '模型调用 #' + modelCallCount,
+      name: (input.modelCallName ? input.modelCallName + ' · ' : '') + '模型调用 #' + modelCallCount,
       status: 'completed',
       details: {},
     };

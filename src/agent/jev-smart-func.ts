@@ -14,6 +14,7 @@
  */
 import * as z from 'zod';
 import { askAgentWithFallback } from './runtime.js';
+import type { AskInput } from './copilot.js';
 import { config } from '../config.js';
 
 /** 有界分类问题：从明确的候选项里选一个。 */
@@ -94,6 +95,8 @@ export interface MissionAlignmentInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 /** Mission 行动前检查结果；只回答“这个动作该不该现在做”。 */
@@ -120,6 +123,8 @@ export interface MissionActionInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 /** Unknown 不再只是文字；结构化判断明确它是否影响 Mission，以及谁能解决。 */
@@ -142,6 +147,8 @@ export interface MissionUnknownInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 export interface JevSmartFuncInput {
@@ -156,8 +163,12 @@ export interface JevSmartFuncInput {
   questions: Record<string, JevQuestion>;
   /** 不传则使用应用默认模型。 */
   model?: string;
+  /** 这次判断在人类可读轨迹中的名称。 */
+  modelCallName?: string;
   /** 让 Smart Function 在正确的工作目录运行；默认使用应用 workspace。 */
   workingDirectory?: string;
+  onTrajectory?: AskInput['onTrajectory'];
+
 }
 
 const probabilitySchema = z.array(
@@ -534,6 +545,7 @@ export async function reviewMissionAction(
     ]);
 
     const raw = await jevSmartFunc({
+      modelCallName: '检查这一步是否有必要',
       prompt: buildMissionActionPrompt(input),
       context: {
         mission: input.mission,
@@ -670,6 +682,7 @@ export async function reviewUnknownImpact(
     });
 
     const raw = await jevSmartFunc({
+      modelCallName: '检查未知项是否需要继续调查',
       prompt: buildMissionUnknownPrompt(input),
       context: {
         mission: input.mission,
@@ -702,6 +715,7 @@ export async function reviewMissionAlignment(
 ): Promise<MissionAlignmentReview | null> {
   try {
     const raw = await jevSmartFunc({
+      modelCallName: '检查阶段成果是否符合任务',
       prompt: buildMissionAlignmentPrompt(input),
       context: {
         mission: input.mission,
@@ -793,7 +807,9 @@ export async function jevSmartFunc(
     systemPrompt,
     purpose: 'review',
     model: input.model ?? config.model,
+    modelCallName: input.modelCallName,
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
+    onTrajectory: input.onTrajectory,
     autoContinuationTurns: 0,
     responseSchema,
   });
