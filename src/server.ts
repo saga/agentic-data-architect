@@ -29,6 +29,7 @@ import {
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, getActiveInvestigationTurn, requestAbort } from './workflow/ask.js';
+import { abortCodeBuddyTurn, listCodeBuddyModels } from './agent/codebuddy.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
 import {
@@ -71,6 +72,7 @@ import {
   type SseEvent,
   type SessionSummary as SharedSessionSummary,
   type WorkflowId as SharedWorkflowId,
+  type AgentRuntime as SharedAgentRuntime,
 } from './api/contracts.js';
 import {
   buildJourneyAgentInstruction,
@@ -234,6 +236,7 @@ async function createSession(
   name?: string,
   userPrompt?: string,
   workflow?: SharedWorkflowId | null,
+  runtime?: SharedAgentRuntime,
 ) {
   const key = sessionKey(
     name?.trim() ||
@@ -246,13 +249,37 @@ async function createSession(
   const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? null);
   await saveInvestigation(investigation);
 
-
+  // Runtime is selected once when the Investigation is created. The task control
+  // keeps it separate from model selection so quota fallback never rewrites user intent.
+  if (runtime) {
+    const currentControl = await loadInvestigationControl(key);
+    const selectedModel = runtime === 'codebuddy-sdk'
+      ? 'codebuddy:' + config.codeBuddyDefaultModel
+      : runtime === 'opencode-run'
+        ? config.openCodeFallbackModel ?? config.model
+        : config.model;
+    await updateInvestigationControl(
+      key,
+      {
+        research: currentControl.research,
+        agent: {
+          ...currentControl.agent,
+          runtime,
+          model: selectedModel,
+        },
+      },
+      'initial Agent Runtime selection',
+    );
+  }
 
   await appendAuditEvent(key, {
     actor: 'user',
     action: 'investigation.created',
     summary: 'Created investigation session.',
-    details: { hasInitialPrompt: Boolean(userPrompt?.trim()) },
+    details: {
+      hasInitialPrompt: Boolean(userPrompt?.trim()),
+      ...(runtime ? { runtime } : {}),
+    },
   });
   return loadWorkspaceContext(key);
 }
@@ -373,7 +400,7 @@ app.get('/api/sessions', async (_req, res) => {
   // 创建 Session API：body 先经 Zod，再进入业务层。
 app.post('/api/sessions', async (req, res) => {
     const body = parseRequest(CreateSessionBodySchema, req.body);
-    const context = await createSession(body.name, body.userPrompt, body.workflow);
+    const context = await createSession(body.name, body.userPrompt, body.workflow, body.runtime);
     res.status(201).json(CreateSessionResponseSchema.parse({ context: toSessionContextView(context) }));
   });
 
@@ -559,6 +586,20 @@ app.post('/api/sessions', async (req, res) => {
     }
 
     try {
+      const codeBuddyModels = listCodeBuddyModels(config.codeBuddyModelAllowlist);
+      models.unshift(...codeBuddyModels.map((model) => ({
+        id: model.id,
+        name: model.name,
+        supportedReasoningEfforts: [],
+        defaultReasoningEffort: null,
+        policyState: null,
+        runtime: 'codebuddy' as const,
+      })));
+    } catch {
+      // CodeBuddy model filter is local configuration; malformed optional entries must not hide other runtimes.
+    }
+
+    try {
       const openCodeModels = await listOpenCodeModels();
       models.push(...openCodeModels.map((model) => ({
         id: model.id,
@@ -569,7 +610,7 @@ app.post('/api/sessions', async (req, res) => {
         runtime: 'opencode' as const,
       })));
     } catch {
-      // OpenCode 未启动很常见；模型菜单仍然可以正常显示 Copilot。
+      // OpenCode 未启动很常见；模型菜单仍然可以正常显示其他 runtime。
     }
 
     res.json(ModelsResponseSchema.parse({ models }));
@@ -1482,7 +1523,10 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
       return;
     }
     const requested = requestAbort(name, turnId);
-    const aborted = requested || await abortCopilotTurn(turnId) || await abortOpenCodeTurn(turnId);
+    const aborted = requested
+      || await abortCopilotTurn(turnId)
+      || await abortCodeBuddyTurn(turnId)
+      || await abortOpenCodeTurn(turnId);
     res.json(AbortResponseSchema.parse({ aborted }));
   });
 
