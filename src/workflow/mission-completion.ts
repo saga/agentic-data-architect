@@ -126,6 +126,7 @@ export async function reviewMissionCompletion(
 
   try {
     const raw = await jevSmartFunc({
+      modelCallName: '检查任务是否可以结束',
       prompt: buildMissionCompletionPrompt(input),
       context: {
         mission: input.mission,
