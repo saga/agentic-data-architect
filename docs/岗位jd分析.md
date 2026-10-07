@@ -2,7 +2,7 @@
 
 > **Enterprise Data Architecture + Semantic Layer + AI/Agent-ready Data Foundation**
 
-我查了 某大型企业 最近一批相关岗位，也对比了 另一家大型企业、一家大型企业、一家大型企业、一家大型企业 等类似岗位。现在这个方向已经形成了比较清晰的岗位谱系。
+我查了多家大型企业最近的相关岗位，并对比了几类类似岗位。现在这个方向已经形成了比较清晰的岗位谱系。
 
 ### 1. 你给的这个岗位到底在做什么
 
@@ -29,7 +29,7 @@
 
 > **企业的数据到底应该怎样被定义、组织和暴露，才能让人、传统应用、分析系统以及 AI Agent 都“正确理解”。**
 
-这和你现在在考虑的 **Snowflake semantic layer / business ontology / AI Agent 使用企业业务定义**，基本是同一个方向。([某大型企业][1])
+这和你现在在考虑的 **Snowflake semantic layer / business ontology / AI Agent 使用企业业务定义**，基本是同一个方向。(（公开企业岗位资料）)
 
 ---
 
@@ -72,7 +72,7 @@
 
 > **AI-ready "Intelligent Data Platform"**
 
-也就是说，数据架构师现在不只是把数据存好，而是要让 AI 能够**可靠地使用这些数据**。([一家大型企业 Careers][2])
+也就是说，数据架构师现在不只是把数据存好，而是要让 AI 能够**可靠地使用这些数据**。(（公开企业岗位资料）)
 
 另外 一家大型企业 的 **AI & Data Architect** 更直接，把职责明确拆成：
 
@@ -93,13 +93,13 @@
 * query routing
 * architectural guardrails
 
-这个已经非常接近你现在做的事情了。([LinkedIn][3])
+这个已经非常接近你现在做的事情了。(（公开企业岗位资料）)
 
 ---
 
 # 4. 第二类：Agentic AI Engineer / Architect
 
-某大型企业 自己现在也有非常典型的岗位。
+大型企业中也有非常典型的同类岗位。
 
 例如：
 
@@ -164,7 +164,7 @@ Action
 
 ---
 
-# 5. 某大型企业 甚至已经出现“Agent Platform Architect”
+# 5. 大型企业甚至已经出现“Agent Platform Architect”
 
 这个岗位尤其值得看：
 
@@ -193,7 +193,7 @@ JD 里面直接要求：
 
 ---
 
-# 6. 另一家大型企业 的岗位也非常接近，而且更强调 Context Engineering
+# 6. 另一家大型企业的岗位也非常接近，而且更强调 Context Engineering
 
 例如 另一家大型企业 最近的：
 
@@ -242,13 +242,13 @@ Business Workflow
 
 > **如何把企业知识、业务上下文、状态、权限、工具和数据组织成 Agent 可以可靠执行的 Context。**
 
-([另一家大型企业 Careers][4])
+(（公开企业岗位资料）)
 
 ---
 
 # 7. 还有一类更高层：AI Transformation
 
-某大型企业 最近还有：
+大型企业最近还有：
 
 **某大型企业公开岗位说明**
 
@@ -310,7 +310,7 @@ Production
 * metadata
 * semantic model
 
-([某大型企业][1])
+(（公开企业岗位资料）)
 
 ---
 
@@ -368,7 +368,7 @@ Transaction
 
 这些东西逐渐成为 **AI infrastructure** 的一部分。
 
-某大型企业 的这个岗位明确要求 shared business glossary + semantic layer。([某大型企业][1])
+某大型企业 的这个岗位明确要求 shared business glossary + semantic layer。(（公开企业岗位资料）)
 
 ---
 
@@ -390,7 +390,7 @@ Grounding
 Provenance
 ```
 
-另一家大型企业 的岗位尤其明确要求 Knowledge Graph + GraphRAG + multi-hop reasoning。([另一家大型企业 Careers][4])
+另一家大型企业 的岗位尤其明确要求 Knowledge Graph + GraphRAG + multi-hop reasoning。(（公开企业岗位资料）)
 
 ---
 
@@ -416,7 +416,7 @@ State
 
 > agents + skills + memory + guardrails + tool orchestration
 
-直接列成 production AI system 的组成部分。([某大型企业][5])
+直接列成 production AI system 的组成部分。(（公开企业岗位资料）)
 
 ---
 
@@ -437,7 +437,7 @@ Cost Control
 Governance
 ```
 
-某大型企业 的 Agent Builder Platform 岗位就是这个方向。([某大型企业][6])
+某大型企业 的 Agent Builder Platform 岗位就是这个方向。(（公开企业岗位资料）)
 
 这实际上是在招聘：
 
@@ -466,7 +466,7 @@ Governance
 
 **他们要的是 Production Agent，不是 Notebook Agent。**
 
-例如 某大型企业 的 AI Application 岗位明确要求 AWS、Kubernetes、distributed data stores、high availability。([某大型企业][5])
+例如 某大型企业 的 AI Application 岗位明确要求 AWS、Kubernetes、distributed data stores、high availability。(（公开企业岗位资料）)
 
 ---
 
@@ -517,7 +517,7 @@ Latency？
 
 **Evaluation + Observability 已经从“nice to have”逐渐变成 Agent Platform 的核心职责。**
 
-某大型企业 和 另一家大型企业 的相关岗位都明确要求 evaluation / monitoring / reliability。([某大型企业][5])
+某大型企业 和 另一家大型企业 的相关岗位都明确要求 evaluation / monitoring / reliability。(（公开企业岗位资料）)
 
 ---
 
@@ -544,7 +544,7 @@ Regulatory Compliance
 
 > LLM + AI architecture + ML architecture + MLOps + Cloud + Agentic harness + workflow + data platform + API + observability
 
-并且要求在大型大型企业的复杂监管环境中担任 architecture authority。([一家大型企业 Careers][7])
+并且要求在大型大型企业的复杂监管环境中担任 architecture authority。(（公开企业岗位资料）)
 
 ---
 
@@ -632,7 +632,7 @@ Regulatory Compliance
 
 > **A + B + C 的交叉型架构师。**
 
-也就是你给的这个 某大型企业 岗位虽然职位名称还是 **Senior Lead Data Architect**，但 JD 已经明显开始往 **AI-ready Data + Semantic Architecture + Agent Infrastructure** 演进。([某大型企业][1])
+也就是你给的这个 某大型企业 岗位虽然职位名称还是 **Senior Lead Data Architect**，但 JD 已经明显开始往 **AI-ready Data + Semantic Architecture + Agent Infrastructure** 演进。(（公开企业岗位资料）)
 
 如果你的目的是**找工作/判断自己应该往哪个岗位包装**，我可以进一步把 某大型企业、另一家大型企业、一家大型企业、一家大型企业、一家大型企业、一家大型企业 等大型企业最近的这类 JD 拉出来，做一张 **“2026 大型企业 AI Architect / Agent Architect / AI Data Architect 岗位能力矩阵”**，再反推你目前这套经验哪些已经匹配、哪些是明显短板。
 
