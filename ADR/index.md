@@ -11,7 +11,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-001](./001-data-estate-as-canonical-graph.md) | DataEstate 是唯一 canonical graph；重复图查询统一到轻量 query helpers，不建立第二套 Catalog 模型 | Accepted |
 | [ADR-002](./002-evidence-first-deterministic-analysis.md) | 确定性事实由代码/工具计算，Agent 负责推理；当前 Investigation 的事实结论必须可追溯到 Evidence | Accepted |
 | [ADR-003](./003-personal-local-agent-runtime.md) | 默认运行模型是个人本机 Agent；runtime 通过统一边界支持 Copilot / OpenCode，不把 provider execution 变成 domain state | Accepted |
-| [ADR-004](./004-local-data-storage-boundaries.md) | SQLite、DuckDB、Parquet、Filesystem 各自承担明确职责；Conversation History 属于 SQLite application state | Accepted |
+| [ADR-004](./004-local-data-storage-boundaries.md) | SQLite、DuckDB、Parquet、Filesystem 各自承担明确职责 | Superseded |
 | [ADR-005](./005-workflow-and-skill-separation.md) | Workflow、Skill、Tool、Agent、Human 分工明确；Workflow 保存/transition 由服务端验证，DSL 保持最小 | Accepted |
 | [ADR-006](./006-provider-neutral-semantic-context.md) | Semantic Context 采用 provider-neutral 核心模型 | Accepted |
 | [ADR-007](./007-structural-analysis-boundary.md) | Graphify 用于 structural navigation，不直接作为业务事实来源 | Accepted |
@@ -57,3 +57,4 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 因此，阅读 ADR 时先看正文；需要理解“为什么会做出这个决定”或追溯设计演进时，再阅读附录。
 
 | [ADR-026](./026-canonical-derived-state-and-result-boundaries.md) | Canonical Derived State 统一 Mission、Workflow、Gate 的完成语义，并分离 Assessment / Modernization Artifact 与 Workflow runtime | Accepted |
+| [ADR-027](./027-investigation-state-persistence-boundary.md) | 明确 context.json、SQLite、DuckDB 和文件产物各自的 canonical persistence boundary | Accepted |
