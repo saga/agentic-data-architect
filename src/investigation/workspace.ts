@@ -287,9 +287,11 @@ export async function setAgentSessionId(
 ): Promise<void> {
   await withWorkspaceContextLock(name, async () => {
     const context = await loadWorkspaceContext(name);
-    context.copilotSessionId = sessionId;
-    if (typeof configurationVersion === 'number') {
-      context.copilotConfigurationVersion = configurationVersion;
+    if (!runtime || runtime === 'copilot-sdk') {
+      context.copilotSessionId = sessionId;
+      if (typeof configurationVersion === 'number') {
+        context.copilotConfigurationVersion = configurationVersion;
+      }
     }
     if (runtime) {
       context.agentSessionId = sessionId;
