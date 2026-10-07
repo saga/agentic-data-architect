@@ -6,7 +6,7 @@
  * permission policy and prompt so the surrounding application remains the
  * owner of Mission / Evidence / Workflow state.
  */
-import { query, AbortError } from '@tencent-ai/agent-sdk';
+import { createSdkMcpServer, query, tool as codeBuddyTool, AbortError } from '@tencent-ai/agent-sdk';
 import {
   GRAPHIFY_MCP_NAME,
   GRAPHIFY_SELECTION_INSTRUCTION,
@@ -16,8 +16,9 @@ import {
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import type { McpServerSetting } from '../investigation/schemas.js';
-import { buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
+import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { requiresGraphifyFirst as requiresGraphifyPrompt } from './opencode.js';
+import { createLocalDataTools } from './local-data-tools.js';
 import type { AskInput } from './copilot.js';
 
 const activeCodeBuddyTurns = new Map<string, () => Promise<void>>();
@@ -96,6 +97,46 @@ function buildPrompt(input: Pick<AskInput, 'missionPrompt' | 'systemPrompt'>, pr
   ].filter((value): value is string => Boolean(value && value.trim())).join('\n\n');
 }
 
+
+interface WorkbenchToolLike {
+  name: string;
+  description: string;
+  parameters: unknown;
+  handler: (input: unknown) => Promise<unknown> | unknown;
+}
+
+/**
+ * 把现有 Workbench tools 适配为 CodeBuddy SDK 的 in-process MCP server。
+ *
+ * 业务 tool implementation 仍只有一份；CodeBuddy 只是换了 Runtime adapter。
+ */
+function buildCodeBuddyWorkbenchServer(sessionName: string): {
+  server: unknown;
+  toolNames: string[];
+} {
+  const tools = createLocalDataTools(sessionName) as unknown as WorkbenchToolLike[];
+  const serverTools = tools.map((item) =>
+    (codeBuddyTool as unknown as (definition: {
+      name: string;
+      description: string;
+      schema: unknown;
+      handler: (input: unknown) => Promise<unknown> | unknown;
+    }) => unknown)({
+      name: item.name,
+      description: item.description,
+      schema: item.parameters,
+      handler: item.handler,
+    }),
+  );
+
+  return {
+    server: createSdkMcpServer('workbench', {
+      tools: serverTools as never[],
+    }),
+    toolNames: tools.map((item) => 'mcp__workbench__' + item.name),
+  };
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof AbortError) return 'Turn aborted.';
   if (error instanceof Error) return error.message;
@@ -146,7 +187,17 @@ async function runCodeBuddyQuery(
     permissionMode: (input.permissionMode ?? 'allow_all') === 'allow_all'
       ? 'bypassPermissions' as const
       : 'default' as const,
+    // SDK defaults to no filesystem settings; Workbench explicitly supplies all
+    // tools/configuration it wants, so user/project .codebuddy files cannot alter it.
+    settingSources: [] as const,
+    systemPrompt: [
+      input.missionPrompt,
+      input.systemPrompt,
+      graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
+      workflowInstruction,
+    ].filter(Boolean).join('\n\n'),
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+    ...(input.sessionId ? { resume: input.sessionId } : {}),
     maxTurns: 20,
     canUseTool: async (
       toolName: string,
@@ -218,6 +269,8 @@ async function runCodeBuddyQuery(
 
       if (raw.type === 'system' && typeof raw.session_id === 'string') {
         sessionId = raw.session_id;
+        input.sessionId = sessionId;
+        input.onSessionId?.(sessionId);
         continue;
       }
 
@@ -371,6 +424,11 @@ export async function askCodeBuddy(
     input.mcpServers as unknown as McpServerSetting[] ?? [],
   );
 
+  if (input.purpose !== 'journey-map' && input.purpose !== 'review' && input.investigationName) {
+    const workbench = buildCodeBuddyWorkbenchServer(input.investigationName);
+    mcpServers.workbench = workbench.server;
+  }
+
   if (graphifyEnabled) {
     await ensureGraphifyGraph(input.workingDirectory ?? process.cwd(), false);
     const graphify = buildGraphifyMcpServer(input.workingDirectory ?? process.cwd());
@@ -428,7 +486,7 @@ export async function askCodeBuddy(
     const result = await runCodeBuddyQuery(
       input,
       model,
-      buildPrompt(input, prompt, currentWorkflowInstruction, graphifyEnabled),
+      prompt,
       mcpServers,
       execution,
       preflight,
