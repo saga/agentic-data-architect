@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
@@ -12,6 +11,8 @@ import {
   graphifyGraphPath,
   prepareGraphifyEnvironment,
   requireGraphifyMcpCommand,
+  ensureGraphifyGraph,
+  isGraphifyTool,
 } from '../src/adapters/graphify.js';
 
 test('Graphify graph path is scoped to the current working directory', () => {
