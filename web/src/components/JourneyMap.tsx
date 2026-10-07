@@ -223,6 +223,7 @@ export function JourneyMap(props: JourneyMapProps) {
                 selectedNodeId={selectedNode?.id}
                 selectedEdgeId={selectedEdge?.id}
                 fitViewRequest={fitViewRequest}
+                execution={snapshot.execution}
                 onNodeClick={onNodeClick}
                 onEdgeClick={onEdgeClick}
                 onBlankClick={clearSelection}
