@@ -32,6 +32,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-022](./022-current-data-architecture-and-assessment-separation.md) | Current Data Architecture 负责看清现状；Data Architecture Assessment 负责评价现状并给出改进顺序 | Accepted |
 | [ADR-023](./023-investigation-report-and-analysis-artifacts.md) | 每次完整 Investigation 都要有用户可读报告，并保留可继续使用的中间分析产物 | Accepted |
 | [ADR-024](./024-skill-input-output-gate-contract.md) | 每个 Skill 都必须声明输入、输出、验证、Gate 和期望结果，并接受基础结构检查 | Accepted |
+| [ADR-025](./025-global-task-config-and-media-cache-boundaries.md) | Global / Task 配置与缓存分层；远程媒体由 yt-dlp 解析，Remote first、Global Cache fallback | Accepted |
 
 ## 如何使用 ADR
 
