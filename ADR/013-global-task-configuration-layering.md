@@ -39,7 +39,7 @@ Effective Task Config 按以下原则计算：
 Effective = Global defaults + Task explicit overrides + runtime-owned capabilities
 ```
 
-Task Override 中未出现的字段必须继续继承 Global。
+Task Override 中未出现的字段必须继续继承 Global。更新 Task 时必须以持久化的 sparse override 为基准合并，不能从 Effective Config 反推 override；否则 Global 变更后一次普通 Task 修改可能把继承字段错误地固化到 Task。
 
 ### 3. Task 不能写 Global
 
