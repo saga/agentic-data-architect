@@ -147,7 +147,7 @@ export async function ensureGraphifyGraph(
 
   const metadata = await getGraphifyRuntimeMetadata(workingDirectory);
   if (metadata.status !== 'available' || !metadata.graphHash) {
-    throw new Error('Graphify 已执行，但没有生成可以查询的结构图。请检查 Graphify 输出。');
+    throw new Error('代码结构分析已经运行，但没有生成可查询的结果。请重新运行结构分析；如果仍然失败，请检查 Graphify 配置。');
   }
   return metadata;
 }
