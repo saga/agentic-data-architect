@@ -141,6 +141,7 @@ import {
 import { listOpenCodeModels, abortOpenCodeTurn } from './agent/opencode.js';
 import {
   appendAuditEvent,
+  AuditDataError,
   loadInvestigationControl,
   loadGlobalConfiguration,
   readAuditEvents,
@@ -728,7 +729,18 @@ app.post('/api/sessions', async (req, res) => {
   app.get('/api/sessions/:name/audit', async (req, res) => {
     const name = sessionKey(req.params.name);
     const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 100;
-    res.json(AuditResponseSchema.parse({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) }));
+    try {
+      res.json(AuditResponseSchema.parse({ events: await readAuditEvents(name, Number.isFinite(limit) ? limit : 100) }));
+    } catch (error) {
+      if (error instanceof AuditDataError) {
+        res.status(500).json(ApiErrorSchema.parse({
+          code: 'AUDIT_DATA_INVALID',
+          error: error.message,
+        }));
+        return;
+      }
+      throw error;
+    }
   });
 
   app.patch('/api/sessions/:name/workflow', async (req, res) => {
