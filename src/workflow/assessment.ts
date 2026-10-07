@@ -100,6 +100,13 @@ function recommendationForFinding(type: string, rules: FindingRecommendationRule
 
 function dedupe(values: string[]): string[] { return [...new Set(values.filter(Boolean))]; }
 
+/** Only evidence-backed gaps may become formal Assessment findings; uncovered gaps remain investigation work. */
+export function filterAssessmentGapsForFindings(
+  gaps: ReturnType<typeof buildModernizationGaps>,
+): ReturnType<typeof buildModernizationGaps> {
+  return gaps.filter((gap) => gap.evidenceIds.length > 0);
+}
+
 /** 根据当前 Investigation 的事实和 Findings 生成评估草案。 */
 export async function buildArchitectureAssessmentPlan(name: string): Promise<{ plan: ArchitectureAssessmentPlan; path: string }> {
   return withWorkspaceContextLock(name, async () => {
@@ -129,7 +136,7 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
 
   // Gap 表示“当前还需要处理的覆盖缺口”，不等于正式 Finding。
   // 只有已经带有当前 Investigation Evidence 的 Gap，才可以进入 Assessment 的正式问题列表。
-  for (const gap of gaps.filter((item) => item.evidenceIds.length > 0).slice(0, 20)) {
+  for (const gap of filterAssessmentGapsForFindings(gaps).slice(0, 20)) {
     if (findings.some((item) => item.id === gap.id)) continue;
     findings.push({
       id: gap.id,
