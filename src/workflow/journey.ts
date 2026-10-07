@@ -308,19 +308,20 @@ function conditionPassed(condition: string | undefined, facts: JourneyFacts): bo
     findingsCount: facts.findingCount ?? 0,
     scopeReady: facts.scopeReady === true,
     highGapKinds: facts.highGapKinds,
-    modernization: {
-      targetComponentCount: facts.targetComponentCount,
-      mappingCount: facts.mappingCount,
-      validationCount: facts.blockingValidationTotal,
-      blockingValidationReady: facts.blockingValidationReady,
-      blockingValidationTotal: facts.blockingValidationTotal,
-    },
+    modernization: facts.targetComponentCount > 0 || facts.mappingStatuses.length || facts.validationStatuses.length
+      ? {
+          targetStatus: facts.targetStatus ?? 'draft',
+          targetComponentCount: facts.targetComponentCount,
+          mappingStatuses: facts.mappingStatuses,
+          validationStatuses: facts.validationStatuses,
+        }
+      : null,
     assessment: facts.assessmentPlanExists !== undefined
       ? {
           exists: facts.assessmentPlanExists,
-          findingsCount: facts.findingCount ?? 0,
-          recommendationCount: facts.recommendationCount ?? 0,
-          roadmapCount: facts.roadmapItemCount ?? 0,
+          findingsCount: facts.assessmentFindingCount ?? 0,
+          recommendationCount: facts.assessmentRecommendationCount ?? 0,
+          roadmapCount: facts.assessmentRoadmapCount ?? 0,
         }
       : null,
   });
