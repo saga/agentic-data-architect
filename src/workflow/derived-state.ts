@@ -69,8 +69,10 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   // Source-of-Truth candidate 是待确认事实，不能直接当成 data-source 已完成。
   const dataSourceReady = currentStateAvailable && input.sourceOfTruthCandidateCount === 0;
 
-  const dataFlowReady = currentStateAvailable
-    && (input.lineageEdgeCount > 0 || coverage!.connectedDatasets >= 2);
+  // Flow 是否成立只看有没有 lineage 边：connectedDatasets 本身就是从 lineage
+  // 关系里数出来的，再拿它当备选条件等于自己证明自己，还会让“0 条边也算有 Flow”
+  // 这种自相矛盾的输入通过门禁。
+  const dataFlowReady = currentStateAvailable && input.lineageEdgeCount > 0;
 
   const dataModelReady = currentStateAvailable && input.estateColumnCount > 0;
 

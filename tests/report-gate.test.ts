@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { evaluateInvestigationReportGate } from '../src/workflow/report-gate.js';
+import { computeScopeFingerprint } from '../src/investigation/artifact-provenance.js';
 
 const evidence = [
   {
@@ -55,7 +56,17 @@ function base() {
 
 function snapshot() {
   return {
-    run: { id: 'run-1', scopeFingerprint: 'not-used-by-test' },
+    // 有效场景的快照指纹必须和调查范围对上，否则门禁拦的是快照过期而不是被测逻辑。
+    run: {
+      id: 'run-1',
+      scopeFingerprint: computeScopeFingerprint({
+        goal: '理解系统当前数据架构。',
+        scope: ['Position'],
+        systems: ['Portfolio System'],
+      }),
+    },
+    lineage: { edges: [{ source: 'a', target: 'b' }] },
+    estate: { nodes: [{ id: 'column:a.c', type: 'column', name: 'a.c', attributes: {} }] },
     currentState: {
       generatedAt: new Date().toISOString(),
       coverage: {
@@ -64,8 +75,8 @@ function snapshot() {
         sqlParsedStatements: 3,
         sqlParseFailures: 0,
         datasets: 4,
-        connectedDatasets: 3,
-        datasetLineageConnectionRate: 0.75,
+        connectedDatasets: 4,
+        datasetLineageConnectionRate: 1,
         columnLineageEdges: 2,
         semanticAssets: 1,
         profiledDatasets: 2,
