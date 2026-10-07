@@ -374,6 +374,7 @@ export async function updateInvestigationControl(
       configurationVersion: control.version,
       details: {
         changed,
+        runtime: control.agent.runtime,
         globalVersion: global.version,
         inheritedAgentFields: Object.keys(global.agent).filter((key) => !(key in task.agent)),
         guidanceVersion: control.agent.systemPrompt.version,
