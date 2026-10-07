@@ -8,7 +8,7 @@ import { workspaceRoot, writeJsonAtomic } from './workspace.js';
  *
  * 目的不是替代 trajectory，而是保留一次真实运行中足够完整的输入/输出，
  * 方便事后分析 Agent 为什么偏离目标。文件只写本机 .workspace，不进入 Git。
- * 不记录模型隐藏推理正文；assistant response、tool 参数/结果、permission、
+ * 普通 events.jsonl 不记录模型隐藏推理正文；思考过程单独写入 reasoning.jsonl，避免混入操作事件。assistant response、tool 参数/结果、
  * user input 和每次 sendAndWait prompt 都会记录。
  */
 export interface RunCloseResult {
