@@ -23,6 +23,8 @@ const EnvSchema = z.object({
   CODEBUDDY_MODEL_ALLOWLIST: z.string().default('glm-5.3-flash,deepseek-v4.1-flash,space-bunny'),
   /** Default CodeBuddy model. Must normally be present in CODEBUDDY_MODEL_ALLOWLIST. */
   CODEBUDDY_DEFAULT_MODEL: z.string().default('glm-5.3-flash'),
+  /** Maximum agent/tool loop turns inside one CodeBuddy SDK query. */
+  CODEBUDDY_MAX_TURNS: z.coerce.number().int().min(1).max(500).default(100),
   /** 是否允许工作台发现并使用本机 OpenCode Server。默认开启发现，不代表自动切换。 */
   OPENCODE_ENABLED: z.enum(['true', 'false']).default('true'),
   /** OpenCode Server 地址；默认使用 opencode serve 的本机地址。 */
@@ -70,6 +72,7 @@ export const config = {
     .map((entry) => entry.trim())
     .filter(Boolean),
   codeBuddyDefaultModel: envConfig.CODEBUDDY_DEFAULT_MODEL.trim(),
+  codeBuddyMaxTurns: envConfig.CODEBUDDY_MAX_TURNS,
   openCodeEnabled: envConfig.OPENCODE_ENABLED === 'true',
   openCodeBaseUrl: envConfig.OPENCODE_BASE_URL.replace(/\/+$/, ''),
   openCodeUsername: envConfig.OPENCODE_SERVER_USERNAME?.trim() || undefined,
