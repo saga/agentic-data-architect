@@ -127,6 +127,13 @@ export function evaluateInvestigationReportGate(
 
   if (investigation.workflow === 'data-architecture-assessment') {
     add(
+      '评估建立在当前架构事实之上',
+      derived.assessmentCurrentStateReady,
+      derived.assessmentCurrentStateReady
+        ? 'Assessment 建立在当前架构事实基础上。'
+        : '当前架构的关键数据流、数据模型或转换信息还不完整，不能形成正式评估。',
+    );
+    add(
       '数据架构评估结果已经形成',
       derived.assessmentRoadmapReady,
       derived.assessmentRoadmapReady
