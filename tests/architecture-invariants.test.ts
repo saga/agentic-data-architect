@@ -93,3 +93,13 @@ test('CodeBuddy investigation runtime keeps a read-only built-in tool whitelist'
   assert.match(codebuddy, /settingSources:\s*\[\]/);
   assert.doesNotMatch(codebuddy, /tools:\s*\[[^\]]*Bash/);
 });
+
+
+test('Investigation Stop remains a first-class UI/API action', async () => {
+  const panel = await fs.readFile(new URL('../web/src/components/InvestigationChatPanel.tsx', import.meta.url), 'utf8');
+  const server = await fs.readFile(new URL('../src/server.ts', import.meta.url), 'utf8');
+  assert.match(panel, /停止本轮调查/);
+  assert.match(panel, /props\.loading \?/);
+  assert.match(panel, /props\.cancelActiveTurn/);
+  assert.match(server, /\/messages\/abort/);
+});
