@@ -1157,6 +1157,25 @@ export const ControlResponseSchema = z.object({
 }).strict();
 
 
+export const GlobalConfigurationResponseSchema = z.object({
+  configuration: GlobalConfigurationSchema,
+}).strict();
+
+export const RemoteMediaResolveBodySchema = z.object({
+  url: z.string().url().max(4000),
+  kind: z.enum(['image', 'video', 'remote']).default('remote'),
+}).strict();
+
+export const RemoteMediaResolveResponseSchema = z.object({
+  source: z.string().url(),
+  kind: z.enum(['image', 'video', 'remote']),
+  remoteUrl: z.string().url().optional(),
+  cacheKey: z.string().regex(/^[a-f0-9]{64}$/i),
+  cacheUrl: z.string().url().optional(),
+  cached: z.boolean(),
+  mimeType: z.string().optional(),
+}).strict();
+
 export const HealthResponseSchema = z.object({
   ok: z.literal(true),
   service: z.string().min(1),
