@@ -456,15 +456,33 @@ async function runCodeBuddyQuery(
             });
           } else if (part.type === 'tool_result') {
             const toolName = typeof part.name === 'string' ? part.name : '工具';
+            const resultRecord = part as Record<string, unknown>;
+            const toolFailed =
+              resultRecord.is_error === true
+              || resultRecord.isError === true
+              || typeof resultRecord.error === 'string';
+            const toolError = typeof resultRecord.error === 'string'
+              ? resultRecord.error
+              : undefined;
+            if (toolFailed) {
+              console.error('[codebuddy] Tool execution failed.', {
+                investigationName: input.investigationName,
+                turnId: input.turnId,
+                execution,
+                tool: toolName,
+                error: toolError,
+              });
+            }
             input.onTrajectory?.({
               type: 'tool_result',
               name: 'CodeBuddy 工具结果：' + toolName,
-              status: 'completed',
+              status: toolFailed ? 'failed' : 'completed',
               model,
               details: {
                 execution,
                 ...(sessionId ? { sessionId } : {}),
                 tool: toolName,
+                ...(toolFailed ? { error: toolError ?? '工具返回错误。' } : {}),
               },
             });
           } else if (
@@ -525,12 +543,34 @@ async function runCodeBuddyQuery(
     if (input.turnId) activeCodeBuddyTurns.delete(input.turnId);
   }
 
-  if (modelError) throw new Error(modelError);
+  if (modelError) {
+    console.error('[codebuddy] Model execution returned an error result.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      model,
+      error: modelError,
+      usage,
+    });
+    throw new Error(modelError);
+  }
   if (!answer.trim()) {
+    console.error('[codebuddy] Model execution completed without a usable answer.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      model,
+      toolCount,
+      usage,
+    });
     throw new Error('助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。');
   }
 
   if (graphifyRequired && !graphifyUsedRef.value) {
+    console.error('[codebuddy] Required Graphify preflight did not complete.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      model,
+      toolCount,
+    });
     throw new Error('代码结构分析这一步没有完成，因此无法按要求继续调查。请查看执行轨迹中的 Graphify 错误后重试。');
   }
 
