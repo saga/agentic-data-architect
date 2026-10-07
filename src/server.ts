@@ -1144,7 +1144,14 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     }
 
     try {
-      const buffer = await fs.readFile(path.join(workspaceRoot(name), relativePath));
+      const root = path.resolve(workspaceRoot(name));
+      const target = path.resolve(root, relativePath);
+      const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
+      if (target !== root && !target.startsWith(rootWithSep)) {
+        res.status(404).end();
+        return;
+      }
+      const buffer = await fs.readFile(target);
       const mimeByExtension: Record<string, string> = {
         '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
         '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
