@@ -702,6 +702,7 @@ export const InvestigationControlSchema = z.object({
     }).strict()),
   }).strict(),
   agent: z.object({
+    runtime: AgentRuntimeSchema,
     model: z.string().min(1),
     autoTier: z.enum(['efficiency', 'balance', 'intelligence', 'fast']).optional(),
     permissionMode: z.enum(['permission', 'allow_all']),
@@ -1082,13 +1083,16 @@ export const OpenCodeStatusSchema = z.object({
 }).strict();
 export type OpenCodeStatus = z.infer<typeof OpenCodeStatusSchema>;
 
+export const AgentRuntimeSchema = z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']);
+export type AgentRuntime = z.infer<typeof AgentRuntimeSchema>;
+
 export const CopilotModelOptionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   supportedReasoningEfforts: z.array(z.string()),
   defaultReasoningEffort: z.string().nullable(),
   policyState: z.string().nullable(),
-  runtime: z.enum(['copilot', 'opencode']).optional(),
+  runtime: z.enum(['codebuddy', 'copilot', 'opencode']).optional(),
 }).strict();
 
 export type CopilotModelOption = z.infer<typeof CopilotModelOptionSchema>;
