@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, lstat, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
-import { parseSkillManifest, SkillKindSchema } from '../src/skills/catalog.js';
+import { parseSkillManifest, SkillKindSchema, syncRuntimeSkillWorkspace } from '../src/skills/catalog.js';
 
 const requiredSections = ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例'] as const;
 
@@ -48,6 +50,23 @@ test('解析 workflow Skill 元数据，包括折叠描述', async () => {
   assert.equal(manifest.name, 'legacy-modernization');
   assert.equal(manifest.metadata.kind, 'workflow');
   assert.equal(manifest.description.startsWith('数据现代化工作路线'), true);
+});
+
+test('non-copilot Skill bridge exposes capability Skills and only the selected Workflow', async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'agentic-data-architect-skills-'));
+  try {
+    const root = await syncRuntimeSkillWorkspace(workspace, 'current-data-architecture');
+    const entries = await readdir(root, { withFileTypes: true });
+    const names = new Set(entries.map((entry) => entry.name));
+
+    assert.equal(names.has('search-confluence'), true);
+    assert.equal(names.has('current-data-architecture'), true);
+    assert.equal(names.has('legacy-modernization'), false);
+    assert.equal(names.has('data-architecture-assessment'), false);
+    assert.equal((await lstat(path.join(root, 'current-data-architecture'))).isSymbolicLink(), true);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test('missing Skill kind is rejected', () => {
