@@ -134,7 +134,7 @@ function buildGlobalConfiguration(agent: InvestigationControl['agent'], version 
   };
 }
 
-async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
+export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
   try {
     return GlobalConfigurationSchema.parse(JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')));
   } catch (error) {
