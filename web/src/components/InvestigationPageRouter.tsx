@@ -44,6 +44,7 @@ export function InvestigationPageRouter({ controller }: { controller: Investigat
         <InvestigationResultsPage
           sessionName={active}
           onBack={() => navigatePage('chat')}
+          onOpenJourney={() => navigatePage('journey')}
           onOpenConfig={() => navigatePage('config')}
           onOpenTrajectory={() => navigatePage('trajectory')}
         />
