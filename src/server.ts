@@ -96,6 +96,25 @@ import { config } from './config.js';
 import { ScopeGateError } from './workflow/scope-gate.js';
 import { ReportGateError } from './workflow/report-gate.js';
 import { getCachedRemoteMedia, resolveAndCacheRemoteMedia } from './media/remote-media.js';
+function formatUserFacingError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const turnLimit = /Max turns \\(\\d+\\) exceeded/i.exec(raw);
+  if (turnLimit) {
+    return '这次调查在完成前已经连续执行了 ' + turnLimit[1] + ' 个步骤，达到了单轮执行上限。请再次提交问题继续调查。';
+  }
+  if (raw === 'Turn aborted.') return '这次调查已停止。';
+  if (/waiting for user input/i.test(raw) && /Timeout after/i.test(raw)) return '等待你的回答时间过长，这次操作已停止。请重新回答。';
+  if (/waiting for permission/i.test(raw) && /Timeout after/i.test(raw)) return '等待你确认操作时间过长，这次操作已停止。请重新提交。';
+  if (/waiting for agent execution/i.test(raw) && /Timeout after/i.test(raw)) return '这次调查执行时间过长，已经停止。请重新开始，必要时缩小问题范围。';
+  if (/waiting for .*session.*completion/i.test(raw) && /Timeout after/i.test(raw)) return '运行服务长时间没有返回结果，已经停止。请重试。';
+  const openCodeHttp = /OpenCode[^\\n]*HTTP\\s+(\\d+)/i.exec(raw);
+  if (openCodeHttp) return 'OpenCode 当前无法连接（HTTP ' + openCodeHttp[1] + '）。请确认 OpenCode 服务已经启动，并检查服务地址。';
+  if (/CodeBuddy SDK 没有返回文本答案/.test(raw)) return '助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。';
+  if (/OpenCode CLI 没有返回文本答案/.test(raw)) return 'OpenCode 这次没有返回可用结果。请查看执行轨迹中的最后一条错误，然后重试。';
+  if (/OpenCode 运行时没有启用/.test(raw)) return 'OpenCode 当前没有启用。请在服务端设置 OPENCODE_ENABLED=true 后重试。';
+  return raw;
+}
+
 
 import {
   buildMissionDraft,
@@ -558,7 +577,7 @@ app.post('/api/sessions', async (req, res) => {
         reachable: false,
         baseUrl: config.openCodeBaseUrl,
         modelCount: 0,
-        error: error instanceof Error ? error.message : 'OpenCode 服务不可用。',
+        error: formatUserFacingError(error),
       }));
     }
   });
@@ -1514,7 +1533,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
       const failureContent = [
         companionNote.trim(),
         streamedAssistant.trim(),
-        '这次调查没有完成，我已经保留刚才已经得到的内容。你可以直接继续提问；详细错误信息显示在这里。',
+        '这次调查没有完成，我已经保留刚才得到的内容。你可以继续提问。错误原因：' + formatUserFacingError(error),
       ].filter(Boolean).join('\n\n');
       try {
         saveConversationMessage({
@@ -1532,7 +1551,7 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         });
       }
 
-      send('error', { error: message });
+      send('error', { error: formatUserFacingError(error) });
       finished = true;
       res.end();
     } finally {
@@ -1604,7 +1623,7 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     }
     res.status(500).json(ApiErrorSchema.parse({
       code: 'INTERNAL_ERROR',
-      error: error instanceof Error ? error.message : '服务暂时无法处理这个请求，请稍后重试。',
+      error: formatUserFacingError(error),
     }));
   });
 
