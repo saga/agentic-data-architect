@@ -199,7 +199,10 @@ export async function answerQuestion(
     active.lastActivityAt = new Date().toISOString();
     active.lastActivity = activity;
   };
+  // 每条 reasoning 独立排队；即使某一条写盘失败，后续 delta 仍要继续尝试，
+  // 同时保存第一次失败原因，最终在 turn 提交前阻止“日志不完整但结果仍被宣布成功”。
   let reasoningWrite: Promise<void> = Promise.resolve();
+  let reasoningWriteError: unknown;
   const emitStatus = (status: string): void => {
     updateLiveActivity(status);
     onStatus?.(status);
@@ -214,7 +217,14 @@ export async function answerQuestion(
   const emitReasoning = (delta: string, source = '执行当前调查'): void => {
     updateLiveActivity('正在分析问题');
     if (delta.trim()) {
-      reasoningWrite = reasoningWrite.then(() => appendReasoningLog(investigationName, turnId, delta, source));
+      reasoningWrite = reasoningWrite
+        .catch((error) => {
+          reasoningWriteError ??= error;
+        })
+        .then(() => appendReasoningLog(investigationName, turnId, delta, source))
+        .catch((error) => {
+          reasoningWriteError ??= error;
+        });
     }
     options?.onReasoningDelta?.(delta);
     emitStatus('助手正在分析你的问题，请稍候…');
@@ -916,6 +926,12 @@ export async function answerQuestion(
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
     await reasoningWrite;
+    if (reasoningWriteError) {
+      throw new Error(
+        '本轮秘书思考记录没有完整保存，因此这次结果不能作为可靠结果返回。'
+        + '（' + (reasoningWriteError instanceof Error ? reasoningWriteError.message : String(reasoningWriteError)) + '）',
+      );
+    }
     await sessionPersistence;
     await trajectoryWrite;
     if (sessionPersistenceError) {
