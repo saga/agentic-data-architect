@@ -78,6 +78,7 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
       status: 'stale',
       generatedAt: metadata.generatedAt,
       sourceRevision: metadata.provenance.sourceRevision,
+      markdown,
     });
   }
   const currentProvenance = computeArtifactProvenance(investigation, snapshot, metadata.version);
@@ -86,6 +87,7 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
       status: 'stale',
       generatedAt: metadata.generatedAt,
       sourceRevision: metadata.provenance.sourceRevision,
+      markdown,
     });
   }
 
@@ -94,6 +96,7 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
       status: 'stale',
       generatedAt: metadata.generatedAt,
       sourceRevision: metadata.provenance.sourceRevision,
+      markdown,
     });
   }
 
@@ -127,6 +130,7 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
       sourceRevision: metadata.provenance.sourceRevision,
       ...(reviewedAt ? { reviewedAt } : {}),
       ...(reviewStatus ? { reviewStatus } : {}),
+      markdown,
     });
   }
 
