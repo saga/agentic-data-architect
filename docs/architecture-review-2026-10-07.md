@@ -28,7 +28,7 @@
 | CodeBuddy Investigation 可修改宿主仓库 | 已解决 | ADR-031 已定义 built-in allowlist、二次 deny 和 workspace path boundary。 |
 ## 摘要
 
-按当时 2026-10-07 基线来看，架构骨架是健康的：ADR 分层清晰，Mission/Scope/Stage/Report 四道 Gate 落到了服务端确定性条件，Evidence-first 的意图贯穿，Skill 的五章节 Contract 100% 齐备，15 个 `completeWhen` 全部命中代码常量。**当时共有 29 条 ADR；当前 main 已增加到 ADR-031。**
+按当时 2026-10-07 基线来看，架构骨架是健康的：ADR 分层清晰，Mission/Scope/Stage/Report 四道 Gate 落到了服务端确定性条件，Evidence-first 的意图贯穿，Skill 的五章节 Contract 100% 齐备，15 个 `completeWhen` 全部命中代码常量。**当时共有 29 条 ADR；当前 main 已增加到 ADR-032。**
 
 这份报告下面的严重问题、测试数量和代码行号全部属于当时基线。当前 main 的修复状态以本报告上面的表和 ADR 为准。
 
