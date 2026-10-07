@@ -5,6 +5,7 @@
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import multer from 'multer';
@@ -63,6 +64,9 @@ import {
   WorkflowSnapshotSchema,
   JourneyAiResponseSchema,
   AbortResponseSchema,
+  GlobalConfigurationResponseSchema,
+  RemoteMediaResolveBodySchema,
+  RemoteMediaResolveResponseSchema,
   type SseEvent,
   type SessionSummary as SharedSessionSummary,
   type WorkflowId as SharedWorkflowId,
@@ -87,6 +91,7 @@ import {
 import { config } from './config.js';
 import { ScopeGateError } from './workflow/scope-gate.js';
 import { ReportGateError } from './workflow/report-gate.js';
+import { getCachedRemoteMedia, resolveAndCacheRemoteMedia } from './media/remote-media.js';
 
 import {
   buildMissionDraft,
@@ -136,6 +141,7 @@ import { listOpenCodeModels, abortOpenCodeTurn } from './agent/opencode.js';
 import {
   appendAuditEvent,
   loadInvestigationControl,
+  loadGlobalConfiguration,
   readAuditEvents,
   updateInvestigationControl
 } from './investigation/control.js';
@@ -342,6 +348,66 @@ export function createApp(vite?: ViteDevServer) {
   // 健康检查：只验证 Web service 能正常响应，不触发模型或数据库连接。
 app.get('/api/health', (_req, res) => {
     res.json(HealthResponseSchema.parse({ ok: true, service: 'agentic-data-architect' }));
+  });
+
+  /** 返回工作台级 Global Agent 配置；与任何 Investigation 无关。 */
+  app.get('/api/config/global', async (_req, res) => {
+    res.json(GlobalConfigurationResponseSchema.parse({ configuration: await loadGlobalConfiguration() }));
+  });
+
+  /** 解析远程图片/视频并预热 Global Cache。 */
+  app.post('/api/global/media/resolve', async (req, res) => {
+    const body = parseRequest(RemoteMediaResolveBodySchema, req.body);
+    const result = await resolveAndCacheRemoteMedia(body.url, body.kind);
+    const cached = await getCachedRemoteMedia(result.cacheKey);
+    res.json(RemoteMediaResolveResponseSchema.parse({
+      source: result.source,
+      kind: result.kind,
+      ...(result.remoteUrl ? { remoteUrl: result.remoteUrl } : {}),
+      cacheKey: result.cacheKey,
+      ...(cached ? { cacheUrl: '/api/global/media/' + result.cacheKey, cached: true } : { cached: false }),
+      ...(result.mimeType ? { mimeType: result.mimeType } : {}),
+    }));
+  });
+
+  /** 服务 Global Cache 中的远程媒体；视频支持 Range。 */
+  app.get('/api/global/media/:cacheKey', async (req, res) => {
+    const cacheKey = String(req.params.cacheKey);
+    if (!/^[a-f0-9]{64}$/i.test(cacheKey)) {
+      res.status(400).end();
+      return;
+    }
+    const cached = await getCachedRemoteMedia(cacheKey);
+    if (!cached) {
+      res.status(404).end();
+      return;
+    }
+
+    const mimeType = cached.mimeType;
+    const range = req.headers.range;
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    if (mimeType) res.setHeader('Content-Type', mimeType);
+
+    if (typeof range === 'string') {
+      const match = /^bytes=(\\d*)-(\\d*)$/.exec(range);
+      if (match) {
+        const start = match[1] ? Number(match[1]) : Math.max(0, cached.sizeBytes - Number(match[2] || 0));
+        const end = match[2] ? Number(match[2]) : cached.sizeBytes - 1;
+        if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end >= start && end < cached.sizeBytes) {
+          res.status(206);
+          res.setHeader('Content-Range', 'bytes ' + start + '-' + end + '/' + cached.sizeBytes);
+          res.setHeader('Content-Length', String(end - start + 1));
+          fsSync.createReadStream(cached.path, { start, end }).pipe(res);
+          return;
+        }
+      }
+      res.status(416).setHeader('Content-Range', 'bytes */' + cached.sizeBytes).end();
+      return;
+    }
+
+    res.setHeader('Content-Length', String(cached.sizeBytes));
+    fsSync.createReadStream(cached.path).pipe(res);
   });
 
   // Session 列表 API：返回 UI 左侧历史 Investigation。
