@@ -6,13 +6,14 @@
 
 ## 1. 结论
 
-当前系统的核心状态分成三块：
+当前系统的核心状态和配置分成四块：
 
 | 状态 | 存储 | 作用 | 权威性 |
 |---|---|---|---|
 | Investigation State | .workspace/<session>/context.json | goal、scope、evidence、claims、findings、inputs、Agent session reference | Investigation 当前状态 |
-| Conversation / Local Registry | .workspace/conversations.db | user/assistant 消息、turn、Dataset Registry、local analysis run | 对话与本地分析元数据 |
-| Control State | .workspace/<session>/control.json | Research、guidance、MCP、平台能力、版本历史 | Agent 执行配置 |
+| Conversation / Local Registry | .workspace/conversations.db | user/assistant 消息、turn、assistant draft、Dataset Registry、local analysis run | 对话与本地分析元数据 |
+| Task Control | .workspace/<session>/control.json | Research、Workflow、Task-level guidance/Agent override、MCP、版本历史 | 当前 Investigation 的执行配置 |
+| Global Configuration | .data/global-config.json | 跨 Investigation 的 Agent 默认行为与长期配置 | 工作台级默认配置 |
 
 Agent session 本身不作为业务状态源，而是由 context.json 保存的可恢复引用；具体是 Copilot、CodeBuddy 还是 OpenCode 由 Runtime 配置决定。
 
