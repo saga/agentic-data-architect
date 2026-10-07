@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Divider, Empty, Flex, Space, Table, Tag, Typography } from 'antd';
-import { ArrowLeftOutlined, HistoryOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Divider, Empty, Flex, Modal, Space, Table, Tag, Typography } from 'antd';
+import { ArrowLeftOutlined, HistoryOutlined, NodeIndexOutlined, ReloadOutlined, SettingOutlined, ToolOutlined } from '@ant-design/icons';
 import { ApiRequestError, getJson, getText } from '../app/api.js';
 import {
   ReportRegenerateResponseSchema,
@@ -29,6 +29,15 @@ function asCheckpoint(event: TrajectoryEvent): InvestigationCheckpoint | undefin
     timestamp: event.timestamp,
     ...details,
   };
+}
+
+function humanizeResultsError(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiRequestError) return cause.apiError.error || fallback;
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (/reportResponse is not defined/i.test(message)) {
+    return '结果报告暂时无法读取；阶段小结和其它调查结果仍然可以查看，请稍后刷新。';
+  }
+  return fallback;
 }
 
 export function InvestigationResultsPage(props: {
@@ -73,8 +82,8 @@ export function InvestigationResultsPage(props: {
         const checkpoint = asCheckpoint(event);
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
       }
-      if (reportResponse.ok) {
-        setReport(reportPayload ?? '');
+      if (reportPayload !== undefined) {
+        setReport(reportPayload);
         setReportGateError(undefined);
       } else {
         setReport('');
@@ -87,7 +96,7 @@ export function InvestigationResultsPage(props: {
       setModernizationStatus(modernizationData.status);
       setModernization(modernizationData.plan ?? undefined);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法读取调查结果');
+      setError(humanizeResultsError(cause, '调查结果暂时无法读取，请稍后刷新结果页面。'));
     } finally {
       setLoading(false);
     }
@@ -114,28 +123,37 @@ export function InvestigationResultsPage(props: {
           <Tag>{workflowLabel}</Tag>
         </Flex>
         <Space>
+          <Button icon={<NodeIndexOutlined />} onClick={() => props.onBack()}>工作地图</Button>
           <Button icon={<SettingOutlined />} onClick={props.onOpenConfig}>调查配置</Button>
           <Button icon={<ToolOutlined />} onClick={props.onOpenTrajectory}>Agent 轨迹</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void load()} loading={loading}>刷新</Button>
           <Button
             icon={<ReloadOutlined />}
             type='primary'
-            onClick={async () => {
-              setLoading(true);
-              setError(undefined);
-              setReportGateError(undefined);
-              try {
-                const payload = await getJson(
-                  '/api/sessions/' + encodeURIComponent(props.sessionName) + '/report/regenerate',
-                  ReportRegenerateResponseSchema,
-                  { method: 'POST' },
-                );
-                setReport(payload.markdown);
-                await load();
-              } catch (cause) {
-                setReportGateError(cause instanceof Error ? cause.message : '报告重新生成失败');
-                setLoading(false);
-              }
+            onClick={() => {
+              Modal.confirm({
+                title: '重新生成报告？',
+                content: '这会重新运行报告生成和独立质量审核，可能需要较长时间。当前正式报告不会因为取消确认而改变。',
+                okText: '重新生成',
+                cancelText: '取消',
+                onOk: async () => {
+                  setLoading(true);
+                  setError(undefined);
+                  setReportGateError(undefined);
+                  try {
+                    const payload = await getJson(
+                      '/api/sessions/' + encodeURIComponent(props.sessionName) + '/report/regenerate',
+                      ReportRegenerateResponseSchema,
+                      { method: 'POST' },
+                    );
+                    setReport(payload.markdown);
+                    await load();
+                  } catch (cause) {
+                    setReportGateError(humanizeResultsError(cause, '报告重新生成失败，请稍后重试。'));
+                    setLoading(false);
+                  }
+                },
+              });
             }}
             loading={loading}
           >重新生成报告</Button>
