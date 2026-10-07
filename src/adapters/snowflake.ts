@@ -40,14 +40,14 @@ async function loadDriver(): Promise<{
       createConnection: (opts: Record<string, string>) => { connect: (cb: (err: Error | undefined) => void) => void } & SfConn;
     };
   } catch {
-    throw new Error('Snowflake 驱动未安装：npm install snowflake-sdk 后再用（文件发现不受影响）');
+    throw new Error('Snowflake 连接功能现在不能使用，因为缺少连接驱动。请安装对应的连接依赖后再试；文件分析不受影响。');
   }
 }
 
 /** 把 snowflake:// 连接串拆成 SDK 所需的 account、用户、数据库、Schema、warehouse 和 role。 */
 function parseUrl(conn: string): Record<string, string> {
   const u = new URL(conn);
-  if (u.protocol !== 'snowflake:') throw new Error('非法 snowflake 连接串');
+  if (u.protocol !== 'snowflake:') throw new Error('Snowflake 连接地址格式不正确，请使用 snowflake:// 开头的连接地址。');
   const parts = u.pathname.split('/').filter(Boolean);
   return {
     account: u.hostname,
@@ -63,7 +63,7 @@ function parseUrl(conn: string): Record<string, string> {
 /** 校验并转义 Snowflake 标识符，禁止任意字符串直接进入 SQL。 */
 function ident(name: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name)) {
-    throw new Error(`非法 Snowflake 标识符：${name}`);
+    throw new Error(`Snowflake 名称格式不正确：${name}`);
   }
   return '"' + name.replace(/"/g, '""') + '"';
 }
