@@ -1,9 +1,19 @@
 /**
- * Agent runtime orchestration.
+ * Agent Runtime 统一入口。
  *
- * The Investigation chooses one preferred runtime. When that runtime exhausts
- * its quota, execution automatically continues with the next configured runtime;
- * no user confirmation is required for this availability fallback.
+ * 这里解决的不是具体 Agent SDK 的调用细节，而是“这次调用应该由哪个 Runtime /
+ * Model 执行、什么时候允许 fallback、Session 是否可以复用、失败怎样记录”这些
+ * 跨 Runtime 的共同问题。
+ *
+ * 关键规则：
+ * 1. Investigation 只保存用户选择的首选 Runtime；quota / usage exhaustion 只是运行时可用性问题，
+ *    不应该反过来修改用户的任务配置。
+ * 2. 同一个 Runtime + Model + Session 可以继续使用原 Session；切换 Runtime 或 Model
+ *    必须从新的 Session 开始，避免两个 SDK 的上下文状态互相污染。
+ * 3. 只有明确属于 quota / rate limit / resource exhausted 的失败才允许自动 fallback；
+ *    普通代码错误、权限错误、参数错误不能被吞掉后“换个模型碰碰运气”。
+ * 4. 每次 Runtime 尝试都要进入 trajectory / audit，并记录开始、结束、失败和耗时，
+ *    否则长时间运行时用户无法判断到底卡在模型、工具还是 fallback。
  */
 import { config } from '../config.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
@@ -40,6 +50,7 @@ function isQuotaError(error: unknown): boolean {
     || /\b(?:429|402)\s*[:\-]?\s*(?:quota|credits?|rate|usage)/i.test(message);
 }
 
+/** 读取应用级 fallback 顺序并去重；非法配置项直接忽略，默认 Runtime 始终排第一。 */
 function configuredRuntimeOrder(): AgentRuntime[] {
   const result: AgentRuntime[] = [];
   for (const value of config.agentRuntimeFallbackOrder) {
@@ -51,6 +62,7 @@ function configuredRuntimeOrder(): AgentRuntime[] {
   return result;
 }
 
+/** 从用户选定 Runtime 开始向后寻找可用候选，不会跨过用户指定 Runtime 反向尝试。 */
 function runtimeCandidates(selected: AgentRuntime): AgentRuntime[] {
   const order = configuredRuntimeOrder();
   const index = order.indexOf(selected);
