@@ -351,7 +351,15 @@ export function InvestigationConfigPage(props:{
                 onChange={e=>update(next=>{next.agent.personality=e.target.value;})}
               />
             </Card>
-            <Card title='本机 OpenCode' className='settings-card'>
+            <Card title='Agent Runtime' className='settings-card'>
+             <Paragraph type='secondary'>
+               当前 Investigation 的首选运行方式决定第一优先级。运行时配额不足时，服务会按全局配置的 fallback 顺序自动继续，不会修改这里保存的首选方式。
+             </Paragraph>
+             <Tag color='blue'>
+               {draft.agent.runtime === 'codebuddy-sdk' ? 'CodeBuddy SDK' : draft.agent.runtime === 'copilot-sdk' ? 'Copilot SDK' : 'OpenCode Run'}
+             </Tag>
+           </Card>
+           <Card title='本机 OpenCode' className='settings-card'>
              <Paragraph type='secondary'>
                模型下拉框会自动读取本机 OpenCode 已连接的 provider / model。选择后，当前 Investigation 的模型值会保存为 <code>opencode:&lt;provider&gt;/&lt;model&gt;</code>，下一轮直接由 OpenCode 执行。
              </Paragraph>
