@@ -33,7 +33,7 @@ async function loadPg(): Promise<{ Client: new (conn: string) => PgClient }> {
   try {
     return (await import('pg')) as unknown as { Client: new (conn: string) => PgClient };
   } catch {
-    throw new Error('PostgreSQL 驱动未安装：npm install pg 后再用 discover-db（文件发现不受影响）');
+    throw new Error('PostgreSQL 连接功能现在不能使用，因为缺少 pg 驱动。请安装 pg 后再试；文件分析不受影响。');
   }
 }
 
@@ -63,7 +63,7 @@ constructor(private readonly connectionString: string) {}
 
   /** 建立 PostgreSQL 连接并保存底层 Client。 */
 async connect(): Promise<void> {
-    if (!this.connectionString) throw new Error('缺少连接串：设置 PG_URL');
+    if (!this.connectionString) throw new Error('还没有配置 PostgreSQL 连接地址。请设置 PG_URL 后再试。');
     const { Client } = await loadPg();
     this.client = new Client(this.connectionString);
     await (this.client as unknown as { connect: () => Promise<void> }).connect();
@@ -77,7 +77,7 @@ async close(): Promise<void> {
 
   /** 统一执行驱动查询，并确保适配器已经连接。 */
 private q(text: string, params: unknown[] = []): Promise<Record<string, unknown>[]> {
-    if (!this.client) throw new Error('未连接：先调用 connect()');
+    if (!this.client) throw new Error('PostgreSQL 连接还没有建立，请先建立数据库连接后再试。');
     return this.client.query(text, params).then((r) => r.rows);
   }
 
@@ -217,7 +217,7 @@ async query(sql: string): Promise<QueryResult> {
 /** 连接串路由（postgres 同步可用；snowflake 请直接 new SnowflakeAdapter）。 */
 export function createAdapter(connectionString: string): DatabaseAdapter {
   if (/^postgres(ql)?:\/\//.test(connectionString)) return new PostgresAdapter(connectionString);
-  throw new Error(`不支持的连接串（V1.1：postgres:// 走这里，snowflake:// 请用 SnowflakeAdapter）：${connectionString.split('://')[0] ?? ''}://...`);
+  throw new Error(`这个数据库连接地址暂不支持：${connectionString.split('://')[0] ?? '未知协议'}。PostgreSQL 请使用 postgres://；Snowflake 请使用 snowflake://。`);
 }
 
 export type { TableInfo, TableMetadata };
