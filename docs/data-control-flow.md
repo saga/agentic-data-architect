@@ -21,7 +21,7 @@ Agent session 本身不作为业务状态源，而是由 context.json 保存的�
 
 1. 一个 Investigation 同时只允许一个 active turn。
 2. turn 在任何 Agent Runtime 真正启动前就完成进程内 reservation，避免异步创建 runtime session 的竞争窗口。
-3. server 重启后残留的 running turn 会恢复成 aborted。
+3. server 重启后残留的 running turn 会恢复成 aborted，并生成可见的 assistant 中断消息。
 4. 没有真实 Agent Runtime execution 的 stale running turn 可以被恢复。
 5. 前端使用稳定 turnId，SSE 与 abort 使用同一个 turn。
 6. SSE 现在是真实使用路径，不再存在“后端有 streaming、前端却调用普通 POST”的双轨问题。
