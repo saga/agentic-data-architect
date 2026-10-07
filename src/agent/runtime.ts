@@ -149,8 +149,8 @@ function adaptInput(
     ...rest,
     runtime,
     model,
-    // A session belongs to one runtime+model selection. A quota fallback starts
-    // a fresh session and never persists that fallback session as the preferred runtime.
+    // 一个 Agent Session 只属于固定的 Runtime + Model 组合。发生 quota fallback 时必须新建 Session，
+    // 不能把备用 Runtime 的 Session 写回 Investigation，覆盖用户原来选择的首选 Runtime。
     ...(preserveSession && sessionId
       ? { sessionId, ...(onSessionId ? { onSessionId } : {}) }
       : {}),
