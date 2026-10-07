@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import {
   abortStaleConversationTurn,
   beginConversationTurn,
+  getConversationTurn,
   getConversationSummary,
+  recoverRunningConversationTurns,
+  updateConversationTurnDraft,
   getRunningConversationTurn,
   listConversationMessages,
   saveConversationMessage,
@@ -63,4 +66,29 @@ test('allows stale running turns to be recovered before a new turn starts', () =
 
   const second = beginConversationTurn(sessionName, 'turn-' + randomUUID());
   assert.equal(second.status, 'running');
+  assert.equal(abortStaleConversationTurn(second.turnId), true);
+});
+
+test('server restart recovery preserves partial assistant draft', () => {
+  const sessionName = 'conversation-recovery-test-' + randomUUID();
+  const turnId = 'turn-' + randomUUID();
+  beginConversationTurn(sessionName, turnId);
+  saveConversationMessage({
+    id: turnId + ':user',
+    sessionName,
+    role: 'user',
+    content: '继续检查代码结构。',
+  });
+  updateConversationTurnDraft(turnId, '秘书：我已经找到一个关键入口。\\n\\n正在检查下游调用。');
+
+  assert.match(getConversationTurn(turnId)?.assistantDraft ?? '', /关键入口/);
+  assert.equal(recoverRunningConversationTurns(), 1);
+  assert.equal(getConversationTurn(turnId)?.status, 'aborted');
+  assert.equal(getConversationTurn(turnId)?.assistantDraft, undefined);
+
+  const messages = listConversationMessages(sessionName);
+  const failure = messages.find((message) => message.id === turnId + ':assistant:failure');
+  assert.ok(failure);
+  assert.match(failure?.content ?? '', /关键入口/);
+  assert.match(failure?.content ?? '', /服务刚刚在调查过程中停止/);
 });
