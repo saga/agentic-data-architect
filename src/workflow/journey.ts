@@ -157,6 +157,13 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     }
 
     const heading = headingPattern.exec(raw);
+    if (!heading) {
+      const unsupportedBlock = /^##\s+@(\\S+)/.exec(raw);
+      if (unsupportedBlock) {
+        issues.push('Workflow 不支持 @' + unsupportedBlock[1] + '；只能使用 @flow、@task、@review、@end。第 ' + lineNumber + ' 行无效。');
+        continue;
+      }
+    }
     if (heading) {
       commitNode();
       const kind = heading[1];
@@ -201,11 +208,17 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
     }
 
     const attr = attrPattern.exec(raw);
-    if (attr && current.routes.length === 0 && !current.attrsClosed) {
+    if (attr) {
       if (!['title', 'objective', 'actor', 'completeWhen'].includes(attr[1])) {
         issues.push(current.id + ' 使用了不支持的 Workflow 字段：' + attr[1] + '。第 ' + lineNumber + ' 行无效。');
+      } else if (current.routes.length === 0 && !current.attrsClosed) {
+        if (current.attrs[attr[1]] !== undefined) {
+          issues.push(current.id + ' 重复设置了 Workflow 字段：' + attr[1] + '。第 ' + lineNumber + ' 行无效。');
+        } else {
+          current.attrs[attr[1]] = attr[2];
+        }
       } else {
-        current.attrs[attr[1]] = attr[2];
+        issues.push(current.id + ' 的 Workflow 字段必须写在出口定义之前。第 ' + lineNumber + ' 行无效。');
       }
       continue;
     }
