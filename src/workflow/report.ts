@@ -221,6 +221,14 @@ export async function runReport(
     provenance,
   });
   if (review.availability !== 'completed' || review.status !== 'pass') {
+    // Keep the failed review attempt for diagnosis without replacing the review
+    // attached to an already-published report version.
+    const failurePath = path.join(
+      reportsDir(name),
+      'report-review-failure-v' + String(nextVersion) + '.json',
+    );
+    await fs.mkdir(reportsDir(name), { recursive: true });
+    await fs.writeFile(failurePath, JSON.stringify(review, null, 2) + '\n', 'utf8');
     throw new ReportQualityGateError(review);
   }
 
