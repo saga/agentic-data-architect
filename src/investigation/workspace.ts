@@ -4,6 +4,7 @@
  * 本文件的注释说明职责、输入输出、状态变化和关键并发边界，方便后续维护。
  */
 import fs from 'node:fs/promises';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
@@ -50,21 +51,27 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
 
 const contextWriteLocks = new Map<string, Promise<void>>();
 const sharedIndexWriteLocks = new Map<string, Promise<void>>();
+const contextLockOwners = new AsyncLocalStorage<Set<string>>();
+const sharedIndexLockOwners = new AsyncLocalStorage<boolean>();
 
 /** 串行化全局 shared index 的读改写操作，防止不同 Session 覆盖彼此的 Artifact。 */
 async function withSharedIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  if (sharedIndexLockOwners.getStore()) return operation();
   const previous = sharedIndexWriteLocks.get('shared') ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const queued = previous.catch(() => undefined).then(() => gate);
   sharedIndexWriteLocks.set('shared', queued);
   await previous.catch(() => undefined);
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (sharedIndexWriteLocks.get('shared') === queued) sharedIndexWriteLocks.delete('shared');
-  }
+  const owner = true;
+  return sharedIndexLockOwners.run(owner, async () => {
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (sharedIndexWriteLocks.get('shared') === queued) sharedIndexWriteLocks.delete('shared');
+    }
+  });
 }
 
 /** 确保 shared/index.json 存在；只负责初始化，不持有外层锁。 */
@@ -90,6 +97,8 @@ export async function withWorkspaceContextLock<T>(
   name: string,
   operation: () => Promise<T>,
 ): Promise<T> {
+  const owners = contextLockOwners.getStore();
+  if (owners?.has(name)) return operation();
   const previous = contextWriteLocks.get(name) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -97,12 +106,16 @@ export async function withWorkspaceContextLock<T>(
   contextWriteLocks.set(name, queued);
 
   await previous.catch(() => undefined);
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (contextWriteLocks.get(name) === queued) contextWriteLocks.delete(name);
-  }
+  const nextOwners = new Set(owners ?? []);
+  nextOwners.add(name);
+  return contextLockOwners.run(nextOwners, async () => {
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (contextWriteLocks.get(name) === queued) contextWriteLocks.delete(name);
+    }
+  });
 }
 
 /** 返回 Investigation transcript.md 路径。 */
