@@ -90,6 +90,24 @@ test('unsupported Skill frontmatter fields are rejected', () => {
     /不支持的 frontmatter 字段：tools/,
   );
 });
+test('Workflow DSL rejects unsupported blocks and attributes even after routes', async () => {
+  const { parseJourneyMarkdown } = await import('../src/workflow/journey.js');
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> start',
+    '',
+    '## @task start',
+    '- success -> done',
+    'tools: bash',
+    '@phase hidden',
+    '',
+    '## @end done',
+  ].join('\n'));
+  const issues = result.issues.join('\n');
+  assert.match(issues, /不支持的 Workflow 字段：tools/);
+  assert.match(issues, /不支持 @phase/);
+});
+
 test('Workflow DSL rejects forbidden blocks and attributes', async () => {
   const { parseJourneyMarkdown } = await import('../src/workflow/journey.js');
   const result = parseJourneyMarkdown([
