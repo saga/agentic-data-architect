@@ -1457,12 +1457,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
     for (const [requestId, pending] of pendingCopilotPermissions) {
       if (pending.turnId === (input.turnId ?? '')) pendingCopilotPermissions.delete(requestId);
     }
-    for (const [requestId, pending] of pendingCopilotUserInputs) {
-      if (pending.turnId === (input.turnId ?? '')) {
-        pendingCopilotUserInputs.delete(requestId);
-        pending.reject(new Error('Copilot session 已结束。'));
-      }
-    }
     if (input.turnId) activeSessions.delete(input.turnId);
     offAssistantTurnStart();
     offMessageDelta();
