@@ -992,8 +992,17 @@ app.post('/api/sessions/:name/files', upload.single('file'), async (req, res) =>
     let dataset;
     try {
       dataset = await registerLocalDataset(name, relativePath, req.file.originalname);
-    } catch {
-      // 非分析文件继续按普通文档处理；CSV/JSON/JSONL/Parquet 会自动进入 Dataset Registry。
+    } catch (error) {
+      const extension = path.extname(req.file.originalname).toLowerCase();
+      const analyticalExtensions = new Set(['.csv', '.json', '.jsonl', '.ndjson', '.parquet', '.xlsx']);
+      if (analyticalExtensions.has(extension)) {
+        throw new Error(
+          '这个数据文件已经上传，但系统没能把它登记为可分析的数据集。'
+          + ' 请检查文件内容后重新上传。'
+          + '（' + (error instanceof Error ? error.message : String(error)) + '）',
+        );
+      }
+      // 其它普通文件继续作为文档保存。
     }
 
     const input = await appendContextInput(name, {
