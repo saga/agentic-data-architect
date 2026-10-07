@@ -318,9 +318,30 @@ export async function answerQuestion(
     if (githubRepositories.length) {
       emitStatus('正在准备代码仓库并建立初始调查资料，请稍候…');
       for (const repository of githubRepositories) {
+        const startedAt = Date.now();
+        recordTrajectory({
+          type: 'status',
+          name: '准备代码仓库：' + repository,
+          status: 'started',
+          details: { operation: 'github_repository_bootstrap', repository },
+        });
         try {
           await researchGitHubRepository(investigationName, repository);
+          recordTrajectory({
+            type: 'status',
+            name: '代码仓库已准备好：' + repository,
+            status: 'completed',
+            durationMs: Math.max(0, Date.now() - startedAt),
+            details: { operation: 'github_repository_bootstrap', repository },
+          });
         } catch (error) {
+          recordTrajectory({
+            type: 'status',
+            name: '代码仓库准备失败：' + repository,
+            status: 'failed',
+            durationMs: Math.max(0, Date.now() - startedAt),
+            details: { operation: 'github_repository_bootstrap', repository, error: error instanceof Error ? error.message : String(error) },
+          });
           await appendAuditEvent(investigationName, {
             actor: 'system',
             action: 'research.github.bootstrap_failed',
