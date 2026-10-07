@@ -49,6 +49,8 @@ export interface JourneyFacts {
   goal: string;
   /** Scope Gate 是否已经确认 Goal / Scope / Systems。 */
   scopeReady?: boolean;
+  /** 当前 Investigation 已保存的 Finding 数量，是原始事实，不是 completion signal。 */
+  findingCount?: number;
   currentState: {
     datasets: number;
     semanticAssets: number;
