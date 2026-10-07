@@ -8,6 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadInvestigation, reportsDir } from '../investigation/store.js';
+import { loadInvestigationControl } from '../investigation/control.js';
 import { loadModernizationPlan } from './modernization.js';
 import { runInvestigationScopeGate } from './scope-gate.js';
 import type { ModernizationPlan } from '../model/modernization.js';
@@ -188,6 +189,7 @@ export async function runModernizationGate(
   }
   const plan = await loadModernizationPlan(name);
   const inv = await loadInvestigation(name);
+  const control = await loadInvestigationControl(name);
   const artifactPath = path.join(reportsDir(name), 'modernization-plan.json');
 
   let exists = false;
@@ -229,7 +231,9 @@ export async function runModernizationGate(
   try {
     const review = await reviewArtifact({
       investigationName: name,
-      goal: inv.userPrompt || inv.goal || plan.goal,
+      mission: inv.mission!,
+      runtime: control.agent.runtime,
+      model: control.agent.model,
       artifactType: stage === 'target'
         ? 'target_architecture'
         : stage === 'mapping'
