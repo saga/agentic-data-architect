@@ -156,8 +156,18 @@ export async function runInvestigationReportGate(
   if (source) return evaluateInvestigationReportGate(source.investigation, source.snapshot);
   const investigation = await loadInvestigation(name);
   const snapshot = await loadLatestSnapshot<DiscoverySnapshot>(name);
+  const assessment = investigation.workflow === 'data-architecture-assessment'
+    ? await loadArchitectureAssessmentPlan(name)
+    : null;
   return evaluateInvestigationReportGate(
-    { ...investigation, resultArtifactCount: await countAnalysisArtifacts(name) },
+    {
+      ...investigation,
+      resultArtifactCount: await countAnalysisArtifacts(name),
+      workflow: investigation.workflow,
+      assessmentPlanAvailable: Boolean(assessment),
+      assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
+      assessmentRoadmapCount: assessment?.roadmap.length ?? 0,
+    },
     snapshot,
   );
 }
