@@ -67,15 +67,15 @@ function looksLikeDirectMedia(source: string, kind: RemoteMediaKind): boolean {
 function mimeFromMediaUrl(value: string): string | undefined {
   try {
     const pathname = new URL(value).pathname.toLowerCase();
-    if (/\\.(png|jpe?g|webp|gif|avif)$/.test(pathname)) {
+    if (/\.(png|jpe?g|webp|gif|avif)$/.test(pathname)) {
       return pathname.endsWith('.png') ? 'image/png'
         : pathname.endsWith('.webp') ? 'image/webp'
           : pathname.endsWith('.gif') ? 'image/gif'
             : 'image/jpeg';
     }
-    if (/\\.(webm)$/.test(pathname)) return 'video/webm';
-    if (/\\.(mov|m4v)$/.test(pathname)) return 'video/quicktime';
-    if (/\\.(mp4)$/.test(pathname)) return 'video/mp4';
+    if (/\.(webm)$/.test(pathname)) return 'video/webm';
+    if (/\.(mov|m4v)$/.test(pathname)) return 'video/quicktime';
+    if (/\.(mp4)$/.test(pathname)) return 'video/mp4';
   } catch {}
   return undefined;
 }
