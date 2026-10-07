@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyJourneyTransition,
   buildJourneyState,
+  isAgentWorkflowCompletionAllowed,
   initialJourneyExecution,
   loadWorkflowJourney,
   parseJourneyMarkdown,
@@ -76,6 +77,18 @@ test('unknown completeWhen is rejected by Workflow validation', () => {
   ].join('\n'));
   assert.ok(result.definition);
   assert.ok(validateJourneyDefinition(result.definition!).some((issue) => issue.includes('未知的 completeWhen')));
+});
+
+test('Agent cannot advance a conditionless task without Stage Gate approval', () => {
+  const node = { actor: 'agent' as const, completeWhen: undefined };
+  assert.equal(isAgentWorkflowCompletionAllowed(node, baseFacts, false), false);
+  assert.equal(isAgentWorkflowCompletionAllowed(node, baseFacts, true), true);
+});
+
+test('Agent completion still uses deterministic facts when completeWhen exists', () => {
+  const node = { actor: 'agent' as const, completeWhen: 'scope-ready' };
+  assert.equal(isAgentWorkflowCompletionAllowed(node, { ...baseFacts, scopeReady: false }, true), false);
+  assert.equal(isAgentWorkflowCompletionAllowed(node, { ...baseFacts, scopeReady: true }, false), true);
 });
 
 test('deterministic retry self-loop does not mark the node completed', () => {
