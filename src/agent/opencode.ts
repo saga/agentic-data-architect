@@ -946,6 +946,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       input.workingDirectory,
       '--agent',
       OPENCODE_CLI_AGENT,
+      '--auto',
       ...(input.onReasoningDelta ? ['--thinking'] : []),
       ...(sessionId ? ['--session', sessionId] : []),
       cliPrompt,
