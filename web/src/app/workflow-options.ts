@@ -4,7 +4,7 @@ export const workflowOptions: ReadonlyArray<{ value: WorkflowId | ''; label: str
   { value: '', label: '自主调查' },
   { value: 'legacy-modernization', label: '改造已有系统' },
   { value: 'current-data-architecture', label: '分析当前数据架构' },
-  { value: 'financial-ai-native-architecture', label: '金融 AI / 数据架构设计' },
+  { value: 'financial-ai-native-architecture', label: 'AI / 数据架构设计' },
   { value: 'data-architecture-assessment', label: '评估数据架构' },
 ];
 
