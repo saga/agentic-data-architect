@@ -62,28 +62,61 @@ export function resolveCodeBuddyModel(
 }
 
 function toCodeBuddyMcpServers(
-  settings: readonly McpServerSetting[],
+  settings: NonNullable<AskInput['mcpServers']>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  for (const server of settings) {
-    if (!server.enabled) continue;
-    if (server.type === 'local') {
-      if (!server.command) continue;
-      result[server.name] = {
+  const entries = Array.isArray(settings)
+    ? settings.map((server) => [server.name, server] as const)
+    : Object.entries(settings as Record<string, unknown>);
+
+  for (const [configuredName, value] of entries) {
+    if (!value || typeof value !== 'object') continue;
+    const server = value as Record<string, unknown>;
+
+    // AskInput.mcpServers follows the Copilot SDK's object-shaped MCP contract.
+    // Keep accepting the historical internal array shape because persisted callers
+    // may still provide McpServerSetting[] during a rolling upgrade.
+    if (Array.isArray(settings)) {
+      if (server.enabled !== true) continue;
+    }
+
+    const name = configuredName.trim();
+    if (!name) continue;
+
+    const type = typeof server.type === 'string' ? server.type : '';
+    const command = typeof server.command === 'string' ? server.command : '';
+    const url = typeof server.url === 'string' ? server.url : '';
+    const args = Array.isArray(server.args)
+      ? server.args.filter((item): item is string => typeof item === 'string')
+      : undefined;
+    const headers = server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)
+      ? Object.fromEntries(
+          Object.entries(server.headers).filter(
+            ([key, item]) => typeof key === 'string' && typeof item === 'string',
+          ),
+        )
+      : undefined;
+
+    if ((type === 'stdio' || type === 'local') && command) {
+      result[name] = {
         type: 'stdio',
-        command: server.command,
-        ...(server.args?.length ? { args: server.args } : {}),
+        command,
+        ...(args?.length ? { args } : {}),
+        ...(headers && Object.keys(headers).length ? { headers } : {}),
       };
       continue;
     }
-    if (server.url) {
-      result[server.name] = {
-        type: 'http',
-        url: server.url,
-        ...(server.headers ? { headers: server.headers } : {}),
+
+    if ((type === 'http' || type === 'sse') && url) {
+      result[name] = {
+        type,
+        url,
+        ...(args?.length ? { args } : {}),
+        ...(headers && Object.keys(headers).length ? { headers } : {}),
       };
     }
   }
+
   return result;
 }
 
