@@ -3,7 +3,7 @@
  *
  * 这里故意不把 DuckDB 做成整个应用的主数据库：
  * - SQLite 继续保存应用状态、对话、Dataset Registry 和分析运行记录；
- * - 每个 Investigation 有自己的 analysis.duckdb，负责分析计算；
+ * - 每个 Investigation 有自己的 local.duckdb，负责分析计算；
  * - 原始 CSV/JSON/JSONL/Parquet/XLSX 文件仍保留在 workspace 中；
  * - Agent 只能通过受限 local_* 工具使用已登记的数据集；分析结果继续绑定 Dataset 版本和 Evidence。
  *
