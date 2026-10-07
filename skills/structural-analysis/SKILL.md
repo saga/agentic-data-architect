@@ -82,7 +82,7 @@ Graphify
 
 如果 Graphify 与 Evidence 冲突，以 Evidence 为准，并把冲突作为下一步调查对象。
 
-运行时会检查 structural-analysis 是否先使用 Graphify；如果先调用 grep / glob / view / bash，系统会要求先完成 Graphify 结构查询。精确文本、文件发现、Git 操作等没有进入 structural-analysis 时仍直接使用常规工具。
+运行时会检查 structural-analysis 是否先使用 Graphify。Copilot 在进入该能力后会阻止先调用 grep / glob / view / bash；OpenCode 对结构问题先执行一次 Graphify-only preflight，完成后才开放源码检查工具。精确文本、文件发现、Git 操作等不需要结构分析时仍直接使用常规工具。
 
 ## 控制范围
 
