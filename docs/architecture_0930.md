@@ -328,6 +328,24 @@ Legacy Modernization Workflow 的确定性关卡不依赖 Agent 自评。空白/
 
 右侧工作区继续展示当前地图相关信息，下一步候选显示在最近一条 Agent 回答下面。全屏工作地图现在就是 Workflow 编辑器：用户可以拖动节点、添加步骤、增加分支、修改 outcome/目标、删除节点或分支。编辑结果只留在当前画布；服务端验证通过后，点击“保存”才创建新的 Workflow version，并尽量保留当前执行位置；只有当前节点被删除时才回到新 Workflow 的 start。
 
+## Agent Runtime
+
+当前 Investigation 支持三种 Agent Runtime：
+
+1. **Copilot SDK**：通过 GitHub Copilot SDK 执行。
+2. **CodeBuddy SDK**：通过 `@tencent-ai/agent-sdk` 程序化执行。
+3. **OpenCode Run**：通过官方 `opencode run` headless CLI 执行。
+
+Runtime 与 Model 分开保存。新建 Investigation 时可以指定首选 Runtime；quota / usage exhaustion 发生时，只在本次执行内从当前 Runtime 向后按全局配置 `AGENT_RUNTIME_FALLBACK_ORDER` 自动尝试，成功后不修改 Investigation 的首选 Runtime，也不需要用户确认。
+
+默认顺序是：
+
+~~~text
+Copilot SDK → CodeBuddy SDK → OpenCode Run
+~~~
+
+CodeBuddy 默认模型和可见模型由 `CODEBUDDY_DEFAULT_MODEL` / `CODEBUDDY_MODEL_ALLOWLIST` 配置，不写死在 Workflow 或 UI。CodeBuddy SDK 默认处于隔离环境，因此本项目显式传入 cwd、MCP、权限策略和任务 prompt，不依赖工作仓库中的 CodeBuddy 配置。
+
 ## Agent Trajectory / 执行轨迹
 
 Investigation 现在持久化 Agent 执行轨迹到 `.workspace/<session>/trajectory.jsonl`。
