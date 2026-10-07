@@ -175,6 +175,9 @@ export async function confirmInvestigationMission(
     if (missionChanged) {
       // Mission 真正改变后，旧范围确认、Copilot Session 和动态路线都可能已经过时。
       delete nextState.scopeValidation;
+      delete nextState.agentSessionId;
+      delete nextState.agentSessionRuntime;
+      delete nextState.agentConfigurationVersion;
       delete nextState.copilotSessionId;
       delete nextState.copilotConfigurationVersion;
       delete nextState.journeyPlan;
@@ -200,6 +203,9 @@ export async function updateInvestigationWorkflow(
     if (current.workflow === workflow) return current;
 
     const nextState = { ...current };
+    delete nextState.agentSessionId;
+    delete nextState.agentSessionRuntime;
+    delete nextState.agentConfigurationVersion;
     delete nextState.copilotSessionId;
     delete nextState.copilotConfigurationVersion;
     // 工作方式换了，上一条 Agent 动态路线也不再可信。
