@@ -5,7 +5,7 @@
 已实现：SQLGlot AST 解析（dataset + column lineage）、精确证据定位
 （文件+行号+hash+discovery run）、Data Estate Graph、只读 DB adapter
 （PostgreSQL/Snowflake）、真实 profiling、domain-agnostic deterministic findings、
-Skill-driven financial review、结构化 Agent 结果（含状态校正）、按问题检索证据、golden benchmark + CI。
+Skill-driven domain review、结构化 Agent 结果（含状态校正）、按问题检索证据、golden benchmark + CI。
 
 V1.1 优先完成（本节是对照清单，做完即勾）：
 1. Evidence provenance ✓ 2. SQL AST / column lineage ✓ 3. Estate Graph ✓
@@ -221,7 +221,7 @@ Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭
 
 1. **Legacy Modernization**
    - 适用于已有系统改造、replatform、迁移和切换。
-2. **Financial AI-Native Architecture**
+2. **AI-Native Architecture**
    - 适用于从零设计复杂企业 AI / 数据平台，例如业务研究 Agent。
 3. **Data Architecture Assessment**
    - 适用于评估已有数据架构：查清当前情况、主要问题、改进建议和实施顺序。
@@ -242,11 +242,11 @@ Legacy Modernization
     → 验证
     → 切换
 
-Financial AI-Native Architecture
+AI-Native Architecture
   明确业务目标
     → 明确业务需求
     → 查数据
-    → 定义金融业务模型
+    → 定义业务领域模型
     → 设计数据架构
     → 设计业务语义
     → 设计 Agent
@@ -266,14 +266,14 @@ Data Architecture Assessment
 
 当前 UI 不提供首页上的普通 Workflow 下拉切换。工作方式属于 Investigation 的重要持久化状态：只有在“调查配置 → 工作方式”的明确调整区选择目标、输入确认语句后才执行切换。这样可以保持工作方式灵活，但避免一次误点击就改变本次调查的导航语义。
 
-Financial AI-Native Architecture 的 Skill 重点覆盖：
+AI-Native Architecture 的 Skill 重点覆盖：
 
-- Business Domain Research / Investment Analytics 业务范围
-- Security / Entity State / Price / FX / Business Event / Benchmark 等金融数据
+- Business Domain Research / Business Analytics 业务范围
+- Entity / Reference Data / Metric / Rules / Business Event / Classification 等企业数据
 - Snowflake 数据层和 Semantic View
 - LangChain / DeepAgents / Skills / Tools
 - LangSmith tracing / evaluation
-- point-in-time research、Evidence 和 deterministic validation
+- effective-dated data、Evidence 和 deterministic validation
 
 不要把四条 Workflow 再抽象成新的 Workflow Registry、Journey Registry 或通用 orchestration engine。
 
@@ -2190,7 +2190,7 @@ Copilot SDK 的 Custom Agent 适合真正存在不同 Agent 角色时，例如�
 ```text
 Data Architect Agent
 Security Reviewer Agent
-Financial Domain Agent
+Domain Agent
 ```
 
 当前项目只有一个主推理角色，因此再包一层 `lead-data-agent` 只会增加配置和 UI 概念，没有增加实际能力。
@@ -2567,7 +2567,7 @@ portfolio hierarchy
 
 ## 5. Current Data ≠ Historical Data
 
-尤其是 investment research。
+尤其是复杂业务研究。
 
 ---
 
