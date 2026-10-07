@@ -423,22 +423,6 @@ export function layoutWorkflow(
   return removeNodeCollisions(normalized);
 }
 
-/** 旧函数名保留，避免已有调用方一次性修改；实现不再依赖 ELK。 */
-export function layoutWithElk(
-  nodes: FlowNode[],
-  edges: FlowEdge[],
-): Promise<FlowNode[]> {
-  return Promise.resolve(layoutWorkflow(nodes, edges));
-}
-
-/** 兼容旧调用方；不再二次压平。 */
-export function enforceWorkflowReadingOrder(
-  nodes: FlowNode[],
-  edges: FlowEdge[],
-): FlowNode[] {
-  return layoutWorkflow(nodes, edges);
-}
-
 export async function autoLayoutJourney(
   nodes: FlowNode[],
   edges: FlowEdge[],
