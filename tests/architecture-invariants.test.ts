@@ -57,3 +57,27 @@ test('Graphify fallback explains that source tools will continue the investigati
   assert.match(codebuddy, /结构分析工具这次没有生成可用结果/);
   assert.match(codebuddy, /改用源码工具继续调查/);
 });
+
+
+test('user-facing runtime errors do not expose common internal control terms', async () => {
+  const files = [
+    '../src/server.ts',
+    '../src/agent/codebuddy.ts',
+    '../src/agent/copilot.ts',
+    '../src/agent/opencode.ts',
+    '../src/workflow/ask.ts',
+    '../src/workflow/journey-editor.ts',
+    '../src/workflow/journey-ai.ts',
+  ];
+  const patterns = [
+    ai + ' 没有返回',
+    ai + ' 使用的工作地图',
+    ag + ' 执行失败',
+    se + ' 错误',
+    wf + ' Gate 未通过',
+  ];
+  for (const file of files) {
+    const content = await fs.readFile(new URL(file, import.meta.url), 'utf8');
+    for (const pattern of patterns) assert.doesNotMatch(content, new RegExp(pattern));
+  }
+});
