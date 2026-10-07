@@ -12,7 +12,7 @@ import {
   GRAPHIFY_MCP_NAME,
   GRAPHIFY_SELECTION_INSTRUCTION,
   buildGraphifyMcpServer,
-  ensureGraphifyGraph,
+  tryEnsureGraphifyGraph,
   isGraphifyTool,
 } from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
@@ -476,14 +476,30 @@ export async function askCodeBuddy(
   }
 
   if (graphifyEnabled) {
-    await ensureGraphifyGraph(input.workingDirectory ?? process.cwd(), false);
-    const graphify = buildGraphifyMcpServer(input.workingDirectory ?? process.cwd());
-    if (graphify) {
-      mcpServers[GRAPHIFY_MCP_NAME] = {
-        type: 'stdio',
-        command: graphify.server.command,
-        ...(graphify.server.args.length ? { args: graphify.server.args } : {}),
-      };
+    const graphifyPreparation = await tryEnsureGraphifyGraph(
+      input.workingDirectory ?? process.cwd(),
+      false,
+    );
+    if (graphifyPreparation.available) {
+      const graphify = buildGraphifyMcpServer(input.workingDirectory ?? process.cwd());
+      if (graphify) {
+        mcpServers[GRAPHIFY_MCP_NAME] = {
+          type: 'stdio',
+          command: graphify.server.command,
+          ...(graphify.server.args.length ? { args: graphify.server.args } : {}),
+        };
+      }
+    } else {
+      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onTrajectory?.({
+        type: 'status',
+        name: '结构分析工具不可用，已继续调查',
+        status: 'info',
+        details: {
+          capability: GRAPHIFY_MCP_NAME,
+          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
+        },
+      });
     }
   }
 
