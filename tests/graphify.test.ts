@@ -12,6 +12,7 @@ import {
   prepareGraphifyEnvironment,
   requireGraphifyMcpCommand,
   ensureGraphifyGraph,
+  tryEnsureGraphifyGraph,
   isGraphifyTool,
 } from '../src/adapters/graphify.js';
 
@@ -67,6 +68,22 @@ test('real Graphify runtime builds a structural graph for an Investigation direc
 
     const graph = await readFile(graphifyGraphPath(root), 'utf8');
     assert.ok(graph.length > 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test('failed or empty Graphify extraction is reported as unavailable for runtime fallback', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'agentic-graphify-empty-'));
+  try {
+    await writeFile(path.join(root, 'README.md'), '# No code here\\n');
+    const result = await tryEnsureGraphifyGraph(root, true);
+    assert.equal(result.available, false);
+    assert.ok(result.error);
+    assert.equal(result.metadata.enabled, true);
+    assert.equal(result.metadata.status, 'missing');
+    assert.equal(result.metadata.graphHash, undefined);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
