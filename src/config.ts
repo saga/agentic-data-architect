@@ -39,6 +39,7 @@ const EnvSchema = z.object({
   GRAPHIFY_MCP_COMMAND: z.string().min(1).default('graphify-mcp'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   HOST: z.string().min(1).default('127.0.0.1'),
+  ALLOW_REMOTE_HOST: z.enum(['true', 'false']).default('false'),
   NODE_ENV: z.string().min(1).default('development'),
 });
 
@@ -69,5 +70,6 @@ export const config = {
   graphifyPlatformCapabilityVersion: 1,
   port: envConfig.PORT,
   host: envConfig.HOST,
+  allowRemoteHost: envConfig.ALLOW_REMOTE_HOST === 'true',
   nodeEnv: envConfig.NODE_ENV,
 } as const;
