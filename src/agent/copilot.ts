@@ -1281,7 +1281,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
               investigationName,
               input.workflowSkill ?? null,
               finalContent,
-              { persistModernizationResult: false },
+              {
+                persistModernizationResult: false,
+                ...(stageGateDecision?.passed === true ? { stageValidationPassed: true } : {}),
+              },
             );
 
       await runRecorder?.write('model_response', {
