@@ -50,6 +50,19 @@ const RETRY_PATTERNS = [
   '回退',
 ];
 
+export interface JourneyEdgeVisual {
+  stroke: string;
+  opacity: number;
+  dash?: string;
+}
+
+export const JOURNEY_EDGE_VISUALS: Record<JourneyEdgeKind, JourneyEdgeVisual> = {
+  success: { stroke: '#52c41a', opacity: 0.82 },
+  fail: { stroke: '#ff4d4f', opacity: 0.86 },
+  retry: { stroke: '#8c99a8', opacity: 0.86, dash: '7 5' },
+  other: { stroke: '#9aa7b7', opacity: 0.66 },
+};
+
 function matchesPattern(outcome: string, patterns: string[]): boolean {
   return patterns.some((pattern) => outcome.includes(pattern));
 }
