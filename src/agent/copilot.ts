@@ -11,12 +11,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import {
-  assertGraphifyRuntimeAvailable,
   buildGraphifyMcpServer,
   tryEnsureGraphifyGraph,
   GRAPHIFY_MCP_NAME,
   isGraphifyTool,
-  prepareGraphifyEnvironment,
   GRAPHIFY_SELECTION_INSTRUCTION,
 } from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
@@ -531,8 +529,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
   let graphifyRuntime: Awaited<ReturnType<typeof tryEnsureGraphifyGraph>>['metadata'] | undefined;
   if (graphifyEnabled) {
-    prepareGraphifyEnvironment();
-    assertGraphifyRuntimeAvailable();
     const graphifyPreparation = await tryEnsureGraphifyGraph(workingDirectory, false);
     graphifyRuntime = graphifyPreparation.metadata;
     if (!graphifyPreparation.available) {
