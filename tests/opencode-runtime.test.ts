@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { isOpenCodeModel, parseOpenCodeModel, listOpenCodeModels } = await import('../src/agent/opencode.js');
+const {
+  isOpenCodeModel,
+  parseOpenCodeModel,
+  listOpenCodeModels,
+  registerOpenCodeGraphifyMcp,
+} = await import('../src/agent/opencode.js');
 
 test('OpenCode model references use provider/model form', () => {
   assert.equal(isOpenCodeModel('opencode:ollama/qwen3-coder'), true);
@@ -40,6 +45,42 @@ test('OpenCode model discovery maps provider catalog to selectable model IDs', a
 
     const filtered = await listOpenCodeModels(['qwen3-coder']);
     assert.deepEqual(filtered.map((model) => model.id), ['opencode:ollama/qwen3-coder']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+ 
+test('OpenCode registers the platform Graphify MCP in the current workspace', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl = '';
+  let requestBody: unknown;
+  globalThis.fetch = (async (input, init) => {
+    requestUrl = String(input);
+    requestBody = init?.body ? JSON.parse(String(init.body)) : undefined;
+    return new Response('{}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    await registerOpenCodeGraphifyMcp('/tmp/session', '/opt/graphify-mcp');
+    assert.match(requestUrl, /\/mcp\?/);
+    assert.deepEqual(requestBody, {
+      name: 'graphify-structural-analysis',
+      config: {
+        type: 'local',
+        command: [
+          '/opt/graphify-mcp',
+          '--graph',
+          '/tmp/session/graphify-out/graph.json',
+        ],
+        cwd: '/tmp/session',
+        enabled: true,
+        timeout: 5000,
+      },
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
