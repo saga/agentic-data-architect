@@ -88,6 +88,8 @@ export function useInvestigationController() {
   const [assistantCompanionNote, setAssistantCompanionNote] = useState('');
   const assistantCompanionNoteRef = useRef('');
   const [reasoningByMessage, setReasoningByMessage] = useState<Record<string, string>>({});
+  // Server reload 期间保留尚未被服务器确认的用户消息，避免异步 session load 覆盖本地乐观更新。
+  const pendingOutgoingMessagesRef = useRef<Record<string, Message>>({});
   // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -242,7 +244,28 @@ export function useInvestigationController() {
         )
       : undefined;
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
-    setCurrent(result);
+
+    setCurrent((existing) => {
+      const pending = pendingOutgoingMessagesRef.current[key];
+      const serverMessages = result.messages;
+      const serverIds = new Set(serverMessages.map((message) => message.id));
+      if (pending && serverIds.has(pending.id)) {
+        delete pendingOutgoingMessagesRef.current[key];
+      }
+
+      const preservedLocal = existing?.context.name === key
+        ? existing.messages.filter((message) => !serverIds.has(message.id))
+        : [];
+      const preservedPending = pending && !serverIds.has(pending.id) ? [pending] : [];
+      const mergedMessages = [...serverMessages, ...preservedLocal, ...preservedPending]
+        .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+
+      // Conversation is durable on the server; this merge only protects messages that
+      // are already visible locally but have not appeared in the latest HTTP snapshot.
+      return mergedMessages.length === serverMessages.length
+        ? result
+        : { ...result, messages: mergedMessages };
+    });
     setJourney(
       workflowSnapshot
         ? { ...workflowSnapshot.state, execution: workflowSnapshot.execution }
@@ -702,6 +725,12 @@ export function useInvestigationController() {
     setError(undefined);
     const turnId = turnIdOverride ?? crypto.randomUUID();
     const controller = new AbortController();
+    const optimisticMessage = {
+      id: turnId + ':user',
+      role: 'user' as const,
+      content: message,
+      capturedAt: new Date().toISOString(),
+    };
     let missionBlocked = false;
     let executionFailed = false;
     let key = active;
@@ -715,6 +744,7 @@ export function useInvestigationController() {
         });
         key = created.context.name;
         activeRef.current = key;
+        pendingOutgoingMessagesRef.current[key] = optimisticMessage;
         navigateToSession(key);
       }
 
@@ -723,15 +753,15 @@ export function useInvestigationController() {
       await waitForExecutionIdle(key as string);
 
       activeTurnRef.current = { key: key as string, turnId, controller };
+      pendingOutgoingMessagesRef.current[key] = optimisticMessage;
       setCurrent((existing) => {
         if (!existing || existing.context.name !== key) return existing;
-        const messageId = turnId + ':user';
-        if (existing.messages.some((item) => item.id === messageId)) return existing;
+        if (existing.messages.some((item) => item.id === optimisticMessage.id)) return existing;
         return {
           ...existing,
           messages: [
             ...existing.messages,
-            { id: messageId, role: 'user' as const, content: message, capturedAt: new Date().toISOString() },
+            optimisticMessage,
           ],
         };
       });
