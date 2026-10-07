@@ -439,10 +439,22 @@ async function consumeOpenCodeEvents(
         }
 
         if (event.type === 'session.error') {
+          // 服务端有时只给 name=APIError，真正的原因藏在 error.data 里
+          //（例如 data.message + statusCode），逐层挖出来，否则 UI 永远只显示四个字。
           const error = properties.error;
-          const message = error && typeof error === 'object'
-            ? String((error as Record<string, unknown>).message ?? (error as Record<string, unknown>).name ?? 'OpenCode 执行失败')
-            : String(error ?? 'OpenCode 执行失败');
+          const record = error && typeof error === 'object'
+            ? error as Record<string, unknown>
+            : undefined;
+          const data = record?.data && typeof record.data === 'object'
+            ? record.data as Record<string, unknown>
+            : undefined;
+          const detail = data && typeof data.message === 'string' ? data.message : undefined;
+          const statusCode = typeof data?.statusCode === 'number' ? `（HTTP ${data.statusCode}）` : '';
+          const message = detail
+            ? detail + statusCode
+            : record && typeof record.message === 'string'
+              ? record.message
+              : 'OpenCode 执行失败' + (typeof record?.name === 'string' ? '：' + record.name : '');
           // 只记录、不 throw：本轮成败以 message 接口的返回为准；
           // 这里抛错只会变成后台任务的 unhandled rejection 崩掉服务进程。
           readerState.sessionError = message;

@@ -6,11 +6,35 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { fetch as proxyFetch, ProxyAgent } from 'undici';
 import { config } from '../config.js';
 
 const execFileAsync = promisify(execFile);
 const MAX_CACHE_BYTES = 50 * 1024 * 1024;
 const MAX_CACHE_TOTAL_BYTES = 512 * 1024 * 1024;
+
+/**
+ * 出站代理：Node 的 fetch 不读代理环境变量，直连外网（如 video.twimg.com）
+ * 在本机网络下会超时。代理地址与 opencode serve 共用同一套本机默认值。
+ */
+function proxyDispatcher(): ProxyAgent | undefined {
+  const proxyUrl = process.env.HTTPS_PROXY
+    || process.env.https_proxy
+    || process.env.HTTP_PROXY
+    || process.env.http_proxy
+    || 'http://127.0.0.1:10809';
+  try {
+    return new ProxyAgent(proxyUrl);
+  } catch {
+    return undefined;
+  }
+}
+
+let proxyAgent: ProxyAgent | undefined;
+function dispatcher(): ProxyAgent | undefined {
+  proxyAgent ??= proxyDispatcher();
+  return proxyAgent;
+}
 
 let ytDlpAvailability: Promise<boolean> | undefined;
 
@@ -162,8 +186,12 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
     }
   } catch {}
 
-  const response = await fetch(remoteUrl, {
+  // 必须用同一份 undici 的 fetch + dispatcher；把 npm 包的 dispatcher
+  // 传给 Node 内建 fetch 会报 UND_ERR_INVALID_ARG。
+  const agent = dispatcher();
+  const response = await proxyFetch(remoteUrl, {
     redirect: 'follow',
+    ...(agent ? { dispatcher: agent } : {}),
     headers: {
       'User-Agent': 'Mozilla/5.0 agentic-data-architect remote-media-cache',
     },
