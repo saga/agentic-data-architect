@@ -189,7 +189,9 @@ async function cacheRemoteResource(cacheKey: string, remoteUrl: string, kind: Re
       return { cachePath: target, ...(mimeType ? { mimeType } : {}) };
     }
   } catch (error) {
-    console.warn('[media] Cached media metadata could not be read before refresh.', error);
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
+      console.warn('[media] Cached media file could not be inspected before refresh.', error);
+    }
   }
 
   // 必须用同一份 undici 的 fetch + dispatcher；把 npm 包的 dispatcher
@@ -248,12 +250,19 @@ export async function getCachedRemoteMedia(cacheKey: string): Promise<{ path: st
     try {
       const metadata = JSON.parse(await fs.readFile(mediaCacheMetaFile(cacheKey), 'utf8')) as { mimeType?: unknown };
       if (typeof metadata.mimeType === 'string') mimeType = metadata.mimeType;
-    } catch {}
-    await fs.utimes(target, new Date(), new Date()).catch(() => undefined);
+    } catch (error) {
+      console.warn('[media] Cached media metadata is invalid; cached file remains available without MIME metadata.', error);
+    }
+    await fs.utimes(target, new Date(), new Date()).catch((error) => {
+      console.warn('[media] Could not refresh cached media access time.', error);
+    });
     return { path: target, sizeBytes: stat.size, ...(mimeType ? { mimeType } : {}) };
   } catch (error) {
-    console.warn('[media] Cached media could not be read; remote media will be used instead.', error);
-    return undefined;
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined;
+    }
+    console.error('[media] Failed to read cached media.', error);
+    throw error;
   }
 }
 
