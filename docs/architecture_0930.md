@@ -226,7 +226,7 @@ Graphify 是平台能力，不由单个 Investigation 的 Skill/MCP 配置关闭
 4. **Current Data Architecture**
    - 适用于只看清现有系统的数据来源、数据流、数据模型和关键转换。
 
-三条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
+四条路线都写在对应 Skill 的 Markdown Workflow 中。区别只是业务工作方法不同：
 
 ~~~text
 Legacy Modernization
@@ -2795,7 +2795,7 @@ Evidence
   artifacts/
 ~~~
 
-## context.json 是研究上下文的入口
+## context.json 是当前 Investigation 状态的入口
 
 context.json 是当前 Investigation 状态的 canonical persistence boundary，至少记录：
 
