@@ -58,11 +58,9 @@ OPENCODE_MODEL_ALLOWLIST=opencode:opencode/muse-spark-1.3-contributor-free
 
 ### 2. HTTP 401：serve 和 app 用的密码不是同一个
 
-新版 `opencode serve` 默认强制 Basic 认证；启动时没给
-`OPENCODE_SERVER_PASSWORD`，它就生成一个谁也不知道的随机密码，
-之后所有请求都是 401（表现为“无法连接 OpenCode 事件流：HTTP 401”）。
+当前脚本同时支持不启用和启用 Basic Auth 的本机 `opencode serve`。未启用认证时不需要配置密码；如果 serve 启用了 Basic Auth，app 与 serve 必须使用同一个 `OPENCODE_SERVER_PASSWORD`，否则工作台访问会得到 401。
 
-- 启动 serve 必须带显式密码，且和 `.env` 里是同一个值。
+- 如果 serve 启用了 Basic Auth，必须带显式密码，且和 `.env` 里是同一个值；未启用认证时无需配置。
 - 终端里残留的 `export OPENCODE_SERVER_PASSWORD=...` 会覆盖 `.env`
   （dotenv 是环境变量优先），造成两边 mismatch。`ensure-opencode.mjs`
   以 `.env` 文件为准，检测到不一致会告警。看到告警就 `unset` 掉残留值。
