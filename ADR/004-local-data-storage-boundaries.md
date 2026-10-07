@@ -1,6 +1,6 @@
 # ADR-004：SQLite、DuckDB、Parquet 和文件系统职责分离
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-05
 
 ## Context
@@ -13,7 +13,8 @@
 
 职责固定为：
 
-- SQLite：应用状态 system of record，包括对话、Investigation、Dataset Registry 和 analysis run metadata；
+- `.workspace/<session>/context.json`：当前 Investigation 业务状态的 canonical persistence boundary；
+- SQLite：应用级状态存储，包括对话、Investigation 的 Dataset Registry 和 analysis run metadata；
 - DuckDB：每个 Investigation 独立的本地分析引擎；
 - Parquet：大型分析数据和可移植中间结果；
 - Filesystem：原始输入和用户可直接打开的报告/产物。
@@ -39,3 +40,6 @@ Relationship Memory 与 conversation history 不混为一谈：Relationship Memo
 ## Related
 
 - ADR-012：Soul / Relationship Memory isolation
+- ADR-027：Investigation State 与本地分析存储边界
+
+> 当前实现边界由 ADR-027 进一步明确：SQLite 是应用级持久化组件，但不取代 `context.json` 作为 Investigation 状态的 canonical source。
