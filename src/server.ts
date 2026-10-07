@@ -1552,30 +1552,8 @@ app.post('/api/sessions/:name/messages/stream', async (req, res) => {
         error,
       });
 
-      // A failed Agent turn is still a conversation turn. The user message is already
-      // durable; preserve secretary notes / partial output as a durable assistant message
-      // before closing SSE, so reload/finally cannot erase what the user saw.
-      const failureContent = [
-        companionNote.trim(),
-        streamedAssistant.trim(),
-        '这次调查没有完成，我已经保留刚才得到的内容。你可以继续提问。错误原因：' + formatUserFacingError(error),
-      ].filter(Boolean).join('\n\n');
-      try {
-        saveConversationMessage({
-          id: turnId + ':assistant:failure',
-          sessionName: name,
-          role: 'assistant',
-          content: failureContent,
-        });
-        await appendTranscript(name, 'assistant', failureContent);
-      } catch (persistenceError) {
-        console.error('[messages/stream] Failed to persist assistant failure message', {
-          sessionName: name,
-          turnId,
-          error: persistenceError,
-        });
-      }
-
+      // answerQuestion 已经把失败 turn 和可见的部分内容保存成 durable assistant message。
+      // SSE 这里只负责把失败通知给当前浏览器，避免和 conversation store 双写。
       send('error', { error: formatUserFacingError(error) });
       finished = true;
       res.end();
