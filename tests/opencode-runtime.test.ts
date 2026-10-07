@@ -6,6 +6,8 @@ const {
   parseOpenCodeModel,
   listOpenCodeModels,
   registerOpenCodeGraphifyMcp,
+  requiresGraphifyFirst,
+  graphifyPreflightTools,
 } = await import('../src/agent/opencode.js');
 
 test('OpenCode model references use provider/model form', () => {
@@ -83,4 +85,18 @@ test('OpenCode registers the platform Graphify MCP in the current workspace', as
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test('structural OpenCode prompts require Graphify preflight and disable generic inspection tools', () => {
+    assert.equal(requiresGraphifyFirst('请分析这个项目的调用链和上下游关系'), true);
+  assert.equal(requiresGraphifyFirst('read the exact README heading'), false);
+
+  const tools = graphifyPreflightTools();
+  assert.equal(tools.read, false);
+  assert.equal(tools.grep, false);
+  assert.equal(tools.glob, false);
+  assert.equal(tools.bash, false);
+  assert.equal(tools['graphify-structural-analysis_query_graph'], true);
+  assert.equal(tools['graphify-structural-analysis_shortest_path'], true);
 });
