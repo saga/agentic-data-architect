@@ -799,7 +799,7 @@ export async function applyAgentWorkflowTransition(
   name: string,
   workflowId: WorkflowId | null,
   rawAnswer: string,
-  options: { persistModernizationResult?: boolean } = {},
+  options: { persistModernizationResult?: boolean; stageValidationPassed?: boolean } = {},
 ): Promise<{ applied: boolean; error?: string; execution?: JourneyExecution }> {
   if (!workflowId) return { applied: false };
   const mission = assertMissionGate((await loadInvestigation(name)).mission);
@@ -907,13 +907,16 @@ export async function applyAgentWorkflowTransition(
 
     if (transition.outcome === 'success' && currentNode) {
       const facts = await buildJourneyFacts(name);
-      if (
-        currentNode.completeWhen
-        && !isJourneyCompletionConditionSatisfied(currentNode.completeWhen, facts)
-      ) {
+      if (currentNode.completeWhen) {
+        if (!isJourneyCompletionConditionSatisfied(currentNode.completeWhen, facts)) {
+          throw new Error(
+            '当前步骤的完成条件还没有满足，不能由 Agent 自行宣布完成：'
+              + ' completeWhen=' + currentNode.completeWhen,
+          );
+        }
+      } else if (currentNode.actor === 'agent' && options.stageValidationPassed !== true) {
         throw new Error(
-          '当前步骤的完成条件还没有满足，不能由 Agent 自行宣布完成：'
-          + ' completeWhen=' + currentNode.completeWhen,
+          '当前步骤没有直接的确定性完成条件，必须先通过阶段成果检查，不能只根据助手自己的回答推进。',
         );
       }
     }
