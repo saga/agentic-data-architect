@@ -18,9 +18,11 @@ async function main(): Promise<void> {
   await import('./agent/copilot-permission-bridge.js');
   const { createApp } = await import('./server.js');
   const { closeConversationStore, recoverRunningConversationTurns } = await import('./investigation/conversation.js');
-  const { getActiveInvestigationTurn } = await import('./workflow/ask.js');
+  const { getActiveInvestigationTurn, listActiveInvestigationTurns, requestAbort } = await import('./workflow/ask.js');
   const { closeLocalAnalytics } = await import('./analytics/local-data.js');
-  const { stopClient } = await import('./agent/copilot.js');
+  const { abortCopilotTurn, stopClient } = await import('./agent/copilot.js');
+  const { abortCodeBuddyTurn } = await import('./agent/codebuddy.js');
+  const { abortOpenCodeTurn } = await import('./agent/opencode.js');
 
   const dev = config.nodeEnv !== 'production';
   let vite: ViteDevServer | undefined;
@@ -87,7 +89,23 @@ async function main(): Promise<void> {
     );
   });
 
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    // Stop Agent work before closing HTTP/DB so its normal abort/failure path
+    // can persist the durable assistant message.
+    const activeTurns = listActiveInvestigationTurns();
+    await Promise.all(activeTurns.map(async (turn) => {
+      requestAbort(turn.investigationName, turn.turnId);
+      await Promise.allSettled([
+        abortCopilotTurn(turn.turnId),
+        abortCodeBuddyTurn(turn.turnId),
+        abortOpenCodeTurn(turn.turnId),
+      ]);
+    }));
+
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });
