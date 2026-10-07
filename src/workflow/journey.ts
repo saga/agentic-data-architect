@@ -158,7 +158,7 @@ export function parseJourneyMarkdown(markdown: string): ParsedJourney {
 
     const heading = headingPattern.exec(raw);
     if (!heading) {
-      const unsupportedBlock = /^##\s+@(\S+)/.exec(raw);
+      const unsupportedBlock = /^(?:##\s+)?@(\S+)/.exec(raw);
       if (unsupportedBlock) {
         issues.push('Workflow 不支持 @' + unsupportedBlock[1] + '；只能使用 @flow、@task、@review、@end。第 ' + lineNumber + ' 行无效。');
         continue;
