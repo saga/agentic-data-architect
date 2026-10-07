@@ -577,32 +577,11 @@ export async function readModernizationArtifact(
     return { status: 'stale', plan: null };
   }
 
-  const gaps = buildModernizationGaps({
-    currentState: current,
-    estate: snapshot?.estate,
-    findings: inv.findings,
-  });
-  const journey = buildJourneyState(await loadModernizationJourney(), {
-    goal: inv.goal || inv.userPrompt,
-    currentState: current ? {
-      datasets: current.coverage.datasets,
-      semanticAssets: current.coverage.semanticAssets,
-      parseFailures: current.coverage.sqlParseFailures,
-    } : null,
-    unknowns: inv.unknowns,
-    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    ...deriveModernizationFacts({
-      targetStatus: plan.targetArchitecture.status,
-      targetComponentCount: plan.targetArchitecture.components.length,
-      mappingStatuses: plan.mappings.map((mapping) => mapping.status),
-      validationStatuses: plan.validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
-    }),
-  });
 
-  return { status: 'current', plan: { ...plan, journey } };
+  return { status: 'current', plan };
 }
 
-/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+/** Only the current artifact is returned to internal callers：只有 current Artifact 才返回 plan。 */
 export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
   const result = await readModernizationArtifact(name);
   return result.status === 'current' ? result.plan : null;
