@@ -6,6 +6,9 @@ import { evaluateMissionGate } from './mission-gate.js';
 import { evaluateInvestigationScopeGate } from './scope-gate.js';
 import { calibrateStatus, type EvidenceRef } from '../evidence/types.js';
 import { isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
+import { evaluateDerivedState } from './derived-state.js';
+import { buildModernizationGaps } from '../analysis/gap.js';
+import { loadArchitectureAssessmentPlan } from './assessment.js';
 import type { DiscoverySnapshot } from './discover.js';
 
 export interface ReportGateCheck { name: string; passed: boolean; detail: string; }
@@ -35,6 +38,10 @@ export interface InvestigationReportGateInput {
   claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
   findings: Array<{ evidenceIds: string[] }>;
   resultArtifactCount?: number;
+  workflow?: string | null;
+  assessmentPlanAvailable?: boolean;
+  assessmentRecommendationCount?: number;
+  assessmentRoadmapCount?: number;
 }
 
 export function evaluateInvestigationReportGate(
@@ -84,6 +91,49 @@ export function evaluateInvestigationReportGate(
 
   const snapshotValid = isDiscoverySnapshotCompatible(investigation, snapshot);
   add('发现结果仍属于当前范围', snapshotValid, snapshotValid ? '发现结果与当前调查范围一致。' : '发现结果属于旧的调查范围，需要重新执行发现。');
+
+  const gaps = buildModernizationGaps({
+    currentState: snapshot?.currentState ?? null,
+    estate: snapshot?.estate,
+    findings: investigation.findings,
+  });
+  const derived = evaluateDerivedState({
+    currentState: snapshot?.currentState ?? null,
+    estateColumnCount: snapshot?.estate?.nodes.filter((node) => node.type === 'column').length ?? 0,
+    sourceOfTruthCandidateCount: snapshot?.currentState?.sourceOfTruthCandidates.length ?? 0,
+    lineageEdgeCount: snapshot?.lineage?.edges.length ?? snapshot?.estate?.edges.length ?? 0,
+    findingsCount: investigation.findings.length,
+    scopeReady: investigation.scopeValidation?.status === 'validated',
+    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
+    assessment: investigation.workflow === 'data-architecture-assessment'
+      ? {
+          exists: input.assessmentPlanAvailable === true,
+          findingsCount: investigation.findings.length,
+          recommendationCount: input.assessmentRecommendationCount ?? 0,
+          roadmapCount: input.assessmentRoadmapCount ?? 0,
+        }
+      : null,
+  });
+
+  if (investigation.workflow === 'current-data-architecture') {
+    add(
+      '当前数据架构已经达到报告所需的事实基础',
+      derived.currentDataArchitectureReady,
+      derived.currentDataArchitectureReady
+        ? '当前数据架构已经形成可阅读的事实基础。'
+        : '当前数据架构的关键数据流、数据模型或转换信息仍不完整。',
+    );
+  }
+
+  if (investigation.workflow === 'data-architecture-assessment') {
+    add(
+      '数据架构评估结果已经形成',
+      derived.assessmentRoadmapReady,
+      derived.assessmentRoadmapReady
+        ? 'Assessment 结果已经保存。'
+        : 'Assessment 结果还没有形成完整的建议与实施顺序。',
+    );
+  }
 
   return { passed: checks.every((item) => item.passed), checks };
 }

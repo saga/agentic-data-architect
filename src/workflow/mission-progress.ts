@@ -15,6 +15,7 @@ import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js
 import { loadModernizationPlan } from './modernization.js';
 import { deriveModernizationFacts } from './journey.js';
 import { evaluateDerivedState } from './derived-state.js';
+import { buildModernizationGaps } from '../analysis/gap.js';
 
 export type MissionDeliverableStatus =
   | 'covered'
@@ -279,6 +280,11 @@ export async function buildMissionProgress(
     }
   }
 
+  const gaps = buildModernizationGaps({
+    currentState: signals.currentState,
+    estate: estate ?? null,
+    findings: investigation.findings,
+  });
   const derived = evaluateDerivedState({
     currentState: signals.currentState,
     estateColumnCount: signals.estateColumnCount,
@@ -286,7 +292,7 @@ export async function buildMissionProgress(
     lineageEdgeCount: signals.lineageEdgeCount,
     findingsCount: signals.findingsCount,
     scopeReady: Boolean(investigation.scopeValidation?.status === 'validated'),
-    highGapKinds: [],
+    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
     modernization: signals.modernization,
     assessment: signals.assessment
       ? {

@@ -10,6 +10,7 @@ import { loadInvestigation, loadLatestSnapshot, reportsDir } from '../investigat
 import { isCurrentStateOnlyScope } from '../workflow/scope-gate.js';
 import type { Investigation } from '../investigation/store.js';
 import { loadModernizationPlan } from '../workflow/modernization.js';
+import { loadArchitectureAssessmentPlan, type ArchitectureAssessmentPlan } from '../workflow/assessment.js';
 import {
   datasetLineageRelations,
   edgesFrom,
@@ -189,6 +190,7 @@ export async function buildReport(
     investigation: Investigation;
     snapshot: DiscoverySnapshot | null;
     modernization?: Awaited<ReturnType<typeof loadModernizationPlan>> | null;
+    assessment?: ArchitectureAssessmentPlan | null;
   },
 ): Promise<{ markdown: string; path: string }> {
 
@@ -196,7 +198,14 @@ export async function buildReport(
   const snapshot = source?.snapshot ?? await loadLatestSnapshot<DiscoverySnapshot>(name);
   const modernization = source
     ? source.modernization ?? null
-    : await loadModernizationPlan(name);
+    : inv.workflow === 'legacy-modernization'
+      ? await loadModernizationPlan(name)
+      : null;
+  const assessment = source
+    ? source.assessment ?? null
+    : inv.workflow === 'data-architecture-assessment'
+      ? await loadArchitectureAssessmentPlan(name)
+      : null;
   const analysisArtifacts = await listAnalysisArtifacts(name);
   const estate = snapshot?.estate ?? null;
   const current = snapshot?.currentState ?? null;
@@ -324,6 +333,29 @@ export async function buildReport(
         ? '已经记录 ' + String(modernization.mappings.length) + ' 条新旧对应关系。'
         : '还没有记录新旧数据对应关系。',
       '验证检查目前有 ' + String(modernization.validationPlan.checks.length) + ' 项。',
+      '',
+    );
+  }
+
+  if (assessment && inv.workflow === 'data-architecture-assessment') {
+    lines.push(
+      '## 架构评估',
+      '',
+      assessment.findings.length
+        ? '这次评估识别出 ' + String(assessment.findings.length) + ' 个需要关注的问题。'
+        : '这次评估没有发现需要单独列出的结构化问题。',
+      '',
+      '### 改进建议',
+      '',
+      ...(assessment.recommendations.length
+        ? assessment.recommendations.slice(0, 12).map((item) => '- ' + item)
+        : ['- 目前没有需要额外提出的改进建议。']),
+      '',
+      '### 实施顺序',
+      '',
+      ...(assessment.roadmap.length
+        ? assessment.roadmap.map((item) => '- ' + item.title + '：' + item.objective)
+        : ['- 目前没有需要额外安排的实施阶段。']),
       '',
     );
   }

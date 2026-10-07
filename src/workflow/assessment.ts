@@ -7,7 +7,6 @@ import { computeArtifactProvenance, artifactProvenanceMatches, isDiscoverySnapsh
 import { ArtifactLifecycleStatusSchema, ArtifactProvenanceSchema, FindingSeveritySchema, type ArchitectureAssessmentView, type ArtifactLifecycleStatus } from '../api/contracts.js';
 import { writeJsonAtomic } from '../investigation/workspace.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
-import { buildJourneyState, loadWorkflowJourney, type JourneyState } from './journey.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { assertMissionGate } from './mission-gate.js';
 
@@ -48,7 +47,6 @@ export const ArchitectureAssessmentPlanSchema = z.object({
     findingIds: z.array(z.string()),
   }).strict()),
   evidenceIds: z.array(z.string()),
-  journey: z.unknown().optional(),
 }).strict();
 export type ArchitectureAssessmentPlan = z.infer<typeof ArchitectureAssessmentPlanSchema>;
 
@@ -150,7 +148,6 @@ export async function buildArchitectureAssessmentPlan(name: string): Promise<{ p
     currentState: { datasets: current?.coverage.datasets ?? 0, lineageCoverage: current?.coverage.datasetLineageConnectionRate ?? null, semanticAssets: current?.coverage.semanticAssets ?? 0, findings: findings.length, unknowns: inv.unknowns.length },
     findings, recommendations, roadmap, evidenceIds: dedupe(findings.flatMap((finding) => finding.evidenceIds)),
   });
-  plan.journey = await buildAssessmentJourneyStateFromPlan(inv, current, plan);
   const outputPath = planFile(name);
   await fs.mkdir(reportsDir(name), { recursive: true });
   await writeJsonAtomic(outputPath, plan);
@@ -191,23 +188,4 @@ export async function readArchitectureAssessmentArtifact(
 export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
   const result = await readArchitectureAssessmentArtifact(name);
   return result.status === 'current' ? result.plan : null;
-}
-
-async function buildAssessmentJourneyStateFromPlan(inv: Awaited<ReturnType<typeof loadInvestigation>>, current: DiscoverySnapshot['currentState'] | null, plan: ArchitectureAssessmentPlan): Promise<JourneyState> {
-  return buildJourneyState(await loadWorkflowJourney('data-architecture-assessment'), {
-    goal: inv.goal || inv.userPrompt,
-    scopeReady: inv.scopeValidation?.status === 'validated',
-    currentState: current ? { datasets: current.coverage.datasets, semanticAssets: current.coverage.semanticAssets, parseFailures: current.coverage.sqlParseFailures } : null,
-    unknowns: inv.unknowns,
-    highGapKinds: buildModernizationGaps({
-      currentState: current ?? undefined,
-      estate: null,
-      findings: inv.findings,
-    }).filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    targetComponentCount: 0,
-    mappingCount: 0,
-    blockingValidationReady: 0,
-    blockingValidationTotal: 0,
-    findingCount: plan.findings.length, recommendationCount: plan.recommendations.length, roadmapItemCount: plan.roadmap.length,
-  });
 }

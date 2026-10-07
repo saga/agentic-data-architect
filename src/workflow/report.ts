@@ -9,6 +9,8 @@ import { assertMissionGate } from './mission-gate.js';
 import { assertInvestigationReportGate } from './report-gate.js';
 import { readModernizationArtifact } from './modernization.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
+import { withWorkspaceContextLock } from '../investigation/workspace.js';
+import { readArchitectureAssessmentArtifact } from './assessment.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
 import type { DiscoverySnapshot } from './discover.js';
 
@@ -148,6 +150,7 @@ export async function readReport(name: string): Promise<ReportArtifactState> {
 export async function runReport(
   name: string,
 ): Promise<{ markdown: string; path: string; review: Awaited<ReturnType<typeof reviewArtifact>> }> {
+  return withWorkspaceContextLock(name, async () => {
   const source = await captureInvestigationArtifactSource(name);
   const investigation = source.investigation;
   const snapshot = source.snapshot;
@@ -157,11 +160,21 @@ export async function runReport(
     investigation: {
       ...source.investigation,
       resultArtifactCount: await countAnalysisArtifacts(name),
+      workflow: source.investigation.workflow,
+      assessmentPlanAvailable: Boolean(assessment),
+      assessmentRecommendationCount: assessment?.recommendations.length ?? 0,
+      assessmentRoadmapCount: assessment?.roadmap.length ?? 0,
     },
     snapshot: source.snapshot,
   });
-  const modernizationResult = await readModernizationArtifact(name, source);
+  const modernizationResult = source.investigation.workflow === 'legacy-modernization'
+    ? await readModernizationArtifact(name, source)
+    : { status: 'blocked' as const, plan: null };
   const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
+  const assessmentResult = source.investigation.workflow === 'data-architecture-assessment'
+    ? await readArchitectureAssessmentArtifact(name)
+    : { status: 'blocked' as const, plan: null };
+  const assessment = assessmentResult.status === 'current' ? assessmentResult.plan : null;
   const existingRaw = await readOptional(reportMetadataFile(name));
   let nextVersion = 1;
   if (existingRaw) {
@@ -173,7 +186,7 @@ export async function runReport(
     }
   }
 
-  const report = await buildReport(name, { investigation, snapshot, modernization });
+  const report = await buildReport(name, { investigation, snapshot, modernization, assessment });
   const provenance = computeArtifactProvenance(investigation, snapshot, nextVersion);
   const artifactHash = hashArtifact(report.markdown);
   const review = await reviewArtifact({
@@ -212,4 +225,5 @@ export async function runReport(
   }
 
   return { ...report, review };
+  });
 }

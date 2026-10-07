@@ -23,7 +23,6 @@ import {
 } from '../model/modernization.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { buildModernizationGaps } from '../analysis/gap.js';
-import { buildJourneyState, deriveModernizationFacts, loadModernizationJourney } from './journey.js';
 import type { ModernizationPlanView } from '../api/contracts.js';
 import { writeJsonAtomic, withWorkspaceContextLock } from '../investigation/workspace.js';
 import { assertMissionGate } from './mission-gate.js';
@@ -308,24 +307,6 @@ async function buildModernizationPlanFromSource(
   const decisions: ModernizationPlan['decisions'] = [];
   const mappings: ModernizationPlan['mappings'] = [];
   const validationPlan = buildValidationPlan(current, mappings, gaps, evidenceIds, inv.scope);
-  const journeyDefinition = await loadModernizationJourney();
-  const journey = buildJourneyState(journeyDefinition, {
-    goal: inv.goal || inv.userPrompt,
-    scopeReady: inv.scopeValidation?.status === 'validated',
-    currentState: current ? {
-      datasets: current.coverage.datasets,
-      semanticAssets: current.coverage.semanticAssets,
-      parseFailures: current.coverage.sqlParseFailures,
-    } : null,
-    unknowns: inv.unknowns,
-    highGapKinds: gaps.filter((gap) => gap.severity === 'high').map((gap) => gap.kind),
-    ...deriveModernizationFacts({
-      targetStatus: targetArchitecture.status,
-      targetComponentCount: targetArchitecture.components.length,
-      mappingStatuses: mappings.map((mapping) => mapping.status),
-      validationStatuses: validationPlan.checks.map((check) => ({ status: check.status, blocking: check.blocking })),
-    }),
-  });
   let artifactVersion = 1;
   try {
     const existingRaw = JSON.parse(await fs.readFile(path.join(reportsDir(name), 'modernization-plan.json'), 'utf8')) as unknown;
@@ -363,7 +344,6 @@ async function buildModernizationPlanFromSource(
     mappings,
     decisions,
     validationPlan,
-    journey,
     evidenceIds,
     provenance: computeArtifactProvenance(inv, snapshot, artifactVersion),
   });
