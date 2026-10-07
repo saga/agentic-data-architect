@@ -104,6 +104,8 @@ export const ScopeValidationSchema = z.object({
   source: z.enum(['user', 'materials', 'mixed']),
   userConfirmed: z.boolean(),
   evidenceIds: z.array(z.string().trim().min(1)),
+  /** Current Scope/Systems identity; legacy validations may omit it but cannot pass the formal Scope Gate. */
+  scopeFingerprint: z.string().min(1).optional(),
   validatedAt: z.string().min(1),
 }).strict();
 export type ScopeValidation = z.infer<typeof ScopeValidationSchema>;
