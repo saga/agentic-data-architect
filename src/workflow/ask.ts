@@ -32,7 +32,7 @@ import {
 } from '../investigation/control.js';
 import { loadInvestigation, loadLatestSnapshot, saveInvestigation, updateInvestigationJourneyPlan } from '../investigation/store.js';
 import { appendTrajectoryEvent } from '../investigation/trajectory.js';
-import { appendContextInput, appendTranscript, setCopilotSessionId, workspaceRoot } from '../investigation/workspace.js';
+import { appendContextInput, appendTranscript, setAgentSessionId, workspaceRoot } from '../investigation/workspace.js';
 import type { DiscoverySnapshot } from './discover.js';
 import { renderArchitectureKnowledge, searchArchitectureKnowledge } from '../knowledge/catalog.js';
 import type { JourneyRouteOption } from '../investigation/schemas.js';
@@ -480,13 +480,26 @@ export async function answerQuestion(
         buildResearchConfigPrompt(control),
         repositoryPrompt,
       ].filter(Boolean).join('\n\n'),
-      ...(inv.copilotConfigurationVersion === control.version && inv.copilotSessionId ? { sessionId: inv.copilotSessionId } : {}),
+      ...(inv.agentConfigurationVersion === control.version
+        && inv.agentSessionRuntime === control.agent.runtime
+        && inv.agentSessionId
+        ? { sessionId: inv.agentSessionId }
+        : inv.copilotConfigurationVersion === control.version && inv.copilotSessionId
+          ? { sessionId: inv.copilotSessionId }
+          : {}),
+      runtime: control.agent.runtime,
       onSessionId: (sessionId) => {
-        inv.copilotSessionId = sessionId;
-        inv.copilotConfigurationVersion = control.version;
-        // onSessionId 本身是同步回调；把实际写盘串起来，确保下一轮真的可以复用 Session。
+        inv.agentSessionId = sessionId;
+        inv.agentSessionRuntime = control.agent.runtime;
+        inv.agentConfigurationVersion = control.version;
+        // onSessionId 本身是同步回调；把实际写盘串起来，确保下一轮真的可以复用对应 Runtime Session。
         sessionPersistence = sessionPersistence
-          .then(() => setCopilotSessionId(investigationName, sessionId, control.version))
+          .then(() => setAgentSessionId(
+            investigationName,
+            sessionId,
+            control.version,
+            control.agent.runtime,
+          ))
           .catch(() => undefined);
       },
       workingDirectory: workspaceRoot(inv.name),
