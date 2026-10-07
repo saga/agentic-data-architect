@@ -1050,7 +1050,7 @@ export function useInvestigationController() {
       setNewSessionGoal(NEW_SESSION_GOAL_SAMPLE);
       setNewSessionExpectedResult(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
       setNewSessionWorkflow(null);
-      setNewSessionRuntime('copilot-sdk');
+      setNewSessionRuntime(globalConfiguration?.agent.runtime ?? 'copilot-sdk');
       await reloadSessions(false);
       navigateToSession(created.context.name);
       // 新建调查先停在配置页；用户完成一次明确的配置保存后，才自动开始首次执行。
