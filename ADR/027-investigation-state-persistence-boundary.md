@@ -44,6 +44,10 @@ Context 使用 runtime schema validation，并通过 workspace lock + atomic ren
 
 原始上传、Discovery snapshots、reports 和 analysis artifacts 保存在 Investigation workspace。它们是可直接复查的工作产物，不与 SQLite 对话状态混成一个数据模型。
 
+Agent SDK 的运行数据不属于 Investigation workspace。Copilot SDK 等 Runtime 自己的日志、session state 和安装缓存必须放在 DATA_DIR 下的独立 Runtime 目录，不能使用 .workspace/<session> 作为 SDK baseDirectory。
+
+Workspace context lock 只保护短的“捕获状态 → 确定性校验 → 原子写入”区间；不得在持锁期间等待 LLM / Agent Runtime 往返。
+
 ### 5. Source of Truth Boundary
 
 不要在 Context、SQLite、DuckDB 或报告之间再创建第二套 Investigation 状态模型：
