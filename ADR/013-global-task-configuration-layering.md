@@ -61,7 +61,7 @@ Task Override schema 不得因为字段上的 default 而在 parse 时补出隐�
 
 不能简单把一个带 defaults 的 schema 做普通 partial()；override schema 应移除 default，再使每个字段 optional。
 
-已有旧版完整 Task Config 数据需要迁移为 v2 sparse override。
+当前实现只支持 v2 sparse override；旧版完整 Task Config 不再作为运行时兼容格式恢复或迁移。
 
 ## Consequences
 
