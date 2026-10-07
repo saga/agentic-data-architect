@@ -151,7 +151,7 @@ export function parseOpenCodeModel(model: string): { providerId: string; modelId
   const value = model.trim();
   const match = /^opencode:([^/]+)\/(.+)$/.exec(value);
   if (!match) {
-    throw new Error('OpenCode 模型格式不正确，应为 opencode:<provider>/<model>。');
+    throw new Error('OpenCode 模型设置不正确，请选择一个可用的 OpenCode 模型（格式示例：opencode:provider/model）。');
   }
   return {
     providerId: match[1],
@@ -240,7 +240,7 @@ export async function registerOpenCodeGraphifyMcp(
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
     throw new Error(
-      '无法把 Graphify 加入 OpenCode：HTTP '
+      '代码结构分析无法接入 OpenCode（HTTP '
       + response.status
       + (detail ? ' · ' + detail.slice(0, 500) : ''),
     );
@@ -253,7 +253,7 @@ export async function listOpenCodeModels(allowlist: readonly string[] = config.o
 
   const response = await openCodeFetch('/provider');
   if (!response.ok) {
-    throw new Error('OpenCode 服务不可用：HTTP ' + response.status);
+    throw new Error('OpenCode 当前无法连接（HTTP ' + response.status + '）。请确认 OpenCode 服务已经启动，并检查服务地址。');
   }
 
   const payload = await response.json() as { all?: OpenCodeProvider[]; connected?: string[] };
@@ -459,7 +459,7 @@ async function consumeOpenCodeEvents(
           // 只记录、不 throw：本轮成败以 message 接口的返回为准；
           // 这里抛错只会变成后台任务的 unhandled rejection 崩掉服务进程。
           readerState.sessionError = message;
-          input.onStatus?.('OpenCode 本轮遇到问题：' + message);
+          input.onStatus?.('OpenCode 这次遇到问题：' + message);
           input.onTrajectory?.({
             type: 'error',
             name: 'OpenCode 会话错误',
@@ -578,7 +578,7 @@ function buildOpenCodeCliConfig(
         existing = parsed as Record<string, unknown>;
       }
     } catch {
-      throw new Error('OPENCODE_CONFIG_CONTENT 不是合法 JSON，无法启动 OpenCode CLI。');
+      throw new Error('OpenCode 配置内容不是合法 JSON，服务无法启动。请检查 OPENCODE_CONFIG_CONTENT。');
     }
   }
 
@@ -719,8 +719,8 @@ async function runOpenCodeCli(
 
       input.onStatus?.(
         graphifyToolCall
-          ? (status === 'error' ? 'Graphify 结构查询失败，正在整理错误信息…' : 'Graphify 已完成结构查询，正在整理结果…')
-          : (status === 'error' ? 'OpenCode 工具调用失败，正在整理错误信息…' : 'OpenCode 已完成工具调用，正在整理结果…'),
+          ? (status === 'error' ? '代码结构分析没有成功，正在整理错误信息…' : 'Graphify 已完成结构查询，正在整理结果…')
+          : (status === 'error' ? '工具调用没有成功，正在整理错误信息…' : 'OpenCode 已完成工具调用，正在整理结果…'),
       );
       input.onTrajectory?.({
         type: 'tool_result',
@@ -777,8 +777,8 @@ async function runOpenCodeCli(
     }
 
     if (event.type === 'error') {
-      sessionError = extractOpenCodeCliError(event.error) ?? 'OpenCode 执行失败';
-      input.onStatus?.('OpenCode 本轮遇到问题：' + sessionError);
+      sessionError = extractOpenCodeCliError(event.error) ?? 'OpenCode 这次执行失败。';
+      input.onStatus?.('OpenCode 这次遇到问题：' + sessionError);
       input.onTrajectory?.({
         type: 'error',
         name: 'OpenCode 会话错误',
@@ -859,7 +859,7 @@ async function runOpenCodeCli(
     if (fallback) {
       return { answer: fallback, sessionId, graphifyUsed, ...(usage ? { usage } : {}), stderr };
     }
-    throw new Error('OpenCode CLI 没有返回文本答案。' + (stderr.trim() ? ' ' + stderr.trim().slice(0, 1000) : ''));
+    throw new Error('OpenCode 这次没有返回可用结果。' + (stderr.trim() ? ' ' + stderr.trim().slice(0, 1000) : ''));
   }
 
   return {
@@ -883,7 +883,7 @@ async function runOpenCodeCli(
  */
 export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   if (!config.openCodeEnabled) {
-    throw new Error('OpenCode 运行时没有启用，请检查 OPENCODE_ENABLED。');
+    throw new Error('OpenCode 当前没有启用。请在服务端设置 OPENCODE_ENABLED=true 后重试。');
   }
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
@@ -897,10 +897,10 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       graphifyServer = buildGraphifyMcpServer(input.workingDirectory);
     } else {
       graphifyEnabled = false;
-      input.onStatus?.('结构分析工具没有生成可用结果，助手会继续用源码工具调查。');
+      input.onStatus?.('代码结构分析这次没有生成可用结果，助手改用源码工具继续调查。');
       input.onTrajectory?.({
         type: 'status',
-        name: '结构分析工具不可用，已继续调查',
+        name: '代码结构分析没成功，已改用源码继续查',
         status: 'info',
         details: {
           capability: GRAPHIFY_MCP_NAME,
@@ -1015,7 +1015,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       stageGate && 'passed' in stageGate && stageGate.passed === false
         ? {
             applied: false,
-            error: stageGate.error ?? 'Stage Gate 未通过，当前 Workflow 保持不变。',
+            error: stageGate.error ?? '这一阶段还不能继续，当前工作方式保持不变。',
             execution: undefined,
           }
         : input.workflowSkill && input.investigationName
@@ -1028,7 +1028,7 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
           : { applied: false, error: undefined, execution: undefined };
 
     if (workflowTransition.error) {
-      input.onStatus?.('OpenCode 本阶段没有通过 Workflow Gate，继续补齐结果。');
+      input.onStatus?.('这一阶段的结果还不够，助手正在继续补齐。');
     }
 
     if (execution >= maxAutomaticContinuations) break;
