@@ -265,18 +265,15 @@ export function useInvestigationController() {
     }
 
     const initialAutoStart = pendingInitialAutoStartRef.current;
-    const hasInitialStartRepository = result.control.research.githubRepositories.some((repository) => repository.trim());
-    const initialStartReady = Boolean(result.context.mission && hasInitialStartRepository);
+    const initialStartReady = Boolean(result.context.mission);
     if (initialAutoStart?.sessionName === key) {
       if (initialStartReady) {
         pendingInitialAutoStartRef.current = undefined;
         // 等本次 render 完成后再调用 send，确保 send 使用的是刚切换到的 active Session。
         window.setTimeout(() => { void send(initialAutoStart.message); }, 0);
       } else if (result.context.mission) {
-        // 新建调查已经完成 Mission，但在首次真正执行前必须先完成研究范围配置。
-        // 这里停住自动启动，不要求用户再输入“开始”，配置保存后由 loadSession 自动恢复。
-        setPage('config');
-        setTurnStatus('调查已创建，请先配置至少一个 GitHub 仓库；保存配置后会自动开始。');
+        // 保留分支结构；Mission 已存在时上面的条件会直接启动。
+        setTurnStatus('调查已准备好，正在开始执行。');
       }
     }
 
@@ -992,9 +989,10 @@ export function useInvestigationController() {
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
-      // 新建调查的首次执行必须先完成研究范围配置；确认后直接打开配置页。
+      // 新建调查仍直接进入配置页，便于用户在首次执行前补充 Repo、MCP 等研究范围；
+      // GitHub 不是启动条件，没有 Repo 也可以直接保存配置并自动开始。
       setPage('config');
-      setTurnStatus('调查已创建，请先配置 GitHub 仓库；保存配置后会自动开始。');
+      setTurnStatus('调查已创建，请检查调查配置；保存配置后会自动开始。');
     } catch (e) {
       // 创建失败时不得把临时 Mission/自动启动状态带入下一次新建调查。
       pendingInitialMissionDraftRef.current = undefined;
