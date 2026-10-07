@@ -8,7 +8,8 @@
 import { config } from '../config.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import { askCodeBuddy, normalizeCodeBuddyModel, resolveCodeBuddyModel } from './codebuddy.js';
-import { askCopilot, type AskInput } from './copilot.js';
+import { askCopilot } from './copilot.js';
+import type { AskInput } from './ask-input.js';
 import { askOpenCode, listOpenCodeModels } from './opencode.js';
 import { syncRuntimeSkillWorkspace } from '../skills/catalog.js';
 
