@@ -28,7 +28,7 @@ sourceRevision
 方括号中的 Discovery identity 仅在该 Artifact 实际依赖 Discovery Snapshot 时参与比较。不能用 `latest`、timestamp 或 filename 替代 generation identity。
 5. GET 只读取现有 artifact；生成 / regenerate 是显式动作。
 
-6. Artifact generation 的正式顺序固定为 `capture → deterministic gate → build → independent review → persist`。生成过程中可以产生临时内存内容，但未通过必要 Review 的 artifact 不应被标记为 current；Review 失败 / unavailable 时应保持 blocked 或对应的未发布状态。
+6. Artifact generation 的正式发布顺序固定为 `capture → deterministic gate → build → independent review → publish`。Workflow 为了让后续 deterministic Gate 检查结构化工作成果，可以在 Review 前保存工作副本；但工作副本不能因此被视为 current / approved。正式 Report 等用户可见结果在 Reviewer 通过前不得发布为 current。
 
 7. Reviewer result 必须绑定 artifact hash 和 source revision。
 8. Reviewer result 必须绑定 artifact hash 和 source revision。
