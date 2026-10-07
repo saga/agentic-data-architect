@@ -10,11 +10,11 @@
 
 | 状态 | 存储 | 作用 | 权威性 |
 |---|---|---|---|
-| Investigation State | .workspace/<session>/context.json | goal、scope、evidence、claims、findings、inputs、Copilot session reference | Investigation 当前状态 |
+| Investigation State | .workspace/<session>/context.json | goal、scope、evidence、claims、findings、inputs、Agent session reference | Investigation 当前状态 |
 | Conversation / Local Registry | .workspace/conversations.db | user/assistant 消息、turn、Dataset Registry、local analysis run | 对话与本地分析元数据 |
 | Control State | .workspace/<session>/control.json | Research、guidance、MCP、平台能力、版本历史 | Agent 执行配置 |
 
-Copilot session 本身不作为业务状态源，而是由 context.json 保存的可恢复引用。
+Agent session 本身不作为业务状态源，而是由 context.json 保存的可恢复引用；具体是 Copilot、CodeBuddy 还是 OpenCode 由 Runtime 配置决定。
 
 本轮已经处理的关键问题：
 
@@ -71,7 +71,7 @@ flowchart LR
 
 核心原则：
 
-> Browser 负责交互状态；SQLite 负责 turn / conversation 生命周期；context.json 负责 Investigation 状态；control.json 负责 Agent 配置；Copilot session 负责模型运行上下文，但不定义 Investigation 业务状态。
+> Browser 负责交互状态；SQLite 负责 turn / conversation 生命周期；context.json 负责 Investigation 状态；control.json 负责 Agent 配置；Agent session 负责模型运行上下文，但不定义 Investigation 业务状态。
 
 ## 3. 正常提问的数据流
 
