@@ -19,7 +19,7 @@ import {
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
-import { rejectAllPendingAgentUserInputs } from './user-input-bridge.js';
+import { rejectAllPendingAgentUserInputs, requestAgentUserInput } from './user-input-bridge.js';
 import type { AskInput } from './ask-input.js';
 
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
@@ -321,6 +321,8 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let graphifyRequiredExecution = -1;
   let graphifyUsedExecution = -1;
 
+  let copilotSessionId = input.sessionId ?? '';
+
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
@@ -440,67 +442,25 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * SDK 的 user_input.requested 事件只有观测意义；真正让 Agent 停下来等待回答的是这个 Promise。
      */
     onUserInputRequest: async (request: UserInputRequestParam) => {
-      const requestId = randomUUID();
       pendingUserInputWaits += 1;
       startUserInputWaitTimeout();
-
-      input.onStatus?.('助手正在等你的回答。');
-      input.onTrajectory?.({
-        type: 'status',
-        name: '等待你的回答',
-        status: 'waiting',
-        details: {
-          requestId,
-          waitingOn: 'user_input',
-          waitingStartedAt: new Date().toISOString(),
-          waitTimeoutMs: config.userInputWaitTimeoutMs,
-        },
-      });
-
-      const requestedAt = new Date().toISOString();
-
-      return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
-        pendingCopilotUserInputs.set(requestId, {
-          sessionName: investigationName,
-          turnId: input.turnId ?? '',
-          sessionId: input.sessionId ?? '',
-          requestId,
-          question: request.question,
-          choices: request.choices ?? [],
-          allowFreeform: request.allowFreeform !== false,
-          requestedAt,
-          onAnswered: ({ answer, wasFreeform }) => {
-            input.onTrajectory?.({
-              type: 'user_input_completed',
-              name: '用户输入已提供',
-              status: 'completed',
-              durationMs: Math.max(0, Date.now() - Date.parse(requestedAt)),
-              details: {
-                requestId,
-                question: request.question,
-                answer: redactTrajectoryValue(answer),
-                wasFreeform,
-              },
-            });
+      try {
+        return await requestAgentUserInput(
+          investigationName,
+          input.turnId ?? '',
+          copilotSessionId,
+          {
+            question: request.question,
+            choices: request.choices ?? [],
+            allowFreeform: request.allowFreeform !== false,
           },
-          resolve,
-          reject,
-        });
-      }).then(
-        (response) => {
-          pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
-          clearUserInputWaitTimeout();
-          if (pendingUserInputWaits === 0) {
-            input.onStatus?.('已收到你的回答，助手继续处理。');
-          }
-          return response;
-        },
-        (error) => {
-          pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
-          clearUserInputWaitTimeout();
-          throw error;
-        },
-      );
+          input.onStatus,
+          input.onTrajectory,
+        );
+      } finally {
+        pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
+        clearUserInputWaitTimeout();
+      }
     },
     workingDirectory,
     systemMessage: {
@@ -526,6 +486,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     ? await resumeOrCreate(c, input.sessionId, sessionConfig)
     : await c.createSession(sessionConfig);
 
+  copilotSessionId = session.sessionId;
   input.onSessionId?.(session.sessionId);
   if (input.turnId) {
     activeSessions.set(input.turnId, { sessionId: session.sessionId, abort: () => session.abort() });
