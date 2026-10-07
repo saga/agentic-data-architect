@@ -297,7 +297,7 @@ export async function requestAgentUserInput(
 ): Promise<{ answer: string; wasFreeform: boolean }> {
   const requestId = randomUUID();
   const requestedAt = new Date().toISOString();
-  onStatus?.('Agent 正在等待你的回答。');
+  onStatus?.('助手正在等你的回答。');
   onTrajectory?.({
     type: 'user_input_requested',
     name: '等待你的回答',
@@ -314,7 +314,7 @@ export async function requestAgentUserInput(
   return new Promise<{ answer: string; wasFreeform: boolean }>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       pendingCopilotUserInputs.delete(requestId);
-      reject(new Error(`Timeout after ${config.userInputWaitTimeoutMs}ms waiting for user input`));
+      reject(new Error(`等待你的回答超过 ${config.userInputWaitTimeoutMs}ms，这次操作已停止。`));
     }, config.userInputWaitTimeoutMs);
     timeoutId.unref?.();
 
@@ -584,7 +584,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
      */
     onMcpAuthRequest: async (request: McpAuthRequestParam) => {
-      input.onStatus?.(`MCP ${request.serverName} 需要登录授权，当前工作台暂不支持 OAuth。`);
+      input.onStatus?.(`MCP ${request.serverName} 需要登录授权，但工作台目前还不能完成 OAuth 登录。请先在 MCP 服务端完成登录，或暂时移除这个 MCP。`);
       input.onTrajectory?.({
         type: 'status',
         name: 'MCP 需要登录授权',
@@ -696,7 +696,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
       pendingUserInputWaits += 1;
       startUserInputWaitTimeout();
 
-      input.onStatus?.('Agent 正在等待你的回答。');
+      input.onStatus?.('助手正在等你的回答。');
       input.onTrajectory?.({
         type: 'status',
         name: '等待你的回答',
@@ -743,7 +743,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
           pendingUserInputWaits = Math.max(0, pendingUserInputWaits - 1);
           clearUserInputWaitTimeout();
           if (pendingUserInputWaits === 0) {
-            input.onStatus?.('已收到你的回答，助手继续处理，请稍候…');
+            input.onStatus?.('已收到你的回答，助手继续处理。');
           }
           return response;
         },
@@ -1301,7 +1301,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const offUserInputRequested = session.on('user_input.requested', (e) => {
     pendingUserInputs.set(e.data.requestId, { requestedAt: Date.now(), question: e.data.question });
     markActivity('user_input_requested', '等待用户输入');
-    input.onStatus?.('Agent 正在等待你的输入。');
+    input.onStatus?.('助手正在等你的输入。');
     // ask_user 的真正等待由 onUserInputRequest handler 实现；这里仅补充 SDK runtime requestId，
     // 方便轨迹中的 user_input.completed 与本轮执行对应。
     void runRecorder?.write('user_input_request', {
@@ -1360,10 +1360,10 @@ export async function askCopilot(input: AskInput): Promise<string> {
 
   const offSessionError = session.on('session.error', (e) => {
     void runRecorder?.write('session_error', e.data);
-    markActivity('session_error', 'Session 错误：' + e.data.message);
+    markActivity('session_error', '助手运行出错：' + e.data.message);
     input.onTrajectory?.({
       type: 'session_error',
-      name: 'Session 错误',
+      name: '助手运行出错',
       status: 'failed',
       details: {
         errorType: e.data.errorType,
@@ -1642,19 +1642,19 @@ export async function askCopilot(input: AskInput): Promise<string> {
     const permissionTimedOut = PERMISSION_WAIT_TIMEOUT.test(errorMessage);
     const timedOut = sdkTimedOut || executionTimedOut || userInputTimedOut || permissionTimedOut;
     const timeoutLabel = permissionTimedOut
-      ? '等待用户确认超时'
+      ? '等待用户确认时间过长'
       : userInputTimedOut
-        ? '等待用户回答超时'
+        ? '等待用户回答时间过长'
         : executionTimedOut
-        ? 'Agent 执行超时'
+        ? '助手执行时间过长'
         : sdkTimedOut
-          ? '等待 Session 完成超时'
+          ? '等待运行结果时间过长'
           : '';
     runOutcome = {
       status: timedOut || /abort/i.test(errorMessage) ? 'aborted' : 'failed',
       error: errorMessage,
     };
-    markActivity(timedOut ? 'timeout' : 'error', timedOut ? timeoutLabel : 'Agent 执行失败');
+    markActivity(timedOut ? 'timeout' : 'error', timedOut ? timeoutLabel : '助手执行失败');
     input.onTrajectory?.({
       type: 'error',
       name: timedOut
