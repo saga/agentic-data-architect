@@ -30,7 +30,7 @@
 
 Agent 每次完成一个有效调查 turn，都必须留下一个分析记录：
 
-`.workspace/<session>/artifacts/analysis/turn-*.md`
+`.workspace/<session>/artifacts/analysis/<sequence>-<turnId>.md`
 
 这份文件保存本轮已经形成的分析结论、资料编号、未知事项和下一步，不替代聊天记录。
 
