@@ -17,6 +17,7 @@ import { appendAuditEvent } from '../investigation/control.js';
 import {
   ensureWorkspace,
   loadWorkspaceContext,
+  contextFile,
   writeJsonAtomic,
   workspaceRoot,
   withWorkspaceContextLock,
@@ -567,18 +568,19 @@ export async function saveJourneyDefinition(
       migratedExecution,
     );
 
-    // Workflow 版本变化后，普通调查 Copilot Session 不能继续携带旧 Workflow 上下文。
+    // Workflow 版本变化后，任何 Runtime Session 都不能继续携带旧 Workflow 上下文。
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
+    delete nextContext.agentSessionId;
+    delete nextContext.agentSessionRuntime;
+    delete nextContext.agentConfigurationVersion;
     delete nextContext.copilotSessionId;
     delete nextContext.copilotConfigurationVersion;
-    await writeJsonAtomic(
-      path.join(workspaceRoot(name), 'context.json'),
-      {
-        ...nextContext,
-        updatedAt: new Date().toISOString(),
-      },
-    );
+    delete nextContext.journeyPlan;
+    await writeJsonAtomic(contextFile(name), {
+      ...nextContext,
+      updatedAt: new Date().toISOString(),
+    });
 
     return nextVersion;
   });
@@ -614,15 +616,16 @@ export async function resetJourneyCustomization(
     if (events) await fs.writeFile(journeyFile(name, EVENTS_FILE), events, 'utf8');
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
+    delete nextContext.agentSessionId;
+    delete nextContext.agentSessionRuntime;
+    delete nextContext.agentConfigurationVersion;
     delete nextContext.copilotSessionId;
     delete nextContext.copilotConfigurationVersion;
-    await writeJsonAtomic(
-      path.join(workspaceRoot(name), 'context.json'),
-      {
-        ...nextContext,
-        updatedAt: new Date().toISOString(),
-      },
-    );
+    delete nextContext.journeyPlan;
+    await writeJsonAtomic(contextFile(name), {
+      ...nextContext,
+      updatedAt: new Date().toISOString(),
+    });
   });
 
   await appendAuditEvent(name, {
