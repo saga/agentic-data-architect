@@ -449,7 +449,7 @@ app.post('/api/sessions', async (req, res) => {
       control: toControlView(await loadInvestigationControl(name)),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
-      messages: listConversationMessages(name, 200).map((message) => ({
+      messages: listConversationMessages(name, 1000).map((message) => ({
         id: message.id,
         role: message.role,
         content: message.content,
