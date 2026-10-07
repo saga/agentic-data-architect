@@ -265,11 +265,12 @@ export function useInvestigationController() {
     }
 
     const initialAutoStart = pendingInitialAutoStartRef.current;
-    const initialStartReady = Boolean(result.context.mission);
+    const initialConfigurationSaved = result.control.version > 1;
+    const initialStartReady = Boolean(result.context.mission && initialConfigurationSaved);
     if (initialAutoStart?.sessionName === key) {
       if (initialStartReady) {
         pendingInitialAutoStartRef.current = undefined;
-        // 等本次 render 完成后再调用 send，确保 send 使用的是刚切换到的 active Session。
+        // 等配置保存后的 render 完成后再调用 send，确保 send 使用的是最新 active Session。
         window.setTimeout(() => { void send(initialAutoStart.message); }, 0);
       } else if (result.context.mission) {
         // 保留分支结构；Mission 已存在时上面的条件会直接启动。
@@ -989,8 +990,8 @@ export function useInvestigationController() {
       setNewSessionWorkflow(null);
       await reloadSessions(false);
       navigateToSession(created.context.name);
-      // 新建调查仍直接进入配置页，便于用户在首次执行前补充 Repo、MCP 等研究范围；
-      // GitHub 不是启动条件，没有 Repo 也可以直接保存配置并自动开始。
+      // 新建调查先停在配置页；用户完成一次明确的配置保存后，才自动开始首次执行。
+      // GitHub 是可选的，保存时可以只有其它配置变化。
       setPage('config');
       setTurnStatus('调查已创建，请检查调查配置；保存配置后会自动开始。');
     } catch (e) {
