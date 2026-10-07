@@ -7,32 +7,6 @@
  */
 import * as z from 'zod';
 import { ArtifactProvenanceSchema } from '../api/contracts.js';
-export const JourneyStateSchema = z.object({
-  workflowId: z.string().min(1),
-  stages: z.array(z.object({
-    id: z.string().min(1),
-    title: z.string().min(1),
-    objective: z.string().min(1),
-    status: z.enum(['completed', 'current', 'locked', 'future']),
-    nodeType: z.enum(['task', 'review', 'end']),
-  }).strict()),
-  execution: z.object({
-    workflowId: z.string().min(1),
-    workflowVersion: z.number().int().nonnegative(),
-    runId: z.string().min(1),
-    currentNodeId: z.string().min(1),
-    completedNodeIds: z.array(z.string()),
-    status: z.enum(['active', 'waiting', 'completed']),
-    pendingInteraction: z.object({
-      id: z.string().min(1),
-      nodeId: z.string().min(1),
-      reason: z.string().min(1),
-      requestedAt: z.string().datetime(),
-    }).optional(),
-  }).strict(),
-}).strict();
-
-
 export const WorkProductStatusSchema = z.enum(['draft', 'in_review', 'approved', 'rejected']);
 export type WorkProductStatus = z.infer<typeof WorkProductStatusSchema>;
 
@@ -262,8 +236,6 @@ export const ModernizationPlanSchema = z.object({
   mappings: z.array(SourceToTargetMappingSchema),
   decisions: z.array(ArchitectureDecisionSchema),
   validationPlan: ValidationPlanSchema,
-  /** 根据 Markdown Workflow 计算出的当前关卡；旧版本计划可暂时没有这一项。 */
-  journey: JourneyStateSchema.optional(),
   /** Artifact provenance：旧版本没有该字段时，读取路径将视为 stale。 */
   provenance: ArtifactProvenanceSchema.optional(),
   /** Mapping Gate 使用的覆盖范围记录。 */
