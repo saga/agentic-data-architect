@@ -211,7 +211,7 @@ export function buildGraphifyMcpServer(
     server: {
       type: 'local',
       command,
-      args: ['--graph', graphPath],
+      args: [graphPath],
       tools: [
         'query_graph',
         'get_node',
