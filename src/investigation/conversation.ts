@@ -171,6 +171,11 @@ function getDatabase(): DatabaseSync {
     END;
   `);
 
+  const columns = database.prepare('PRAGMA table_info(conversation_turns)').all() as Array<{ name?: unknown }>;
+  if (!columns.some((column) => column.name === 'assistant_draft')) {
+    database.exec('ALTER TABLE conversation_turns ADD COLUMN assistant_draft TEXT');
+  }
+
   return database;
 }
 
