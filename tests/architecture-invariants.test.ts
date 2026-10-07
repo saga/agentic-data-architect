@@ -42,3 +42,18 @@ test('CLI does not force a legacy workflow by default', async () => {
   assert.match(cli, /current-data-architecture/);
   assert.match(cli, /data-architecture-assessment/);
 });
+
+test('CodeBuddy query turn limit is configured rather than hardcoded', async () => {
+  const config = await fs.readFile(new URL('../src/config.ts', import.meta.url), 'utf8');
+  const codebuddy = await fs.readFile(new URL('../src/agent/codebuddy.ts', import.meta.url), 'utf8');
+  assert.match(config, /CODEBUDDY_MAX_TURNS/);
+  assert.match(config, /codeBuddyMaxTurns/);
+  assert.match(codebuddy, /maxTurns: config\.codeBuddyMaxTurns/);
+  assert.doesNotMatch(codebuddy, /maxTurns:\s*20\b/);
+});
+
+test('Graphify fallback explains that source tools will continue the investigation', async () => {
+  const codebuddy = await fs.readFile(new URL('../src/agent/codebuddy.ts', import.meta.url), 'utf8');
+  assert.match(codebuddy, /结构分析工具这次没有生成可用结果/);
+  assert.match(codebuddy, /改用源码工具继续调查/);
+});
