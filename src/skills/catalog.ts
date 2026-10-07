@@ -105,11 +105,13 @@ export function parseSkillManifest(markdown: string, filePath = 'SKILL.md'): Ski
           kind = unquote(kindMatch[1] ?? '');
           continue;
         }
-        if (/^\s*[A-Za-z][A-Za-z0-9_-]*\s*:/.test(nested)) {
+        if (/^\s+/.test(nested)) {
           const field = /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*:/.exec(nested)?.[1];
           if (field) unsupportedFields.push(field);
+          continue;
         }
-        continue;
+        index -= 1;
+        break;
       }
       continue;
     }
