@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     });
     await vite?.close();
     await stopClient();
-    closeLocalAnalytics();
+    await closeLocalAnalytics();
     closeConversationStore();
   };
 
