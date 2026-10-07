@@ -31,6 +31,7 @@ import {
   type GlobalConfiguration,
   type InvestigationControl,
   type JourneyState,
+  type Message,
   type MissionContract,
   type MissionDraft,
   type PendingPermission,
