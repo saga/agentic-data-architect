@@ -23,7 +23,7 @@ export interface ResolvedRemoteMedia {
 }
 
 function mediaCacheRoot(): string {
-  return path.join(config.legacyDataDir, 'cache', 'media');
+  return path.join(config.dataDir, 'cache', 'media');
 }
 
 export function mediaCacheFile(cacheKey: string): string {
