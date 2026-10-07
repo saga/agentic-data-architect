@@ -1171,7 +1171,7 @@ export const RemoteMediaResolveResponseSchema = z.object({
   kind: z.enum(['image', 'video', 'remote']),
   remoteUrl: z.string().url().optional(),
   cacheKey: z.string().regex(/^[a-f0-9]{64}$/i),
-  cacheUrl: z.string().url().optional(),
+  cacheUrl: z.string().startsWith('/').optional(),
   cached: z.boolean(),
   mimeType: z.string().optional(),
 }).strict();
