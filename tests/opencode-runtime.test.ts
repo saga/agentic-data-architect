@@ -6,9 +6,9 @@ const {
   parseOpenCodeModel,
   listOpenCodeModels,
   registerOpenCodeGraphifyMcp,
-  requiresGraphifyFirst,
   graphifyPreflightTools,
 } = await import('../src/agent/opencode.js');
+const { requiresGraphifyFirst } = await import('../src/adapters/graphify.js');
 
 test('OpenCode model references use provider/model form', () => {
   assert.equal(isOpenCodeModel('opencode:ollama/qwen3-coder'), true);
