@@ -88,3 +88,24 @@ test('failed or empty Graphify extraction is reported as unavailable for runtime
     await rm(root, { recursive: true, force: true });
   }
 });
+test('Graphify tool detection accepts normalized MCP tool names', () => {
+  assert.equal(isGraphifyTool({ toolName: 'graphify-structural-analysis_query_graph' }), true);
+  assert.equal(isGraphifyTool({ toolName: 'graphify-structural-analysis.query_graph' }), true);
+  assert.equal(isGraphifyTool({ toolName: 'mcp__graphify-structural-analysis__query_graph' }), true);
+  assert.equal(isGraphifyTool({ toolName: 'mcp__graphify-structural-analysis' }), true);
+});
+
+test('Graphify tool detection accepts MCP server/tool fields', () => {
+  assert.equal(
+    isGraphifyTool({
+      mcpServerName: 'graphify-structural-analysis',
+      mcpToolName: 'query_graph',
+    }),
+    true,
+  );
+});
+
+test('Graphify tool detection does not classify unrelated tools', () => {
+  assert.equal(isGraphifyTool({ toolName: 'Read' }), false);
+  assert.equal(isGraphifyTool({ toolName: 'mcp__filesystem__read_file' }), false);
+});
