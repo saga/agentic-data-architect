@@ -397,7 +397,7 @@ Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件
 “这个 legacy 系统哪些节点最关键？”
 ~~~
 
-Code Structure Index 使用 TypeScript compiler API 做确定性分析，提供 find、callers、callees、trace 等最小结构查询。它只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。Agent 定位源码后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
+Code Structure Index 按语言选择确定性解析器：TS/JS 使用 TypeScript compiler API；Java、Python、C# 使用 Microsoft VS Code 的 `@vscode/tree-sitter-wasm` 预构建 WASM grammar。统一提供 find、callers、callees、trace 等最小结构查询。它只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。Agent 定位源码后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
 
 ## Semantic Context
 
