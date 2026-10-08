@@ -97,7 +97,9 @@ export function evaluateModernizationGate(
       Boolean(
         coverage
         && coverage.sourceAssets.length > 0
-        && coverage.unmappedAssets.length === 0,
+        && coverage.unmappedAssets.every((asset) =>
+          coverage.unmappedAssetDispositions?.some((item) => item.asset === asset && item.reason.trim().length > 0) === true,
+        ),
       ),
       coverage
         ? 'sources=' + String(coverage.sourceAssets.length)
