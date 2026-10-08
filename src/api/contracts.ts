@@ -1045,6 +1045,14 @@ export const SessionContextViewSchema = z.object({
 }).strict();
 export type SessionContextView = z.infer<typeof SessionContextViewSchema>;
 
+export const RunningConversationTurnSchema = z.object({
+  turnId: z.string().min(1),
+  assistantDraft: z.string().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+}).strict();
+export type RunningConversationTurn = z.infer<typeof RunningConversationTurnSchema>;
+
 export const SessionDataSchema = z.object({
   context: SessionContextViewSchema,
   missionProgress: MissionProgressSchema.nullable(),
@@ -1052,6 +1060,7 @@ export const SessionDataSchema = z.object({
   localDatasets: z.array(z.unknown()),
   recentAudit: z.array(AuditEventSchema),
   messages: z.array(MessageSchema),
+  runningTurn: RunningConversationTurnSchema.nullable(),
   conversationCount: z.number().int().nonnegative(),
   conversationLastMessageAt: z.string().datetime().nullable(),
   currentState: CurrentStateViewSchema.nullable(),
