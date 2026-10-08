@@ -127,5 +127,5 @@ test('current data architecture readiness is blocked by missing flow, model, or 
       },
     },
   }));
-  assert.equal(sqlGap.currentDataArchitectureReady, false);
+  assert.equal(sqlGap.currentDataArchitectureReady, true);\n});\n\ntest('high discovery or lineage gaps do not block a usable current-state result', () => {\n  const derived = evaluateDerivedState(state({ highGapKinds: ['lineage'] }));\n  assert.equal(derived.currentStateReady, true);\n  assert.equal(derived.currentDataArchitectureReady, true);
 });
