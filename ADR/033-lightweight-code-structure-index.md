@@ -1,6 +1,6 @@
-# ADR-033：轻量级 Code Structure Index 作为 Graphify 的可替换实现
+# ADR-033：轻量级 Code Structure Index（历史过渡决定）
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-08
 
 ## Context
@@ -117,3 +117,7 @@ Node id 必须由 repository-relative path + symbol identity 稳定生成，避�
 Positive：无需 Graphify 也能进行基本结构导航；代码量小；provider 可替换；查询结果可复现；未来可接入 Graphify 而不修改 Investigation contract。
 
 Negative：第一阶段语言覆盖有限；本地 AST 解析不能立即达到 Graphify 的跨语言能力；需要维护索引版本和快照生命周期。
+
+## Superseded
+
+本 ADR 最初把 Code Structure Index 定义为 Graphify 的可替换 provider。该外部 provider 方案现已取消。Code Structure Index 本身保留，并由 ADR-034 重新定义为项目唯一的结构分析实现。
