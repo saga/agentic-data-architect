@@ -71,7 +71,7 @@ export function normalizeMissionClarity(raw: Record<string, { type: string; noul
 export async function reviewMissionClarity(
   purpose: string,
   expectedResult: string,
-  options: { model?: string; workingDirectory?: string } = {},
+  options: { model?: string; workingDirectory?: string; investigationName?: string } = {},
 ): Promise<MissionClarityReview | null> {
   try {
     const raw = await jevSmartFunc({
@@ -92,7 +92,9 @@ export async function reviewMissionClarity(
         },
       },
       ...(options.model ? { model: options.model } : {}),
+      modelCallName: 'Mission 清晰度检查',
       ...(options.workingDirectory ? { workingDirectory: options.workingDirectory } : {}),
+      ...(options.investigationName ? { investigationName: options.investigationName } : {}),
     });
 
     return normalizeMissionClarity(raw as Record<string, { type: string; noul?: number }>);
