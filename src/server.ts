@@ -149,6 +149,7 @@ import {
   getConversationTurn,
   listConversationMessages,
   listConversationTurns,
+  getRunningConversationTurn,
   saveConversationMessage,
   updateConversationTurnDraft,
   searchConversation,
@@ -449,6 +450,15 @@ app.post('/api/sessions', async (req, res) => {
       control: toControlView(await loadInvestigationControl(name)),
       localDatasets: listLocalDatasets(name),
       recentAudit: await readAuditEvents(name, 8),
+      runningTurn: (() => {
+        const turn = getRunningConversationTurn(name);
+        return turn ? {
+          turnId: turn.turnId,
+          ...(turn.assistantDraft ? { assistantDraft: turn.assistantDraft } : {}),
+          createdAt: turn.createdAt,
+          updatedAt: turn.updatedAt,
+        } : null;
+      })(),
       messages: listConversationMessages(name, 1000).map((message) => ({
         id: message.id,
         role: message.role,
