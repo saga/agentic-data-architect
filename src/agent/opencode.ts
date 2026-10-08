@@ -705,7 +705,6 @@ async function runOpenCodeCli(
   return {
     answer,
     sessionId,
-    graphifyUsed,
     ...(usage ? { usage } : {}),
     stderr,
   };
