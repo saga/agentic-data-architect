@@ -594,6 +594,8 @@ export async function answerQuestion(
           ? { sessionId: inv.copilotSessionId }
           : {}),
       runtime: control.agent.runtime,
+      investigationName,
+      turnId,
       onSessionId: (sessionId) => {
         inv.agentSessionId = sessionId;
         inv.agentSessionRuntime = control.agent.runtime;

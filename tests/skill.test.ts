@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, lstat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { syncRuntimeSkillWorkspace } from '../src/skills/catalog.js';
+import { parseSkillManifest, syncRuntimeSkillWorkspace } from '../src/skills/catalog.js';
 
 const requiredSections = ['输入校验', '输出', '输出与验证', 'Gate', '期望结果示例'] as const;
 
@@ -11,6 +11,8 @@ test('每个 Skill 都有完整的输入、输出、验证、Gate 和期望结�
   for (const entry of await readdir('skills', { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const markdown = await readFile(`skills/${entry.name}/SKILL.md`, 'utf8');
+    const manifest = parseSkillManifest(markdown, `skills/${entry.name}/SKILL.md`);
+    assert.equal(manifest.name, entry.name, entry.name + ' 的 Skill manifest 名称必须与目录名一致');
     for (const section of requiredSections) {
       const lines = markdown.split(/\r?\n/);
       const start = lines.findIndex((line) => line.trim() === '## ' + section);

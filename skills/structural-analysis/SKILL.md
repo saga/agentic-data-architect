@@ -1,6 +1,17 @@
+---
+name: structural-analysis
+description: 快速理解 legacy / modernization 项目的代码和集成工件结构，帮助 Investigation 在深入查证前缩小范围。
+metadata:
+  kind: capability
+---
+
 # Structural Analysis
 
 用途：快速理解 legacy / modernization 项目的代码和集成工件结构，帮助 Investigation 在深入查证前缩小范围。
+
+## 输入校验
+
+先确认待分析的仓库或工作目录可访问。结构索引是导航工具；已有索引可复用，源码明显变化时再重新生成。没有可访问的源码时，不要把缺失的结构索引解释成系统不存在相关能力。
 
 ## 边界
 
@@ -84,12 +95,17 @@ Code Structure Index
 
 如果结构索引与 Evidence 冲突，以 Evidence 为准。
 
-## 输出与 Gate
+## 输出
 
-Code Structure Index 是中间分析产物，应保留在 Investigation workspace。
+保留可重建的结构索引和其来源引用，供后续 Investigation 查询。正式调查结论仍应回到源码、SQL、配置或 metadata，并产生相应 Evidence。
 
-Gate 不是“图生成了就算完成”，而是：
+## 输出与验证
 
+结构索引是中间分析产物，应保留在 Investigation workspace。报告或正式 Claim 不得只引用结构图中的 inferred 关系作为已验证事实。
+
+## Gate
+
+Code Structure Index 的可用条件是：
 1. snapshot 成功生成；
 2. 关键结构关系可以回到原始来源；
 3. 重要关系不能只依赖 inferred 结果；
@@ -103,3 +119,7 @@ Gate 不是“图生成了就算完成”，而是：
 - 不建立第二套 graph database。
 - 不为了语言覆盖一次性实现几十种 parser。
 - 不把 structural analysis 当作 lineage / metadata / business semantics 的替代品。
+
+## 期望结果示例
+
+发现 `OrderService` 调用了 `loadPositions` 后，先把调用关系作为源码导航线索，再回到实现和 SQL 确认它实际读取的数据；仅在形成可追溯 Evidence 后，才把数据来源写进架构结论。

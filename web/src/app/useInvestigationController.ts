@@ -267,7 +267,7 @@ export function useInvestigationController() {
         : [];
       const preservedPending = pendingMessages.filter((message) => !serverIds.has(message.id));
       const mergedMessages = [...serverMessages, ...preservedLocal, ...preservedPending]
-        .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+        .sort((a, b) => (a.capturedAt ?? '').localeCompare(b.capturedAt ?? ''));
 
       // Conversation is durable on the server; this merge only protects messages that
       // are already visible locally but have not appeared in the latest HTTP snapshot.
@@ -749,10 +749,10 @@ export function useInvestigationController() {
     let executionFailed = false;
     let key = active;
     const updateTurnStatus = (value: string) => {
-      if (activeRef.current === key) updateTurnStatus(value);
+      if (activeRef.current === key) setTurnStatus(value);
     };
     const updateTurnError = (value: string | undefined) => {
-      if (activeRef.current === key) updateTurnError(value);
+      if (activeRef.current === key) setError(value);
     };
 
     try {
