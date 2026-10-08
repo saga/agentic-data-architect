@@ -601,11 +601,7 @@ export async function saveJourneyDefinition(
       : migratedExecutionBase;
 
     await fs.mkdir(journeyDir(name), { recursive: true });
-    await fs.writeFile(
-      journeyFile(name, ACTIVE_FILE),
-      serializeJourneyMarkdown(definition),
-      'utf8',
-    );
+    await writeTextAtomic(journeyFile(name, ACTIVE_FILE), serializeJourneyMarkdown(definition));
     await writeJsonAtomic(journeyFile(name, META_FILE), {
       schemaVersion: 1,
       baseWorkflowId: workflowId,
