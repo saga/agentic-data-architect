@@ -45,8 +45,6 @@ const EnvSchema = z.object({
   USER_INPUT_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
   // 权限确认和 Agent 实际计算是两种等待。用户没有及时点“允许/拒绝”时，不能被 6 分钟执行超时误杀。
   PERMISSION_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_600_000),
-  GRAPHIFY_ENABLED: z.enum(['true', 'false']).default('true'),
-  GRAPHIFY_MCP_COMMAND: z.string().min(1).default('graphify-mcp'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   HOST: z.string().min(1).default('127.0.0.1'),
   ALLOW_REMOTE_HOST: z.enum(['true', 'false']).default('false'),
@@ -84,9 +82,6 @@ export const config = {
   turnTimeoutMs: envConfig.TURN_TIMEOUT_MS,
   userInputWaitTimeoutMs: envConfig.USER_INPUT_WAIT_TIMEOUT_MS,
   permissionWaitTimeoutMs: envConfig.PERMISSION_WAIT_TIMEOUT_MS,
-  graphifyEnabled: envConfig.GRAPHIFY_ENABLED === 'true',
-  graphifyMcpCommand: envConfig.GRAPHIFY_MCP_COMMAND,
-  graphifyPlatformCapabilityVersion: 1,
   port: envConfig.PORT,
   host: envConfig.HOST,
   allowRemoteHost: envConfig.ALLOW_REMOTE_HOST === 'true',
