@@ -27,12 +27,14 @@ function input(overrides: Partial<StageGateInput> = {}): StageGateInput {
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      claimKeys: [],
       scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     after: {
       evidenceIds: ['ev-old', 'ev-new'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      claimKeys: [],
       scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     missionProgressBefore: {
@@ -103,6 +105,7 @@ test('Stage Gate still rejects empty work when Mission Alignment is unavailable'
       evidenceIds: ['ev-old'],
       findingIds: ['finding-old'],
       discoveryRunCount: 1,
+      claimKeys: [],
       scopeValidatedAt: '2026-10-05T00:00:00.000Z',
     },
     parsed: {
@@ -116,6 +119,33 @@ test('Stage Gate still rejects empty work when Mission Alignment is unavailable'
   const result = evaluateInvestigationStageGate(base);
   assert.equal(result.passed, false);
   assert.ok(result.checks.some((item) => item.name === '本阶段存在真实调查成果' && !item.passed));
+});
+
+test('Stage Gate does not treat a repeated evidence-backed claim as new work', () => {
+  const base = input({
+    before: {
+      ...input().before,
+      claimKeys: [JSON.stringify({
+        claim: 'Position 的主要来源是订单库。',
+        evidenceIds: ['ev-new'],
+      })],
+    },
+    after: input().after,
+    missionProgressBefore: input().missionProgressBefore,
+    missionProgressAfter: input().missionProgressAfter,
+    parsed: {
+      ...input().parsed,
+      claims: [{
+        claim: 'Position 的主要来源是订单库。',
+        status: 'supported',
+        evidenceIds: ['ev-new'],
+      }],
+    },
+    missionAlignment: null,
+  });
+  const result = evaluateInvestigationStageGate(base);
+  assert.equal(result.passed, true, 'There is still a new evidence delta in the base fixture.');
+  assert.equal(result.evidenceBackedClaimCount, 0);
 });
 
 test('Stage Gate rejects a checkpoint when current scope has not been validated', () => {
