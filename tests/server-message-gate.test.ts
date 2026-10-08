@@ -53,6 +53,8 @@ test('Mission Gate preserves the user message it blocks', async () => {
 });
 
 test.after(async () => {
+  // fetch() may leave keep-alive sockets open; close them before awaiting server.close().
+  server.closeAllConnections();
   await new Promise<void>((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
