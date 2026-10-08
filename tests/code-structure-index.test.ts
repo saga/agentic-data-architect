@@ -13,7 +13,7 @@ test('uses stable node ids based on file, kind, name, and same-name ordinal', as
       'export function same() { return 1; }',
       'export function same() { return 2; }',
       'export function caller() { return same(); }',
-    ].filter(Boolean).join('\\n') + '\\n');
+    ].filter(Boolean).join('\n') + '\n');
   };
 
   await writeSource('');
