@@ -387,7 +387,7 @@ Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件
 上传 CSV / JSON / JSONL / Parquet 后会自动进入 Dataset Registry。文件变化会产生新的 dataset version，分析结果会保存为 Evidence，因此后续回答可以回溯到具体数据文件和 SHA-256。
 ## Structural Analysis
 
-当前增加了一个独立的 structural-analysis capability，底层使用 [Graphify](https://github.com/Graphify-Labs/graphify) 把当前 Investigation working directory 中的代码和 SQL 建成可查询的结构图。
+当前提供一个独立的 structural-analysis capability，底层使用项目自己的 Code Structure Index 对当前 Investigation working directory 的 TS/JS 建立可查询的结构索引。
 
 它主要帮助 Agent 快速回答：
 
@@ -397,7 +397,7 @@ Agent 会自动发现当前 workspace 中的 CSV、JSON、JSONL、Parquet 文件
 “这个 legacy 系统哪些节点最关键？”
 ~~~
 
-Graphify 是平台级 structural-analysis capability，通过 MCP 注入当前 Agent Runtime；第一次调查时由 Skill 运行本地、确定性的结构扫描。当前 Control version 会固定 Graphify capability version，turn audit 记录实际 package version、MCP command 和 graph SHA-256。Graphify 的结果只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。目录 Discovery 同时为源文件建立 `source_file` Evidence，Agent 定位文件后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
+Code Structure Index 使用 TypeScript compiler API 做确定性分析，提供 find、callers、callees、trace 等最小结构查询。它只用于缩小调查范围和发现关系候选，不自动进入 Evidence，也不能把业务事实提升为 supported / verified。Agent 定位源码后仍必须回到本项目的 metadata、SQL lineage、profiling、targeted query 和 Semantic Context。
 
 ## Semantic Context
 
