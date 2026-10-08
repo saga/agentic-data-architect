@@ -15,6 +15,7 @@ import {
   GRAPHIFY_MCP_NAME,
   isGraphifyTool,
   GRAPHIFY_SELECTION_INSTRUCTION,
+  tryEnsureLocalCodeStructureIndex,
 } from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
@@ -304,22 +305,33 @@ export async function askCopilot(input: AskInput): Promise<string> {
   let graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
   // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
   let graphifyRuntime: Awaited<ReturnType<typeof tryEnsureGraphifyGraph>>['metadata'] | undefined;
+  let localStructureAvailable = false;
   if (graphifyEnabled) {
     const graphifyPreparation = await tryEnsureGraphifyGraph(workingDirectory, false);
     graphifyRuntime = graphifyPreparation.metadata;
     if (!graphifyPreparation.available) {
       graphifyEnabled = false;
+      const localStructure = await tryEnsureLocalCodeStructureIndex(workingDirectory);
+      localStructureAvailable = localStructure.status === 'available';
       input.onStatus?.(
-        '结构分析工具这次没有生成可用结果，助手改用源码工具继续调查。'
-        + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
+        localStructureAvailable
+          ? 'Graphify 不可用，已切换到本地代码结构索引继续调查。'
+          : '结构分析工具不可用，助手继续使用常规源码工具。'
+          + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
       );
       input.onTrajectory?.({
         type: 'status',
         name: '结构分析工具不可用，已继续调查',
         status: 'info',
         details: {
-          capability: GRAPHIFY_MCP_NAME,
+          capability: localStructureAvailable ? 'code-structure-index' : GRAPHIFY_MCP_NAME,
           ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
+          ...(localStructureAvailable ? {
+            localIndexPath: localStructure.indexPath,
+            files: localStructure.files,
+            nodes: localStructure.nodes,
+            edges: localStructure.edges,
+          } : { localStructureError: localStructure.error }),
         },
       });
     }
@@ -492,7 +504,24 @@ export async function askCopilot(input: AskInput): Promise<string> {
       mode: 'append' as const,
       // Mission 是最高优先级上下文；即使长期 Session 发生 compaction，
     // 服务器每个 turn 都会通过 system message 重新把任务契约放在最前面。
-    content: [input.missionPrompt, input.systemPrompt, graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '', workflowInstruction].filter(Boolean).join('\\n\\n'),
+    content: [
+      input.missionPrompt,
+      input.systemPrompt,
+      graphifyEnabled
+        ? GRAPHIFY_SELECTION_INSTRUCTION
+        : localStructureAvailable
+          ? [
+              'Graphify 当前不可用，已经准备好本地 Code Structure Index。',
+              '遇到调用链、依赖关系、上下游、路径或模块关系问题时，优先使用本地结构索引：',
+              'npm run structure:query -- <repository> find <name> [kind]',
+              'npm run structure:query -- <repository> callers <nodeId>',
+              'npm run structure:query -- <repository> callees <nodeId>',
+              'npm run structure:query -- <repository> trace <fromNodeId> <toNodeId>',
+              '查询结果只用于结构导航；正式结论必须回到源码、SQL、metadata 或 Evidence。',
+            ].join('\\n')
+          : '',
+      workflowInstruction,
+    ].filter(Boolean).join('\\n\\n'),
     },
     skillDirectories: isolatedPurpose ? [] : (input.skillDirectories ?? [config.skillsDir]),
     // Capability Skills stay available for Copilot's automatic task-based selection.
