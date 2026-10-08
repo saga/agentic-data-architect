@@ -56,6 +56,7 @@ export async function writeJsonAtomic(file: string, value: unknown): Promise<voi
 
 const contextWriteLocks = new Map<string, Promise<void>>();
 const workspaceInitializationLocks = new Map<string, Promise<void>>();
+const transcriptWriteLocks = new Map<string, Promise<void>>();
 const sharedIndexWriteLocks = new Map<string, Promise<void>>();
 const contextLockOwners = new AsyncLocalStorage<Set<string>>();
 const sharedIndexLockOwners = new AsyncLocalStorage<boolean>();
@@ -363,7 +364,21 @@ export async function appendTranscript(name: string, role: 'user' | 'assistant' 
   await ensureWorkspace(name);
   const label = role === 'assistant' ? 'Agent' : role === 'user' ? 'User' : 'System';
   const text = '## ' + label + ' — ' + new Date().toISOString() + '\n\n' + content.trim() + '\n\n';
-  await fs.appendFile(transcriptFile(name), text, 'utf-8');
+
+  // transcript 是 append-only 记录，但多个异步任务仍可能同时追加，例如主回答、
+  // Companion Note 和恢复处理。统一串行写入，避免 JSONL 之外的 Markdown 日志也出现顺序混乱。
+  const previous = transcriptWriteLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  transcriptWriteLocks.set(name, queued);
+  await previous.catch(() => undefined);
+  try {
+    await fs.appendFile(transcriptFile(name), text, 'utf-8');
+  } finally {
+    release();
+    if (transcriptWriteLocks.get(name) === queued) transcriptWriteLocks.delete(name);
+  }
 }
 
 /** 以读改写方式注册共享 Artifact，并在全局锁内原子更新 index.json。 */
