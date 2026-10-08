@@ -48,6 +48,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
   constructor(
     private readonly rootDirectory: string,
     private readonly outputFile = path.join(rootDirectory, '.code-structure', 'index.json'),
+    private readonly database: string = 'mysql',
   ) {}
 
   async build(): Promise<CodeStructureIndex> {
@@ -71,7 +72,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
 
       let statements: any[];
       try {
-        const parsed = parser.astify(text, { database: 'mysql' }) as any;
+        const parsed = parser.astify(text, { database: this.database as any }) as any;
         statements = Array.isArray(parsed) ? parsed : [parsed];
       } catch {
         // 不把无法解析的 SQL 猜成结构事实；文件仍然保留在 snapshot 中。
