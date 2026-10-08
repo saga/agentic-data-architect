@@ -49,6 +49,12 @@ export interface JourneyFacts {
   goal: string;
   /** Scope Gate 是否已经确认 Goal / Scope / Systems。 */
   scopeReady?: boolean;
+  /**
+   * Mission 的确定性“所有可量化必需交付物都已 covered”状态。
+   * 自定义结果 / not_tracked 不会被这里乐观地当成完成；因此 deterministic Workflow 不能
+   * 仅凭节点 completeWhen 就越过 Mission completion 直接进入 @end。
+   */
+  missionComplete?: boolean;
   /** 当前 Investigation 已保存的 Finding 数量，是原始事实，不是 completion signal。 */
   findingCount?: number;
   currentState: {
@@ -652,6 +658,12 @@ function advanceDeterministicJourney(
 
     // 只有真正走出当前节点才算完成；自环通常表示 retry/重新处理，不应把当前节点标成 completed。
     if (!route || route.target === node.id) break;
+
+    // @end 是最终业务状态，不只是图上的终点。即使 completeWhen 已满足，
+    // 也不能绕过 Mission Completion；否则一个局部事实刚满足，就可能把整个 Investigation
+    // 标成 completed，而 Mission 其实还有其它 required deliverable 未完成。
+    const target = definition.nodes.find((item) => item.id === route.target);
+    if (target?.type === 'end' && facts.missionComplete !== true) break;
 
     completed.add(node.id);
     currentNodeId = route.target;
