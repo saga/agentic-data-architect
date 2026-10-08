@@ -68,3 +68,4 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 
 | [ADR-034](./034-remove-graphify-use-code-structure-index.md) | 完全移除 Graphify，Code Structure Index 成为唯一结构分析能力 | Accepted |
 | [ADR-035](./035-polyglot-structure-analysis-provider-boundary.md) | 多语言采用 Provider + Artifact Extractor；不把所有工件强行 Tree-sitter 化 | Accepted |
+| [ADR-036](./036-code-structure-index-duckdb-projection.md) | Code Structure Index 保持 canonical JSON；DuckDB 作为可重建分析 projection 和统一结构查询层 | Accepted |
