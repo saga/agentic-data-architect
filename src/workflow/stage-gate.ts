@@ -16,11 +16,14 @@ import { evaluateMissionGate } from './mission-gate.js';
 import type { MissionProgress } from './mission-progress.js';
 import type { MissionAlignmentReview } from '../agent/jev-smart-func.js';
 import type { Investigation } from '../investigation/store.js';
+import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 
 export interface StageGateSnapshot {
   evidenceIds: string[];
   findingIds: string[];
   discoveryRunCount: number;
+  /** 当前 Scope generation 内可用的 Evidence；旧轨迹没有该字段时按空集合处理。 */
+  scopeEvidenceIds?: string[];
   /** 已经保存过的 Claim 摘要，用于判断本阶段是否只是重复旧结论；旧轨迹没有该字段时按空集合处理。 */
   claimKeys?: string[];
   scopeValidatedAt?: string;
@@ -106,8 +109,19 @@ function deliverableAdvanced(
 export function snapshotInvestigationForStageGate(
   investigation: Pick<Investigation, 'evidence' | 'findings' | 'discoveryRuns' | 'claims' | 'scopeValidation'>,
 ): StageGateSnapshot {
+  const scopeFingerprint = computeScopeFingerprint(investigation);
+  const currentScopeRunIds = new Set(
+    investigation.discoveryRuns
+      .filter((run) => run.scopeFingerprint === scopeFingerprint)
+      .map((run) => run.id),
+  );
+  const scopeEvidenceIds = investigation.evidence
+    .filter((item) => currentScopeRunIds.has(item.discoveryRunId))
+    .map((item) => item.id);
+
   return {
     evidenceIds: investigation.evidence.map((item) => item.id),
+    scopeEvidenceIds,
     findingIds: investigation.findings.map((item) => item.id),
     discoveryRunCount: investigation.discoveryRuns.length,
     claimKeys: investigation.claims.map((item) => JSON.stringify({
@@ -143,14 +157,17 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
   );
 
   const knownEvidence = new Set(input.after.evidenceIds);
+  const currentScopeEvidence = new Set(input.after.scopeEvidenceIds ?? input.after.evidenceIds);
   const invalidClaimEvidence = input.parsed.claims.filter((claim) =>
     claim.evidenceIds.length > 0
     && claim.evidenceIds.some((id) => !knownEvidence.has(id)),
   );
 
+  // “Evidence 存在”与“Evidence 属于当前调查范围”是两个条件。
+  // 旧 Scope 的证据仍然保留在 Investigation 中用于历史追溯，但不能拿来证明新 Scope 下的阶段成果。
   const evidenceBackedClaims = input.parsed.claims.filter((claim) =>
     claim.evidenceIds.length > 0
-    && claim.evidenceIds.every((id) => knownEvidence.has(id)),
+    && claim.evidenceIds.every((id) => currentScopeEvidence.has(id)),
   );
   const previousClaimKeys = new Set(input.before.claimKeys ?? []);
   const newEvidenceBackedClaims = evidenceBackedClaims.filter(
@@ -294,7 +311,7 @@ export function buildStageCheckpoint(
     .filter((claim) =>
       (claim.status === 'supported' || claim.status === 'verified')
       && claim.evidenceIds.length > 0
-      && claim.evidenceIds.every((id) => knownEvidence.has(id)),
+      && claim.evidenceIds.every((id) => currentScopeEvidence.has(id)),
     )
     .map((claim) => claim.claim.trim())
     .filter(Boolean)
