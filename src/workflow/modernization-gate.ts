@@ -93,7 +93,7 @@ export function evaluateModernizationGate(
       'mappings=' + String(plan.mappings.length),
     );
     add(
-      'Mapping 覆盖范围已经明确且没有未对应来源',
+      'Mapping 覆盖范围已经明确且未对应来源都有处置',
       Boolean(
         coverage
         && coverage.sourceAssets.length > 0
