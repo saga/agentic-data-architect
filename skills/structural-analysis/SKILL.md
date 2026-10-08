@@ -1,6 +1,6 @@
 ---
 name: structural-analysis
-description: 使用 Graphify 建立并查询本地代码、SQL、配置和项目文件的结构关系，帮助在深入调查前快速定位依赖、调用链和关键架构节点。
+description: 使用 Graphify 或本地 Code Structure Index 建立并查询代码结构关系，帮助在深入调查前快速定位依赖、调用链和关键架构节点。
 metadata:
   kind: capability
 ---
@@ -25,7 +25,7 @@ metadata:
 
 ## 第一次进入 Investigation
 
-Investigation 进入代码仓库后，宿主运行时会先尝试为当前 working directory 建一份可查询的 Graphify 结构图。第一次没有 graph 时生成，正式 Discovery 会刷新已有 graph。Graphify 生成失败或结果为空时，不应让整个 Investigation 失败；Runtime 会记录这次能力不可用，并改用常规源码工具继续调查。Skill 自己负责在源码明显变化后按需刷新。运行环境优先使用当前项目的 Graphify executable；如果 Graphify 只安装在项目虚拟环境中，就直接调用 `.venv/bin/graphify`，不要假定 `graphify` 一定在 PATH：
+Investigation 进入代码仓库后，优先使用 Graphify；如果 Graphify 未安装、被关闭或当前环境不适合使用，则使用本项目的轻量 Code Structure Index。两者都只提供结构导航，不直接提供 Evidence。Skill 自己负责在源码明显变化后按需刷新。运行环境优先使用当前项目的 Graphify executable；如果 Graphify 只安装在项目虚拟环境中，就直接调用 `.venv/bin/graphify`，不要假定 `graphify` 一定在 PATH：
 
 ~~~bash
 <项目 Graphify 命令> extract . --code-only --no-viz
@@ -45,7 +45,7 @@ graphify-out/graph.json
 
 ## 调查方式
 
-Graphify MCP 已作为 'graphify-structural-analysis' 注入当前 Agent Runtime。进入 structural-analysis 后，它是第一项结构调查动作；常规 grep / view / bash 只能用于后续源码核对：
+Graphify MCP 是首选结构能力；没有 Graphify 时，使用 `npm run structure:index -- <repo>` 建立 `.code-structure/index.json`，再通过 `npm run structure:query -- <repo> ...` 查询。进入 structural-analysis 后，结构查询优先于常规 grep / view / bash：
 
 - 'query_graph'：按自然语言问题找相关节点和边
 - 'get_node' / 'get_neighbors'：查看一个对象及其直接关系
@@ -64,9 +64,22 @@ Graphify MCP 已作为 'graphify-structural-analysis' 注入当前 Agent Runtime
 4. 再回到本项目 Evidence / Lineage / Metadata 查原始证据
 ~~~
 
+## Code Structure Index
+
+Code Structure Index 第一阶段使用 TypeScript compiler API 分析 TS/JS，提供 `find`、`callers`、`callees`、`trace` 四个最小查询。它是 Graphify 的可替换轻量 provider，不是第二套 graph database，也不承担 SQL、metadata、profiling 或 business semantics。
+
+当没有 Graphify 时，典型流程是：
+
+~~~text
+npm run structure:index -- <repository>
+npm run structure:query -- <repository> find position function
+~~~
+
+查询结果仍然必须回到源码核对。
+
 ## 证据边界
 
-Graphify 输出是 **结构导航和关系候选**，不是本 Investigation 的 Evidence。
+Graphify 和 Code Structure Index 输出都是 **结构导航和关系候选**，不是本 Investigation 的 Evidence。
 
 必须遵守：
 
