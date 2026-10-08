@@ -36,7 +36,9 @@ export function InvestigationDialogs(props: {
       <Modal
         title="新建工作"
         open={props.newSessionOpen}
-        onCancel={() => props.setNewSessionOpen(false)}
+        onCancel={() => {
+          if (!props.newSessionCreating) props.setNewSessionOpen(false);
+        }}
         onOk={props.onCreateSession}
         okButtonProps={{
           loading: props.newSessionCreating,
