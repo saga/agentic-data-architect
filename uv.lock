@@ -12,7 +12,6 @@ name = "agentic-data-architect"
 version = "0.3.3"
 source = { virtual = "." }
 dependencies = [
-    { name = "graphifyy", extra = ["mcp", "sql"] },
     { name = "sqlglot" },
 ]
 
