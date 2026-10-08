@@ -90,7 +90,8 @@ export function useInvestigationController() {
   const assistantCompanionNoteRef = useRef('');
   const [reasoningByMessage, setReasoningByMessage] = useState<Record<string, string>>({});
   // Server reload 期间保留尚未被服务器确认的用户消息，避免异步 session load 覆盖本地乐观更新。
-  const pendingOutgoingMessagesRef = useRef<Record<string, Message>>({});
+  const pendingOutgoingMessagesRef = useRef<Record<string, Record<string, Message>>>({});
+  const sendLockRef = useRef(false);
   // 每条回复固定一个随机头像。分配结果同时持久化到浏览器，避免上传新头像或刷新页面后旧消息全部换头像。
   const [assistantAvatarByMessage, setAssistantAvatarByMessage] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -718,7 +719,8 @@ export function useInvestigationController() {
         ? '选择下一步：' + selectedRoute.title
         : ''
       : (text ?? value).trim();
-    if (!message || loading) return;
+    if (!message || sendLockRef.current) return;
+    sendLockRef.current = true;
 
     setValue('');
     setNextGuidance([]);
@@ -749,7 +751,7 @@ export function useInvestigationController() {
         });
         key = created.context.name;
         activeRef.current = key;
-        pendingOutgoingMessagesRef.current[key] = optimisticMessage;
+        (pendingOutgoingMessagesRef.current[key] ??= {})[turnId] = optimisticMessage;
         navigateToSession(key);
       }
 
@@ -928,6 +930,7 @@ export function useInvestigationController() {
         }
       }
     } finally {
+      sendLockRef.current = false;
       setStreamingAnswer(undefined);
       setStreamingReasoning('');
       assistantCompanionNoteRef.current = '';
@@ -941,7 +944,7 @@ export function useInvestigationController() {
             : '可以继续提问');
       if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = undefined;
       if (stopRequestedTurnRef.current === turnId) stopRequestedTurnRef.current = undefined;
-      setLoading(false);
+      if (activeRef.current === key) setLoading(false);
     }
   };
 
