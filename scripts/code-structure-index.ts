@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { TypeScriptCodeStructureProvider } from '../src/structure/typescript-provider.js';
+import { CodeStructureIndexProvider } from '../src/structure/code-structure-index-provider.js';
 
 /**
  * 构建轻量 Code Structure Index。
@@ -8,7 +8,7 @@ import { TypeScriptCodeStructureProvider } from '../src/structure/typescript-pro
  * 生成的快照位于目标 repository 的 .code-structure/index.json。
  */
 const root = path.resolve(process.argv[2] ?? '.');
-const provider = new TypeScriptCodeStructureProvider(root);
+const provider = new CodeStructureIndexProvider(root);
 const index = await provider.build();
 
 console.log(JSON.stringify({
