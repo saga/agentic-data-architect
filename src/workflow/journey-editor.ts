@@ -655,10 +655,15 @@ export async function resetJourneyCustomization(
 ): Promise<JourneySnapshot> {
   await withWorkspaceContextLock(name, async () => {
     // Workflow 定义可以重置，但运行历史属于审计/诊断信息，不随 reset 丢失。
-    const events = await readTextOrNull(journeyFile(name, EVENTS_FILE));
-    await fs.rm(journeyDir(name), { recursive: true, force: true });
+    // 不要直接 rm 整个目录：如果进程在 rm 之后异常退出，已经读入内存的 events 也会一起消失。
+    // 这里只删除当前 Workflow 的“状态文件”，保留 EVENTS_FILE 原样不动。
+    await Promise.all([
+      fs.rm(journeyFile(name, ACTIVE_FILE), { force: true }),
+      fs.rm(journeyFile(name, META_FILE), { force: true }),
+      fs.rm(journeyFile(name, LAYOUT_FILE), { force: true }),
+      fs.rm(journeyFile(name, EXECUTION_FILE), { force: true }),
+    ]);
     await fs.mkdir(journeyDir(name), { recursive: true });
-    if (events) await writeTextAtomic(journeyFile(name, EVENTS_FILE), events);
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.agentSessionId;
