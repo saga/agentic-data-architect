@@ -27,6 +27,7 @@
 | Global configuration 首次初始化与用户更新使用不同锁，存在默认配置覆盖新配置的窗口 | 初始化与更新统一使用同一 global config lock |
 | Trajectory、Workflow run events、Audit、Transcript 都可能被多个异步路径同时 append | 各 durable JSONL/Markdown append 增加 session 级串行写入 |
 | Scope 变化后旧 Agent / CodeBuddy / OpenCode Session 可能残留；material-backed Scope 还可能引用旧 Scope Evidence | Scope change 清理所有 Runtime Session 引用；材料来源必须属于当前 Scope generation |
+| reset Workflow 时先删除整个 workflow 目录，进程中断可能连运行历史一起丢失 | reset 只删除 definition/meta/layout/execution 状态文件，保留 workflow run history |
 
 这些修复都属于已有 ADR 边界内的实现硬化，没有引入新的 Workflow / Agent / storage abstraction。
 
