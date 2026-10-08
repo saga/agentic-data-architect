@@ -53,11 +53,19 @@ test('target gate rejects empty draft even when Agent claimed success', () => {
   assert.ok(result.checks.some((check) => check.name.includes('目标架构') && !check.passed));
 });
 
-test('mapping gate requires explicit coverage, rules and evidence', () => {
-  const value = plan({ mappingCoverage: { sourceAssets: ['legacy_position'], unmappedAssets: ['legacy_account'] } });
-  const result = evaluateModernizationGate(value, new Set(['ev-1']), 'mapping', '/tmp/modernization-plan.json');
-  assert.equal(result.passed, false);
-  assert.ok(result.checks.some((check) => check.name.includes('覆盖范围') && !check.passed));
+test('mapping gate requires explicit disposition for intentionally unmapped assets', () => {
+  const value = plan({ mappingCoverage: { sourceAssets: ['legacy_position', 'legacy_account'], unmappedAssets: ['legacy_account'] } });
+  const blocked = evaluateModernizationGate(value, new Set(['ev-1']), 'mapping', '/tmp/modernization-plan.json');
+  assert.equal(blocked.passed, false);
+  assert.ok(blocked.checks.some((check) => check.name.includes('覆盖范围') && !check.passed));
+
+  const disposed = plan({ mappingCoverage: {
+    sourceAssets: ['legacy_position', 'legacy_account'],
+    unmappedAssets: ['legacy_account'],
+    unmappedAssetDispositions: [{ asset: 'legacy_account', disposition: 'obsolete', reason: '已确认是废弃测试表。' }],
+  }});
+  const passed = evaluateModernizationGate(disposed, new Set(['ev-1']), 'mapping', '/tmp/modernization-plan.json');
+  assert.equal(passed.passed, true);
 });
 
 test('validation gate rejects ready-only checks and passes only persisted results', () => {
