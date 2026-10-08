@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { config } from '../src/config.js';
+
 import {
   buildJevSmartFuncResponseSchema,
   buildMissionActionPrompt,
@@ -11,6 +13,11 @@ import {
   normalizeUnknownImpact,
   type JevQuestion,
 } from '../src/agent/jev-smart-func.js';
+
+test('Copilot model tiers default to Sonnet 5.5 and use Haiku 5.5 for simple calls', () => {
+  assert.equal(config.model, 'claude-sonnet-5.5');
+  assert.equal(config.simpleModel, 'claude-haiku-5.5');
+});
 
 const questions: Record<string, JevQuestion> = {
   route: {
