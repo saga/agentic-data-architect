@@ -64,6 +64,26 @@ test('rejects dangling nodes and dead-end nodes', () => {
   assert.ok(result.issues.some((issue) => issue.includes('orphan')));
 });
 
+test('human workflow nodes cannot use deterministic completeWhen', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> review',
+    '',
+    '## @review review',
+    'completeWhen: goal',
+    '- approved -> done',
+    '',
+    '## @end done',
+  ].join('\\n'));
+
+  assert.ok(result.definition);
+  assert.ok(
+    validateJourneyDefinition(result.definition!).some(
+      (issue) => issue.includes('人工步骤') && issue.includes('completeWhen'),
+    ),
+  );
+});
+
 test('unknown completeWhen is rejected by Workflow validation', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
