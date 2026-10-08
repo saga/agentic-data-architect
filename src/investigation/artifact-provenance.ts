@@ -11,7 +11,11 @@ function normalizeScopeValues(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
 }
 
-/** Scope identity deliberately excludes Mission goal text; Mission and Scope have independent lifecycles. */
+/**
+ * Scope identity 只由 scope + systems 决定，不把 Mission goal 混进去。
+ * 原因是 Mission 与 Scope 有独立生命周期：改任务目标不应该伪装成范围变化，反之亦然。
+ * 这个 fingerprint 会被 Discovery、Artifact 和旧 turn 防护共同使用，因此一旦字段组成改变，必须同步更新相关 ADR 和测试。
+ */
 export function computeScopeFingerprint(
   investigation: Pick<Investigation, 'scope' | 'systems'>,
 ): string {
@@ -21,7 +25,11 @@ export function computeScopeFingerprint(
   });
 }
 
-/** Stable Mission identity used to reject stale Agent turns before they commit results. */
+/**
+ * 计算 Mission 的稳定 identity，用来判断一个正在执行的 Agent turn 是否已经过期。
+ * purpose、expectedResult 和 deliverable 契约都会影响结果解释，因此全部纳入 fingerprint；
+ * confirmedAt、version 等只描述确认过程的元数据不纳入 identity。
+ */
 export function computeMissionFingerprint(
   investigation: Pick<Investigation, 'mission' | 'goal'>,
 ): string {
@@ -38,9 +46,9 @@ export function computeMissionFingerprint(
 }
 
 /**
- * Computes the identity of the Investigation state that an artifact was built from.
- * Only deterministic, persisted inputs are included; timestamps that do not change facts
- * are intentionally excluded.
+ * 计算一个结果产物所依据的 Investigation 来源版本。
+ * 这里只放会影响事实内容的确定性持久化输入；单纯的时间戳不参与计算，否则每次读取都会让
+ * 旧报告无意义地变成 stale。调用方通过它判断报告/Assessment/Modernization 是否仍对应当前事实。
  */
 export function isDiscoverySnapshotCompatible(
   investigation: Pick<Investigation, 'goal' | 'scope' | 'systems'>,
