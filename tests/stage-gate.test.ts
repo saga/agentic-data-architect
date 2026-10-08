@@ -127,24 +127,30 @@ test('Stage Gate does not treat a repeated evidence-backed claim as new work', (
       ...input().before,
       claimKeys: [JSON.stringify({
         claim: 'Position 的主要来源是订单库。',
-        evidenceIds: ['ev-new'],
+        evidenceIds: ['ev-old'],
       })],
     },
-    after: input().after,
+    after: {
+      ...input().before,
+      claimKeys: [JSON.stringify({
+        claim: 'Position 的主要来源是订单库。',
+        evidenceIds: ['ev-old'],
+      })],
+    },
     missionProgressBefore: input().missionProgressBefore,
-    missionProgressAfter: input().missionProgressAfter,
+    missionProgressAfter: input().missionProgressBefore,
     parsed: {
       ...input().parsed,
       claims: [{
         claim: 'Position 的主要来源是订单库。',
         status: 'supported',
-        evidenceIds: ['ev-new'],
+        evidenceIds: ['ev-old'],
       }],
     },
     missionAlignment: null,
   });
   const result = evaluateInvestigationStageGate(base);
-  assert.equal(result.passed, true, 'There is still a new evidence delta in the base fixture.');
+  assert.equal(result.passed, false);
   assert.equal(result.evidenceBackedClaimCount, 0);
 });
 
