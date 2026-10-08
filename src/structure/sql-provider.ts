@@ -37,8 +37,16 @@ function add(
   const key = `${kind}\0${name}`;
   const ordinal = ordinals.get(key) ?? 0;
   ordinals.set(key, ordinal + 1);
-  const node = { id: nodeId(file, kind, name, ordinal), kind, name, file, line };
-  nodes.push(node); map.set(node.id, node); return node;
+  const node: CodeNode = {
+    id: nodeId(file, kind, name, ordinal),
+    kind,
+    name,
+    file,
+    ...(line !== undefined ? { line } : {}),
+  };
+  nodes.push(node);
+  map.set(node.id, node);
+  return node;
 }
 
 export class SqlCodeStructureProvider implements CodeStructureProvider {
