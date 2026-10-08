@@ -5,8 +5,8 @@
  * 上层只依赖结构节点、关系和四个查询能力，因此未来可以把
  * Graphify、Tree-sitter 或其它实现替换到同一个 provider 边界。
  */
-export type CodeNodeKind = 'file' | 'class' | 'function' | 'interface' | 'type';
-export type CodeEdgeKind = 'imports' | 'defines' | 'calls' | 'references';
+export type CodeNodeKind = 'file' | 'module' | 'package' | 'class' | 'function' | 'method' | 'interface' | 'type' | 'statement' | 'table' | 'view' | 'column' | 'job' | 'pipeline';
+export type CodeEdgeKind = 'imports' | 'defines' | 'calls' | 'references' | 'contains' | 'reads' | 'writes' | 'joins' | 'dependsOn';
 export type CodeEdgeConfidence = 'exact' | 'inferred';
 
 export interface CodeNode {
@@ -57,4 +57,5 @@ export interface CodeStructureProvider {
   callers(nodeId: string): CodeNode[];
   callees(nodeId: string): CodeNode[];
   trace(fromNodeId: string, toNodeId: string, maxDepth?: number): StructurePath | undefined;
+  loadIndex?(index: CodeStructureIndex): void;
 }
