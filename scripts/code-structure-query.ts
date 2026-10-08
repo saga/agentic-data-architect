@@ -15,20 +15,7 @@ try {
 }
 
 const provider = new TypeScriptCodeStructureProvider(root);
-await fs.mkdir(path.dirname(indexFile), { recursive: true });
-await fs.writeFile(indexFile, JSON.stringify(index, null, 2) + '\n', 'utf8');
-
-// 查询 provider 使用持久化快照，避免每次 query 都重新扫描源码。
-const providerIndex = (provider as unknown as { index: CodeStructureIndex }).index;
-providerIndex.version = index.version;
-providerIndex.root = index.root;
-providerIndex.generatedAt = index.generatedAt;
-providerIndex.files = index.files;
-providerIndex.nodes = index.nodes;
-providerIndex.edges = index.edges;
-for (const node of index.nodes) {
-  (provider as unknown as { nodesById: Map<string, unknown> }).nodesById.set(node.id, node);
-}
+provider.loadIndex(index);
 
 const output = (() => {
   switch (operation) {
