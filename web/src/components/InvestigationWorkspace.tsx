@@ -36,6 +36,9 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     attachmentsOpen,
     uploadingFiles,
     availableModels,
+    providerStatuses,
+    providerCatalogLoaded,
+    providerCatalogError,
     modelOptions,
     modelSaving,
     value,
@@ -74,6 +77,8 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     updateModelSettings,
     onAttachmentChange,
     createSession,
+    loadAgentCatalog,
+    retryProvider,
     continueUnknown,
     editMission,
     confirmMission,
@@ -104,6 +109,11 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
           newSessionOpen={newSessionOpen}
           newSessionName={newSessionName}
           newSessionRuntime={newSessionRuntime}
+          providerStatuses={providerStatuses}
+          providerCatalogLoaded={providerCatalogLoaded}
+          providerCatalogError={providerCatalogError}
+          onRetryProvider={(runtime) => void retryProvider(runtime)}
+          onRefreshProviders={() => void loadAgentCatalog(true).catch((e) => controller.setError(e instanceof Error ? e.message : String(e)))}
           newSessionGoal={newSessionGoal}
           newSessionExpectedResult={newSessionExpectedResult}
           newSessionWorkflow={newSessionWorkflow}
@@ -225,6 +235,12 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
         newSessionName={newSessionName}
         newSessionGoal={newSessionGoal}
         newSessionExpectedResult={newSessionExpectedResult}
+        newSessionRuntime={newSessionRuntime}
+        providerStatuses={providerStatuses}
+        providerCatalogLoaded={providerCatalogLoaded}
+        providerCatalogError={providerCatalogError}
+        onRetryProvider={(runtime) => void retryProvider(runtime)}
+        onRefreshProviders={() => void loadAgentCatalog(true).catch((e) => controller.setError(e instanceof Error ? e.message : String(e)))}
         newSessionWorkflow={newSessionWorkflow}
         unknownsOpen={unknownsOpen}
         userInputDrafts={userInputDrafts}

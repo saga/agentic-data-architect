@@ -597,8 +597,13 @@ export async function reviewMissionAction(
     return normalizeMissionAction(
       raw as Record<string, { type: string; noul?: number; choice?: string }>,
     );
-  } catch {
-    // Smart Function 不是权限边界；不可用时不伪装成“业务判断通过”，交给 Stage Gate 做最终兜底。
+  } catch (error) {
+    console.warn('[smart-function] Mission action review failed; returning unavailable so the deterministic gate can decide.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      modelCallName: '检查这一步是否有必要',
+      error,
+    });
     return null;
   }
 }
@@ -761,8 +766,13 @@ export async function reviewMissionAlignment(
     });
 
     return normalizeMissionAlignment(raw as Record<string, { type: string; noul?: number }>);
-  } catch {
-    // Smart Function 只是语义判断辅助；服务异常时由确定性 Stage Script Gate 继续裁决。
+  } catch (error) {
+    console.warn('[smart-function] Mission alignment review failed; the deterministic Stage Gate remains authoritative.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      modelCallName: '检查阶段成果是否符合任务',
+      error,
+    });
     return null;
   }
 }

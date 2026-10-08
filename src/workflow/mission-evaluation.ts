@@ -98,7 +98,12 @@ export async function reviewMissionClarity(
     });
 
     return normalizeMissionClarity(raw as Record<string, { type: string; noul?: number }>);
-  } catch {
+  } catch (error) {
+    console.warn('[mission] Mission clarity review failed; returning unavailable instead of hiding the failure.', {
+      investigationName: options.investigationName,
+      modelCallName: 'Mission 清晰度检查',
+      error,
+    });
     return null;
   }
 }

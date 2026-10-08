@@ -74,6 +74,17 @@ Workspace 使用 runtime-neutral Agent session slot：
 Session 必须与 Runtime 和 Control version 一致才能恢复；同一 Runtime/model 的阶段继续执行使用 SDK `resume`，发生 Runtime/Configuration/model 变化时必须从新 session 开始。
 
 
+### 7. Provider catalog and health state
+
+Provider preference and provider availability are different facts:
+
+- Global Agent configuration owns the preferred Runtime; the application fallback order is the single source of ordering.
+- `GET /api/agent/catalog` is the canonical provider/model catalog used by the new-Investigation UI and server-side Session creation. The legacy `/api/copilot/models` route is only a model-list projection of that catalog.
+- Copilot and OpenCode availability comes from live discovery. CodeBuddy's allowlist means “configured candidate”, not a claim that authentication/quota has already been verified.
+- Actionable quota exhaustion, authentication failure and connection failure are persisted in `.data/agent-provider-health.json`. Known unavailable providers are skipped for subsequent calls and new sessions; a confirmed model success or explicit user retry clears the marker. Skill, prompt, tool and business errors must not poison provider health.
+- If the preferred Runtime is known to be unavailable, new Investigation creation chooses the first usable Runtime in the canonical fallback order. The Global preference itself is not silently rewritten. If no Runtime is usable, creation is blocked with provider-specific diagnostics.
+- Server console records use ISO timestamps and severity levels. Startup logs the effective configuration and provider snapshot; HTTP requests, turn lifecycle, model attempts, failures and fallback transitions carry investigation/turn/runtime context where available.
+
 ### 6. Copilot 模型分层
 
 Copilot Runtime 使用两档明确的模型策略：

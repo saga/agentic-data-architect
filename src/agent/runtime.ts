@@ -23,6 +23,7 @@ import type { AskInput } from './ask-input.js';
 import { askOpenCode, listOpenCodeModels } from './opencode.js';
 import { syncRuntimeSkillWorkspace } from '../skills/catalog.js';
 import { appendAuditEvent } from '../investigation/control.js';
+import { getProviderFailures, recordProviderFailure, recordProviderSuccess } from './provider-health.js';
 
 function runtimeFromModel(model: string | undefined): AgentRuntime | undefined {
   const value = model?.trim().toLowerCase() ?? '';
@@ -236,9 +237,39 @@ async function executeRuntime(
 export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const selectedRuntime = input.runtime ?? runtimeFromModel(input.model) ?? config.agentRuntimeDefault;
   const blockedModels = blockedModelsForTurn(input.turnId);
-  const runtimeOrder = runtimeCandidates(selectedRuntime);
+  const knownProviderFailures = await getProviderFailures();
+  const unavailableProviders: Array<{ runtime: AgentRuntime; message: string; category: string }> = [];
+  const runtimeOrder = runtimeCandidates(selectedRuntime).filter((runtime) => {
+    const failure = knownProviderFailures[runtime];
+    if (!failure) return true;
+    unavailableProviders.push({ runtime, message: failure.message, category: failure.category });
+    console.warn('[agent-runtime] Skipping a Runtime with a persisted provider failure.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      selectedRuntime,
+      runtime,
+      category: failure.category,
+      failedAt: failure.failedAt,
+      message: failure.message,
+    });
+    input.onTrajectory?.({
+      type: 'status',
+      name: runtimeLabel(runtime) + ' 当前不可用，已跳过',
+      status: 'info',
+      details: { runtime, category: failure.category, failedAt: failure.failedAt },
+    });
+    return false;
+  });
   const allAttempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
 
+  console.info('[agent-runtime] Runtime selection resolved.', {
+    investigationName: input.investigationName,
+    turnId: input.turnId,
+    selectedRuntime,
+    runtimeOrder,
+    unavailableProviders,
+    purpose: input.purpose ?? 'investigation',
+  });
 
   for (const runtime of runtimeOrder) {
     if (runtime === 'codebuddy-sdk') {
@@ -372,10 +403,19 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
           details: {},
         });
       }
+      await recordProviderSuccess(attempt.runtime).catch((healthError) => {
+        console.error('[agent-runtime] Failed to clear a recovered provider health marker.', {
+          investigationName: input.investigationName,
+          runtime: attempt.runtime,
+          error: healthError,
+        });
+      });
       console.info('[agent-runtime] Model execution completed.', {
         investigationName: input.investigationName,
+        turnId: input.turnId,
         runtime: attempt.runtime,
         model,
+        purpose: input.purpose ?? 'investigation',
         durationMs: Math.max(0, Date.now() - callStartedAt),
       });
       return result;
@@ -383,11 +423,27 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       const durationMs = Math.max(0, Date.now() - callStartedAt);
       console.error('[agent-runtime] Model execution failed.', {
         investigationName: input.investigationName,
+        turnId: input.turnId,
         runtime: attempt.runtime,
         model,
+        purpose: input.purpose ?? 'investigation',
         durationMs,
         quotaError: isQuotaError(error),
         error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      const persistedProviderFailure = await recordProviderFailure(
+        attempt.runtime,
+        model,
+        error,
+      ).catch((healthError) => {
+        console.error('[agent-runtime] Failed to persist provider failure state.', {
+          investigationName: input.investigationName,
+          runtime: attempt.runtime,
+          model,
+          error: healthError,
+        });
+        return undefined;
       });
       if (input.investigationName) {
         await appendAuditEvent(input.investigationName, {
@@ -419,39 +475,66 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
           details: {},
         });
       }
-      if (!isQuotaError(error) || index === attempts.length - 1) {
+      // Provider-level quota/auth/connectivity failures can safely fall back. All other
+      // failures (Skill, prompt, tool, business logic) must surface without changing Runtime.
+      if ((!isQuotaError(error) && !persistedProviderFailure) || index === attempts.length - 1) {
         throw error;
       }
 
       lastQuotaError = error;
       blockModelForTurn(input.turnId, attempt.runtime, model);
-      const next = attempts[index + 1];
+      const failedAttemptIndex = index;
+      let nextIndex = index + 1;
+      // If the failure identifies the provider itself as unavailable (monthly quota,
+      // authentication or connectivity), do not burn more calls on its sibling models.
+      if (persistedProviderFailure) {
+        while (nextIndex < attempts.length && attempts[nextIndex]?.runtime === attempt.runtime) {
+          nextIndex += 1;
+        }
+      }
+      if (nextIndex >= attempts.length) throw error;
+      index = nextIndex - 1;
+      const next = attempts[nextIndex]!;
       const sameRuntime = next.runtime === attempt.runtime;
       const runtimeLabel = (value: AgentRuntime) =>
         value === 'codebuddy-sdk' ? 'CodeBuddy' : value === 'copilot-sdk' ? 'Copilot' : 'OpenCode';
 
-      console.warn('[agent-runtime] Falling back after quota/usage exhaustion.', {
+      console.warn('[agent-runtime] Falling back after provider failure.', {
         investigationName: input.investigationName,
+        turnId: input.turnId,
+        purpose: input.purpose ?? 'investigation',
         fromRuntime: attempt.runtime,
         fromModel: model,
         toRuntime: next.runtime,
         toModel: next.model,
+        providerFailureCategory: persistedProviderFailure?.category ?? 'quota_exhausted',
+        skippedProviderModels: persistedProviderFailure
+          ? attempts.slice(failedAttemptIndex + 1, nextIndex).map((item) => ({ runtime: item.runtime, model: item.model }))
+          : [],
       });
 
+      const providerFailureCategory = persistedProviderFailure?.category ?? 'quota_exhausted';
+      const providerFailureDescription = providerFailureCategory === 'quota_exhausted'
+        ? '配额已耗尽'
+        : providerFailureCategory === 'authentication_error'
+          ? '认证失败'
+          : '连接失败';
       input.onStatus?.(
         sameRuntime
-          ? 'CodeBuddy 当前模型配额已用尽，自动切换到下一个 CodeBuddy 模型，继续当前调查。'
-          : runtimeLabel(attempt.runtime) + ' 配额已用尽，自动切换到 ' + runtimeLabel(next.runtime) + '，继续当前调查。',
+          ? runtimeLabel(attempt.runtime) + ' 当前模型配额已用尽，自动切换到下一个模型，继续当前调查。'
+          : runtimeLabel(attempt.runtime) + ' ' + providerFailureDescription
+            + '，自动切换到 ' + runtimeLabel(next.runtime) + '，继续当前调查。',
       );
       input.onTrajectory?.({
         type: 'status',
         name: sameRuntime
-          ? 'CodeBuddy 模型配额已用尽，自动 fallback'
-          : 'Agent Runtime 配额已用尽，自动 fallback',
+          ? runtimeLabel(attempt.runtime) + ' 模型配额已用尽，自动 fallback'
+          : 'Agent Runtime 发生 provider 故障，自动 fallback',
         status: 'info',
         ...(next.model !== undefined ? { model: next.model } : {}),
         details: {
           fallback: true,
+          providerFailureCategory,
           fromRuntime: attempt.runtime,
           toRuntime: next.runtime,
           ...(sameRuntime ? { fromModel: model, toModel: next.model } : {}),
@@ -464,7 +547,10 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
   throw new Error(
     attempts.length === 0 && blockedModels.size > 0
       ? '本轮可用的模型都已经因配额/限流失败而被跳过，请稍后重试或更换运行方式。'
-      : '没有可用的 Agent Runtime。'
-        + (lastQuotaError instanceof Error ? ' 原始错误：' + lastQuotaError.message : ''),
+      : unavailableProviders.length > 0 && allAttempts.length === 0
+        ? '当前没有可尝试的 Agent Runtime；已跳过不可用 provider：'
+          + unavailableProviders.map((item) => item.runtime + '（' + item.category + '：' + item.message + '）').join('；')
+        : '没有可用的 Agent Runtime。'
+          + (lastQuotaError instanceof Error ? ' 原始错误：' + lastQuotaError.message : ''),
   );
 }

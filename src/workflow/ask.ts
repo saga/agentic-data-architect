@@ -184,6 +184,15 @@ export async function answerQuestion(
   }
 
   const turnStartedAt = new Date().toISOString();
+  console.info('[investigation] Turn started.', {
+    sessionName: investigationName,
+    turnId,
+    questionLength: question.length,
+    workflow: inv.workflow ?? null,
+    runtime: control.agent.runtime,
+    model: control.agent.model,
+    configurationVersion: control.version,
+  });
   activeInvestigationTurns.set(investigationName, {
     turnId,
     phase: 'executing',
@@ -1141,6 +1150,16 @@ export async function answerQuestion(
     saveConversationMessage({ sessionName: investigationName, role: 'assistant', content: answer });
     await appendTranscript(investigationName, 'assistant', answer);
     finishConversationTurn(turnId, 'completed', JSON.stringify(result));
+    console.info('[investigation] Turn completed.', {
+      sessionName: investigationName,
+      turnId,
+      durationMs: Date.now() - new Date(turnStartedAt).getTime(),
+      claimCount: result.claimIds.length,
+      unknownCount: result.unknowns.length,
+      warningCount: result.warnings.length,
+      followUpCount: result.followUpQuestions.length,
+      routeCount: result.routeOptions.length,
+    });
     return result;
   } catch (error) {
     await reasoningWrite;
@@ -1151,6 +1170,13 @@ export async function answerQuestion(
       error instanceof Error && error.name && error.name !== 'Error' ? '错误类型：' + error.name : '',
       error instanceof Error && error.stack && error.stack !== message ? 'Stack:\n' + error.stack : '',
     ].filter(Boolean).join('\n\n');
+    console.error('[investigation] Turn failed.', {
+      sessionName: investigationName,
+      turnId,
+      durationMs: Math.max(0, Date.now() - new Date(turnStartedAt).getTime()),
+      lastActivity: activeFailure?.lastActivity,
+      error: detailedError,
+    });
     const failureDetails = {
       error: detailedError,
       elapsedMs: Math.max(0, Date.now() - new Date(turnStartedAt).getTime()),

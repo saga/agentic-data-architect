@@ -1110,6 +1110,38 @@ export const ModelsResponseSchema = z.object({
   models: z.array(CopilotModelOptionSchema),
 }).strict();
 
+export const AgentProviderStateSchema = z.enum([
+  'available',
+  'configured',
+  'unavailable',
+  'quota_exhausted',
+  'authentication_error',
+  'connection_error',
+  'disabled',
+]);
+
+export const AgentProviderStatusSchema = z.object({
+  runtime: AgentRuntimeSchema,
+  label: z.string().min(1),
+  state: AgentProviderStateSchema,
+  usable: z.boolean(),
+  modelCount: z.number().int().nonnegative(),
+  message: z.string(),
+  checkedAt: z.string().datetime(),
+  lastFailureAt: z.string().datetime().optional(),
+  failedModel: z.string().optional(),
+}).strict();
+export type AgentProviderStatus = z.infer<typeof AgentProviderStatusSchema>;
+
+export const AgentCatalogResponseSchema = z.object({
+  models: z.array(CopilotModelOptionSchema),
+  providers: z.array(AgentProviderStatusSchema),
+  configuredDefaultRuntime: AgentRuntimeSchema,
+  recommendedRuntime: AgentRuntimeSchema,
+  fallbackOrder: z.array(AgentRuntimeSchema),
+}).strict();
+export type AgentCatalogResponse = z.infer<typeof AgentCatalogResponseSchema>;
+
 export const PendingPermissionSchema = z.object({
   sessionName: z.string().min(1),
   turnId: z.string().min(1),

@@ -1,5 +1,6 @@
 import type {
   AgentRuntime as SharedAgentRuntime,
+  AgentProviderStatus as SharedAgentProviderStatus,
   AuditEvent as SharedAuditEvent,
   ConversationTurnSummary as SharedConversationTurnSummary,
   CopilotModelOption as SharedCopilotModelOption,
@@ -23,6 +24,7 @@ import type {
 } from '../../../src/api/contracts.js';
 
 export type AgentRuntime = SharedAgentRuntime;
+export type AgentProviderStatus = SharedAgentProviderStatus;
 export type SessionSummary = SharedSessionSummary;
 export type WorkspaceInput = SharedSessionData['context']['inputs'][number];
 export type AutoTier = 'efficiency' | 'balance' | 'intelligence' | 'fast';

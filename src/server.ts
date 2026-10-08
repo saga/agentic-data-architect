@@ -29,7 +29,7 @@ import {
 } from './api/schemas.js';
 import { SharedIndexSchema } from './investigation/schemas.js';
 import { answerQuestion, getActiveInvestigationTurn, requestAbort } from './workflow/ask.js';
-import { abortCodeBuddyTurn, listCodeBuddyModels } from './agent/codebuddy.js';
+import { abortCodeBuddyTurn } from './agent/codebuddy.js';
 import { generateJourneyFlow } from './workflow/journey-ai.js';
 import { JourneyDefinitionSchema } from './workflow/journey.js';
 import {
@@ -44,6 +44,8 @@ import {
   MissionResponseSchema,
   OpenCodeStatusSchema,
   ModelsResponseSchema,
+  AgentCatalogResponseSchema,
+  AgentRuntimeSchema,
   PermissionsResponseSchema,
   UserInputsResponseSchema,
   AuditResponseSchema,
@@ -93,6 +95,8 @@ import {
   toArchitectureAssessmentView,
 } from './workflow/assessment.js';
 import { config } from './config.js';
+import { getAgentCatalog, invalidateAgentCatalog } from './agent/provider-catalog.js';
+import { clearProviderFailure } from './agent/provider-health.js';
 import { ScopeGateError } from './workflow/scope-gate.js';
 import { ReportGateError } from './workflow/report-gate.js';
 import { getCachedRemoteMedia, resolveAndCacheRemoteMedia } from './media/remote-media.js';
@@ -278,29 +282,64 @@ async function createSession(
   if (await investigationExists(key)) {
     return loadWorkspaceContext(key);
   }
+  const catalog = await getAgentCatalog();
+  const requestedProvider = runtime
+    ? catalog.providers.find((provider) => provider.runtime === runtime)
+    : undefined;
+  const selectedRuntime = requestedProvider?.usable
+    ? runtime!
+    : catalog.recommendedRuntime;
+  const selectedProvider = catalog.providers.find((provider) => provider.runtime === selectedRuntime);
+  if (!selectedProvider?.usable) {
+    const failures = catalog.providers.map((provider) => provider.label + ': ' + provider.message).join('；');
+    throw new Error('当前没有可用的 Agent Runtime。请检查 provider 配置后重试。' + (failures ? ' ' + failures : ''));
+  }
+  if (runtime && runtime !== selectedRuntime) {
+    console.warn('[sessions] Requested Runtime is known to be unavailable; using the recommended available Runtime instead.', {
+      sessionName: key,
+      requestedRuntime: runtime,
+      selectedRuntime,
+      reason: requestedProvider?.message ?? selectedProvider.message,
+    });
+  }
+
   const investigation = newInvestigation(key, userPrompt?.trim() ?? '', workflow ?? null);
   await saveInvestigation(investigation);
 
-  // Runtime is selected once when the Investigation is created. The task control
-  // keeps it separate from model selection so quota fallback never rewrites user intent.
-  if (runtime) {
-    const currentControl = await loadInvestigationControl(key);
-    const selectedModel = runtime === 'codebuddy-sdk'
-      ? 'codebuddy:' + config.codeBuddyDefaultModel
-      : runtime === 'opencode-run'
-        ? config.openCodeFallbackModel ?? config.model
-        : config.model;
+  // Keep the user's Global preference separate from runtime availability. A new task
+  // stores the effective usable choice; an unavailable preference is never copied blindly.
+  const currentControl = await loadInvestigationControl(key);
+  const selectedModel = selectedRuntime === 'codebuddy-sdk'
+    ? catalog.models.find((model) => model.id === 'codebuddy:' + config.codeBuddyDefaultModel)?.id
+      ?? catalog.models.find((model) => model.runtime === 'codebuddy')?.id
+      ?? config.codeBuddyDefaultModel
+    : selectedRuntime === 'opencode-run'
+      ? (() => {
+          const configured = config.openCodeFallbackModel
+            ? (config.openCodeFallbackModel.startsWith('opencode:')
+              ? config.openCodeFallbackModel
+              : 'opencode:' + config.openCodeFallbackModel)
+            : undefined;
+          return (configured && catalog.models.some((model) => model.id === configured) ? configured : undefined)
+            ?? catalog.models.find((model) => model.runtime === 'opencode')?.id
+            ?? config.model;
+        })()
+      : catalog.models.find((model) => model.id === config.model && model.runtime === 'copilot')?.id
+        ?? catalog.models.find((model) => model.runtime === 'copilot')?.id
+        ?? config.model;
+
+  if (runtime || selectedRuntime !== currentControl.agent.runtime) {
     await updateInvestigationControl(
       key,
       {
         research: currentControl.research,
         agent: {
           ...currentControl.agent,
-          runtime,
+          runtime: selectedRuntime,
           model: selectedModel,
         },
       },
-      'initial Agent Runtime selection',
+      runtime === selectedRuntime ? 'initial Agent Runtime selection' : 'initial selection of available Agent Runtime',
     );
   }
 
@@ -310,8 +349,17 @@ async function createSession(
     summary: 'Created investigation session.',
     details: {
       hasInitialPrompt: Boolean(userPrompt?.trim()),
-      ...(runtime ? { runtime } : {}),
+      requestedRuntime: runtime ?? catalog.configuredDefaultRuntime,
+      runtime: selectedRuntime,
+      providerState: selectedProvider.state,
     },
+  });
+  console.info('[sessions] Investigation created.', {
+    sessionName: key,
+    requestedRuntime: runtime ?? catalog.configuredDefaultRuntime,
+    selectedRuntime,
+    providerState: selectedProvider.state,
+    workflow: workflow ?? null,
   });
   return loadWorkspaceContext(key);
 }
@@ -351,6 +399,39 @@ export function createApp(vite?: ViteDevServer) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '2mb' }));
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    const requestId = typeof req.headers['x-request-id'] === 'string'
+      ? req.headers['x-request-id']
+      : randomUUID();
+    res.setHeader('X-Request-Id', requestId);
+    res.on('finish', () => {
+      const durationMs = Date.now() - startedAt;
+      const details = {
+        requestId,
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        durationMs,
+      };
+      if (res.statusCode >= 500) {
+        console.error('[http] Request failed.', details);
+      } else if (res.statusCode >= 400) {
+        console.warn('[http] Request rejected.', details);
+      } else if (
+        req.method !== 'GET'
+        || req.path === '/api/agent/catalog'
+        || req.path === '/api/config/global'
+        || req.path === '/api/sessions'
+        || req.path.endsWith('/messages/stream')
+      ) {
+        console.info('[http] Request completed.', details);
+      } else if (durationMs >= 2_000) {
+        console.warn('[http] Slow request.', details);
+      }
+    });
+    next();
+  });
 
   // 健康检查：只验证 Web service 能正常响应，不触发模型或数据库连接。
 app.get('/api/health', (_req, res) => {
@@ -366,6 +447,12 @@ app.get('/api/health', (_req, res) => {
   app.put('/api/config/global', async (req, res) => {
     const body = parseRequest(UpdateGlobalConfigBodySchema, req.body);
     const configuration = await updateGlobalConfiguration(body.agent);
+    invalidateAgentCatalog();
+    console.info('[agent-config] Global Agent preference updated.', {
+      version: configuration.version,
+      preferredRuntime: configuration.agent.runtime,
+      fallbackOrder: config.agentRuntimeFallbackOrder,
+    });
     res.json(GlobalConfigurationResponseSchema.parse({ configuration }));
   });
 
@@ -595,65 +682,38 @@ app.post('/api/sessions', async (req, res) => {
     }
   });
 
-  /**
-   * 返回工作台可用模型。
-   *
-   * Copilot 和本机 OpenCode 是两个独立来源；任意一个暂时不可用都不应该阻塞另一个。
-   * OpenCode 模型统一加 `opencode:` 前缀，前端选择后会自动切换运行时。
-   */
+  /** Canonical provider/model catalog shared by creation defaults and all Runtime consumers. */
+  app.get('/api/agent/catalog', async (req, res) => {
+    res.json(AgentCatalogResponseSchema.parse(
+      await getAgentCatalog({ force: req.query.refresh === '1' }),
+    ));
+  });
+
+  /** Clear a persisted unavailable marker only when the user explicitly asks to retry that provider. */
+  app.post('/api/agent/providers/:runtime/retry', async (req, res) => {
+    const parsedRuntime = AgentRuntimeSchema.safeParse(req.params.runtime);
+    if (!parsedRuntime.success) {
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'VALIDATION_ERROR',
+        error: '不认识这个 Agent Runtime。',
+      }));
+      return;
+    }
+    const runtime = parsedRuntime.data;
+    await clearProviderFailure(runtime);
+    invalidateAgentCatalog();
+    const catalog = await getAgentCatalog({ force: true });
+    console.warn('[agent-providers] User requested a provider retry; cleared its saved failure marker.', {
+      runtime,
+      stateAfterRetry: catalog.providers.find((provider) => provider.runtime === runtime)?.state,
+    });
+    res.json(AgentCatalogResponseSchema.parse(catalog));
+  });
+
+  /** Backward-compatible model-only route; it delegates to the same canonical provider catalog. */
   app.get('/api/copilot/models', async (_req, res) => {
-    const models: Array<{
-      id: string;
-      name: string;
-      supportedReasoningEfforts: string[];
-      defaultReasoningEffort: string | null;
-      policyState: string | null;
-      runtime: 'codebuddy' | 'copilot' | 'opencode';
-    }> = [];
-
-    try {
-      const copilotModels = await (await getClient()).listModels();
-      models.push(...copilotModels.map((model) => ({
-        id: model.id,
-        name: model.name,
-        supportedReasoningEfforts: model.supportedReasoningEfforts ?? [],
-        defaultReasoningEffort: model.defaultReasoningEffort ?? null,
-        policyState: model.policy?.state ?? null,
-        runtime: 'copilot' as const,
-      })));
-    } catch (error) {
-      console.warn('[models] Copilot model discovery failed; other runtimes will still be listed.', error);
-    }
-
-    try {
-      const codeBuddyModels = listCodeBuddyModels(config.codeBuddyModelAllowlist);
-      models.unshift(...codeBuddyModels.map((model) => ({
-        id: model.id,
-        name: model.name,
-        supportedReasoningEfforts: [],
-        defaultReasoningEffort: null,
-        policyState: null,
-        runtime: 'codebuddy' as const,
-      })));
-    } catch (error) {
-      console.warn('[models] CodeBuddy model discovery failed; other runtimes will still be listed.', error);
-    }
-
-    try {
-      const openCodeModels = await listOpenCodeModels();
-      models.push(...openCodeModels.map((model) => ({
-        id: model.id,
-        name: model.name,
-        supportedReasoningEfforts: [],
-        defaultReasoningEffort: null,
-        policyState: null,
-        runtime: 'opencode' as const,
-      })));
-    } catch (error) {
-      console.warn('[models] OpenCode model discovery failed; other runtimes will still be listed.', error);
-    }
-
-    res.json(ModelsResponseSchema.parse({ models }));
+    const catalog = await getAgentCatalog();
+    res.json(ModelsResponseSchema.parse({ models: catalog.models }));
   });
 
   app.get('/api/sessions/:name/execution', async (req, res) => {
@@ -1632,8 +1692,14 @@ app.post('/api/sessions/:name/messages/abort', async (req, res) => {
     });
   }
 
-  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    console.error(error);
+  app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+    console.error('[http] Request handler failed.', {
+      requestId: req.headers['x-request-id'],
+      method: req.method,
+      path: req.path,
+      error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     if (res.headersSent) return;
     if (error instanceof RequestValidationError) {
       res.status(400).json(ApiErrorSchema.parse({ code: 'VALIDATION_ERROR', error: error.message }));

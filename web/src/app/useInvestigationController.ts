@@ -12,7 +12,7 @@ import {
   FileUploadResponseSchema,
   MissionDraftSchema,
   MissionUpdateResponseSchema,
-  ModelsResponseSchema,
+  AgentCatalogResponseSchema,
   PermissionsResponseSchema,
   SessionsResponseSchema,
   SessionDataSchema,
@@ -25,6 +25,7 @@ import type { AnswerSummaryContract } from '../../../src/api/contracts.js';
 import { buildInvestigationPath, parseRoute, type PageId } from './routing';
 import {
   type AutoTier,
+  type AgentProviderStatus,
   type CopilotModelOption,
   type ExecutionStatus,
   type InvestigationCheckpoint,
@@ -84,6 +85,10 @@ export function useInvestigationController() {
   const [current, setCurrent] = useState<SessionData>();
   const [globalConfiguration, setGlobalConfiguration] = useState<GlobalConfiguration>();
   const [availableModels, setAvailableModels] = useState<CopilotModelOption[]>([]);
+  const [providerStatuses, setProviderStatuses] = useState<AgentProviderStatus[]>([]);
+  const [providerCatalogLoaded, setProviderCatalogLoaded] = useState(false);
+  const [providerCatalogError, setProviderCatalogError] = useState<string>();
+  const providerCatalogInitializedRef = useRef(false);
   const [modelSaving, setModelSaving] = useState(false);
   const [streamingReasoning, setStreamingReasoning] = useState('');
   const [assistantCompanionNote, setAssistantCompanionNote] = useState('');
@@ -156,7 +161,8 @@ export function useInvestigationController() {
   const NEW_SESSION_GOAL_SAMPLE = '研究现有项目的数据架构设计，调查data model，data source，vendor input方式，重要的数据转换逻辑';
   const NEW_SESSION_EXPECTED_RESULT_SAMPLE = '生成一份深入浅出，详细的分析报告，分析报告应该包含mermaid形式的架构图、数据流图等等';
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionRuntime, setNewSessionRuntime] = useState<AgentRuntime>('copilot-sdk');
+  // Provider catalog resolves this bootstrap value before the creation form can submit.
+  const [newSessionRuntime, setNewSessionRuntime] = useState<AgentRuntime>('codebuddy-sdk');
   const [newSessionWorkflow, setNewSessionWorkflow] = useState<WorkflowId | null>(null);
   const [newSessionGoal, setNewSessionGoal] = useState(NEW_SESSION_GOAL_SAMPLE);
   const [newSessionExpectedResult, setNewSessionExpectedResult] = useState(NEW_SESSION_EXPECTED_RESULT_SAMPLE);
@@ -438,16 +444,62 @@ export function useInvestigationController() {
     }
   };
 
+  const applyAgentCatalog = (catalog: import('../../../src/api/contracts.js').AgentCatalogResponse) => {
+    setAvailableModels(catalog.models);
+    setProviderStatuses(catalog.providers);
+    setProviderCatalogError(undefined);
+    setProviderCatalogLoaded(true);
+    setNewSessionRuntime((currentRuntime) => {
+      const currentProvider = catalog.providers.find((provider) => provider.runtime === currentRuntime);
+      if (!providerCatalogInitializedRef.current) {
+        providerCatalogInitializedRef.current = true;
+        return catalog.recommendedRuntime;
+      }
+      return currentProvider?.usable ? currentRuntime : catalog.recommendedRuntime;
+    });
+  };
+
+  const loadAgentCatalog = async (force = false) => {
+    try {
+      const catalog = await getJson(
+        '/api/agent/catalog' + (force ? '?refresh=1' : ''),
+        AgentCatalogResponseSchema,
+      );
+      applyAgentCatalog(catalog);
+      return catalog;
+    } catch (e) {
+      setProviderCatalogLoaded(false);
+      setProviderCatalogError(e instanceof Error ? e.message : '无法读取 Agent Runtime 状态。');
+      throw e;
+    }
+  };
+
+  const retryProvider = async (runtime: AgentRuntime) => {
+    try {
+      const catalog = await getJson(
+        '/api/agent/providers/' + runtime + '/retry',
+        AgentCatalogResponseSchema,
+        { method: 'POST' },
+      );
+      applyAgentCatalog(catalog);
+      setTurnStatus('已刷新 ' + runtime + ' 的状态；新调查将按当前可用 Runtime 选择。');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '无法重新检测 ' + runtime + '。';
+      setProviderCatalogError(message);
+      setError(message);
+    }
+  };
+
   useEffect(() => {
-    void getJson('/api/copilot/models', ModelsResponseSchema)
-      .then((result) => setAvailableModels(result.models ?? []))
-      .catch(() => setAvailableModels([]));
+    void loadAgentCatalog().catch((e) => {
+      console.error('[agent-providers] Failed to load the Runtime catalog in the browser.', e);
+    });
     void getJson('/api/config/global', GlobalConfigurationResponseSchema)
-      .then((result) => {
-        setGlobalConfiguration(result.configuration);
-        setNewSessionRuntime(result.configuration.agent.runtime);
-      })
-      .catch(() => setGlobalConfiguration(undefined));
+      .then((result) => setGlobalConfiguration(result.configuration))
+      .catch((e) => {
+        console.error('[agent-config] Failed to load Global configuration.', e);
+        setGlobalConfiguration(undefined);
+      });
   }, []);
 
   const updateGlobalConfiguration = async (agent: InvestigationControl['agent']) => {
@@ -457,7 +509,8 @@ export function useInvestigationController() {
       body: JSON.stringify({ agent }),
     });
     setGlobalConfiguration(result.configuration);
-    setTurnStatus('工作台默认配置已更新；没有覆盖该设置的其它 Investigation 会自动继承新默认值。');
+    await loadAgentCatalog(true);
+    setTurnStatus('工作台默认配置已更新；新调查会结合这个偏好和 Runtime 当前可用状态选择运行方式。');
     return result.configuration;
   };
 
@@ -940,6 +993,9 @@ export function useInvestigationController() {
             }
           }
           updateTurnError(errorText);
+          void loadAgentCatalog().catch((catalogError) => {
+            console.error('[agent-providers] Failed to refresh provider state after a failed turn.', catalogError);
+          });
         }
       }
     } finally {
@@ -1092,7 +1148,8 @@ export function useInvestigationController() {
 
   const createSession = async () => {
     const name = newSessionName.trim();
-    if (!name || newSessionCreatingRef.current || newSessionCreating) return;
+    if (!name || !providerCatalogLoaded || !providerStatuses.some((provider) => provider.usable)
+      || newSessionCreatingRef.current || newSessionCreating) return;
     newSessionCreatingRef.current = true;
     // 防止上一次创建失败留下的临时启动状态污染下一次新建调查。
     pendingInitialMissionDraftRef.current = undefined;
@@ -1224,6 +1281,9 @@ export function useInvestigationController() {
     current,
     globalConfiguration,
     availableModels,
+    providerStatuses,
+    providerCatalogLoaded,
+    providerCatalogError,
     modelOptions,
     modelSaving,
     streamingReasoning,
@@ -1277,6 +1337,8 @@ export function useInvestigationController() {
     changeWorkflow,
     continueUnknown,
     createSession,
+    loadAgentCatalog,
+    retryProvider,
     uploadFile,
     onAttachmentChange,
     navigatePage,

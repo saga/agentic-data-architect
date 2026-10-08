@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { config } from './config.js';
+import { installConsoleLogger } from './logger.js';
 import { listPendingCopilotPermissions } from './agent/copilot.js';
 import { listPendingAgentUserInputs, rejectAllPendingAgentUserInputs } from './agent/user-input-bridge.js';
 
@@ -16,6 +17,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '../web');
 
 async function main(): Promise<void> {
+  installConsoleLogger();
+  console.info('[startup] Starting Agentic Data Architect.', {
+    nodeVersion: process.version,
+    platform: process.platform,
+    nodeEnv: config.nodeEnv,
+    host: config.host,
+    port: config.port,
+    workspaceDir: config.workspaceDir,
+    dataDir: config.dataDir,
+    configuredRuntimeDefault: config.agentRuntimeDefault,
+    runtimeFallbackOrder: config.agentRuntimeFallbackOrder,
+    copilotModel: config.model,
+    copilotSimpleModel: config.simpleModel,
+    codeBuddyDefaultModel: config.codeBuddyDefaultModel,
+    openCodeEnabled: config.openCodeEnabled,
+    openCodeBaseUrl: config.openCodeBaseUrl,
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[process] Unhandled promise rejection.', { reason });
+  });
+  process.on('uncaughtExceptionMonitor', (error, origin) => {
+    console.error('[process] Uncaught exception.', { origin, error, stack: error.stack });
+  });
+
   await import('./agent/copilot-permission-bridge.js');
   const { createApp } = await import('./server.js');
   const { closeConversationStore, recoverRunningConversationTurns } = await import('./investigation/conversation.js');
@@ -83,11 +108,43 @@ async function main(): Promise<void> {
   }
 
   server.listen(config.port, config.host, () => {
-    console.log(
-      'Agentic Data Architect Web UI: http://'
-      + (config.host === '0.0.0.0' ? 'localhost' : config.host)
-      + ':' + config.port,
-    );
+    console.info('[startup] Web UI is listening.', {
+      url: 'http://' + (config.host === '0.0.0.0' ? 'localhost' : config.host) + ':' + config.port,
+      host: config.host,
+      port: config.port,
+      nodeEnv: config.nodeEnv,
+    });
+    void import('./agent/provider-catalog.js')
+      .then(({ getAgentCatalog }) => getAgentCatalog({ force: true }))
+      .then((catalog) => {
+        console.info('[startup] Agent provider availability snapshot.', {
+          configuredDefaultRuntime: catalog.configuredDefaultRuntime,
+          recommendedRuntime: catalog.recommendedRuntime,
+          fallbackOrder: catalog.fallbackOrder,
+          providers: catalog.providers.map((provider) => ({
+            runtime: provider.runtime,
+            state: provider.state,
+            usable: provider.usable,
+            modelCount: provider.modelCount,
+            message: provider.message,
+            lastFailureAt: provider.lastFailureAt,
+          })),
+        });
+        for (const provider of catalog.providers.filter((item) => !item.usable)) {
+          console.warn('[startup] Agent provider is not selectable.', {
+            runtime: provider.runtime,
+            state: provider.state,
+            message: provider.message,
+            lastFailureAt: provider.lastFailureAt,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('[startup] Agent provider discovery failed.', {
+          error,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      });
   });
 
   let shuttingDown = false;
@@ -95,9 +152,14 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
 
+    console.warn('[shutdown] Server shutdown requested.');
     // Stop Agent work before closing HTTP/DB so its normal abort/failure path
     // can persist the durable assistant message.
     const activeTurns = listActiveInvestigationTurns();
+    console.info('[shutdown] Active Investigation turns will be stopped.', {
+      activeTurnCount: activeTurns.length,
+      sessionNames: activeTurns.map((turn) => turn.investigationName),
+    });
 
     // ask_user 本身是一个等待中的 Promise。仅调用 Runtime abort 不保证这个
     // bridge Promise 会立即结束；先明确拒绝所有待处理输入，再停止各 Runtime，
@@ -124,6 +186,7 @@ async function main(): Promise<void> {
     await stopClient();
     await closeLocalAnalytics();
     closeConversationStore();
+    console.info('[shutdown] Server shutdown completed.');
   };
 
   process.once('SIGINT', shutdown);
