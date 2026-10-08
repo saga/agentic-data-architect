@@ -455,10 +455,9 @@ export async function getJourneySnapshot(
 
   if (executionChanged) {
     const latest = await loadJourneyExecution(name, active.definition, active.version);
-    if (
-      latest.currentNodeId === execution.currentNodeId
-      && latest.workflowVersion === execution.workflowVersion
-    ) {
+    // buildJourneyState() 可能需要读取多个持久化状态，期间 execution 有机会被其它请求推进后又回到原节点。
+    // 只比较 currentNodeId 会留下 ABA race；必须确认完整快照仍与我们刚读到的版本一致。
+    if (sameJourneyExecution(latest, execution)) {
       await fs.mkdir(journeyDir(name), { recursive: true });
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), state.execution);
       await appendDeterministicAdvanceEvents(name, execution, state.execution);
