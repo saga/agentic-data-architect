@@ -19,6 +19,14 @@
 | reasoning 日志写失败后仍可能继续返回成功结果 | reasoning 持久化失败现在会被 turn 识别并阻止可靠结果提交 |
 | shutdown 时 pending `ask_user` Promise 可能继续等到超时 | shutdown 主动结束 pending user-input wait |
 | 人工 Workflow transition 被拒绝时只有 UI 错误，没有审计记录 | 增加 rejected transition audit |
+| Stage Gate 把已有 Evidence 上重复出现的 Claim 也可能当成新分析 | 增加 Claim + Evidence 稳定 key，只允许新的证据支撑结论作为阶段分析成果 |
+| deterministic Workflow 可在单个 completeWhen 满足后直接进入 @end，绕过 Mission Completion | JourneyFacts 增加 Mission completion 状态；进入 @end 前必须满足全部可量化 required deliverable |
+| Human transition 到 @end 没有和 Agent transition 使用相同的 Mission completion 检查 | 人工推进到终点前增加相同的 required deliverable 校验 |
+| Journey execution / custom Workflow metadata 损坏时可能被当成初始/内置 Workflow | durable execution / metadata / layout 读取改为 fail-closed，损坏数据不再静默回到 start 或 base workflow |
+| Assessment / Modernization 内部 loader 把 `error` 状态转成 `null`，可能让状态机把损坏结果当成“尚未生成” | error 显式抛出；只有 missing / stale 才允许返回 null |
+| Global configuration 首次初始化与用户更新使用不同锁，存在默认配置覆盖新配置的窗口 | 初始化与更新统一使用同一 global config lock |
+| Trajectory、Workflow run events、Audit、Transcript 都可能被多个异步路径同时 append | 各 durable JSONL/Markdown append 增加 session 级串行写入 |
+| Scope 变化后旧 Agent / CodeBuddy / OpenCode Session 可能残留；material-backed Scope 还可能引用旧 Scope Evidence | Scope change 清理所有 Runtime Session 引用；材料来源必须属于当前 Scope generation |
 
 这些修复都属于已有 ADR 边界内的实现硬化，没有引入新的 Workflow / Agent / storage abstraction。
 
