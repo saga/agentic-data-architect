@@ -12,7 +12,7 @@ Stage Gate 曾把“本阶段推进了 Mission Deliverable”与“本阶段存�
 ## Decision
 
 1. Checkpoint 是一次真实、可验证的执行阶段成果，不是为了填充 UI 而制造的记录。
-2. 可以形成 checkpoint 的真实工作包括新增 Evidence、Finding、Discovery run、Scope validation 或新的持久化 structured work product。
+2. 可以形成 checkpoint 的真实工作包括新增 Evidence、Finding、Discovery run、Scope validation、持久化 structured work product，或基于已有有效 Evidence 形成新的证据支撑分析结论。后者不能只是重复转述已有内容，必须能回到当前 Evidence。
 3. Deliverable coverage 负责回答“交付物完成到什么程度”，不是 checkpoint 是否存在的唯一条件。
 4. 同一个 Investigation 可以有多个 checkpoint，但数量必须对应真实执行阶段；不得为了得到“多个阶段”而人为续跑。
 5. Stage Gate 继续是 deterministic Gate；Agent 的 success 声明不能直接创建 checkpoint。
@@ -21,7 +21,7 @@ Stage Gate 曾把“本阶段推进了 Mission Deliverable”与“本阶段存�
 ## Consequences
 
 - Result 页面可以准确保留多次真实阶段执行的历史。
-- 已经 covered 的交付物发生新的有价值细化时，仍可形成 checkpoint。
+- 已经 covered 的交付物发生新的有价值细化时，仍可形成 checkpoint；只要新的分析结论有现有 Evidence 支撑，即使没有新增库存记录，也可以留下阶段小结。
 - 不会因为 UI 需要多个小结而制造没有实际内容的假阶段。
 
 ## Related ADRs
