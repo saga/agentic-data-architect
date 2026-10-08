@@ -95,6 +95,7 @@ export interface MissionAlignmentInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  investigationName?: string;
   turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
@@ -124,6 +125,7 @@ export interface MissionActionInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  investigationName?: string;
   turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
@@ -149,6 +151,7 @@ export interface MissionUnknownInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  investigationName?: string;
   turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
