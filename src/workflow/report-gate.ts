@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadInvestigation, loadLatestSnapshot } from '../investigation/store.js';
+import { loadInvestigation, loadLatestSnapshot, type Investigation } from '../investigation/store.js';
 import { artifactsDir } from '../investigation/workspace.js';
 import { evaluateMissionGate } from './mission-gate.js';
 import { evaluateInvestigationScopeGate } from './scope-gate.js';
@@ -35,6 +35,8 @@ export interface InvestigationReportGateInput {
   systems: string[];
   scopeValidation?: { status: string; goal: string; scope: string[]; systems: string[]; source: 'user' | 'materials' | 'mixed'; userConfirmed: boolean; evidenceIds: string[]; validatedAt: string; } | undefined;
   evidence: EvidenceRef[];
+  /** Scope Gate 需要把引用 Evidence 追溯到产生它的 DiscoveryRun。 */
+  discoveryRuns: Investigation['discoveryRuns'];
   claims: Array<{ status: 'verified' | 'supported' | 'inferred' | 'unknown' | 'contradicted'; evidenceIds: string[] }>;
   findings: Finding[];
   resultArtifactCount?: number;
