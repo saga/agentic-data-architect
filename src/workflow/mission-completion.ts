@@ -24,6 +24,9 @@ export interface MissionCompletionInput {
   unknownReviews?: MissionUnknownReview[] | undefined;
   model?: string;
   workingDirectory?: string;
+  investigationName?: string;
+  /** 关联整个 Investigation turn，避免同一轮前后两次 Completion Review 重复尝试已耗尽配额的模型。 */
+  turnId?: string;
   onTrajectory?: import('../agent/jev-smart-func.js').JevSmartFuncInput['onTrajectory'];
 }
 
@@ -147,6 +150,8 @@ export async function reviewMissionCompletion(
       },
       ...(input.model ? { model: input.model } : {}),
       ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+      ...(input.investigationName ? { investigationName: input.investigationName } : {}),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
       ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
     });
     const { resultSupported, support } = normalizeMissionCompletion(raw);
