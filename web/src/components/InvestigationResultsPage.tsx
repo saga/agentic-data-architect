@@ -87,8 +87,14 @@ export function InvestigationResultsPage(props: {
         if (checkpoint) unique.set(checkpoint.id, checkpoint);
       }
       if (reportPayload !== undefined) {
+        // stale / blocked 报告仍然可以帮助用户回看上一次结果，但绝不能把它当成当前正式结果。
+        // 因此“正文是否存在”和“生命周期状态”分开处理：有正文就显示，有非 current 状态就保留明确提示。
         setReport(reportPayload);
-        setReportGateError(undefined);
+        setReportGateError(
+          reportResult.status === 'current'
+            ? undefined
+            : reportUnavailableReason || '这份报告不是当前最新结果，请根据最新调查状态重新生成。',
+        );
       } else {
         setReport('');
         setReportGateError(
