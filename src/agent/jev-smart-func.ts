@@ -95,6 +95,7 @@ export interface MissionAlignmentInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
 }
@@ -123,6 +124,7 @@ export interface MissionActionInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
 }
@@ -147,6 +149,7 @@ export interface MissionUnknownInput {
   context?: string | string[] | Record<string, unknown>;
   model?: string;
   workingDirectory?: string;
+  turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
 }
@@ -169,6 +172,8 @@ export interface JevSmartFuncInput {
   workingDirectory?: string;
   /** 关联当前 Investigation；review/clarity 这类短模型调用也必须能追到具体任务。 */
   investigationName?: string;
+  /** 关联一次完整用户 turn；同一 turn 内共享 Runtime fallback 健康状态。 */
+  turnId?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
 }
@@ -582,6 +587,8 @@ export async function reviewMissionAction(
       },
       ...(input.model ? { model: input.model } : {}),
       ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+      ...(input.investigationName ? { investigationName: input.investigationName } : {}),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
     });
 
     return normalizeMissionAction(
@@ -694,6 +701,8 @@ export async function reviewUnknownImpact(
       questions,
       ...(input.model ? { model: input.model } : {}),
       ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+      ...(input.investigationName ? { investigationName: input.investigationName } : {}),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
     });
 
     return unknowns.map((unknown, index) =>
@@ -744,6 +753,8 @@ export async function reviewMissionAlignment(
       },
       ...(input.model ? { model: input.model } : {}),
       ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+      ...(input.investigationName ? { investigationName: input.investigationName } : {}),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
     });
 
     return normalizeMissionAlignment(raw as Record<string, { type: string; noul?: number }>);
@@ -815,6 +826,8 @@ export async function jevSmartFunc(
     ...(input.modelCallName ? { modelCallName: input.modelCallName } : {}),
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
     ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
+    ...(input.investigationName ? { investigationName: input.investigationName } : {}),
+    ...(input.turnId ? { turnId: input.turnId } : {}),
     autoContinuationTurns: 0,
     responseSchema,
   });
