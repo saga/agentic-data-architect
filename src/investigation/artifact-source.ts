@@ -12,8 +12,9 @@ export interface InvestigationArtifactSource {
 }
 
 /**
- * Capture the exact Investigation + Discovery source used by artifact generation.
- * The pair is treated as the immutable input snapshot for the whole operation.
+ * 捕获生成正式结果时真正使用的 Investigation + Discovery 输入快照。
+ * 这里返回的对象是当前一次生成操作的只读输入；后续 Reviewer、报告生成和 provenance 都必须
+ * 基于这同一份快照，不能一半读取旧状态、一半读取新状态。
  */
 export async function captureInvestigationArtifactSource(name: string): Promise<InvestigationArtifactSource> {
   const investigation = await loadInvestigation(name);
@@ -36,6 +37,10 @@ export async function captureInvestigationArtifactSource(name: string): Promise<
   return Object.freeze({ investigation, snapshot, analysisArtifacts });
 }
 
+/**
+ * 对正式结果的 source snapshot 再做一次 Scope Gate。
+ * artifact generation 不能仅依赖调用入口之前做过的校验，因为 capture 与后续生成之间仍可能发生状态变化。
+ */
 export function assertInvestigationArtifactSourceScope(source: InvestigationArtifactSource): void {
   const result = evaluateInvestigationScopeGate(
     source.investigation,
