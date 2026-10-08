@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto';
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
 import { askAgentWithFallback } from '../agent/runtime.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
-import { getGraphifyRuntimeMetadata } from '../adapters/graphify.js';
 import { computeMissionFingerprint, computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import { buildAssistantAnswerPrompt, buildAssistantCompanionPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { parseAgentAnswer, toClaims } from '../agent/result.js';
@@ -561,14 +560,6 @@ export async function answerQuestion(
       ].filter(Boolean).join('\n');
     };
 
-    const graphifyBefore = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
-    await appendAuditEvent(investigationName, {
-      actor: 'system',
-      action: 'investigation.graphify.runtime.started',
-      summary: 'Captured Graphify runtime metadata before Agent execution.',
-      configurationVersion: control.version,
-      details: { runtime: graphifyBefore, platformCapabilities: control.agent.platformCapabilities },
-    });
 
     let sessionPersistence: Promise<void> = Promise.resolve();
     let sessionPersistenceError: unknown;
@@ -947,15 +938,6 @@ export async function answerQuestion(
       );
     }
     if (abortRequestedTurns.has(turnId)) throw new Error('Turn aborted.');
-
-    const graphifyAfter = await getGraphifyRuntimeMetadata(workspaceRoot(inv.name));
-    await appendAuditEvent(investigationName, {
-      actor: 'system',
-      action: 'investigation.graphify.runtime.completed',
-      summary: 'Captured Graphify runtime and graph hash after Agent execution.',
-      configurationVersion: control.version,
-      details: { runtime: graphifyAfter, platformCapabilities: control.agent.platformCapabilities },
-    });
 
     const activeAfterExecution = activeInvestigationTurns.get(investigationName);
     if (activeAfterExecution?.turnId === turnId) {
