@@ -136,6 +136,14 @@ function callName(node: any): string | undefined {
   return match?.[1];
 }
 
+/**
+ * Java / Python / C# 的结构解析 Provider。
+ *
+ * Tree-sitter 只负责把源码解析成 AST；这里负责把 AST 转成项目自己的 Code Structure Index。
+ * 上层只依赖 CodeStructureProvider，不会看到 Tree-sitter 的 Node / Parser 对象，也不会直接产生 Evidence。
+ *
+ * Parser 和 Tree 都占用 WASM heap，所以每个文件处理结束时必须释放，异常路径也不能遗漏。
+ */
 export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
   private index: CodeStructureIndex = { version: 1, root: '', generatedAt: '', files: [], nodes: [], edges: [] };
   private readonly nodesById = new Map<string, CodeNode>();
@@ -145,6 +153,12 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
     private readonly outputFile = path.join(rootDirectory, '.code-structure', 'index.json'),
   ) {}
 
+  /**
+   * 从当前目录重新建立完整结构索引。
+   *
+   * 每次 build 都以当前源码为唯一输入，重新产生 canonical snapshot；不复用旧节点/边，
+   * 这样文件被删除后不会留下幽灵节点，结果也更容易复现。
+   */
   async build(): Promise<CodeStructureIndex> {
     const root = path.resolve(this.rootDirectory);
     const sourceFiles = await filesUnder(root);
@@ -152,7 +166,7 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
     const edges: CodeEdge[] = [];
     const symbols = new Map<string, CodeNode[]>();
     const declarationByStart = new Map<string, CodeNode>();
-    const fileNodeByPath = new Map<string, CodeNode>();
+    const fileRecords: CodeStructureIndex['files'] = [];
 
     for (const absolute of sourceFiles) {
       const grammar = languageFor(absolute)!;
@@ -160,61 +174,71 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
       const source = sourceBytes.toString('utf8');
       const rel = path.relative(root, absolute).split(path.sep).join('/');
       const language = await loadLanguage(grammar);
+
+      // Parser / Tree 都是当前文件的短生命周期 WASM 资源；无论解析还是遍历失败，都必须释放。
       const parser = new TreeSitter.Parser();
-      parser.setLanguage(language);
-      const tree = parser.parse(source);
-      if (!tree) throw new Error('Tree-sitter 没有返回语法树：' + rel);
-      const fileNode: CodeNode = { id: id(rel, 'file', rel, 0), kind: 'file', name: rel, file: rel, line: 1 };
-      nodes.push(fileNode);
-      fileNodeByPath.set(rel, fileNode);
+      try {
+        parser.setLanguage(language);
+        const tree = parser.parse(source);
+        if (!tree) throw new Error('Tree-sitter 没有返回语法树：' + rel);
 
-      const ordinals = new Map<string, number>();
-      const visit = (node: any, owner?: CodeNode): void => {
-        let currentOwner = owner;
-        const d = declaration(node, grammar.language);
-        if (d) {
-          const key = `${d.kind}\0${d.name}`;
-          const ordinal = ordinals.get(key) ?? 0;
-          ordinals.set(key, ordinal + 1);
-          const symbol: CodeNode = { id: id(rel, d.kind, d.name, ordinal), kind: d.kind, name: d.name, file: rel, line: line(node) };
-          nodes.push(symbol);
-          declarationByStart.set(`${rel}:${node.startIndex}`, symbol);
-          const list = symbols.get(d.name) ?? [];
-          list.push(symbol);
-          symbols.set(d.name, list);
-          edges.push({ from: fileNode.id, to: symbol.id, kind: 'defines', confidence: 'exact', file: rel, line: symbol.line });
-          if (owner) edges.push({ from: owner.id, to: symbol.id, kind: 'defines', confidence: 'exact', file: rel, line: symbol.line });
-          currentOwner = symbol;
+        try {
+          const fileNode: CodeNode = { id: id(rel, 'file', rel, 0), kind: 'file', name: rel, file: rel, line: 1 };
+          nodes.push(fileNode);
+
+          const ordinals = new Map<string, number>();
+          const visit = (node: any, owner?: CodeNode): void => {
+            let currentOwner = owner;
+            const d = declaration(node, grammar.language);
+            if (d) {
+              const key = `${d.kind}\0${d.name}`;
+              const ordinal = ordinals.get(key) ?? 0;
+              ordinals.set(key, ordinal + 1);
+              const declarationLine = line(node);
+              const symbol: CodeNode = { id: id(rel, d.kind, d.name, ordinal), kind: d.kind, name: d.name, file: rel, line: declarationLine };
+              nodes.push(symbol);
+              declarationByStart.set(`${rel}:${node.startIndex}`, symbol);
+              const list = symbols.get(d.name) ?? [];
+              list.push(symbol);
+              symbols.set(d.name, list);
+              edges.push({ from: fileNode.id, to: symbol.id, kind: 'defines', confidence: 'exact', file: rel, line: declarationLine });
+              if (owner) edges.push({ from: owner.id, to: symbol.id, kind: 'defines', confidence: 'exact', file: rel, line: declarationLine });
+              currentOwner = symbol;
+            }
+            for (const child of children(node)) visit(child, currentOwner);
+          };
+          visit(tree.rootNode);
+
+          const visitCalls = (node: any, owner?: CodeNode): void => {
+            const currentOwner = declarationByStart.get(`${rel}:${node.startIndex}`) ?? owner;
+            const name = callName(node);
+            if (name && currentOwner) {
+              const candidates = symbols.get(name) ?? [];
+              // 只有候选唯一时才建立 calls edge。重载、同名方法或跨作用域情况不能仅凭文本可靠解析，
+              // 宁可漏掉关系，也不能把错误关系写进 canonical index。
+              if (candidates.length === 1) {
+                edges.push({ from: currentOwner.id, to: candidates[0].id, kind: 'calls', confidence: 'exact', file: rel, line: line(node) });
+              }
+            }
+            for (const child of children(node)) visitCalls(child, currentOwner);
+          };
+          visitCalls(tree.rootNode, fileNode);
+        } finally {
+          // Tree 也占用 WASM heap；遍历函数抛异常时仍要释放。
+          tree.delete();
         }
-        for (const child of children(node)) visit(child, currentOwner);
-      };
-      visit(tree.rootNode);
+      } finally {
+        // Parser 同样不是 GC 可以及时替代的资源，必须显式 delete。
+        parser.delete();
+      }
 
-      const visitCalls = (node: any, owner?: CodeNode): void => {
-        let currentOwner = declarationByStart.get(`${rel}:${node.startIndex}`) ?? owner;
-        const name = callName(node);
-        if (name && currentOwner) {
-          const candidates = symbols.get(name) ?? [];
-          if (candidates.length === 1) edges.push({ from: currentOwner.id, to: candidates[0].id, kind: 'calls', confidence: 'exact', file: rel, line: line(node) });
-        }
-        for (const child of children(node)) visitCalls(child, currentOwner);
-      };
-      visitCalls(tree.rootNode, fileNode);
-      tree.delete();
-      parser.delete();
-    }
-
-    const files = sourceFiles.map(async absolute => {
-      const grammar = languageFor(absolute)!;
-      const sourceBytes = await fs.readFile(absolute);
-      return {
-        path: path.relative(root, absolute).split(path.sep).join('/'),
+      fileRecords.push({
+        path: rel,
         hash: createHash('sha256').update(sourceBytes).digest('hex'),
         parser: '@vscode/tree-sitter-wasm/' + grammar.language,
-      };
-    });
+      });
+    }
 
-    const fileRecords = await Promise.all(files);
     this.index = { version: 1, root, generatedAt: new Date().toISOString(), files: fileRecords, nodes, edges: dedupe(edges) };
     this.nodesById.clear();
     for (const node of nodes) this.nodesById.set(node.id, node);
@@ -222,7 +246,6 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
     await fs.writeFile(this.outputFile, JSON.stringify(this.index, null, 2) + '\n', 'utf8');
     return this.index;
   }
-
   find(query: StructureQuery): CodeNode[] {
     const text = query.text?.toLowerCase();
     return this.index.nodes.filter(n =>
