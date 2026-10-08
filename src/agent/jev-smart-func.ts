@@ -167,6 +167,8 @@ export interface JevSmartFuncInput {
   modelCallName?: string;
   /** 让 Smart Function 在正确的工作目录运行；默认使用应用 workspace。 */
   workingDirectory?: string;
+  /** 关联当前 Investigation；review/clarity 这类短模型调用也必须能追到具体任务。 */
+  investigationName?: string;
   onTrajectory?: AskInput['onTrajectory'];
 
 }
