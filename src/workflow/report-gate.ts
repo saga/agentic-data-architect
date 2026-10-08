@@ -123,8 +123,8 @@ export function evaluateInvestigationReportGate(
       '当前数据架构已经达到报告所需的事实基础',
       derived.currentDataArchitectureReady,
       derived.currentDataArchitectureReady
-        ? '当前数据架构已经形成可阅读的事实基础。'
-        : '当前数据架构的关键数据流、数据模型或转换信息仍不完整。',
+        ? '已经形成可阅读的当前状态事实基础；未覆盖的数据流、模型或转换信息应在报告中明确标注。'
+        : '当前状态还没有形成足够的基础数据资产，暂时无法形成当前架构结果。',
     );
   }
 
@@ -133,8 +133,8 @@ export function evaluateInvestigationReportGate(
       '评估建立在当前架构事实之上',
       derived.assessmentCurrentStateReady,
       derived.assessmentCurrentStateReady
-        ? 'Assessment 建立在当前架构事实基础上。'
-        : '当前架构的关键数据流、数据模型或转换信息还不完整，不能形成正式评估。',
+        ? 'Assessment 建立在当前已发现的架构事实基础上，未覆盖部分作为明确缺口保留。'
+        : '当前状态还没有形成足够的基础数据资产，不能形成正式评估。',
     );
     add(
       '数据架构评估结果已经形成',
