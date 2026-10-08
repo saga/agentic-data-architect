@@ -59,6 +59,30 @@ function allKnownEvidence(ids: string[], known: Set<string>): boolean {
   return ids.length > 0 && ids.every((id) => known.has(id));
 }
 
+/**
+ * Material-backed Scope Validation 不能只验证“Evidence ID 存在”。
+ * Evidence 可能来自更早的一次 Scope；如果换过范围，旧 Evidence 不能拿来确认新范围。
+ * 新的正式 DiscoveryRun 必须带 scopeFingerprint，这里要求它与当前范围一致。
+ */
+function allEvidenceBelongToScope(
+  investigation: Pick<Investigation, 'scope' | 'systems' | 'evidence' | 'discoveryRuns'>,
+  ids: string[],
+): boolean {
+  if (!ids.length) return false;
+  const fingerprint = computeScopeFingerprint(investigation);
+  const evidenceById = new Map(investigation.evidence.map((item) => [item.id, item]));
+  const runById = new Map(investigation.discoveryRuns.map((run) => [run.id, run]));
+  return ids.every((id) => {
+    const evidence = evidenceById.get(id);
+    const run = evidence ? runById.get(evidence.discoveryRunId) : undefined;
+    return Boolean(
+      evidence
+      && run?.scopeFingerprint
+      && run.scopeFingerprint === fingerprint,
+    );
+  });
+}
+
 /** 纯函数 Gate，方便测试，也方便报告与 Workflow 共用同一规则。 */
 export function evaluateInvestigationScopeGate(
   investigation: Pick<Investigation, 'goal' | 'scope' | 'systems' | 'scopeValidation'>,
@@ -115,7 +139,11 @@ export function evaluateInvestigationScopeGate(
   if (validation) {
     const evidenceValid = validation.evidenceIds.length === 0
       ? false
-      : allKnownEvidence(validation.evidenceIds, knownEvidence);
+      : allKnownEvidence(validation.evidenceIds, knownEvidence)
+        && allEvidenceBelongToScope(investigation as Investigation & {
+          evidence: Investigation['evidence'];
+          discoveryRuns: Investigation['discoveryRuns'];
+        }, validation.evidenceIds);
     sourceValid = validation.source === 'user'
       ? validation.userConfirmed
       : validation.source === 'materials'
@@ -192,8 +220,14 @@ export async function persistAgentIntake(
   const sourceValid = source === 'user'
     ? intake.userConfirmed
     : source === 'materials'
-      ? evidenceIds.length > 0
-      : intake.userConfirmed && evidenceIds.length > 0;
+      ? allEvidenceBelongToScope(
+          { ...inv, scope, systems },
+          evidenceIds,
+        )
+      : intake.userConfirmed && allEvidenceBelongToScope(
+          { ...inv, scope, systems },
+          evidenceIds,
+        );
   if (!sourceValid) return false;
 
   const changed =
@@ -205,10 +239,15 @@ export async function persistAgentIntake(
   inv.scope = scope;
   inv.systems = systems;
   if (changed) {
+    // 范围一旦变化，旧 Runtime Session 里携带的上下文也不再可信。
+    // 只清 Copilot 字段是不够的：CodeBuddy / OpenCode 使用统一 agentSessionId。
     inv.claims = [];
     inv.findings = [];
     inv.unknowns = [];
     delete inv.journeyPlan;
+    delete inv.agentSessionId;
+    delete inv.agentSessionRuntime;
+    delete inv.agentConfigurationVersion;
     delete inv.copilotSessionId;
     delete inv.copilotConfigurationVersion;
   }
