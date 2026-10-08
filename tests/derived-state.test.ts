@@ -108,12 +108,14 @@ test('modernization readiness is derived from persisted status semantics in one 
   assert.equal(complete.validationReady, true);
 });
 
-test('current data architecture readiness is blocked by missing flow, model, or transformation facts', () => {
+test('current data architecture keeps partial facts instead of blocking on missing analysis dimensions', () => {
   const noFlow = evaluateDerivedState(state({ lineageEdgeCount: 0 }));
-  assert.equal(noFlow.currentDataArchitectureReady, false);
+  assert.equal(noFlow.dataFlowReady, false);
+  assert.equal(noFlow.currentDataArchitectureReady, true);
 
   const noModel = evaluateDerivedState(state({ estateColumnCount: 0 }));
-  assert.equal(noModel.currentDataArchitectureReady, false);
+  assert.equal(noModel.dataModelReady, false);
+  assert.equal(noModel.currentDataArchitectureReady, true);
 
   const sqlGap = evaluateDerivedState(state({
     currentState: {
