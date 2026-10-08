@@ -13,7 +13,7 @@ export class CodeStructureDuckDBQuery {
   constructor(private readonly databaseFile: string) {}
 
   async find(query: StructureQuery): Promise<CodeNode[]> {
-    const instance = await DuckDBInstance.create(this.databaseFile);
+    const instance = await DuckDBInstance.fromCache(this.databaseFile);
     const connection = await instance.connect();
     try {
       const text = query.text ? '%' + escapeLike(query.text) + '%' : '%';
