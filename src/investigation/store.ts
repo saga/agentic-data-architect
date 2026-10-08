@@ -135,11 +135,11 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       evidence: scopeUnchanged
         ? mergeById(current.evidence, inv.evidence)
         : current.evidence,
-      // Claims / Findings / Unknowns 依赖 Mission。Mission 一旦变了，旧快照里的结果
-      // 绝不能重新写回新 Mission；Mission 相同则做按 ID 合并，避免并行调查互相覆盖。
-      claims: missionUnchanged ? mergeById(current.claims, inv.claims) : current.claims,
-      findings: missionUnchanged ? mergeById(current.findings, inv.findings) : current.findings,
-      unknowns: missionUnchanged
+      // Claims / Findings / Unknowns 同时依赖 Mission 和 Scope。任一边界发生变化，
+      // 旧 turn 的结论都不能重新写回新 generation；两者都没变时才按 ID 合并。
+      claims: missionUnchanged && scopeUnchanged ? mergeById(current.claims, inv.claims) : current.claims,
+      findings: missionUnchanged && scopeUnchanged ? mergeById(current.findings, inv.findings) : current.findings,
+      unknowns: missionUnchanged && scopeUnchanged
         ? [...new Set([...current.unknowns, ...inv.unknowns])]
         : current.unknowns,
       importantInformation: [...new Set([...current.importantInformation, ...inv.importantInformation])],
