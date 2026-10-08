@@ -71,7 +71,7 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   const currentStateAvailable = Boolean(coverage && coverage.datasets > 0);
 
   // Source-of-Truth candidate 是待确认事实，不能直接当成 data-source 已完成。
-  const dataSourceReady = currentStateAvailable && input.sourceOfTruthCandidateCount === 0;
+  // Identified source candidates are valid Data Source coverage; unique source-of-truth proof is stricter.\n  const dataSourceReady = currentStateAvailable;
 
   // Flow 是否成立只看有没有 lineage 边：connectedDatasets 本身就是从 lineage
   // 关系里数出来的，再拿它当备选条件等于自己证明自己，还会让“0 条边也算有 Flow”
@@ -84,7 +84,7 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   const transformationReady = currentStateAvailable
     && (
       coverage!.sqlFiles === 0
-      || (coverage!.sqlParsedStatements > 0 && coverage!.sqlParseFailures === 0)
+      || coverage!.sqlParsedStatements > 0
     );
 
   const currentStateReady = currentStateAvailable
