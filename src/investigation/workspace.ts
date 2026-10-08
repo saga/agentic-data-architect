@@ -43,15 +43,21 @@ export function contextFile(name: string): string {
   return path.join(workspaceRoot(name), 'context.json');
 }
 
-// 先完整写入临时文件，再一次 rename 替换目标文件；读取者要么看到旧 JSON，要么看到完整新 JSON，
-// 不会看到只写了一半的内容。
-/** 使用临时文件+rename 原子替换 JSON，避免读取者看到半写入文件。 */
-export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
+// 先完整写入临时文件，再一次 rename 替换目标文件；读取者要么看到旧文件，要么看到完整新文件，
+// 不会看到只写了一半的 JSON / Markdown。原子写解决“进程被打断留下半文件”，
+ // 并不等于多文件事务；调用方仍需要通过 provenance / version 校验整体状态。
+/** 使用临时文件 + rename 原子替换任意文本文件。 */
+export async function writeTextAtomic(file: string, content: string): Promise<void> {
   const directory = path.dirname(file);
   await fs.mkdir(directory, { recursive: true });
   const temporary = path.join(directory, '.tmp-' + randomUUID() + '-' + path.basename(file));
-  await fs.writeFile(temporary, JSON.stringify(value, null, 2), 'utf8');
+  await fs.writeFile(temporary, content, 'utf8');
   await fs.rename(temporary, file);
+}
+
+/** 使用原子文本写入保存 JSON；不让读取者看到半写入的 JSON。 */
+export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
+  await writeTextAtomic(file, JSON.stringify(value, null, 2));
 }
 
 const contextWriteLocks = new Map<string, Promise<void>>();
