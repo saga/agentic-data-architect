@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { CodeStructureIndexProvider } from '../src/structure/code-structure-index-provider.js';
+import { CodeStructureDuckDBProjector } from '../src/structure/duckdb-projector.js';
 import { CodeStructureDuckDBQuery } from '../src/structure/duckdb-query.js';
 import type { CodeNodeKind, CodeStructureIndex } from '../src/structure/types.js';
 
@@ -16,7 +17,13 @@ try {
   index = await new CodeStructureIndexProvider(root).build();
 }
 
-const query = new CodeStructureDuckDBQuery(databaseFile);
+let query = new CodeStructureDuckDBQuery(databaseFile);
+try {
+  await query.summary();
+} catch {
+  await new CodeStructureDuckDBProjector(root, databaseFile).project(index);
+  query = new CodeStructureDuckDBQuery(databaseFile);
+}
 const output = await (async () => {
   switch (operation) {
     case 'find':
