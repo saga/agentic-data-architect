@@ -255,14 +255,16 @@ export function useInvestigationController() {
       const pending = pendingOutgoingMessagesRef.current[key];
       const serverMessages = result.messages;
       const serverIds = new Set(serverMessages.map((message) => message.id));
-      if (pending && serverIds.has(pending.id)) {
-        delete pendingOutgoingMessagesRef.current[key];
+      for (const pending of pendingMessages) {
+        if (serverIds.has(pending.id)) delete pendingByTurn[pending.id.replace(/:user$/, '')];
       }
+      if (Object.keys(pendingByTurn).length > 0) pendingOutgoingMessagesRef.current[key] = pendingByTurn;
+      else delete pendingOutgoingMessagesRef.current[key];
 
       const preservedLocal = existing?.context.name === key
         ? existing.messages.filter((message) => !serverIds.has(message.id))
         : [];
-      const preservedPending = pending && !serverIds.has(pending.id) ? [pending] : [];
+      const preservedPending = pendingMessages.filter((message) => !serverIds.has(message.id));
       const mergedMessages = [...serverMessages, ...preservedLocal, ...preservedPending]
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
 
@@ -272,6 +274,10 @@ export function useInvestigationController() {
         ? result
         : { ...result, messages: mergedMessages };
     });
+    if (result.runningTurn?.assistantDraft && key === activeRef.current) {
+      setStreamingAnswer({ key, content: result.runningTurn.assistantDraft });
+    }
+
     setJourney(
       workflowSnapshot
         ? { ...workflowSnapshot.state, execution: workflowSnapshot.execution }
