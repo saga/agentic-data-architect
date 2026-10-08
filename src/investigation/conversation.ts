@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
+import { transcriptFile } from './workspace.js';
 
 /** 对话消息角色；与 Copilot/LLM 的常见角色保持简单一致。 */
 function dbOrThrow(): DatabaseSync {
@@ -288,6 +289,22 @@ export function recoverRunningConversationTurns(): number {
       role: 'assistant',
       content,
     });
+
+    // recovery 不是正常 ask() 路径，不会经过 appendTranscript；但 ADR-030 要求
+    // 恢复出来的可见对话与普通对话一样可人工回看，因此这里同步补写 transcript。
+    // 使用同步追加是故意的：startup recovery 完成前不能把日志写入留到数据库关闭之后。
+    const transcript = '## Agent — ' + new Date().toISOString() + '\n\n' + content.trim() + '\n\n';
+    try {
+      fs.appendFileSync(transcriptFile(sessionName), transcript, 'utf8');
+    } catch (error) {
+      console.error('[conversation-recovery] Failed to persist recovery message to transcript.', {
+        sessionName,
+        turnId,
+        error,
+      });
+      throw error;
+    }
+
     db.prepare(`
       UPDATE conversation_turns
       SET status = 'aborted',
