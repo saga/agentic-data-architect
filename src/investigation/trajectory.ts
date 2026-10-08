@@ -3,6 +3,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod';
 import { workspaceRoot } from './workspace.js';
+
+const trajectoryWriteLocks = new Map<string, Promise<void>>();
 import {
   TrajectoryEventSchema,
   TrajectorySummarySchema,
@@ -29,6 +31,11 @@ export type {
   TrajectoryCheckpoint,
 };
 
+/**
+ * 按 turnId 把平铺的轨迹事件重新聚合。
+ * 这里故意不依赖事件写入顺序来判断某一轮是否成功：读取时会重新找到该轮最后的 turn_end
+ * 和用户输入，因此即使前端按分页/过滤读取，也不会把历史 turn 与当前 turn 混在一起。
+ */
 export function summarizeTrajectoryTurns(events: TrajectoryEvent[]): TrajectoryTurnSummary[] {
   const groups = new Map<string, TrajectoryEvent[]>();
   for (const event of events) {
@@ -72,11 +79,31 @@ function trajectoryFile(name: string): string {
   return path.join(workspaceRoot(name), 'trajectory.jsonl');
 }
 
-/** 追加一条 Agent 执行轨迹；不记录思维链正文，只记录可审查的运行事件。 */
-export async function appendTrajectoryEvent(name: string, event: Omit<TrajectoryEvent, 'id' | 'timestamp'> & Partial<Pick<TrajectoryEvent, 'timestamp'>>): Promise<TrajectoryEvent> {
-  const full = TrajectoryEventSchema.parse({ id: randomUUID(), timestamp: new Date().toISOString(), ...event });
-  await fs.appendFile(trajectoryFile(name), JSON.stringify(full) + '\n', 'utf8');
-  return full;
+/** 追加一条 Agent 执行轨迹；不记录隐藏思维链正文，只记录可审查的运行事件。 */
+export async function appendTrajectoryEvent(name: string, event: Omit<TrajectoryEvent, 'id' | 'timestamp'> & Partial<Pick<TrajectoryEvent, 'id' | 'timestamp'>>): Promise<TrajectoryEvent> {
+  const full = TrajectoryEventSchema.parse({
+    id: event.id ?? randomUUID(),
+    timestamp: event.timestamp ?? new Date().toISOString(),
+    ...event,
+  });
+
+  // 一个 turn 里可能同时有模型事件、工具事件、Checkpoint 和状态事件。
+  // 这些事件都写同一个 JSONL 文件；必须串行追加，否则并发 write 可能产生半行/交错记录，
+  // 一旦发生，整个 trajectory reader 就会拒绝读取这份历史。
+  const previous = trajectoryWriteLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  trajectoryWriteLocks.set(name, queued);
+  await previous.catch(() => undefined);
+  try {
+    await fs.mkdir(path.dirname(trajectoryFile(name)), { recursive: true });
+    await fs.appendFile(trajectoryFile(name), JSON.stringify(full) + '\n', 'utf8');
+    return full;
+  } finally {
+    release();
+    if (trajectoryWriteLocks.get(name) === queued) trajectoryWriteLocks.delete(name);
+  }
 }
 
 /** 读取最近的执行轨迹；UI 可按 turnId 再筛选。 */
