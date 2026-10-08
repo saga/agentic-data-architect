@@ -188,10 +188,6 @@ export async function answerQuestion(
     sessionName: investigationName,
     turnId,
     questionLength: question.length,
-    workflow: inv.workflow ?? null,
-    runtime: control.agent.runtime,
-    model: control.agent.model,
-    configurationVersion: control.version,
   });
   activeInvestigationTurns.set(investigationName, {
     turnId,
@@ -949,7 +945,6 @@ export async function answerQuestion(
 
         return !completion.completed;
       },
-      turnId,
       shouldAbort: () => abortRequestedTurns.has(turnId),
     });
     await reasoningWrite;
