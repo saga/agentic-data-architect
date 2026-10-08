@@ -681,6 +681,16 @@ export async function resetJourneyCustomization(
       fs.rm(journeyFile(name, EXECUTION_FILE), { force: true }),
     ]);
     await fs.mkdir(journeyDir(name), { recursive: true });
+    // reset 会回到 base workflow version=0。若继续使用 workflowId-v0，reset 前后的事件会共享同一个 runId，
+    // 事后无法可靠区分两次执行，因此这里显式创建新的执行实例并立即持久化。
+    await writeJsonAtomic(
+      journeyFile(name, EXECUTION_FILE),
+      initialJourneyExecution(
+        await loadWorkflowJourney(workflowId),
+        0,
+        workflowId + '-reset-' + crypto.randomUUID(),
+      ),
+    );
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.agentSessionId;
