@@ -28,6 +28,28 @@ function state(overrides: Partial<Parameters<typeof evaluateDerivedState>[0]> = 
   };
 }
 
+test('a partial current-state signal is enough to continue current architecture analysis', () => {
+  const derived = evaluateDerivedState(state({
+    currentState: {
+      coverage: {
+        sqlFiles: 2,
+        sqlParsedStatements: 1,
+        sqlParseFailures: 1,
+        datasets: 0,
+        connectedDatasets: 0,
+        semanticAssets: 0,
+      },
+    },
+    estateColumnCount: 0,
+    lineageEdgeCount: 0,
+  }));
+  assert.equal(derived.currentStateAvailable, true);
+  assert.equal(derived.currentDataArchitectureReady, true);
+  assert.equal(derived.dataSourceReady, false);
+  assert.equal(derived.dataFlowReady, false);
+  assert.equal(derived.dataModelReady, false);
+});
+
 test('source-of-truth candidates remain valid data-source coverage but do not prove data truth', () => {
   const derived = evaluateDerivedState(state({ sourceOfTruthCandidateCount: 2 }));
   assert.equal(derived.dataSourceReady, true);
