@@ -180,6 +180,11 @@ export async function runReport(
     const modernizationResult = investigation.workflow === 'legacy-modernization'
       ? await readModernizationArtifact(name, source)
       : { status: 'blocked' as const, plan: null };
+    // legacy-modernization 可以暂时没有最新 Plan（例如尚未进入 target/mapping 阶段），
+    // 但如果已经存在 modernization-plan.json 且读取状态明确是 error，不能把损坏结果伪装成“没有方案”。
+    if (modernizationResult.status === 'error') {
+      throw new Error('改造工作成果无法读取，不能生成基于不完整资料的正式报告。请先修复 modernization-plan.json 后重新生成。');
+    }
     const modernization = modernizationResult.status === 'current' ? modernizationResult.plan : null;
 
     const assessmentResult = investigation.workflow === 'data-architecture-assessment'
