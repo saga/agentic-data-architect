@@ -21,6 +21,8 @@ export interface StageGateSnapshot {
   evidenceIds: string[];
   findingIds: string[];
   discoveryRunCount: number;
+  /** 已经保存过的 Claim 摘要，用于判断本阶段是否只是重复旧结论。 */
+  claimKeys: string[];
   scopeValidatedAt?: string;
 }
 
@@ -67,6 +69,17 @@ function newIds(before: string[], after: string[]): string[] {
   return after.filter((id) => !previous.has(id));
 }
 
+/**
+ * 用“结论文字 + Evidence 引用”构造稳定 key。
+ * Stage Gate 不需要重新生成 Claim ID；它只需要知道当前回答是否带来了新的分析结论。
+ */
+function claimKey(claim: Pick<ParsedAnswer['claims'][number], 'claim' | 'evidenceIds'>): string {
+  return JSON.stringify({
+    claim: claim.claim.trim(),
+    evidenceIds: [...new Set(claim.evidenceIds)].sort(),
+  });
+}
+
 /** 只把交付物状态向前推进视为“本阶段真的帮助了 Mission”。 */
 function deliverableAdvanced(
   before: MissionProgress,
@@ -97,6 +110,10 @@ export function snapshotInvestigationForStageGate(
     evidenceIds: investigation.evidence.map((item) => item.id),
     findingIds: investigation.findings.map((item) => item.id),
     discoveryRunCount: investigation.discoveryRuns.length,
+    claimKeys: investigation.claims.map((item) => JSON.stringify({
+      claim: item.claim.trim(),
+      evidenceIds: [...new Set(item.evidenceIds)].sort(),
+    })),
     ...(investigation.scopeValidation?.validatedAt
       ? { scopeValidatedAt: investigation.scopeValidation.validatedAt }
       : {}),
@@ -135,6 +152,9 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     claim.evidenceIds.length > 0
     && claim.evidenceIds.every((id) => knownEvidence.has(id)),
   );
+  const newEvidenceBackedClaims = evidenceBackedClaims.filter(
+    (claim) => !input.before.claimKeys.includes(claimKey(claim)),
+  );
 
   const newEvidenceIds = newIds(input.before.evidenceIds, input.after.evidenceIds);
   const newFindingIds = newIds(input.before.findingIds, input.after.findingIds);
@@ -156,7 +176,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
   // A stage can produce a meaningful, evidence-backed analysis without changing the
   // underlying catalog rows. Do not discard such a result merely because the delta
   // is in the interpretation rather than in the inventory.
-  const hasEvidenceBackedAnalysis = evidenceBackedClaims.length > 0;
+  const hasEvidenceBackedAnalysis = newEvidenceBackedClaims.length > 0;
   const hasRealStageWork =
     newEvidenceIds.length > 0
     || newFindingIds.length > 0
@@ -208,7 +228,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
       '新增 Discovery=' + String(newDiscoveryRuns),
       '新增范围确认=' + (scopeValidationChanged ? '1' : '0'),
       '结构化成果更新=' + (persistedWorkProductChanged ? '1' : '0'),
-      '有 Evidence 的 Claim=' + String(evidenceBackedClaims.length),
+      '有新的 Evidence 支撑 Claim=' + String(newEvidenceBackedClaims.length),
     ].join('，'),
   );
 
@@ -241,7 +261,7 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     newEvidenceIds,
     newFindingIds,
     advancedDeliverables,
-    evidenceBackedClaimCount: evidenceBackedClaims.length,
+    evidenceBackedClaimCount: newEvidenceBackedClaims.length,
     shouldContinue,
     ...(input.missionAlignment ? { missionAlignment: input.missionAlignment } : {}),
   };
