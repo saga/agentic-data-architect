@@ -57,27 +57,33 @@ function isQuotaError(error: unknown): boolean {
  *
  * 典型场景是：
  *   主调查 → Mission Alignment → Unknown Review → Completion Review
- * 每一步都是独立的模型调用，但它们共享同一个 turnId。第一次 Copilot 月度配额耗尽后，
- * 如果没有这个状态，每个 review 都会再次浪费约 5 秒尝试 Copilot，然后才 fallback。
+ * 每一步都是独立的模型调用，但它们共享同一个 turnId。第一次 Copilot 某模型明确
+ * 返回月度配额耗尽后，如果没有这个状态，每个 review 都会再次浪费约 5 秒尝试同一个模型，
+ * 然后才 fallback。这里只屏蔽“失败的 Runtime + Model”，不会把整个 Runtime 永久禁掉，
+ * 因为同一个 Runtime 仍可能有另一个可用模型。
  *
  * 这里只记“本轮暂不可用”，不会修改用户保存的 Runtime 配置；turn 结束时由 ask.ts 清理。
  */
-const quotaBlockedRuntimesByTurn = new Map<string, Set<AgentRuntime>>();
+const quotaBlockedModelsByTurn = new Map<string, Set<string>>();
 
 export function clearRuntimeFallbackState(turnId: string | undefined): void {
-  if (turnId) quotaBlockedRuntimesByTurn.delete(turnId);
+  if (turnId) quotaBlockedModelsByTurn.delete(turnId);
 }
 
-function blockedRuntimesForTurn(turnId: string | undefined): Set<AgentRuntime> {
+function modelKey(runtime: AgentRuntime, model: string): string {
+  return runtime + '\0' + model;
+}
+
+function blockedModelsForTurn(turnId: string | undefined): Set<string> {
   if (!turnId) return new Set();
-  return quotaBlockedRuntimesByTurn.get(turnId) ?? new Set();
+  return quotaBlockedModelsByTurn.get(turnId) ?? new Set();
 }
 
-function blockRuntimeForTurn(turnId: string | undefined, runtime: AgentRuntime): void {
+function blockModelForTurn(turnId: string | undefined, runtime: AgentRuntime, model: string): void {
   if (!turnId) return;
-  const blocked = quotaBlockedRuntimesByTurn.get(turnId) ?? new Set<AgentRuntime>();
-  blocked.add(runtime);
-  quotaBlockedRuntimesByTurn.set(turnId, blocked);
+  const blocked = quotaBlockedModelsByTurn.get(turnId) ?? new Set<string>();
+  blocked.add(modelKey(runtime, model));
+  quotaBlockedModelsByTurn.set(turnId, blocked);
 }
 
 function configuredRuntimeOrder(): AgentRuntime[] {
@@ -229,34 +235,14 @@ async function executeRuntime(
  */
 export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const selectedRuntime = input.runtime ?? runtimeFromModel(input.model) ?? config.agentRuntimeDefault;
-  const blockedRuntimes = blockedRuntimesForTurn(input.turnId);
-  const allRuntimeOrder = runtimeCandidates(selectedRuntime);
-  const runtimeOrder = allRuntimeOrder.filter((runtime) => !blockedRuntimes.has(runtime));
-  const attempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
+  const blockedModels = blockedModelsForTurn(input.turnId);
+  const runtimeOrder = runtimeCandidates(selectedRuntime);
+  const allAttempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
 
-  if (blockedRuntimes.size > 0) {
-    console.info('[agent-runtime] Skipping Runtime(s) already known to be unavailable in this turn.', {
-      investigationName: input.investigationName,
-      turnId: input.turnId,
-      blockedRuntimes: [...blockedRuntimes],
-      selectedRuntime,
-      remainingRuntimes: runtimeOrder,
-    });
-    input.onTrajectory?.({
-      type: 'status',
-      name: '已跳过本轮已知不可用的 Runtime',
-      status: 'info',
-      details: {
-        skippedRuntimes: [...blockedRuntimes],
-        selectedRuntime,
-        remainingRuntimes: runtimeOrder,
-      },
-    });
-  }
 
   for (const runtime of runtimeOrder) {
     if (runtime === 'codebuddy-sdk') {
-      attempts.push(
+      allAttempts.push(
         ...resolveCodeBuddyModels(
           runtime === selectedRuntime ? input.model : undefined,
         ).map((model) => ({
@@ -301,7 +287,30 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       if (runtime === selectedRuntime) throw error;
       continue;
     }
-    attempts.push({ runtime, model });
+    allAttempts.push({ runtime, model });
+  }
+
+  const attempts = allAttempts.filter((attempt) =>
+    attempt.model ? !blockedModels.has(modelKey(attempt.runtime, attempt.model)) : true,
+  );
+  if (attempts.length !== allAttempts.length) {
+    const skipped = allAttempts.filter((attempt) =>
+      attempt.model && blockedModels.has(modelKey(attempt.runtime, attempt.model)),
+    );
+    console.info('[agent-runtime] Skipping model(s) already known to be quota-limited in this turn.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      selectedRuntime,
+      skipped: skipped.map((item) => ({ runtime: item.runtime, model: item.model })),
+    });
+    input.onTrajectory?.({
+      type: 'status',
+      name: '已跳过本轮已知配额不足的模型',
+      status: 'info',
+      details: {
+        skipped: skipped.map((item) => ({ runtime: item.runtime, model: item.model })),
+      },
+    });
   }
 
   let lastQuotaError: unknown;
@@ -415,7 +424,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       }
 
       lastQuotaError = error;
-      blockRuntimeForTurn(input.turnId, attempt.runtime);
+      blockModelForTurn(input.turnId, attempt.runtime, model);
       const next = attempts[index + 1];
       const sameRuntime = next.runtime === attempt.runtime;
       const runtimeLabel = (value: AgentRuntime) =>
