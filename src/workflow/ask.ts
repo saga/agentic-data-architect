@@ -1096,8 +1096,9 @@ export async function answerQuestion(
       details: { turnId, workflow: inv.workflow, routeCount: parsed.routeOptions.length },
     });
 
-    saveConversationMessage({ sessionName: investigationName, role: 'assistant', content: answer });
-    await appendTranscript(investigationName, 'assistant', answer);
+    // 先确认本轮 trajectory 已完整落盘，再宣布 Conversation 成功完成。
+    // 如果先写 success message、后发现 trajectory 丢失，用户会同时看到“成功答案”和“本轮失败”，
+    // 造成事实状态与可审计状态不一致。
     const result: AnswerSummary = {
       answer,
       claimIds: claims.map((c) => `${c.id}[${c.status}]`),
@@ -1119,6 +1120,8 @@ export async function answerQuestion(
         + '（' + (trajectoryWriteError instanceof Error ? trajectoryWriteError.message : String(trajectoryWriteError)) + '）',
       );
     }
+    saveConversationMessage({ sessionName: investigationName, role: 'assistant', content: answer });
+    await appendTranscript(investigationName, 'assistant', answer);
     finishConversationTurn(turnId, 'completed', JSON.stringify(result));
     return result;
   } catch (error) {
