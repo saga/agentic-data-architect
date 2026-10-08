@@ -38,6 +38,10 @@ View                  metadata      semantic system
 
 核心模型只认识 SemanticAsset。Snowflake Semantic View、Data Product、Catalog、dbt、BI 等来源都转换成同一个结构。
 
+## Code Structure Index
+
+当前结构分析采用分语言 Provider：TS/JS 使用 TypeScript compiler API，Java / Python / C# 使用 `@vscode/tree-sitter-wasm` 的预构建 WASM grammar，SQL 使用 `node-sql-parser` 做 statement/table/column 级结构提取。各 Provider 最终输出统一的 `.code-structure/index.json`；DuckDB 只负责查询投影，不作为 canonical source。
+
 ## Canonical Estate
 
 Estate 现在已经支持 system/application、data store、dataset、column、job、job run、file、API、dashboard 和 report 等类型；当前 SQL Discovery 会把 SQL 文件建成静态 Job 节点，并保留文件到 Job、Job 到数据集的关系。
