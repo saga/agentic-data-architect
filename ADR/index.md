@@ -64,3 +64,4 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-030](./030-sse-restart-and-turn-recovery.md) | SSE 只负责实时显示；turn draft、Server shutdown、restart recovery 和浏览器 reconnect 必须保护 Conversation Turn 可恢复性 | Accepted |
 | [ADR-031](./031-codebuddy-investigation-sandbox.md) | CodeBuddy Investigation 只使用只读 built-in tools；禁止宿主仓库写入和 shell 路径逃逸 | Accepted |
 | [ADR-032](./032-agent-runtime-adapter-isolation-and-workflow-completion.md) | Runtime adapter 互不直接依赖；共享输入/Graphify 能力下沉；无 completeWhen 的 Agent 节点必须先通过 Stage Gate | Accepted |
+- [ADR-033：轻量级 Code Structure Index 作为 Graphify 的可替换实现](033-lightweight-code-structure-index.md) — 不安装 Graphify 时，用少量确定性代码结构索引提供 find/callers/callees/trace，并通过 Evidence 边界接入 Investigation。
