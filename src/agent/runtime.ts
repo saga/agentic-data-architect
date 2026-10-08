@@ -230,8 +230,29 @@ async function executeRuntime(
 export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const selectedRuntime = input.runtime ?? runtimeFromModel(input.model) ?? config.agentRuntimeDefault;
   const blockedRuntimes = blockedRuntimesForTurn(input.turnId);
-  const runtimeOrder = runtimeCandidates(selectedRuntime).filter((runtime) => !blockedRuntimes.has(runtime));
+  const allRuntimeOrder = runtimeCandidates(selectedRuntime);
+  const runtimeOrder = allRuntimeOrder.filter((runtime) => !blockedRuntimes.has(runtime));
   const attempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
+
+  if (blockedRuntimes.size > 0) {
+    console.info('[agent-runtime] Skipping Runtime(s) already known to be unavailable in this turn.', {
+      investigationName: input.investigationName,
+      turnId: input.turnId,
+      blockedRuntimes: [...blockedRuntimes],
+      selectedRuntime,
+      remainingRuntimes: runtimeOrder,
+    });
+    input.onTrajectory?.({
+      type: 'status',
+      name: '已跳过本轮已知不可用的 Runtime',
+      status: 'info',
+      details: {
+        skippedRuntimes: [...blockedRuntimes],
+        selectedRuntime,
+        remainingRuntimes: runtimeOrder,
+      },
+    });
+  }
 
   for (const runtime of runtimeOrder) {
     if (runtime === 'codebuddy-sdk') {
@@ -432,7 +453,9 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
   }
 
   throw new Error(
-    '没有可用的 Agent Runtime。'
-    + (lastQuotaError instanceof Error ? ' 原始错误：' + lastQuotaError.message : ''),
+    runtimeOrder.length === 0 && blockedRuntimes.size > 0
+      ? '本轮可用的 Agent Runtime 都已经因配额/限流失败而被跳过，请稍后重试或更换运行方式。'
+      : '没有可用的 Agent Runtime。'
+        + (lastQuotaError instanceof Error ? ' 原始错误：' + lastQuotaError.message : ''),
   );
 }
