@@ -105,6 +105,8 @@ test('material-backed scope passes only with known evidence', () => {
   const investigationWithValidation = investigation({
     systems: ['ISS Portal'],
     scopeValidation: validation,
+    evidence: [{ id: 'ev-001', discoveryRunId: 'run-current' }],
+    discoveryRuns: [{ id: 'run-current', scopeFingerprint: validation.scopeFingerprint }],
   });
 
   assert.equal(
