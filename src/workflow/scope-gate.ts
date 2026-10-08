@@ -85,7 +85,7 @@ function allEvidenceBelongToScope(
 
 /** 纯函数 Gate，方便测试，也方便报告与 Workflow 共用同一规则。 */
 export function evaluateInvestigationScopeGate(
-  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems' | 'scopeValidation'>,
+  investigation: Pick<Investigation, 'goal' | 'scope' | 'systems' | 'scopeValidation' | 'evidence' | 'discoveryRuns'>,
   knownEvidence: Set<string>,
 ): ScopeGateResult {
   const checks: ScopeGateCheck[] = [];
@@ -140,10 +140,7 @@ export function evaluateInvestigationScopeGate(
     const evidenceValid = validation.evidenceIds.length === 0
       ? false
       : allKnownEvidence(validation.evidenceIds, knownEvidence)
-        && allEvidenceBelongToScope(investigation as Investigation & {
-          evidence: Investigation['evidence'];
-          discoveryRuns: Investigation['discoveryRuns'];
-        }, validation.evidenceIds);
+        && allEvidenceBelongToScope(investigation, validation.evidenceIds);
     sourceValid = validation.source === 'user'
       ? validation.userConfirmed
       : validation.source === 'materials'
