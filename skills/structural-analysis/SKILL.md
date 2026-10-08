@@ -1,137 +1,99 @@
----
-name: structural-analysis
-description: 使用本项目 Code Structure Index 建立并查询代码结构关系，帮助在深入调查前快速定位依赖、调用链和关键架构节点。
-metadata:
-  kind: capability
----
-
 # Structural Analysis
 
-用途：快速理解一个 legacy / modernization 项目的结构关系，尤其是代码、SQL、DDL、配置之间的依赖和路径。
+用途：快速理解 legacy / modernization 项目的代码和集成工件结构，帮助 Investigation 在深入查证前缩小范围。
 
-## 什么时候使用
+## 边界
 
-优先用于：
-- 不熟悉的大型代码库或 legacy repository
-- 想知道一个 dataset / table / module 从哪里来、被谁使用、和哪些对象连接
-- 需要查一条调用链、依赖链、上下游路径
-- 需要先定位最关键的架构节点，再进行 metadata、profiling 和 targeted query
+Code Structure Index 是本项目唯一的 structural-analysis 能力。它只产生结构导航信息，不直接产生 Evidence，也不替代 live metadata、SQL lineage、profiling 或 business semantics。
 
-不要用它替代：
-- Snowflake / PostgreSQL 的 live metadata
-- 本项目的 SQL AST lineage
-- profiling 和 targeted query
-- 已确认的 Business / Semantic Context
-
-## 第一次进入 Investigation
-
-Investigation 进入代码仓库后，优先使用本项目的轻量 Code Structure Index。两者都只提供结构导航，不直接提供 Evidence。Skill 自己负责在源码明显变化后按需刷新。运行环境优先使用当前项目的 Code Structure Index executable；如果 Code Structure Index 只安装在项目虚拟环境中，就直接调用 `.venv/bin/code-structure`，不要假定 `code-structure` 一定在 PATH：
+进入代码仓库后，优先：
 
 ~~~bash
-<项目 Code Structure Index 命令> extract . --code-only --no-viz
-~~~
-
-这一步主要分析代码和 SQL，不要求 Code Structure Index 自己调用 LLM。命令使用当前项目实际提供的 Code Structure Index executable；例如本地项目环境通常可直接使用 `.venv/bin/code-structure`，已加入 PATH 时也可以写成 `code-structure`。生成物位于：
-
-~~~text
-code-structure-out/graph.json
-~~~
-
-已经存在并且需要更新时：
-
-~~~bash
-<项目 Code Structure Index 命令> update . --no-viz
-~~~
-
-## 调查方式
-
-Code Structure Index 是本项目唯一的结构分析能力；使用 `npm run structure:index -- <repo>` 建立 `.code-structure/index.json`，再通过 `npm run structure:query -- <repo> ...` 查询。进入 structural-analysis 后，结构查询优先于常规 grep / view / bash：
-
-- 'find / callers / callees / trace'：按自然语言问题找相关节点和边
-- 'find / callers / callees / trace' / 'find / callers / callees / trace'：查看一个对象及其直接关系
-- 'find / callers / callees / trace'：追踪两个对象之间的结构路径
-- 'find / callers / callees / trace' / 'find / callers / callees / trace'：快速识别结构性枢纽和整体规模
-- 'find / callers / callees / trace'：理解一个对象所在的子系统
-
-典型调查：
-
-~~~text
-用户问：position 是怎么产生的？
-
-1. find / callers / callees / trace("how is position produced?")
-2. 找到相关节点
-3. find / callers / callees / trace("source_position", "position")
-4. 再回到本项目 Evidence / Lineage / Metadata 查原始证据
-~~~
-
-## Code Structure Index
-
-Code Structure Index 第一阶段使用 TypeScript compiler API 分析 TS/JS，提供 `find`、`callers`、`callees`、`trace` 四个最小查询。它是 Code Structure Index 的可替换轻量 provider，不是第二套 graph database，也不承担 SQL、metadata、profiling 或 business semantics。
-
-当没有 Code Structure Index 时，典型流程是：
-
-~~~text
 npm run structure:index -- <repository>
-npm run structure:query -- <repository> find position function
 ~~~
 
-查询结果仍然必须回到源码核对。
+然后：
 
-## 证据边界
+~~~bash
+npm run structure:query -- <repository> find <name> [kind]
+npm run structure:query -- <repository> callers <nodeId>
+npm run structure:query -- <repository> callees <nodeId>
+npm run structure:query -- <repository> trace <fromNodeId> <toNodeId>
+~~~
 
-Code Structure Index 和 Code Structure Index 输出都是 **结构导航和关系候选**，不是本 Investigation 的 Evidence。
+如果已有 `.code-structure/index.json`，query 会直接读取 snapshot；源码变化明显时再重新 index。
 
-必须遵守：
+## 当前实现
+
+TS/JS 第一阶段使用 TypeScript compiler API，而不是外部 Graphify 或独立 Graph database。
+
+节点 ID 必须稳定：`file + kind + name + same-name ordinal`。不得把行号或字符 offset 放进 ID，因为插入注释/空行不应改变已有实体身份。
+
+当前节点：
+- file
+- class
+- function
+- interface
+- type
+
+当前关系：
+- imports
+- defines
+- calls
+- references
+
+关系必须区分 exact / inferred。无法可靠解析的关系宁可不建立，也不要伪造 exact relation。
+
+## 多语言策略
+
+不要把所有东西都强行 Tree-sitter 化。遵循 ADR-035：
+
+| 对象 | 实现策略 | 优先级 |
+|---|---|---:|
+| TS / JS / TSX | TypeScript compiler API | 已有 |
+| Java | Tree-sitter extractor | P1 |
+| Python | Tree-sitter extractor | P1 |
+| C# | Tree-sitter extractor | P1 |
+| SQL | SQL-specific extractor，可使用 Tree-sitter 作为语法基础 | P1 |
+| C/C++ / Go / Kotlin / Scala | Tree-sitter，真实项目需要时再加 | P2 |
+| COBOL / PL-SQL / DB2 SQL | 真实 legacy 项目需要时增加 dialect/language extractor | P2 |
+| Control-M | job/folder/dependency artifact extractor | P1（有该工件时） |
+| SnapLogic | pipeline/export JSON artifact extractor | P1（有该工件时） |
+| Snowflake | SQL extractor + Snowflake live metadata | P1（有该工件时） |
+| YAML / JSON / XML / HCL | 按承载的架构语义增加轻量 artifact extractor | P2 |
+
+Control-M、SnapLogic、Snowflake 不是普通 Tree-sitter language 问题。它们应映射为 job、pipeline、table、view、dependency 等领域对象。
+
+## 调查规则
+
+结构索引的正确使用方式是：
 
 ~~~text
 Code Structure Index
-  → 找到可能相关的对象 / 路径
-  → 定位原始代码、SQL、metadata 或 documentation
-  → 用现有 deterministic discovery / query 产生 Evidence
-  → Claim 只引用 Evidence ID
+  → 找到候选对象 / 路径
+  → 回到源码、SQL、配置、metadata
+  → 产生正式 Evidence
+  → Claim 只引用 Evidence
 ~~~
 
-不得因为 Code Structure Index 给出了某条 INFERRED 或路径，就把它直接写成 supported、verified 的业务事实。
+如果结构索引与 Evidence 冲突，以 Evidence 为准。
 
-如果 Code Structure Index 与 Evidence 冲突，以 Evidence 为准，并把冲突作为下一步调查对象。
+## 输出与 Gate
 
-进入 structural-analysis 后，优先使用 Code Structure Index 缩小调查范围，再回到源码核对；精确文本、文件发现、Git 操作等不需要结构分析时仍直接使用常规工具。
+Code Structure Index 是中间分析产物，应保留在 Investigation workspace。
 
-## 控制范围
+Gate 不是“图生成了就算完成”，而是：
 
-Code Structure Index 主要回答：
+1. snapshot 成功生成；
+2. 关键结构关系可以回到原始来源；
+3. 重要关系不能只依赖 inferred 结果；
+4. 正式结论已经进入 Evidence。
 
-~~~text
-“这些东西在结构上怎么连？”
-~~~
+不要因为结构图存在，就把结构关系直接写成 verified / supported business fact。
 
-本项目的其他工具回答：
+## 不做什么
 
-~~~text
-“数据库实际上是什么？”
-“数据实际是什么？”
-“业务含义到底是什么？”
-“这条 lineage 有没有确定证据？”
-~~~
-
-复杂问题先 Code Structure Index 缩小调查范围，再做 metadata / lineage / profiling / semantic investigation。
-
-## 输入校验
-
-开始前必须确认工作目录是当前 Investigation 的研究目录，并检查 Code Structure Index 是否可用。
-
-Code Structure Index 只用于结构导航；需要业务结论时必须再查源码、SQL、数据或正式资料。
-## 输出
-
-Code Structure Index 生成的图和查询结果属于中间分析产物。继续分析时保留在当前 workspace，并把关键关系回写到正式 Evidence。
-## 输出与验证
-
-- graph.json 必须能生成并有稳定 hash。
-- 重要关系必须可以追溯到原始代码、SQL 或配置。
-- Code Structure Index 输出不能直接变成 supported / verified 业务结论。
-## Gate
-
-Gate 是“结构图生成成功 + 关键路径能回到原始来源”。如果只能得到 Code Structure Index 路径、找不到原始依据，就只能把它当作待验证线索。
-## 期望结果示例
-
-> Code Structure Index 找到 A → B → C 的代码依赖。进一步查看源码后，确认 A 确实调用 B；C 只是结构上可达，目前还没有证据证明它参与这个业务流程。
+- 不重新引入 Graphify。
+- 不建立第二套 graph database。
+- 不为了语言覆盖一次性实现几十种 parser。
+- 不把 structural analysis 当作 lineage / metadata / business semantics 的替代品。
