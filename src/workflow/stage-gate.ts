@@ -107,7 +107,7 @@ function deliverableAdvanced(
 
 /** 从 Investigation 状态提取只读快照；快照用于比较本阶段是否产生了真实持久化变化。 */
 export function snapshotInvestigationForStageGate(
-  investigation: Pick<Investigation, 'evidence' | 'findings' | 'discoveryRuns' | 'claims' | 'scopeValidation'>,
+  investigation: Pick<Investigation, 'scope' | 'systems' | 'evidence' | 'findings' | 'discoveryRuns' | 'claims' | 'scopeValidation'>,
 ): StageGateSnapshot {
   const scopeFingerprint = computeScopeFingerprint(investigation);
   const currentScopeRunIds = new Set(
@@ -307,6 +307,7 @@ export function buildStageCheckpoint(
     || '这一阶段已经形成可保存的调查结果。';
 
   const knownEvidence = new Set(input.after.evidenceIds);
+  const currentScopeEvidence = new Set(input.after.scopeEvidenceIds ?? input.after.evidenceIds);
   const confirmed = input.parsed.claims
     .filter((claim) =>
       (claim.status === 'supported' || claim.status === 'verified')
@@ -320,7 +321,7 @@ export function buildStageCheckpoint(
   const evidenceIds = unique([
     ...gate.newEvidenceIds,
     ...input.parsed.claims.flatMap((claim) =>
-      claim.evidenceIds.filter((id) => knownEvidence.has(id))),
+      claim.evidenceIds.filter((id) => currentScopeEvidence.has(id))),
   ]).slice(0, 12);
 
   const unknowns = input.parsed.unknowns
