@@ -22,6 +22,8 @@
 3. Code Structure Index 使用现有 TypeScript compiler API 分析 TS/JS，生成 .code-structure/index.json。
 4. Code Structure Index 仍然只是结构导航层，不直接产生 Evidence；正式结论必须回到源码、SQL、metadata 或 deterministic analysis。
 5. 不为了替代 Graphify 而重新建设通用 graph database、MCP server、community/god-node、embedding 或跨语言解析平台。
+6. 节点 ID 使用 `file + kind + name + same-name ordinal`，不得使用行号或字符 offset；详见 ADR-035。
+7. 多语言扩展遵循 ADR-035：TS/JS 保留 compiler API；Java/Python/C# 优先 Tree-sitter；SQL、Control-M、SnapLogic、Snowflake 使用领域 extractor。
 
 ## Runtime boundary
 
@@ -53,7 +55,7 @@ Positive:
 Negative:
 - 当前主要覆盖 TS/JS。
 - 不再拥有 Graphify 的跨语言和高级 graph analysis 能力。
-- 后续如需 Java/SQL 等语言，需要在 CodeStructureProvider 边界内扩展，而不是重新引入 Graphify。
+- 后续多语言扩展遵循 ADR-035，而不是重新引入 Graphify。
 
 ## Rejected alternatives
 
