@@ -51,6 +51,35 @@ function isQuotaError(error: unknown): boolean {
 }
 
 /** 读取应用级 fallback 顺序并去重；非法配置项直接忽略，默认 Runtime 始终排第一。 */
+/**
+ * 同一 Investigation turn 内，一个 Runtime 一旦明确返回 quota / rate-limit，
+ * 后续的 Smart Function / review 调用不应再次从头尝试这个 Runtime。
+ *
+ * 典型场景是：
+ *   主调查 → Mission Alignment → Unknown Review → Completion Review
+ * 每一步都是独立的模型调用，但它们共享同一个 turnId。第一次 Copilot 月度配额耗尽后，
+ * 如果没有这个状态，每个 review 都会再次浪费约 5 秒尝试 Copilot，然后才 fallback。
+ *
+ * 这里只记“本轮暂不可用”，不会修改用户保存的 Runtime 配置；turn 结束时由 ask.ts 清理。
+ */
+const quotaBlockedRuntimesByTurn = new Map<string, Set<AgentRuntime>>();
+
+export function clearRuntimeFallbackState(turnId: string | undefined): void {
+  if (turnId) quotaBlockedRuntimesByTurn.delete(turnId);
+}
+
+function blockedRuntimesForTurn(turnId: string | undefined): Set<AgentRuntime> {
+  if (!turnId) return new Set();
+  return quotaBlockedRuntimesByTurn.get(turnId) ?? new Set();
+}
+
+function blockRuntimeForTurn(turnId: string | undefined, runtime: AgentRuntime): void {
+  if (!turnId) return;
+  const blocked = quotaBlockedRuntimesByTurn.get(turnId) ?? new Set<AgentRuntime>();
+  blocked.add(runtime);
+  quotaBlockedRuntimesByTurn.set(turnId, blocked);
+}
+
 function configuredRuntimeOrder(): AgentRuntime[] {
   const result: AgentRuntime[] = [];
   for (const value of config.agentRuntimeFallbackOrder) {
@@ -192,12 +221,16 @@ async function executeRuntime(
 }
 
 /**
- * Execute the selected runtime and automatically fall back in configured order
- * only when the current runtime reports quota/usage exhaustion.
+ * 执行选定的 Runtime；只有当前 Runtime 明确报告 quota / rate-limit / resource exhaustion
+ * 时才自动 fallback。
+ *
+ * 注意：一次 Investigation turn 可能包含多次独立的 Smart Function 调用。turnId 用于
+ * 共享本轮 Runtime 健康状态，防止已经确认 quota 耗尽的 Runtime 被后续 review 再次尝试。
  */
 export async function askAgentWithFallback(input: AskInput): Promise<string> {
   const selectedRuntime = input.runtime ?? runtimeFromModel(input.model) ?? config.agentRuntimeDefault;
-  const runtimeOrder = runtimeCandidates(selectedRuntime);
+  const blockedRuntimes = blockedRuntimesForTurn(input.turnId);
+  const runtimeOrder = runtimeCandidates(selectedRuntime).filter((runtime) => !blockedRuntimes.has(runtime));
   const attempts: Array<{ runtime: AgentRuntime; model?: string }> = [];
 
   for (const runtime of runtimeOrder) {
@@ -361,6 +394,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
       }
 
       lastQuotaError = error;
+      blockRuntimeForTurn(input.turnId, attempt.runtime);
       const next = attempts[index + 1];
       const sameRuntime = next.runtime === attempt.runtime;
       const runtimeLabel = (value: AgentRuntime) =>
