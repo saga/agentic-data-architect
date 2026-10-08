@@ -116,6 +116,7 @@ function resolveCodeBuddyModels(requestedModel?: string): string[] {
 async function resolveModelForRuntime(
   runtime: AgentRuntime,
   requestedModel: string | undefined,
+  modelTier: AskInput['modelTier'],
 ): Promise<string> {
   const value = requestedModel?.trim() ?? '';
   switch (runtime) {
@@ -125,7 +126,9 @@ async function resolveModelForRuntime(
     case 'copilot-sdk':
       return value && !value.startsWith('codebuddy:') && !value.startsWith('opencode:') && value.toLowerCase() !== 'auto'
         ? value
-        : config.model;
+        : modelTier === 'simple'
+          ? config.simpleModel
+          : config.model;
     case 'opencode-run':
       return resolveOpenCodeModel(value);
   }
@@ -212,7 +215,7 @@ export async function askAgentWithFallback(input: AskInput): Promise<string> {
 
     let model: string;
     try {
-      model = await resolveModelForRuntime(runtime, input.model);
+      model = await resolveModelForRuntime(runtime, input.model, input.modelTier);
     } catch (error) {
       // Resolution failure for the selected runtime must surface; a fallback runtime
       // may be unavailable and can simply be skipped. Either way it is operationally
