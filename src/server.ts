@@ -508,7 +508,11 @@ app.post('/api/sessions', async (req, res) => {
     const clarity = await reviewMissionClarity(
       body.purpose,
       body.expectedResult,
-      { model: (await loadInvestigationControl(name)).agent.model, workingDirectory: workspaceRoot(name) },
+      {
+        model: (await loadInvestigationControl(name)).agent.model,
+        workingDirectory: workspaceRoot(name),
+        investigationName: name,
+      },
     );
     if (clarity && !clarity.clear) {
       res.status(409).json(ApiErrorSchema.parse({
