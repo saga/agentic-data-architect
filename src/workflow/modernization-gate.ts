@@ -114,18 +114,20 @@ export function evaluateModernizationGate(
     );
 
     const incomplete = plan.mappings.filter((mapping) =>
-      mapping.status === 'rejected'
-      || !nonEmpty(mapping.transformation)
-      || !nonEmpty(mapping.businessRule)
-      || !nonEmpty(mapping.validationRule)
-      || !allEvidenceKnown(mapping.evidenceIds, evidenceIds),
+      mapping.status !== 'proposed' && (
+        mapping.status === 'rejected'
+        || !nonEmpty(mapping.transformation)
+        || !nonEmpty(mapping.businessRule)
+        || !nonEmpty(mapping.validationRule)
+        || !allEvidenceKnown(mapping.evidenceIds, evidenceIds)
+      ),
     );
     add(
-      '每条 Mapping 都有转换、业务规则、验证规则和 Evidence',
-      plan.mappings.length > 0 && incomplete.length === 0,
+      '每条已进入审核的 Mapping 都有转换、业务规则、验证规则和 Evidence',
+      (plan.mappings.length === 0 ? mappedSourceCount === 0 : incomplete.length === 0),
       incomplete.length > 0
         ? '不完整 Mapping=' + String(incomplete.length)
-        : '完整 Mapping=' + String(plan.mappings.length),
+        : 'Mapping=' + String(plan.mappings.length) + '，尚未审核的 proposed 草案允许不完整。',
     );
   }
 
