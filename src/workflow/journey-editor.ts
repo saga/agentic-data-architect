@@ -314,8 +314,14 @@ async function loadCustomActive(
   const markdown = await readTextOrNull(journeyFile(name, ACTIVE_FILE));
   if (markdown === null) return null;
 
-  const meta = JourneyMetaSchema.safeParse(await readJson<unknown>(journeyFile(name, META_FILE)));
-  if (!meta.success || meta.data.baseWorkflowId !== workflowId) return null;
+  const rawMeta = await readJson<unknown>(journeyFile(name, META_FILE));
+  if (rawMeta === null) {
+    throw new Error('自定义 Workflow 缺少 journey-meta.json，无法确认当前版本。请恢复完整的 Workflow 文件，或重置工作方式。');
+  }
+  const meta = JourneyMetaSchema.parse(rawMeta);
+  if (meta.baseWorkflowId !== workflowId) {
+    throw new Error('自定义 Workflow 与当前工作方式不匹配：' + meta.baseWorkflowId);
+  }
 
   const parsed = parseJourneyMarkdown(markdown);
   if (!parsed.definition || parsed.issues.length) {
@@ -328,14 +334,14 @@ async function loadCustomActive(
   }
 
   const rawLayout = await readJson<unknown>(journeyFile(name, LAYOUT_FILE));
-  const parsedLayout = JourneyLayoutSchema.safeParse(rawLayout);
+  const layout = rawLayout === null
+    ? defaultJourneyLayout(parsed.definition)
+    : JourneyLayoutSchema.parse(rawLayout);
 
   return {
     definition: parsed.definition,
-    layout: parsedLayout.success
-      ? parsedLayout.data
-      : defaultJourneyLayout(parsed.definition),
-    version: meta.data.version,
+    layout,
+    version: meta.version,
   };
 }
 
@@ -450,9 +456,12 @@ export async function loadJourneyExecution(
   version: number,
 ): Promise<JourneyExecution> {
   const raw = await readJson<unknown>(journeyFile(name, EXECUTION_FILE));
-  const parsed = JourneyExecutionSchema.safeParse(raw);
 
-  return normalizeExecution(definition, version, parsed.success ? parsed.data : null);
+  // execution 文件不存在时才代表“这条 Workflow 还没有执行状态”；如果文件存在但 schema 不对，
+  // 绝不能悄悄回到 start，否则用户会看到路线倒退而不知道已有执行历史已经损坏。
+  if (raw === null) return normalizeExecution(definition, version, null);
+  const parsed = JourneyExecutionSchema.parse(raw);
+  return normalizeExecution(definition, version, parsed);
 }
 
 /** 编辑器 / 右侧 Journey 共用的完整快照。 */
