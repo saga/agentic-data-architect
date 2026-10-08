@@ -445,6 +445,9 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
     if (node.completeWhen && !(KNOWN_COMPLETION_CONDITIONS as readonly string[]).includes(node.completeWhen)) {
       issues.push(node.id + ' 使用了未知的 completeWhen：' + node.completeWhen);
     }
+    if (node.actor === 'human' && node.completeWhen) {
+      issues.push(node.id + ' 是人工步骤，不能使用 completeWhen；人工步骤必须通过人工 outcome 推进。');
+    }
     if (node.type === 'end' && node.completeWhen) {
       issues.push(node.id + ' 是终点节点，不需要 completeWhen。');
     }
