@@ -28,9 +28,9 @@ function state(overrides: Partial<Parameters<typeof evaluateDerivedState>[0]> = 
   };
 }
 
-test('unresolved source-of-truth candidates never count as a covered data source', () => {
+test('source-of-truth candidates remain valid data-source coverage but do not prove data truth', () => {
   const derived = evaluateDerivedState(state({ sourceOfTruthCandidateCount: 2 }));
-  assert.equal(derived.dataSourceReady, false);
+  assert.equal(derived.dataSourceReady, true);
   assert.equal(derived.dataTruthReady, false);
 });
 
@@ -127,5 +127,12 @@ test('current data architecture readiness is blocked by missing flow, model, or 
       },
     },
   }));
-  assert.equal(sqlGap.currentDataArchitectureReady, true);\n});\n\ntest('high discovery or lineage gaps do not block a usable current-state result', () => {\n  const derived = evaluateDerivedState(state({ highGapKinds: ['lineage'] }));\n  assert.equal(derived.currentStateReady, true);\n  assert.equal(derived.currentDataArchitectureReady, true);
+  assert.equal(sqlGap.currentDataArchitectureReady, true);
+});
+
+test('high discovery or lineage gaps do not block a usable current-state result', () => {
+  const derived = evaluateDerivedState(state({ highGapKinds: ['lineage'] }));
+  assert.equal(derived.currentStateReady, true);
+  assert.equal(derived.currentDataArchitectureReady, true);
+});
 });
