@@ -1,20 +1,23 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import Parser from 'tree-sitter';
-import Java from 'tree-sitter-java';
-import Python from 'tree-sitter-python';
-import CSharp from 'tree-sitter-c-sharp';
+import TreeSitter from '@vscode/tree-sitter-wasm';
+import type * as TreeSitterTypes from '@vscode/tree-sitter-wasm';
 import type { CodeEdge, CodeNode, CodeNodeKind, CodeStructureIndex, CodeStructureProvider, StructurePath, StructureQuery } from './types.js';
 
 type Language = 'java' | 'python' | 'csharp';
-type Grammar = { extensions: string[]; language: Language; grammar: unknown };
+type Grammar = { extensions: string[]; language: Language; wasmFile: string };
 
 const GRAMMARS: Grammar[] = [
-  { language: 'java', extensions: ['.java'], grammar: Java },
-  { language: 'python', extensions: ['.py'], grammar: Python },
-  { language: 'csharp', extensions: ['.cs'], grammar: CSharp },
+  { language: 'java', extensions: ['.java'], wasmFile: 'tree-sitter-java.wasm' },
+  { language: 'python', extensions: ['.py'], wasmFile: 'tree-sitter-python.wasm' },
+  { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c-sharp.wasm' },
 ];
+
+const require = createRequire(import.meta.url);
+let treeSitterInitPromise: Promise<typeof TreeSitter> | undefined;
+const languagePromises = new Map<string, Promise<TreeSitterTypes.Language>>();
 
 const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.code-structure']);
 
@@ -41,6 +44,53 @@ async function filesUnder(root: string): Promise<string[]> {
   }
   await visit(root);
   return result.sort();
+}
+
+/**
+ * 初始化 VS Code 提供的 Tree-sitter WASM runtime。
+ *
+ * Parser.init() 会修改进程级 WASM 状态，因此整个进程只初始化一次。
+ * 多个并发 build 会共享同一个 Promise，不会重复初始化底层运行时。
+ */
+async function getTreeSitter(): Promise<typeof TreeSitter> {
+  treeSitterInitPromise ??= (async () => {
+    const moduleRoot = path.dirname(require.resolve('@vscode/tree-sitter-wasm'));
+    await TreeSitter.Parser.init({
+      // npm 包把 tree-sitter.js 和 tree-sitter.wasm 放在同一个目录。
+      // 显式指定路径，避免 ESM / tsx 的运行方式影响 Emscripten 的文件定位。
+      locateFile: () => path.join(moduleRoot, 'tree-sitter.wasm'),
+    });
+    return TreeSitter;
+  })();
+  return treeSitterInitPromise;
+}
+
+/**
+ * 加载 Java / Python / C# 的预编译 grammar，并按语言缓存。
+ *
+ * Language.load() 接收完整 WASM 二进制；缓存 Promise 是为了让同一个进程里大量同语言文件
+ * 共享一次加载和编译，同时在首次加载失败时允许下一次 build 重试。
+ */
+async function loadLanguage(grammar: Grammar): Promise<TreeSitterTypes.Language> {
+  const cached = languagePromises.get(grammar.language);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    const TreeSitter = await getTreeSitter();
+    const moduleRoot = path.dirname(require.resolve('@vscode/tree-sitter-wasm'));
+    const bytes = await fs.readFile(path.join(moduleRoot, grammar.wasmFile));
+    return TreeSitter.Language.load(
+      new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    );
+  })();
+
+  languagePromises.set(grammar.language, promise);
+  try {
+    return await promise;
+  } catch (error) {
+    languagePromises.delete(grammar.language);
+    throw error;
+  }
 }
 
 function children(node: any): any[] { return node.namedChildren ?? []; }
@@ -106,11 +156,14 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
 
     for (const absolute of sourceFiles) {
       const grammar = languageFor(absolute)!;
-      const source = await fs.readFile(absolute, 'utf8');
+      const sourceBytes = await fs.readFile(absolute);
+      const source = sourceBytes.toString('utf8');
       const rel = path.relative(root, absolute).split(path.sep).join('/');
-      const parser = new Parser();
-      parser.setLanguage(grammar.grammar as any);
+      const language = await loadLanguage(grammar);
+      const parser = new TreeSitter.Parser();
+      parser.setLanguage(language);
       const tree = parser.parse(source);
+      if (!tree) throw new Error('Tree-sitter 没有返回语法树：' + rel);
       const fileNode: CodeNode = { id: id(rel, 'file', rel, 0), kind: 'file', name: rel, file: rel, line: 1 };
       nodes.push(fileNode);
       fileNodeByPath.set(rel, fileNode);
@@ -147,15 +200,22 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
         for (const child of children(node)) visitCalls(child, currentOwner);
       };
       visitCalls(tree.rootNode, fileNode);
+      tree.delete();
+      parser.delete();
     }
 
-    const files = await Promise.all(sourceFiles.map(async absolute => ({
-      path: path.relative(root, absolute).split(path.sep).join('/'),
-      hash: createHash('sha256').update(await fs.readFile(absolute)).digest('hex'),
-      parser: languageFor(absolute)!.language === 'csharp' ? 'tree-sitter-c-sharp' : `tree-sitter-${languageFor(absolute)!.language}`,
-    })));
+    const files = sourceFiles.map(async absolute => {
+      const grammar = languageFor(absolute)!;
+      const sourceBytes = await fs.readFile(absolute);
+      return {
+        path: path.relative(root, absolute).split(path.sep).join('/'),
+        hash: createHash('sha256').update(sourceBytes).digest('hex'),
+        parser: '@vscode/tree-sitter-wasm/' + grammar.language,
+      };
+    });
 
-    this.index = { version: 1, root, generatedAt: new Date().toISOString(), files, nodes, edges: dedupe(edges) };
+    const fileRecords = await Promise.all(files);
+    this.index = { version: 1, root, generatedAt: new Date().toISOString(), files: fileRecords, nodes, edges: dedupe(edges) };
     this.nodesById.clear();
     for (const node of nodes) this.nodesById.set(node.id, node);
     await fs.mkdir(path.dirname(this.outputFile), { recursive: true });
