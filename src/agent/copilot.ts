@@ -4,19 +4,6 @@
  * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
-import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
-import { randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { config } from '../config.js';
-import {
-  buildGraphifyMcpServer,
-  tryEnsureGraphifyGraph,
-  GRAPHIFY_MCP_NAME,
-  isGraphifyTool,
-  GRAPHIFY_SELECTION_INSTRUCTION,
-  tryEnsureLocalCodeStructureIndex,
-} from '../adapters/graphify.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
@@ -301,42 +288,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // This application intentionally uses Copilot's default agent. The project
   // config controls reusable Skills; custom agents are only needed when we
   // introduce genuinely different agent roles.
-  const graphifyCapability = input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis');
-  let graphifyEnabled = !isolatedPurpose && config.graphifyEnabled && (graphifyCapability ? graphifyCapability.enabled : true);
-  // 工作地图 AI 不依赖 Graphify；只有真正进行 Investigation 时才检查它。
-  let graphifyRuntime: Awaited<ReturnType<typeof tryEnsureGraphifyGraph>>['metadata'] | undefined;
-  let localStructureAvailable = false;
-  if (graphifyEnabled) {
-    const graphifyPreparation = await tryEnsureGraphifyGraph(workingDirectory, false);
-    graphifyRuntime = graphifyPreparation.metadata;
-    if (!graphifyPreparation.available) {
-      graphifyEnabled = false;
-      const localStructure = await tryEnsureLocalCodeStructureIndex(workingDirectory);
-      localStructureAvailable = localStructure.status === 'available';
-      input.onStatus?.(
-        localStructureAvailable
-          ? 'Graphify 不可用，已切换到本地代码结构索引继续调查。'
-          : '结构分析工具不可用，助手继续使用常规源码工具。'
-          + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
-      );
-      input.onTrajectory?.({
-        type: 'status',
-        name: '结构分析工具不可用，已继续调查',
-        status: 'info',
-        details: {
-          capability: localStructureAvailable ? 'code-structure-index' : GRAPHIFY_MCP_NAME,
-          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
-          ...(localStructureAvailable ? {
-            localIndexPath: localStructure.indexPath,
-            files: localStructure.files,
-            nodes: localStructure.nodes,
-            edges: localStructure.edges,
-          } : { localStructureError: localStructure.error }),
-        },
-      });
-    }
-  }
-  const graphifyMcp = graphifyEnabled ? buildGraphifyMcpServer(workingDirectory) : undefined;
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
   const mcpServers = {
@@ -352,8 +303,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // 当前自动续跑阶段；onPreToolUse 会读取它，不需要把 execution 泄漏到 SDK Session 状态。
   let currentExecution = 0;
   let missionActionReviewedExecution = -1;
-  let graphifyRequiredExecution = -1;
-  let graphifyUsedExecution = -1;
 
   let copilotSessionId = input.sessionId ?? '';
   let pendingUserInputWaits = 0;
@@ -385,54 +334,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
       });
       return { kind: 'cancelled' as const };
     },
-    ...((input.missionActionGate || graphifyEnabled) ? {
+    ...(input.missionActionGate ? {
       hooks: {
         onPreToolUse: async (toolInput: PreToolUseParam) => {
           const argsText = (() => {
             try { return JSON.stringify(toolInput.toolArgs ?? ''); } catch { return String(toolInput.toolArgs ?? ''); }
           })();
-
-          if (graphifyEnabled && toolInput.toolName === 'skill' && /structural-analysis/i.test(argsText)) {
-            graphifyRequiredExecution = currentExecution;
-            graphifyUsedExecution = -1;
-            input.onTrajectory?.({
-              type: 'status',
-              name: '已启用结构分析，先查看代码关系',
-              status: 'started',
-              details: { execution: currentExecution, capability: GRAPHIFY_MCP_NAME },
-            });
-            return;
-          }
-
-          if (graphifyEnabled && isGraphifyTool({
-            toolName: toolInput.toolName,
-            mcpServerName: (toolInput.toolArgs as Record<string, unknown> | undefined)?.mcpServerName,
-            mcpToolName: (toolInput.toolArgs as Record<string, unknown> | undefined)?.mcpToolName,
-          })) {
-            graphifyUsedExecution = currentExecution;
-          }
-
-          if (graphifyEnabled
-            && graphifyRequiredExecution === currentExecution
-            && graphifyUsedExecution !== currentExecution
-            && /^(grep|glob|view|bash)$/i.test(toolInput.toolName)
-            && !/graphify/i.test(argsText)) {
-            input.onTrajectory?.({
-              type: 'status',
-              name: '先用 Graphify 查看代码关系',
-              status: 'info',
-              details: { execution: currentExecution, blockedTool: toolInput.toolName },
-            });
-            return {
-              permissionDecision: 'deny',
-              permissionDecisionReason: '这次问题需要先用 Graphify 查看代码关系。',
-              additionalContext: [
-                '这次问题已经进入结构分析。',
-                '先调用 Graphify 找到调用链、依赖、上下游或路径，再使用 grep/view/bash 核对原始源码。',
-                '不要用多个文本搜索替代 Graphify 的结构查询。',
-              ].join('\\n'),
-            };
-          }
 
           if (!shouldCheckMissionAction(toolInput.toolName)) return;
           if (missionActionReviewedExecution === currentExecution) return;
@@ -507,19 +414,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
     content: [
       input.missionPrompt,
       input.systemPrompt,
-      graphifyEnabled
-        ? GRAPHIFY_SELECTION_INSTRUCTION
-        : localStructureAvailable
-          ? [
-              'Graphify 当前不可用，已经准备好本地 Code Structure Index。',
-              '遇到调用链、依赖关系、上下游、路径或模块关系问题时，优先使用本地结构索引：',
-              'npm run structure:query -- <repository> find <name> [kind]',
-              'npm run structure:query -- <repository> callers <nodeId>',
-              'npm run structure:query -- <repository> callees <nodeId>',
-              'npm run structure:query -- <repository> trace <fromNodeId> <toNodeId>',
-              '查询结果只用于结构导航；正式结论必须回到源码、SQL、metadata 或 Evidence。',
-            ].join('\\n')
-          : '',
       workflowInstruction,
     ].filter(Boolean).join('\\n\\n'),
     },
