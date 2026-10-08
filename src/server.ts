@@ -123,7 +123,6 @@ import {
   inferMissionDeliverables,
   MissionGateError,
 } from './workflow/mission-gate.js';
-import { reviewMissionClarity } from './workflow/mission-evaluation.js';
 import { buildMissionProgress } from './workflow/mission-progress.js';
 import { closeLocalAnalytics, discoverLocalDatasets, listLocalDatasets, registerLocalDataset } from './analytics/local-data.js';
 import {
@@ -515,23 +514,18 @@ app.post('/api/sessions', async (req, res) => {
     }
 
     const body = parseRequest(UpdateMissionBodySchema, req.body);
-    const clarity = await reviewMissionClarity(
-      body.purpose,
-      body.expectedResult,
-      {
-        model: (await loadInvestigationControl(name)).agent.model,
-        workingDirectory: workspaceRoot(name),
-        investigationName: name,
-      },
-    );
-    if (clarity && !clarity.clear) {
-      res.status(409).json(ApiErrorSchema.parse({
-        code: 'MISSION_CLARITY_REQUIRED',
-        error: clarity.reason,
-        details: {
-          clarity,
-          draft: buildMissionDraft(body.purpose, body.expectedResult),
-        },
+
+    // “确认任务”是用户对任务边界的明确授权，不应该因为一次概率性的语言质量评分
+    // 就把一个已经可以工作的任务挡在门外。真正的硬约束由 Mission Gate 负责：
+    // 不能为空、不能是明显占位语句、必须能拆出至少一个交付物，而且交付物必须和文本一致。
+    // 这样“希望调查当前项目的数据流 / 最后生成数据流图”这种自然表达可以直接开始，
+    // 而“分析一下 / 给我一些建议”仍然会被确定性 Gate 拒绝。
+    const draft = buildMissionDraft(body.purpose, body.expectedResult);
+    if (!draft.purpose || !draft.expectedResult || draft.deliverableIds.length === 0) {
+      res.status(400).json(ApiErrorSchema.parse({
+        code: 'MISSION_INVALID',
+        error: '请把任务目的和期望结果填写完整，并至少说明一种需要得到的结果。',
+        details: { draft },
       }));
       return;
     }
