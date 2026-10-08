@@ -65,6 +65,7 @@ export const config = {
   knowledgeDir: path.resolve(envConfig.KNOWLEDGE_DIR),
   githubToken: envConfig.GITHUB_TOKEN?.trim() || undefined,
   model: envConfig.COPILOT_MODEL,
+  simpleModel: envConfig.COPILOT_SIMPLE_MODEL,
   agentRuntimeDefault: envConfig.AGENT_RUNTIME_DEFAULT,
   agentRuntimeFallbackOrder: envConfig.AGENT_RUNTIME_FALLBACK_ORDER.split(',')
     .map((entry) => entry.trim())
