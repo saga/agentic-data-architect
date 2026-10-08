@@ -14,7 +14,10 @@ const EnvSchema = z.object({
   SKILLS_DIR: z.string().default('skills'),
   KNOWLEDGE_DIR: z.string().default('knowledge'),
   GITHUB_TOKEN: z.string().optional(),
-  COPILOT_MODEL: z.string().default('auto'),
+  /** Default Copilot model for substantive Agent work. */
+  COPILOT_MODEL: z.string().default('claude-sonnet-5.5'),
+  /** Lightweight Copilot model reserved for Smart Functions and explicitly simple calls. */
+  COPILOT_SIMPLE_MODEL: z.string().default('claude-haiku-5.5'),
   /** Default Agent Runtime for newly created Investigations. */
   AGENT_RUNTIME_DEFAULT: z.enum(['codebuddy-sdk', 'copilot-sdk', 'opencode-run']).default('copilot-sdk'),
   /** Ordered runtime fallback chain; a selected runtime starts at its own position. */
