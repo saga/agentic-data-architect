@@ -658,7 +658,7 @@ export async function resetJourneyCustomization(
     const events = await readTextOrNull(journeyFile(name, EVENTS_FILE));
     await fs.rm(journeyDir(name), { recursive: true, force: true });
     await fs.mkdir(journeyDir(name), { recursive: true });
-    if (events) await fs.writeFile(journeyFile(name, EVENTS_FILE), events, 'utf8');
+    if (events) await writeTextAtomic(journeyFile(name, EVENTS_FILE), events);
     const current = await loadWorkspaceContext(name);
     const nextContext = { ...current };
     delete nextContext.agentSessionId;
