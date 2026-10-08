@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { TypeScriptCodeStructureProvider } from './typescript-provider.js';
 import { TreeSitterCodeStructureProvider } from './tree-sitter-provider.js';
 import { SqlCodeStructureProvider } from './sql-provider.js';
+import { CodeStructureDuckDBProjector, DEFAULT_STRUCTURE_DATABASE } from './duckdb-projector.js';
 import type { CodeEdge, CodeNode, CodeStructureIndex, CodeStructureProvider, StructurePath, StructureQuery } from './types.js';
 
 export class CodeStructureIndexProvider implements CodeStructureProvider {
@@ -11,11 +12,10 @@ export class CodeStructureIndexProvider implements CodeStructureProvider {
   constructor(
     private readonly rootDirectory: string,
     private readonly outputFile = path.join(rootDirectory, '.code-structure', 'index.json'),
+    private readonly databaseFile = path.join(rootDirectory, DEFAULT_STRUCTURE_DATABASE),
   ) {}
 
   async build(): Promise<CodeStructureIndex> {
-    // 各语言 provider 独立解析；最后在这里合并成一个 canonical snapshot。
-    // provider 不互相调用，也不产生第二套图数据库。
     const root = path.resolve(this.rootDirectory);
     const partsDir = path.join(root, '.code-structure', '.parts');
     const providers = [
@@ -41,6 +41,9 @@ export class CodeStructureIndexProvider implements CodeStructureProvider {
     };
     await fs.mkdir(path.dirname(this.outputFile), { recursive: true });
     await fs.writeFile(this.outputFile, JSON.stringify(this.index, null, 2) + '\n', 'utf8');
+
+    // DuckDB is a disposable analytical projection. index.json remains authoritative.
+    await new CodeStructureDuckDBProjector(root, this.databaseFile).project(this.index);
     return this.index;
   }
 
@@ -99,9 +102,8 @@ export class CodeStructureIndexProvider implements CodeStructureProvider {
 function dedupeFiles(files: CodeStructureIndex['files']): CodeStructureIndex['files'] {
   const seen = new Set<string>();
   return files.filter(file => {
-    const key = file.path;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seen.has(file.path)) return false;
+    seen.add(file.path);
     return true;
   });
 }
