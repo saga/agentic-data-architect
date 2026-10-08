@@ -1,6 +1,6 @@
-# ADR-007：Graphify 作为结构分析能力，并定义结构分析与常规命令的选择边界
+# ADR-007：Graphify 结构分析能力（历史决定）
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-07
 
 ## Context
@@ -241,3 +241,8 @@ Agent 可以使用下面的简单判断：
 - 项目 deterministic analysis + Evidence：可验证事实。
 
 这种设计与“专用工具优先”的原则一致：当任务属于某个专用能力的职责范围，应优先使用该能力；只有任务超出其范围、能力不可用或成本明显不值得时，才使用通用工具。
+
+
+## Superseded
+
+本 ADR 已被 ADR-034 取代。项目已经移除 Graphify runtime、MCP、配置和相关 Agent 强制逻辑；当前结构分析统一使用本项目自己的 Code Structure Index。本文保留为历史设计记录，不再作为实现约束。
