@@ -563,28 +563,16 @@ export async function readAuditEvents(name: string, limit = 50): Promise<AuditEv
 
   const rows = text.split('\n').filter((row) => row.trim()).slice(-Math.max(1, Math.min(limit, 500)));
   const events: AuditEvent[] = [];
-  let invalidCount = 0;
-  for (const [index, row] of rows.reverse().entries()) {
+  const offset = Math.max(0, text.split('\n').filter((row) => row.trim()).length - rows.length);
+  for (const [index, row] of rows.entries()) {
     try {
-      const parsed = AuditEventSchema.parse(JSON.parse(row));
-      events.push(parsed);
+      events.push(AuditEventSchema.parse(JSON.parse(row)));
     } catch (error) {
-      invalidCount += 1;
-      // Audit 是诊断信息，单条历史坏记录不能拖垮整个 Session API。
-      // 保留可解析记录给 UI，同时把原始解析异常写到 console；后续可通过 audit
-      // repair/migration 工具单独处理坏行，而不是让正常业务请求整体失败。
-      console.error('[audit] Ignoring malformed audit record.', {
-        sessionName: name,
-        index: index + 1,
-        error,
-      });
+      throw new AuditDataError(
+        'Invalid audit record in session "' + name + '" at recent record ' + (offset + index + 1) + ': ' +
+        (error instanceof Error ? error.message : String(error)),
+      );
     }
-  }
-  if (invalidCount > 0) {
-    console.warn('[audit] Some audit records could not be read.', {
-      sessionName: name,
-      invalidCount,
-    });
   }
   return events;
 }
