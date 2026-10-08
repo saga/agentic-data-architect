@@ -8,14 +8,6 @@
  */
 import { createSdkMcpServer, query, tool as codeBuddyTool, AbortError } from '@tencent-ai/agent-sdk';
 import path from 'node:path';
-import {
-  GRAPHIFY_MCP_NAME,
-  GRAPHIFY_SELECTION_INSTRUCTION,
-  buildGraphifyMcpServer,
-  tryEnsureGraphifyGraph,
-  isGraphifyTool,
-  requiresGraphifyFirst,
-} from '../adapters/graphify.js';
 import type { AgentRuntime } from '../investigation/schemas.js';
 import { config } from '../config.js';
 import * as z from 'zod';
@@ -45,7 +37,7 @@ const CODEBUDDY_MUTATING_TOOLS = new Set([
   'TodoRead',
 ]);
 
-/** Investigation 只允许只读 built-in tool；MCP workbench/Graphify 由应用自己的工具边界控制。 */
+/** Investigation 只允许只读 built-in tool；额外能力只能来自当前任务明确注入的 MCP/Workbench。 */
 export function isCodeBuddyToolAllowed(toolName: string): boolean {
   const normalized = toolName.trim();
   if (!normalized) return false;
@@ -230,7 +222,6 @@ interface CodeBuddyQueryResult {
   answer: string;
   sessionId: string;
   toolCount: number;
-  graphifyUsed: boolean;
   modelError?: string;
   usage?: Record<string, unknown>;
 }
@@ -242,11 +233,7 @@ async function runCodeBuddyQuery(
   workflowInstruction: string,
   mcpServers: Record<string, unknown>,
   execution: number,
-  graphifyEnabled: boolean,
-  graphifyPreflight: boolean,
-  graphifyRequired: boolean,
 ): Promise<CodeBuddyQueryResult> {
-  const graphifyUsedRef = { value: false };
   let missionActionReviewed = false;
 
   const workingDirectory = path.resolve(input.workingDirectory ?? process.cwd());
@@ -268,7 +255,6 @@ async function runCodeBuddyQuery(
     systemPrompt: [
       input.missionPrompt,
       input.systemPrompt,
-      graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
       workflowInstruction,
       ...(input.responseSchema
         ? [
@@ -298,9 +284,6 @@ async function runCodeBuddyQuery(
           interrupt: false,
         };
       }
-
-      const graphifyToolCall = isGraphifyTool({ toolName });
-      if (graphifyToolCall) graphifyUsedRef.value = true;
 
       if (toolName === 'AskUserQuestion') {
         const questions = toolInput && typeof toolInput === 'object'
@@ -337,14 +320,6 @@ async function runCodeBuddyQuery(
             ...(toolInput && typeof toolInput === 'object' ? toolInput : {}),
             answers,
           },
-        };
-      }
-
-      if (graphifyPreflight && !graphifyToolCall) {
-        return {
-          behavior: 'deny' as const,
-          message: '结构调查前置阶段必须先使用 Graphify；当前步骤暂不允许使用其它工具。',
-          interrupt: false,
         };
       }
 
@@ -432,27 +407,16 @@ async function runCodeBuddyQuery(
           } else if (part.type === 'tool_use') {
             toolCount += 1;
             const toolName = typeof part.name === 'string' ? part.name : '工具';
-            const graphifyToolCall = isGraphifyTool({ toolName });
-            if (graphifyToolCall) graphifyUsedRef.value = true;
-
-            input.onStatus?.(
-              graphifyToolCall
-                ? 'Graphify 正在帮助助手梳理代码结构，请稍候…'
-                : 'CodeBuddy 正在使用工具 ' + toolName + '，请稍候…',
-            );
+            input.onStatus?.('CodeBuddy 正在使用工具 ' + toolName + '，请稍候…');
             input.onTrajectory?.({
               type: 'tool_call',
-              name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'CodeBuddy 工具：' + toolName,
+              name: 'CodeBuddy 工具：' + toolName,
               status: 'started',
               model,
               details: {
                 execution,
                 ...(sessionId ? { sessionId } : {}),
                 tool: toolName,
-                ...(graphifyToolCall ? {
-                  mcpServerName: GRAPHIFY_MCP_NAME,
-                  mcpToolName: toolName,
-                } : {}),
               },
             });
           } else if (part.type === 'tool_result') {
@@ -582,21 +546,10 @@ async function runCodeBuddyQuery(
     throw new Error('助手这次没有返回可用结果。请重试；如果连续发生，请查看执行轨迹。');
   }
 
-  if (graphifyRequired && !graphifyUsedRef.value) {
-    console.error('[codebuddy] Required Graphify preflight did not complete.', {
-      investigationName: input.investigationName,
-      turnId: input.turnId,
-      model,
-      toolCount,
-    });
-    throw new Error('代码结构分析这一步没有完成，因此无法按要求继续调查。请查看执行轨迹中的 Graphify 错误后重试。');
-  }
-
   return {
     answer: answer.trim(),
     sessionId,
     toolCount,
-    graphifyUsed: graphifyUsedRef.value,
     ...(usage && Object.keys(usage).length ? { usage } : {}),
   };
 }
@@ -612,68 +565,13 @@ export async function askCodeBuddy(
   input: AskInput & { runtime?: AgentRuntime },
   model: string,
 ): Promise<string> {
-  let graphifyEnabled = input.purpose !== 'journey-map'
-    && input.purpose !== 'review'
-    && Boolean(input.platformCapabilities?.find((item) => item.name === 'graphify-structural-analysis')?.enabled ?? true);
-
+  // CodeBuddy 不再耦合任何具体结构分析实现；结构分析属于独立 capability。
+  // 需要时由 Skill/结构分析工具显式使用，不由 Runtime adapter 强制注入。
   const mcpServers = toCodeBuddyMcpServers(input.mcpServers ?? {});
 
   if (input.purpose !== 'journey-map' && input.purpose !== 'review' && input.investigationName) {
     const workbench = buildCodeBuddyWorkbenchServer(input.investigationName);
     mcpServers.workbench = workbench;
-  }
-
-  if (graphifyEnabled) {
-    const graphifyPreparation = await tryEnsureGraphifyGraph(
-      input.workingDirectory ?? process.cwd(),
-      false,
-    );
-    if (graphifyPreparation.available) {
-      const graphify = buildGraphifyMcpServer(input.workingDirectory ?? process.cwd());
-      if (graphify) {
-        mcpServers[GRAPHIFY_MCP_NAME] = {
-          type: 'stdio',
-          command: graphify.server.command,
-          ...(graphify.server.args.length ? { args: graphify.server.args } : {}),
-        };
-      }
-    } else {
-      graphifyEnabled = false;
-      console.warn('[codebuddy] Graphify preparation failed; falling back to source tools.', {
-        investigationName: input.investigationName,
-        turnId: input.turnId,
-        error: graphifyPreparation.error,
-      });
-      if (input.investigationName) {
-        void appendAuditEvent(input.investigationName, {
-          actor: 'system',
-          action: 'agent.graphify.preparation_failed',
-          summary: 'Graphify 准备失败，CodeBuddy 已降级到源码工具。',
-          details: {
-            turnId: input.turnId,
-            ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
-          },
-        }).catch((auditError) => {
-          console.error('[codebuddy] Failed to persist Graphify preparation failure audit.', {
-            investigationName: input.investigationName,
-            error: auditError,
-          });
-        });
-      }
-      input.onStatus?.(
-        '结构分析工具这次没有生成可用结果，助手改用源码工具继续调查。'
-        + (graphifyPreparation.error ? '（Graphify：' + graphifyPreparation.error.slice(0, 180) + '）' : ''),
-      );
-      input.onTrajectory?.({
-        type: 'status',
-        name: '代码结构分析没成功，已改用源码继续查',
-        status: 'info',
-        details: {
-          capability: GRAPHIFY_MCP_NAME,
-          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
-        },
-      });
-    }
   }
 
   let currentPrompt = input.prompt;
@@ -689,28 +587,17 @@ export async function askCodeBuddy(
     6,
     Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
   );
-  const graphifyRequired = graphifyEnabled && requiresGraphifyFirst(input.prompt);
-  const maxAutomaticContinuations = graphifyRequired
-    ? Math.min(6, requestedAutomaticContinuations + 1)
-    : requestedAutomaticContinuations;
+  const maxAutomaticContinuations = requestedAutomaticContinuations;
 
   let lastStageAnswer = '';
   for (let execution = 0; execution <= maxAutomaticContinuations; execution += 1) {
     if (input.shouldAbort?.()) throw new Error('Turn aborted.');
 
-    const preflight = execution === 0 && graphifyRequired;
     if (execution > 0) {
       input.onStatus?.('助手已完成前一阶段，正在继续调查（第 ' + (execution + 1) + ' 阶段）…');
     }
 
     const prompt = [
-      ...(preflight
-        ? [
-            '这是结构调查的前置步骤。',
-            '先使用 Graphify MCP 完成结构导航；至少执行一次 Graphify 查询。',
-            '这一轮不要回答最终问题；完成 Graphify 导航后返回关键节点和关系。',
-          ]
-        : []),
       ...(lastStageAnswer
         ? [
             '上一阶段已经完成。请在不重复已经完成工作的前提下继续当前 Mission。',
@@ -728,26 +615,7 @@ export async function askCodeBuddy(
       currentWorkflowInstruction,
       mcpServers,
       execution,
-      graphifyEnabled,
-      preflight,
-      graphifyRequired,
     );
-
-    if (preflight) {
-      lastStageAnswer = result.answer;
-      input.onTrajectory?.({
-        type: 'status',
-        name: 'Graphify 结构分析前置检查完成',
-        status: 'completed',
-        model,
-        details: {
-          execution,
-          sessionId: result.sessionId,
-        },
-      });
-      currentPrompt = input.prompt;
-      continue;
-    }
 
     finalAnswer = result.answer;
     lastStageAnswer = finalAnswer;
