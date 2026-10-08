@@ -25,22 +25,28 @@ npm run structure:query -- <repository> trace <fromNodeId> <toNodeId>
 
 ## 当前实现
 
-TS/JS 第一阶段使用 TypeScript compiler API，而不是外部 Graphify 或独立 Graph database。
+TS/JS 使用 TypeScript compiler API；Java/Python/C# 使用 Tree-sitter；SQL 使用 SQL-specific extractor。所有 provider 最终合并为一个 canonical `.code-structure/index.json`，而不是多套图。
 
 节点 ID 必须稳定：`file + kind + name + same-name ordinal`。不得把行号或字符 offset 放进 ID，因为插入注释/空行不应改变已有实体身份。
 
 当前节点：
 - file
-- class
-- function
-- interface
-- type
+- module / package
+- class / interface / type
+- function / method
+- statement
+- table / view / column
+- job / pipeline（为 Control-M / SnapLogic 等 artifact extractor 预留）
 
 当前关系：
 - imports
 - defines
 - calls
 - references
+- contains
+- reads / writes
+- joins
+- dependsOn
 
 关系必须区分 exact / inferred。无法可靠解析的关系宁可不建立，也不要伪造 exact relation。
 
@@ -54,7 +60,7 @@ TS/JS 第一阶段使用 TypeScript compiler API，而不是外部 Graphify 或�
 | Java | Tree-sitter extractor | P1 |
 | Python | Tree-sitter extractor | P1 |
 | C# | Tree-sitter extractor | P1 |
-| SQL | SQL-specific extractor，可使用 Tree-sitter 作为语法基础 | P1 |
+| SQL | SQL-specific extractor；当前使用 node-sql-parser，并保留 dialect 边界 | P1 |
 | C/C++ / Go / Kotlin / Scala | Tree-sitter，真实项目需要时再加 | P2 |
 | COBOL / PL-SQL / DB2 SQL | 真实 legacy 项目需要时增加 dialect/language extractor | P2 |
 | Control-M | job/folder/dependency artifact extractor | P1（有该工件时） |
