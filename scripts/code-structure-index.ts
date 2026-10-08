@@ -17,4 +17,5 @@ console.log(JSON.stringify({
   nodes: index.nodes.length,
   edges: index.edges.length,
   output: path.join(index.root, '.code-structure', 'index.json'),
+  database: path.join(index.root, '.code-structure', 'structure.duckdb'),
 }, null, 2));
