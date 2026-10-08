@@ -18,6 +18,7 @@ import {
   type WorkspaceContext,
 } from './workspace.js';
 import { JourneyPlanSchema, WorkspaceContextSchema, type JourneyPlan } from './schemas.js';
+import { computeScopeFingerprint } from './artifact-provenance.js';
 
 /** Investigation 是 WorkspaceContext 在业务层的别名，代表持久化的当前分析状态。 */
 export type Investigation = WorkspaceContext;
@@ -108,6 +109,8 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
 
     const current = await loadWorkspaceContext(inv.name);
     const missionUnchanged = sameMission(current.mission, inv.mission);
+    const scopeUnchanged =
+      computeScopeFingerprint(current) === computeScopeFingerprint(inv);
 
     // 这里不是简单的“把 inv 整体覆盖回去”。inv 可能是几十秒前读取的快照，
     // 在 Agent 调工具期间，用户/API 可能已经更新了 Mission、Workflow、scope 或其它状态。
@@ -124,8 +127,14 @@ export async function saveInvestigation(inv: Investigation): Promise<string> {
       ...(current.mission ? { mission: current.mission } : {}),
       ...(current.scopeValidation ? { scopeValidation: current.scopeValidation } : {}),
       questions: [...new Set([...current.questions, ...inv.questions])],
-      discoveryRuns: mergeById(current.discoveryRuns, inv.discoveryRuns),
-      evidence: mergeById(current.evidence, inv.evidence),
+      // Scope 已变化时，旧 turn 带回来的 Discovery / Evidence 不能混进新 Scope generation。
+      // 历史的旧结果仍保留在 current；这里只禁止 stale snapshot 把它们再次“追加”进去。
+      discoveryRuns: scopeUnchanged
+        ? mergeById(current.discoveryRuns, inv.discoveryRuns)
+        : current.discoveryRuns,
+      evidence: scopeUnchanged
+        ? mergeById(current.evidence, inv.evidence)
+        : current.evidence,
       // Claims / Findings / Unknowns 依赖 Mission。Mission 一旦变了，旧快照里的结果
       // 绝不能重新写回新 Mission；Mission 相同则做按 ID 合并，避免并行调查互相覆盖。
       claims: missionUnchanged ? mergeById(current.claims, inv.claims) : current.claims,
