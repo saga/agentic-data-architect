@@ -333,3 +333,47 @@ export async function getGraphifyRuntimeMetadata(workingDirectory: string): Prom
 export function assertGraphifyRuntimeAvailable(): void {
   if (config.graphifyEnabled) requireGraphifyMcpCommand();
 }
+
+
+export interface LocalStructureMetadata {
+  status: 'available' | 'failed';
+  indexPath: string;
+  generatedAt: string;
+  files?: number;
+  nodes?: number;
+  edges?: number;
+  error?: string;
+}
+
+/**
+ * Graphify 不可用时建立本地轻量结构索引。
+ *
+ * 这里不把 local index 冒充成 Graphify；它只是同一 structural-analysis
+ * capability 的 fallback。索引仍然只是结构导航，正式结论必须回到源码/Evidence。
+ */
+export async function tryEnsureLocalCodeStructureIndex(
+  workingDirectory: string,
+): Promise<LocalStructureMetadata> {
+  const generatedAt = new Date().toISOString();
+  const indexPath = path.join(path.resolve(workingDirectory), '.code-structure', 'index.json');
+  try {
+    const { TypeScriptCodeStructureProvider } = await import('../structure/typescript-provider.js');
+    const provider = new TypeScriptCodeStructureProvider(workingDirectory, indexPath);
+    const index = await provider.build();
+    return {
+      status: 'available',
+      indexPath,
+      generatedAt,
+      files: index.files.length,
+      nodes: index.nodes.length,
+      edges: index.edges.length,
+    };
+  } catch (error) {
+    return {
+      status: 'failed',
+      indexPath,
+      generatedAt,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
