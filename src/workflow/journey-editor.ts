@@ -1172,7 +1172,9 @@ export async function applyHumanWorkflowTransition(
           // 这样自定义 Workflow 无法通过“非 approved 的特殊出口”绕过最终结果检查。
           const progress = await buildMissionProgress(name, mission);
           const uncovered = progress?.deliverables.filter(
-            (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+            // not_tracked 不是完成，只代表当前系统没有可量化的自动进度。
+            // Agent 和人工都必须遵守同一条结束规则，不能因为是人工点击“approved”就绕过必需交付物。
+            (item) => item.required && item.status !== 'covered',
           ) ?? [];
           if (uncovered.length) {
             throw new Error(
@@ -1182,15 +1184,13 @@ export async function applyHumanWorkflowTransition(
             );
           }
         }
-        if (outcome === 'approved') {
-          const missionBoundary = isMissionWorkflowTargetAllowed(
+        const missionBoundary = isMissionWorkflowTargetAllowed(
           mission,
           route.target,
           active.definition.nodes.find((node) => node.id === route.target)?.title,
         );
-          if (!missionBoundary.allowed) {
-            throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
-          }
+        if (!missionBoundary.allowed) {
+          throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
         }
       }
     }
