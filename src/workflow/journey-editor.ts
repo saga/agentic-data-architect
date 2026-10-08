@@ -130,8 +130,16 @@ async function readTextOrNull(file: string): Promise<string | null> {
  * 人工操作和 UI 读取请求；所有写入都必须串行，否则 JSONL 一旦交错，整个事件历史
  * 就无法被严格 Schema 重新读取。
  */
-export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
-  const validated = JourneyRunEventSchema.parse(event);
+async function appendJourneyRunEvents(
+  name: string,
+  events: JourneyRunEvent[],
+): Promise<void> {
+  if (!events.length) return;
+  const validated = events.map((event) => JourneyRunEventSchema.parse(event));
+
+  // 一次 Workflow transition 会产生 node-completed + node-waiting/workflow-completed 多条事件。
+  // 必须把这一组事件作为一个连续批次写入，不能让另一个 transition 插进中间，否则按事件顺序
+  // 回放时会看到“下一节点 waiting”先于“上一节点 completed”等不可能的状态。
   const previous = JOURNEY_EVENT_WRITE_LOCKS.get(name) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -141,11 +149,19 @@ export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent
 
   try {
     await fs.mkdir(journeyDir(name), { recursive: true });
-    await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(validated) + '\n', 'utf8');
+    await fs.appendFile(
+      journeyFile(name, EVENTS_FILE),
+      validated.map((event) => JSON.stringify(event)).join('\n') + '\n',
+      'utf8',
+    );
   } finally {
     release();
     if (JOURNEY_EVENT_WRITE_LOCKS.get(name) === queued) JOURNEY_EVENT_WRITE_LOCKS.delete(name);
   }
+}
+
+export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
+  await appendJourneyRunEvents(name, [event]);
 }
 
 /** 只读取最近事件供 UI/诊断使用；完整历史文件仍留在 workspace，不塞进当前快照。 */
@@ -731,25 +747,23 @@ async function appendDeterministicAdvanceEvents(
   const completedBefore = new Set(before.completedNodeIds);
   const newlyCompleted = after.completedNodeIds.filter((id) => !completedBefore.has(id));
 
-  for (const nodeId of newlyCompleted) {
-    await appendJourneyRunEvent(name, {
-      id: crypto.randomUUID(),
-      runId: after.runId,
-      workflowId: after.workflowId,
-      workflowVersion: after.workflowVersion,
-      type: 'node-completed',
-      timestamp: new Date().toISOString(),
-      nodeId,
-      data: { deterministic: true },
-    });
-  }
+  const events: JourneyRunEvent[] = newlyCompleted.map((nodeId) => ({
+    id: crypto.randomUUID(),
+    runId: after.runId,
+    workflowId: after.workflowId,
+    workflowVersion: after.workflowVersion,
+    type: 'node-completed',
+    timestamp: new Date().toISOString(),
+    nodeId,
+    data: { deterministic: true },
+  }));
 
   if (
     before.status !== 'waiting'
     && after.status === 'waiting'
     && after.pendingInteraction
   ) {
-    await appendJourneyRunEvent(name, {
+    events.push({
       id: crypto.randomUUID(),
       runId: after.runId,
       workflowId: after.workflowId,
@@ -760,7 +774,7 @@ async function appendDeterministicAdvanceEvents(
       data: { ...after.pendingInteraction, deterministic: true },
     });
   } else if (before.status !== 'completed' && after.status === 'completed') {
-    await appendJourneyRunEvent(name, {
+    events.push({
       id: crypto.randomUUID(),
       runId: after.runId,
       workflowId: after.workflowId,
@@ -771,6 +785,8 @@ async function appendDeterministicAdvanceEvents(
       data: { deterministic: true },
     });
   }
+
+  await appendJourneyRunEvents(name, events);
 }
 
 /**
@@ -810,10 +826,9 @@ async function appendJourneyTransitionEvents(
     outcome,
     data: { nextNodeId: next.currentNodeId },
   };
-  await appendJourneyRunEvent(name, currentEvent);
-
+  const events: JourneyRunEvent[] = [currentEvent];
   if (next.status === 'waiting' && next.pendingInteraction) {
-    await appendJourneyRunEvent(name, {
+    events.push({
       id: crypto.randomUUID(),
       runId: next.runId,
       workflowId: next.workflowId,
@@ -824,7 +839,7 @@ async function appendJourneyTransitionEvents(
       data: next.pendingInteraction,
     });
   } else if (next.status === 'completed') {
-    await appendJourneyRunEvent(name, {
+    events.push({
       id: crypto.randomUUID(),
       runId: next.runId,
       workflowId: next.workflowId,
@@ -834,6 +849,7 @@ async function appendJourneyTransitionEvents(
       nodeId: next.currentNodeId,
     });
   }
+  await appendJourneyRunEvents(name, events);
 }
 
 /**
@@ -1052,15 +1068,23 @@ export async function applyAgentWorkflowTransition(
 
       await fs.mkdir(journeyDir(name), { recursive: true });
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
-    });
 
-    await appendJourneyTransitionEvents(
-      name,
-      execution,
-      transition.nodeId,
-      transition.outcome,
-      next,
-    );
+      // Execution 与对应事件属于同一次状态提交。把事件写入 critical section，
+      // 避免下一次 transition 先提交 execution 后插入本次 event，造成历史顺序倒置。
+      try {
+        await appendJourneyTransitionEvents(
+          name,
+          execution,
+          transition.nodeId,
+          transition.outcome,
+          next,
+        );
+      } catch (eventError) {
+        // 如果事件记录失败，回滚 execution；否则会留下“状态已经前进但审计事件缺失”的半提交状态。
+        await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), execution);
+        throw eventError;
+      }
+    });
 
     await appendAuditEvent(name, {
       actor: 'system',
@@ -1148,7 +1172,9 @@ export async function applyHumanWorkflowTransition(
           // 这样自定义 Workflow 无法通过“非 approved 的特殊出口”绕过最终结果检查。
           const progress = await buildMissionProgress(name, mission);
           const uncovered = progress?.deliverables.filter(
-            (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+            // not_tracked 不是完成，只代表当前系统没有可量化的自动进度。
+            // Agent 和人工都必须遵守同一条结束规则，不能因为是人工点击“approved”就绕过必需交付物。
+            (item) => item.required && item.status !== 'covered',
           ) ?? [];
           if (uncovered.length) {
             throw new Error(
@@ -1158,15 +1184,13 @@ export async function applyHumanWorkflowTransition(
             );
           }
         }
-        if (outcome === 'approved') {
-          const missionBoundary = isMissionWorkflowTargetAllowed(
+        const missionBoundary = isMissionWorkflowTargetAllowed(
           mission,
           route.target,
           active.definition.nodes.find((node) => node.id === route.target)?.title,
         );
-          if (!missionBoundary.allowed) {
-            throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
-          }
+        if (!missionBoundary.allowed) {
+          throw new Error(missionBoundary.reason ?? '当前 Workflow 下一阶段不属于本次任务结果范围。');
         }
       }
     }
@@ -1198,9 +1222,14 @@ export async function applyHumanWorkflowTransition(
 
       await fs.mkdir(journeyDir(name), { recursive: true });
       await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), next);
+      try {
+        await appendJourneyTransitionEvents(name, execution, nodeId, outcome, next);
+      } catch (eventError) {
+        // 与 Agent transition 一样，人工操作也必须避免 execution 前进而事件缺失。
+        await writeJsonAtomic(journeyFile(name, EXECUTION_FILE), execution);
+        throw eventError;
+      }
     });
-
-    await appendJourneyTransitionEvents(name, execution, nodeId, outcome, next);
     await appendAuditEvent(name, {
       actor: 'user',
       action: 'workflow.human.transition',

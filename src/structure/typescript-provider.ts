@@ -139,12 +139,13 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
             const ordinalKey = `${kind}\u0000${name}`;
             const ordinal = declarationOrdinal.get(ordinalKey) ?? 0;
             declarationOrdinal.set(ordinalKey, ordinal + 1);
+            const declarationLine = lineOf(source, node.getStart(source));
             const symbol: CodeNode = {
               id: nodeId(rel, kind, name, ordinal),
               kind,
               name,
               file: rel,
-              line: lineOf(source, node.getStart(source)),
+              line: declarationLine,
             };
             addNode(nodes, this.nodesById, symbol);
             declarationByStart.set(`${rel}:${node.getStart(source)}`, symbol);

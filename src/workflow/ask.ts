@@ -513,6 +513,9 @@ export async function answerQuestion(
     // Stage Gate 的基线必须建立在本次 Agent turn 真正开始前；这样每个自动续跑阶段
     // 都只能因为本阶段新增的 Evidence / Finding / Discovery 等真实结果而形成小结。
     let stageGateBaseline = snapshotInvestigationForStageGate(inv);
+    // Modernization work product 是“实际是否改变”的结果，不是“Agent 是否返回了 modernization JSON”。
+    // 后面必须使用 persistModernizationAgentResult 返回的 changedSections，避免重复回答被错误地当成新阶段成果。
+    let persistedWorkProductChanged = false;
     let stageMissionProgressBaseline = missionProgress ?? {
       covered: 0,
       total: mission.deliverables.length,
@@ -673,7 +676,8 @@ export async function answerQuestion(
           || stageAfter.findingIds.length > stageGateBaseline.findingIds.length
           || stageAfter.discoveryRunCount > stageGateBaseline.discoveryRunCount
           || stageAfter.scopeValidatedAt !== stageGateBaseline.scopeValidatedAt
-          || missionProgressAfterStage.percent !== stageMissionProgressBaseline.percent;
+          || missionProgressAfterStage.percent !== stageMissionProgressBaseline.percent
+          || persistedWorkProductChanged;
 
         const missionUnknownReviews = stageParsed.unknowns.length
           ? await reviewUnknownImpact({
@@ -737,7 +741,7 @@ export async function answerQuestion(
           before: stageGateBaseline,
           // legacy-modernization 的结构化工作成果由 onBeforeWorkflowTransition 刚刚持久化；
           // 它本身就是本阶段真实成果，即使没有新增 Evidence/Finding 也不能被 Gate 忽略。
-          persistedWorkProductChanged: Boolean(stageParsed.modernization),
+          persistedWorkProductChanged,
           after: stageAfter,
           missionProgressBefore: stageMissionProgressBaseline,
           missionProgressAfter: missionProgressAfterStage,
@@ -834,6 +838,8 @@ export async function answerQuestion(
 
         stageGateBaseline = stageAfter;
         stageMissionProgressBaseline = missionProgressAfterStage;
+        // 一个阶段最多把本阶段实际变化计为一次；下一阶段重新建立自己的 delta。
+        persistedWorkProductChanged = false;
 
         return gate.passed
           ? { passed: true }
@@ -859,7 +865,12 @@ export async function answerQuestion(
         }
         if (latest.workflow === 'legacy-modernization' && stageParsed.modernization) {
           // 先保存结构化 work product，Stage Gate 才能用真实状态判断交付物是否前进。
-          await persistModernizationAgentResult(investigationName, stageParsed.modernization);
+          // changedSections 为空代表 Agent 只是重复了已有结果，这种回答不能制造新的 checkpoint。
+          const saved = await persistModernizationAgentResult(
+            investigationName,
+            stageParsed.modernization,
+          );
+          persistedWorkProductChanged = saved.changedSections.length > 0;
         }
       },
       onReasoningDelta: emitReasoning,

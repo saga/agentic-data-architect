@@ -1,5 +1,5 @@
 import { DuckDBInstance } from '@duckdb/node-api';
-import type { CodeNode, StructurePath, StructureQuery } from './types.js';
+import type { CodeEdge, CodeNode, StructurePath, StructureQuery } from './types.js';
 
 export interface StructureSummary {
   files: number;
