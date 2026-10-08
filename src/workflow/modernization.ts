@@ -581,8 +581,14 @@ export async function readModernizationArtifact(
   return { status: 'current', plan };
 }
 
-/** Only the current artifact is returned to internal callers：只有 current Artifact 才返回 plan。 */
+/**
+ * 给 Workflow / Gate 提供当前可用的 Modernization Plan。
+ * missing / stale 仍然按“当前没有可用计划”处理；但 error 必须继续抛出，不能把损坏的
+ * durable artifact 伪装成不存在，否则 deterministic completion 会在错误状态下继续运行。
+ */
 export async function loadModernizationPlan(name: string): Promise<ModernizationPlan | null> {
   const result = await readModernizationArtifact(name);
-  return result.status === 'current' ? result.plan : null;
+  if (result.status === 'current') return result.plan;
+  if (result.status === 'missing' || result.status === 'stale') return null;
+  throw new Error('Modernization 工作成果无法读取，当前状态是 error。请检查 modernization-plan.json 后重新处理。');
 }
