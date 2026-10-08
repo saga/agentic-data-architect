@@ -91,7 +91,6 @@ export const DiscoveryRunSchema = z.object({
   lineageEdgesFound: z.number().int().nonnegative(),
   sqlParseFailures: z.number().int().nonnegative().optional(),
   semanticAssetsFound: z.number().int().nonnegative().optional(),
-  graphify: GraphifyRunMetadataSchema.optional(),
 }).strict();
 export type DiscoveryRun = z.infer<typeof DiscoveryRunSchema>;
 
