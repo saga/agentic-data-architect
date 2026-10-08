@@ -245,6 +245,9 @@ export async function answerQuestion(
   let companionTimer: ReturnType<typeof setTimeout> | undefined;
   let trajectoryWrite: Promise<void> = Promise.resolve();
   let trajectoryWriteError: unknown;
+  // Companion Note 在正常和失败路径都要等待收尾；因此生命周期必须位于外层 try 之外。
+  // 否则 catch 无法访问它，已经启动的后台陪伴任务可能在失败消息之后继续写入 transcript。
+  let companionNoteTask: Promise<void> = Promise.resolve();
   // 轨迹事件通常由 appendTrajectoryEvent 统一生成 id/timestamp。
   // checkpoint 例外：同一条“阶段小结”需要把完全相同的 id/timestamp 同时给
   // durable trajectory 和 SSE，浏览器才能可靠去重并在实时/刷新两条路径之间对齐。
@@ -319,7 +322,6 @@ export async function answerQuestion(
     }
     let companionNoteCount = 0;
     let lastCompanionNoteAt = 0;
-    let companionNoteTask: Promise<void> = Promise.resolve();
     const requestCompanionNote = (activity: string, force = false): void => {
       const now = Date.now();
       const minimumFirstDelay = 12_000;
