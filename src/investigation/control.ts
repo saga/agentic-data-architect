@@ -122,7 +122,8 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
       avatarWidth: 180,
       avatarHeight: 240,
       avatarSources: [],
-      platformCapabilities: config.graphifyEnabled ? [{ name: 'graphify-structural-analysis', version: config.graphifyPlatformCapabilityVersion, enabled: true }] : [],
+      // platformCapabilities 是运行时能力快照；结构分析现在由本地 Code Structure Index 提供，
+      // 不再注册 Graphify 之类的外部结构分析能力。
       systemPrompt: {
         version: 1,
         content: '',
