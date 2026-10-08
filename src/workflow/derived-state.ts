@@ -91,12 +91,10 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   // prevent a usable Current State result. Stricter results apply their own conditions.
   const currentStateReady = currentStateAvailable;
 
-  // “Current Data Architecture”允许保留业务上尚未确认的候选项；
-  // 真正要求数据真相时，由 dataTruthReady 单独收紧。
-  const currentDataArchitectureReady = currentStateReady
-    && dataFlowReady
-    && dataModelReady
-    && transformationReady;
+  // Current Data Architecture 的目标是尽可能还原当前状态，而不是要求每个分析维度
+  // 都已经完整。Flow / Model / Transformation 是独立的覆盖信号；缺失时应进入报告
+  // 的 Unknown / Limitation，而不是阻止整个 Current State 结果。
+  const currentDataArchitectureReady = currentStateReady;
 
   const dataTruthReady = currentStateReady
     && dataSourceReady
