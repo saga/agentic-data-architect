@@ -63,10 +63,7 @@ test('workspace keeps the confirmed Mission Contract after reload', async () => 
 
 test('concurrent investigation saves merge facts instead of losing the other snapshot', async () => {
   const name = 'concurrent-save';
-  await newInvestigation(name, {
-    userPrompt: '并发保存测试',
-    goal: '验证并发保存不会覆盖另一份调查结果',
-  });
+  await newInvestigation(name, '验证并发保存不会覆盖另一份调查结果');
 
   const first = await loadInvestigation(name);
   const second = await loadInvestigation(name);
