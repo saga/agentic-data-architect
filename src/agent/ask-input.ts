@@ -45,6 +45,8 @@ export interface AskInput {
   runtime?: import('../investigation/schemas.js').AgentRuntime;
   model?: string;
   modelCallName?: string;
+  /** Copilot 模型档位；默认 standard，只有明确简单的高频调用才使用 simple。 */
+  modelTier?: 'standard' | 'simple';
   autoTier?: 'efficiency' | 'balance' | 'intelligence' | 'fast';
   missionPrompt?: string;
   refreshMissionPrompt?: () => string | Promise<string>;
