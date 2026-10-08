@@ -52,6 +52,7 @@ function base() {
       validatedAt: new Date().toISOString(),
     },
     evidence,
+    discoveryRuns: [],
     claims: [],
     findings: [],
     resultArtifactCount: 1,
