@@ -19,6 +19,7 @@ import {
   loadWorkspaceContext,
   contextFile,
   writeJsonAtomic,
+  writeTextAtomic,
   workspaceRoot,
   withWorkspaceContextLock,
 } from '../investigation/workspace.js';
