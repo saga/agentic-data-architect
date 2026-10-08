@@ -21,8 +21,8 @@ export interface StageGateSnapshot {
   evidenceIds: string[];
   findingIds: string[];
   discoveryRunCount: number;
-  /** 已经保存过的 Claim 摘要，用于判断本阶段是否只是重复旧结论。 */
-  claimKeys: string[];
+  /** 已经保存过的 Claim 摘要，用于判断本阶段是否只是重复旧结论；旧轨迹没有该字段时按空集合处理。 */
+  claimKeys?: string[];
   scopeValidatedAt?: string;
 }
 
@@ -152,8 +152,9 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     claim.evidenceIds.length > 0
     && claim.evidenceIds.every((id) => knownEvidence.has(id)),
   );
+  const previousClaimKeys = new Set(input.before.claimKeys ?? []);
   const newEvidenceBackedClaims = evidenceBackedClaims.filter(
-    (claim) => !input.before.claimKeys.includes(claimKey(claim)),
+    (claim) => !previousClaimKeys.has(claimKey(claim)),
   );
 
   const newEvidenceIds = newIds(input.before.evidenceIds, input.after.evidenceIds);
