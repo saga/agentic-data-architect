@@ -16,7 +16,7 @@ import {
   type MissionDraft as SharedMissionDraft,
   type WorkflowId as SharedWorkflowId,
 } from '../api/contracts.js';
-import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema, GraphifyRunMetadataSchema } from '../evidence/types.js';
+import { ClaimSchema, DiscoveryRunSchema, EvidenceRefSchema, FindingSchema } from '../evidence/types.js';
 
 /** 任务契约中的单个交付物；用于判断调查是否一直在朝用户最终结果推进。 */
 export const MissionDeliverableSchema = SharedMissionDeliverableSchema;
