@@ -323,6 +323,13 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
   public getIndex(): CodeStructureIndex {
     return this.index;
   }
+
+  /** 从已经生成的快照装载索引；查询阶段不会再次扫描源码。 */
+  public loadIndex(index: CodeStructureIndex): void {
+    this.index = index;
+    this.nodesById.clear();
+    for (const node of index.nodes) this.nodesById.set(node.id, node);
+  }
 }
 
 function dedupeEdges(edges: CodeEdge[]): CodeEdge[] {
