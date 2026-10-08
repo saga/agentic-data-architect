@@ -50,6 +50,22 @@ test('mission gate rejects a persisted contract whose deliverables no longer mat
   assert.ok(result.checks.some((item) => item.name === '交付物与任务契约一致' && !item.passed));
 });
 
+test('mission gate accepts a concrete natural-language purpose without semantic over-review', () => {
+  const purpose = '希望调查当前项目的数据流，弄清数据从哪里来、经过什么处理。';
+  const expectedResult = '形成完整的数据架构报告，包括 Data Source、Data Flow、Data Model 和 Mermaid 图。';
+  const result = evaluateMissionGate({
+    version: 1,
+    purpose,
+    expectedResult,
+    deliverables: inferMissionDeliverables(purpose, expectedResult),
+    status: 'confirmed',
+    confirmedAt: '2026-10-09T00:00:00.000Z',
+    confirmedBy: 'user',
+  });
+
+  assert.equal(result.passed, true);
+});
+
 test('mission gate accepts a confirmed mission with observable deliverables', () => {
   const mission = {
     version: 1 as const,
