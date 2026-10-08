@@ -4,6 +4,11 @@
  * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
+import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { config } from '../config.js';
 import { createLocalDataTools } from './local-data-tools.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import { createRunRecorder, type RunRecorder } from '../investigation/run-recorder.js';
