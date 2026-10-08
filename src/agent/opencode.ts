@@ -697,7 +697,7 @@ async function runOpenCodeCli(
   if (!answer) {
     const fallback = stdoutFallback.trim();
     if (fallback) {
-      return { answer: fallback, sessionId, graphifyUsed, ...(usage ? { usage } : {}), stderr };
+      return { answer: fallback, sessionId, ...(usage ? { usage } : {}), stderr };
     }
     throw new Error('OpenCode 这次没有返回可用结果。' + (stderr.trim() ? ' ' + stderr.trim().slice(0, 1000) : ''));
   }
