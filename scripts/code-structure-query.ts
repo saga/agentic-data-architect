@@ -1,11 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { CodeStructureIndexProvider } from '../src/structure/code-structure-index-provider.js';
-import type { CodeStructureIndex } from '../src/structure/types.js';
+import { CodeStructureDuckDBQuery } from '../src/structure/duckdb-query.js';
+import type { CodeNodeKind, CodeStructureIndex } from '../src/structure/types.js';
 
 const [rootArg = '.', operation = 'find', ...args] = process.argv.slice(2);
 const root = path.resolve(rootArg);
 const indexFile = path.join(root, '.code-structure', 'index.json');
+const databaseFile = path.join(root, '.code-structure', 'structure.duckdb');
 
 let index: CodeStructureIndex;
 try {
@@ -14,22 +16,22 @@ try {
   index = await new CodeStructureIndexProvider(root).build();
 }
 
-const provider = new CodeStructureIndexProvider(root);
-provider.loadIndex(index);
-
-const output = (() => {
+const query = new CodeStructureDuckDBQuery(databaseFile);
+const output = await (async () => {
   switch (operation) {
     case 'find':
-      return provider.find({ text: args[0], kind: args[1] as import('../src/structure/types.js').CodeNodeKind });
+      return query.find({ text: args[0], kind: args[1] as CodeNodeKind });
     case 'callers':
-      return provider.callers(args[0] ?? '');
+      return query.callers(args[0] ?? '');
     case 'callees':
-      return provider.callees(args[0] ?? '');
+      return query.callees(args[0] ?? '');
     case 'trace':
-      return provider.trace(args[0] ?? '', args[1] ?? '', Number(args[2] ?? 8));
+      return query.trace(args[0] ?? '', args[1] ?? '', Number(args[2] ?? 8));
+    case 'summary':
+      return query.summary();
     default:
-      throw new Error('operation must be find|callers|callees|trace');
+      throw new Error('operation must be find|callers|callees|trace|summary');
   }
 })();
-
+void index;
 console.log(JSON.stringify(output, null, 2));
