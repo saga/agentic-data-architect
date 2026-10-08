@@ -6,7 +6,7 @@
  *
  * Gate 的核心原则：
  * 1. 仅凭一段自然语言 answer 永远不能通过；
- * 2. Investigation 必须在本阶段出现真实持久化变化；
+ * 2. 本阶段必须出现真实成果：新增持久化状态，或者基于已有有效 Evidence 形成新的分析结论；
  * 3. Claim 引用的 Evidence 必须真实存在；
  * 4. Gate 结果本身可以序列化到 trajectory，脚本可以重新检查，避免运行时和事后判断不一致。
  */
@@ -104,7 +104,7 @@ function deliverableAdvanced(
 
 /** 从 Investigation 状态提取只读快照；快照用于比较本阶段是否产生了真实持久化变化。 */
 export function snapshotInvestigationForStageGate(
-  investigation: Pick<Investigation, 'evidence' | 'findings' | 'discoveryRuns' | 'scopeValidation'>,
+  investigation: Pick<Investigation, 'evidence' | 'findings' | 'discoveryRuns' | 'claims' | 'scopeValidation'>,
 ): StageGateSnapshot {
   return {
     evidenceIds: investigation.evidence.map((item) => item.id),
