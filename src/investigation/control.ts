@@ -129,6 +129,9 @@ function defaultControl(): Omit<InvestigationControl, 'history'> {
         content: '',
       },
       mcpServers: [],
+      // 能力列表由平台生成，不属于 Task Override；默认配置必须显式带上空快照，
+      // 否则首次创建 Investigation 时会违反 ControlAgentSchema。
+      platformCapabilities: [],
     },
   };
 }
