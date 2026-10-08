@@ -356,9 +356,17 @@ async function buildJourneyFacts(name: string): Promise<JourneyFacts> {
   const assessment = context.workflow === 'data-architecture-assessment'
     ? await loadArchitectureAssessmentPlan(name)
     : null;
+  const missionProgress = await buildMissionProgress(name, context.mission);
+  const missionComplete = Boolean(
+    missionProgress
+    && missionProgress.deliverables
+      .filter((item) => item.required)
+      .every((item) => item.status === 'covered'),
+  );
   return {
     goal: context.goal || context.userPrompt,
     scopeReady: context.scopeValidation?.status === 'validated',
+    missionComplete,
     currentState: snapshot?.currentState
       ? {
           datasets: snapshot.currentState.coverage.datasets,
@@ -1121,6 +1129,20 @@ export async function applyHumanWorkflowTransition(
     if (outcome === 'approved') {
       const route = currentNode.routes.find((item) => item.outcome.toLowerCase() === outcome.toLowerCase());
       if (route) {
+        const targetNode = active.definition.nodes.find((item) => item.id === route.target);
+        if (targetNode?.type === 'end') {
+          const progress = await buildMissionProgress(name, mission);
+          const uncovered = progress?.deliverables.filter(
+            (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+          ) ?? [];
+          if (uncovered.length) {
+            throw new Error(
+              '本次任务还有未完成的结果：'
+              + uncovered.map((item) => item.title).join('、')
+              + '。请先完成这些结果，再结束 Workflow。',
+            );
+          }
+        }
         const missionBoundary = isMissionWorkflowTargetAllowed(
           mission,
           route.target,
