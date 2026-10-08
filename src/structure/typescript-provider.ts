@@ -166,7 +166,7 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
                 kind: 'defines',
                 confidence: 'exact',
                 file: rel,
-                line: symbol.line,
+                line: declarationLine,
               });
             }
             currentOwner = symbol;
