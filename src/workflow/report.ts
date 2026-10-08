@@ -10,7 +10,7 @@ import { assertMissionGate } from './mission-gate.js';
 import { assertInvestigationReportGate } from './report-gate.js';
 import { readModernizationArtifact } from './modernization.js';
 import { computeArtifactProvenance, artifactProvenanceMatches, hashArtifact, isDiscoverySnapshotCompatible } from '../investigation/artifact-provenance.js';
-import { withWorkspaceContextLock, writeJsonAtomic } from '../investigation/workspace.js';
+import { withWorkspaceContextLock, writeJsonAtomic, writeTextAtomic } from '../investigation/workspace.js';
 import { readArchitectureAssessmentArtifact } from './assessment.js';
 import { ReportArtifactStateSchema, ArtifactProvenanceSchema, type ReportArtifactState } from '../api/contracts.js';
 import type { DiscoverySnapshot } from './discover.js';
@@ -325,7 +325,7 @@ export async function runReport(
     // 三个文件是同一份结果的不同层：正文、provenance metadata、review。
     // 单个文件必须原子替换，避免进程中断后留下半份正文/JSON；三文件整体仍不是事务，
     // 所以 readReport 会通过 hash + provenance + review 再次判断是否可以把它当作 current。
-    await fs.writeFile(reportFile(name), prepared.report.markdown + '\n', 'utf8');
+    await writeTextAtomic(reportFile(name), prepared.report.markdown + '\n');
     await writeJsonAtomic(reportMetadataFile(name), metadata);
     await saveArtifactReview(name, review);
   });
