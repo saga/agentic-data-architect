@@ -911,8 +911,10 @@ export async function applyAgentWorkflowTransition(
       const targetNode = active.definition.nodes.find((node) => node.id === route.target);
       if (targetNode?.type === 'end') {
         const progress = await buildMissionProgress(name, mission);
+        // Agent 不能自行把 not_tracked 当成完成；它只能在所有可量化 required deliverable
+        // 都已经由确定性状态标记为 covered 时结束 Workflow。自定义结果需要回到人工确认/其它显式 Gate。
         const uncovered = progress?.deliverables.filter(
-          (item) => item.required && item.status !== 'covered' && item.status !== 'not_tracked',
+          (item) => item.required && item.status !== 'covered',
         ) ?? [];
         if (uncovered.length) {
           throw new Error(
