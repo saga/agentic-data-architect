@@ -118,6 +118,38 @@ test('material-backed scope passes only with known evidence', () => {
 });
 
 
+test('material-backed scope rejects evidence from an older scope generation', () => {
+  const currentValidation = createUserScopeValidation(
+    '替换老的投票工作流',
+    ['Proxy Voting'],
+    ['ISS Portal'],
+  );
+  const investigationWithOldEvidence = investigation({
+    scopeValidation: {
+      ...currentValidation,
+      source: 'materials',
+      userConfirmed: false,
+      evidenceIds: ['ev-old'],
+    },
+    evidence: [{
+      id: 'ev-old',
+      discoveryRunId: 'run-old',
+    }],
+    discoveryRuns: [{
+      id: 'run-old',
+      scopeFingerprint: 'different-scope',
+    }],
+  });
+
+  const result = evaluateInvestigationScopeGate(
+    investigationWithOldEvidence as never,
+    new Set(['ev-old']),
+  );
+
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item) => item.name === '确认来源可以追溯' && !item.passed));
+});
+
 test('explicit current-state-only scope is recognized', () => {
   assert.equal(
     isCurrentStateOnlyScope(
