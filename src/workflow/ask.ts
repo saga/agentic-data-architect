@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { askCopilot, hasActiveCopilotTurn, type AskInput } from '../agent/copilot.js';
-import { askAgentWithFallback } from '../agent/runtime.js';
+import { askAgentWithFallback, clearRuntimeFallbackState } from '../agent/runtime.js';
 import { extractGitHubRepositories, researchGitHubRepository } from '../agent/research-github.js';
 import { computeMissionFingerprint, computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import { buildAssistantAnswerPrompt, buildAssistantCompanionPrompt, buildMissionContractPrompt, buildQuestionPrompt, LEAD_SYSTEM_PROMPT } from '../agent/prompts.js';
@@ -778,6 +778,8 @@ export async function answerQuestion(
             unknownReviews: missionUnknownReviews ?? undefined,
             model: control.agent.model,
             workingDirectory: workspaceRoot(inv.name),
+            investigationName,
+            turnId,
             onTrajectory: recordTrajectory,
           });
           recordTrajectory({
