@@ -91,6 +91,37 @@ test('Agent completion still uses deterministic facts when completeWhen exists',
   assert.equal(isAgentWorkflowCompletionAllowed(node, { ...baseFacts, scopeReady: true }, false), true);
 });
 
+test('deterministic completion cannot jump to @end before Mission completion', () => {
+  const result = parseJourneyMarkdown([
+    '## @flow demo',
+    'start -> intake',
+    '',
+    '## @task intake',
+    'completeWhen: goal',
+    '- success -> done',
+    '',
+    '## @end done',
+  ].join('\\n'));
+
+  assert.ok(result.definition);
+  const incomplete = buildJourneyState(
+    result.definition!,
+    { ...baseFacts, missionComplete: false },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(incomplete.execution.currentNodeId, 'intake');
+  assert.deepEqual(incomplete.execution.completedNodeIds, []);
+
+  const complete = buildJourneyState(
+    result.definition!,
+    { ...baseFacts, missionComplete: true },
+    initialJourneyExecution(result.definition!),
+  );
+  assert.equal(complete.execution.currentNodeId, 'done');
+  assert.deepEqual(complete.execution.completedNodeIds, ['intake']);
+  assert.equal(complete.execution.status, 'completed');
+});
+
 test('deterministic retry self-loop does not mark the node completed', () => {
   const result = parseJourneyMarkdown([
     '## @flow demo',
