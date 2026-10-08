@@ -808,7 +808,9 @@ export async function jevSmartFunc(
     prompt,
     systemPrompt,
     purpose: 'review',
-    model: input.model ?? config.model,
+    // Smart Function 是高频、短、结构化判断；固定使用轻量模型，避免消耗主调查模型。
+    // input.model 保留在类型上用于兼容旧调用方，但 Jev 的模型策略不由调用方覆盖。
+    model: config.simpleModel,
     ...(input.modelCallName ? { modelCallName: input.modelCallName } : {}),
     workingDirectory: input.workingDirectory ?? config.workspaceDir,
     ...(input.onTrajectory ? { onTrajectory: input.onTrajectory } : {}),
