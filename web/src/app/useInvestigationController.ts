@@ -151,6 +151,7 @@ export function useInvestigationController() {
   const [streamingAnswer, setStreamingAnswer] = useState<{ key: string; content: string }>();
   const [nextGuidance, setNextGuidance] = useState<string[]>([]);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [newSessionCreating, setNewSessionCreating] = useState(false);
   const NEW_SESSION_GOAL_SAMPLE = '研究现有项目的数据架构设计，调查data model，data source，vendor input方式，重要的数据转换逻辑';
   const NEW_SESSION_EXPECTED_RESULT_SAMPLE = '生成一份深入浅出，详细的分析报告，分析报告应该包含mermaid形式的架构图、数据流图等等';
   const [newSessionName, setNewSessionName] = useState('');
@@ -1072,11 +1073,12 @@ export function useInvestigationController() {
 
   const createSession = async () => {
     const name = newSessionName.trim();
-    if (!name) return;
+    if (!name || newSessionCreating) return;
     // 防止上一次创建失败留下的临时启动状态污染下一次新建调查。
     pendingInitialMissionDraftRef.current = undefined;
     pendingInitialAutoStartRef.current = undefined;
     pendingInitialMissionErrorRef.current = undefined;
+    setNewSessionCreating(true);
     try {
       const purpose = newSessionGoal.trim();
       const expectedResult = newSessionExpectedResult.trim();
@@ -1144,6 +1146,10 @@ export function useInvestigationController() {
       pendingInitialAutoStartRef.current = undefined;
       pendingInitialMissionErrorRef.current = undefined;
       setError(e instanceof Error ? e.message : '无法创建调查');
+    } finally {
+      // 必须在所有异步步骤（尤其 Mission clarity review）结束后才允许再次点击“确定”。
+      // 否则一次快速双击会创建两个并行 review，并把同一个 Investigation 推进两遍。
+      setNewSessionCreating(false);
     }
   };
 
@@ -1213,6 +1219,7 @@ export function useInvestigationController() {
     streamingAnswer,
     nextGuidance,
     newSessionOpen,
+    newSessionCreating,
     newSessionName,
     newSessionRuntime,
     newSessionWorkflow,
