@@ -27,7 +27,8 @@
     "gate:mission": "tsx scripts/investigation-mission-gate.ts",
     "predev": "node scripts/ensure-opencode.mjs",
     "prestart": "node scripts/ensure-opencode.mjs",
-    "structure:index": "tsx scripts/code-structure-index.ts"
+    "structure:index": "tsx scripts/code-structure-index.ts",
+    "structure:query": "tsx scripts/code-structure-query.ts"
   },
   "dependencies": {
     "@ant-design/x": "^2.9.0",
