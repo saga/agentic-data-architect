@@ -21,7 +21,7 @@ metadata:
 - Web Search 是调查动作，不是独立阶段。没有本地证据时可以主动去 GitHub、Confluence、Web 或问业务人员。
 - Agent 的“我已经完成了”不是通关依据。关键阶段必须先产生持久化工作成果，再通过服务端的确定性 Script Gate。
 - 目标架构、新旧对应、验证结果都会保存到 `reports/modernization-plan.json`，结果页直接展示这些内容。
-- Gate 检查已经落盘的成果、真实 Evidence、Mapping 完整性和 Validation 实际结果；单独返回 `workflow.success` 永远不能完成这些阶段。
+- Gate 检查已经落盘的成果、真实 Evidence、Mapping 完整性和 Validation 实际结果；未直接 Mapping 的来源只要有明确的 excluded / deprecated / obsolete / out-of-scope / requires-review 处置，就不视为遗漏；单独返回 `workflow.success` 永远不能完成这些阶段。
 - 出现新证据后可以回到前面的关卡重新调查。
 - “查关键问题”不是固定阶段。调查中的 unknown 只是当前不知道的内容，不自动变成必须解决的问题；是否继续深挖由用户目标、当前成果覆盖面和确定性 Gate 决定。
 
@@ -165,7 +165,7 @@ objective: 把旧数据对应到新数据，并把 transformation、business rul
 - evidence
 - 当前状态
 
-遇到不能自动确定的映射，先保留为未解决项；只有它会影响本次 Mission 的交付时，才回到当前架构调查继续查清，而不是猜。
+遇到不能自动确定的映射，先保留为未解决项；只有它会影响本次 Mission 的交付时，才回到当前架构调查继续查清，而不是猜。对明确不迁移的来源，必须记录处置和原因，而不是简单留在 unmapped。
 
 - success -> validation
 
