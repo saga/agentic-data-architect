@@ -530,13 +530,16 @@ export function validateJourneyDefinition(definition: JourneyDefinition): string
 export function initialJourneyExecution(
   definition: JourneyDefinition,
   workflowVersion = 0,
+  runIdOverride?: string,
 ): JourneyExecution {
+  // runId 是“一次执行实例”的 identity，不是 Workflow version 的别名。
+  // reset 可以回到同一个 base version，因此这里允许显式注入新的 runId，避免旧历史和新一轮执行混在一起。
   const startNode = definition.nodes.find((node) => node.id === definition.start);
   const waitingForHuman = startNode?.actor === 'human';
   return {
     workflowId: definition.id,
     workflowVersion,
-    runId: definition.id + '-v' + String(workflowVersion),
+    runId: runIdOverride?.trim() || definition.id + '-v' + String(workflowVersion),
     currentNodeId: definition.start,
     completedNodeIds: [],
     status: waitingForHuman ? 'waiting' : 'active',
@@ -631,12 +634,18 @@ function advanceDeterministicJourney(
   let currentNodeId = execution.currentNodeId;
   let status = execution.status;
   let pendingInteraction = execution.pendingInteraction;
+  const visited = new Set<string>();
 
   if (status === 'waiting') {
     return execution;
   }
 
   for (let guard = 0; guard < definition.nodes.length + 1; guard += 1) {
+    // 自定义 Workflow 可以合法存在环，但 deterministic auto-advance 不能在一个 snapshot
+    // 内沿着环无限循环。visited 是本次计算的局部保护，不会把一个正常的 retry loop 永久判成非法。
+    if (visited.has(currentNodeId)) break;
+    visited.add(currentNodeId);
+
     const node = definition.nodes.find((item) => item.id === currentNodeId);
     if (!node) break;
     if (node.type === 'end') {
@@ -660,7 +669,7 @@ function advanceDeterministicJourney(
     const route = node.routes[0];
 
     // 只有真正走出当前节点才算完成；自环通常表示 retry/重新处理，不应把当前节点标成 completed。
-    if (!route || route.target === node.id) break;
+    if (!route || route.target === node.id || visited.has(route.target)) break;
 
     // @end 是最终业务状态，不只是图上的终点。即使 completeWhen 已满足，
     // 也不能绕过 Mission Completion；否则一个局部事实刚满足，就可能把整个 Investigation
