@@ -252,7 +252,8 @@ export function useInvestigationController() {
     if (requestId !== loadRequestRef.current || key !== activeRef.current) return;
 
     setCurrent((existing) => {
-      const pending = pendingOutgoingMessagesRef.current[key];
+      const pendingByTurn = pendingOutgoingMessagesRef.current[key] ?? {};
+      const pendingMessages = Object.values(pendingByTurn);
       const serverMessages = result.messages;
       const serverIds = new Set(serverMessages.map((message) => message.id));
       for (const pending of pendingMessages) {
