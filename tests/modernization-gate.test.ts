@@ -40,7 +40,7 @@ function plan(overrides: Partial<ModernizationPlan> = {}): ModernizationPlan {
       ],
       cutoverCriteria: ['关键业务指标一致'], rollbackCriteria: ['关键指标持续偏差'],
     },
-    mappingCoverage: { sourceAssets: ['legacy_position'], unmappedAssets: [] },
+    mappingCoverage: { sourceAssets: ['legacy_position'], unmappedAssets: [], unmappedAssetDispositions: [] },
     evidenceIds: ['ev-1'],
     ...overrides,
   };
