@@ -14,10 +14,9 @@ import { discoverDatabase } from '../discovery/database.js';
 import { loadInvestigation, saveDiscoverySnapshot, saveInvestigation } from '../investigation/store.js';
 import { appendContextInput, discoveryDir, redactSensitiveUri } from '../investigation/workspace.js';
 import { emptyEstate, nextEstateId, nodeId, type DataEstate } from '../model/estate.js';
-import { nextId, type DiscoveryRun, type EvidenceRef, type GraphifyRunMetadata } from '../evidence/types.js';
+import { nextId, type DiscoveryRun, type EvidenceRef } from '../evidence/types.js';
 import type { DataProfile } from '../adapters/database.js';
 import type { SemanticAsset } from '../semantic/types.js';
-import { ensureGraphifyGraph } from '../adapters/graphify.js';
 import { assertMissionGate } from './mission-gate.js';
 import { computeScopeFingerprint } from '../investigation/artifact-provenance.js';
 import type { DiscoveryGeneration } from '../investigation/discovery-snapshot-schema.js';
@@ -126,10 +125,7 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
   const semanticAssets: SemanticAsset[] = [];
   const unknowns: string[] = [];
 
-  let graphify: GraphifyRunMetadata | undefined;
-
   if (opts.path && inventory) {
-    // Source-file Evidence 建立 Graphify → source provenance 的桥：Graphify 只负责定位候选文件。
     const sourceEvidence: EvidenceRef[] = inventory.files.map((file) => ({
       id: nextId('ev'),
       type: 'source_file',
@@ -142,9 +138,6 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
       collectedAt: new Date().toISOString(),
     }));
     inv.evidence.push(...sourceEvidence);
-    // Discovery 不再只记录 Graphify 是否安装；它必须先生成/刷新当前 structural graph，
-    // 后续 Agent 查询到的关系才和这次 Discovery 的源码快照一致。
-    graphify = await ensureGraphifyGraph(opts.path, true);
     unknowns.push(...inventory.unknowns);
     lineage = await buildLineage(
       inventory.files
@@ -192,7 +185,6 @@ export async function runDiscovery(name: string, opts: DiscoverOptions): Promise
     lineageEdgesFound: lineage?.edges.length ?? 0,
     sqlParseFailures: lineage?.parseFailures.length ?? 0,
     semanticAssetsFound: semanticAssets.length,
-    ...(graphify ? { graphify } : {}),
   };
   inv.discoveryRuns.push(run);
 
