@@ -290,10 +290,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
   // introduce genuinely different agent roles.
   // 用户显式配置的 MCP 优先，避免内置 capability 覆盖用户自己的同名设置。
   const disabledWorkflowSkills = WORKFLOW_SKILL_NAMES.filter((name) => name !== input.workflowSkill);
-  const mcpServers = {
-    ...(graphifyMcp ? { [graphifyMcp.name]: graphifyMcp.server } : {}),
-    ...(input.mcpServers ?? {}),
-  };
+  const mcpServers = { ...(input.mcpServers ?? {}) };
   // SDK 自己的 wait timeout 只做极长的 transport-level 兜底；业务 timeout 由下面独立 watchdog 管理。
   const SDK_WAIT_GUARD_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
@@ -641,20 +638,6 @@ export async function askCopilot(input: AskInput): Promise<string> {
       },
     });
   });
-  if (graphifyRuntime) {
-    input.onTrajectory?.({
-      type: 'status',
-      name: 'Graphify 结构图已准备好',
-      status: 'completed',
-      details: {
-        capability: GRAPHIFY_MCP_NAME,
-        graphPath: graphifyRuntime.graphPath,
-        ...(graphifyRuntime.packageVersion ? { packageVersion: graphifyRuntime.packageVersion } : {}),
-        ...(graphifyRuntime.graphHash ? { graphHash: graphifyRuntime.graphHash } : {}),
-      },
-    });
-    input.onStatus?.('代码结构已经准备好；需要看调用关系时，助手会先使用 Graphify。');
-  }
   const offToolStart = session.on('tool.execution_start', (e) => {
     const toolName = typeof e.data.toolName === 'string' ? e.data.toolName.trim() : '';
     const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : toolName;
@@ -662,17 +645,7 @@ export async function askCopilot(input: AskInput): Promise<string> {
     toolCallCount += 1;
     trajectoryToolStarts.set(toolCallId, { startedAt, name: toolName || '工具调用' });
     markActivity('tool_call', '正在调用工具 ' + (toolName || '工具'));
-    const graphifyToolCall = isGraphifyTool({
-      toolName,
-      mcpServerName: e.data.mcpServerName,
-      mcpToolName: e.data.mcpToolName,
-    });
-    if (graphifyToolCall) graphifyUsedExecution = currentExecution;
-    input.onStatus?.(
-      graphifyToolCall
-        ? '助手正在用 Graphify 查看代码结构，请稍候…'
-        : toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…',
-    );
+    input.onStatus?.(toolName ? `助手正在使用工具 ${toolName}，请稍候…` : '助手正在处理相关资料，请稍候…');
     void runRecorder?.write('tool_call', {
       toolCallId,
       toolName,
