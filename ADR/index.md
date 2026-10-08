@@ -14,7 +14,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-004](./004-local-data-storage-boundaries.md) | SQLite、DuckDB、Parquet、Filesystem 各自承担明确职责 | Superseded |
 | [ADR-005](./005-workflow-and-skill-separation.md) | Workflow、Skill、Tool、Agent、Human 分工明确；Workflow 保存/transition 由服务端验证，DSL 保持最小 | Accepted |
 | [ADR-006](./006-provider-neutral-semantic-context.md) | Semantic Context 采用 provider-neutral 核心模型 | Accepted |
-| [ADR-007](./007-structural-analysis-boundary.md) | Graphify 用于 structural navigation，不直接作为业务事实来源 | Accepted |
+| [ADR-007](./007-structural-analysis-boundary.md) | Graphify structural-analysis 历史决定 | Superseded |
 | [ADR-008](./008-lightweight-modernization-workbench.md) | Modernization work products 保持轻量；artifact validation、semantic review 和 human approval 分层 | Accepted |
 | [ADR-009](./009-app-shell-and-ui-state-separation.md) | 前端 App 只负责装配；Journey/Workflow runtime state 由服务端拥有 | Accepted |
 | [ADR-010](./010-independent-artifact-review.md) | AI 工作成果增加独立语义质量审核；Reviewer 不替代 Evidence Gate 或人工批准 | Accepted |
