@@ -185,6 +185,9 @@ export function useInvestigationController() {
     try { return localStorage.getItem('ada.tip.left') !== 'dismissed'; } catch { return true; }
   });
   const activeRef = useRef<string | undefined>(undefined);
+  // React state 更新在下一次 render 才可见；仅靠 newSessionCreating state 防不住同一事件循环内的快速双击。
+  // 这个 ref 是即时互斥锁，保证一次“确定”只会进入一条创建链。
+  const newSessionCreatingRef = useRef(false);
   const loadRequestRef = useRef(0);
   /** 新建调查时临时保存用户已经写好的 Mission 草稿，等 Session 加载完成后交给 Mission 确认窗口。 */
   const pendingInitialMissionDraftRef = useRef<MissionDraft | undefined>(undefined);
@@ -1073,7 +1076,8 @@ export function useInvestigationController() {
 
   const createSession = async () => {
     const name = newSessionName.trim();
-    if (!name || newSessionCreating) return;
+    if (!name || newSessionCreatingRef.current || newSessionCreating) return;
+    newSessionCreatingRef.current = true;
     // 防止上一次创建失败留下的临时启动状态污染下一次新建调查。
     pendingInitialMissionDraftRef.current = undefined;
     pendingInitialAutoStartRef.current = undefined;
@@ -1149,6 +1153,7 @@ export function useInvestigationController() {
     } finally {
       // 必须在所有异步步骤（尤其 Mission clarity review）结束后才允许再次点击“确定”。
       // 否则一次快速双击会创建两个并行 review，并把同一个 Investigation 推进两遍。
+      newSessionCreatingRef.current = false;
       setNewSessionCreating(false);
     }
   };
