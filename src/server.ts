@@ -852,6 +852,19 @@ app.post('/api/sessions', async (req, res) => {
   /** 保存工作地图；服务端先做完整结构检查，通过后才创建新版本。 */
   app.put('/api/sessions/:name/workflow', async (req, res) => {
     const name = sessionKey(req.params.name);
+    // Workflow Definition/Execution 是同一状态机的控制面；Agent 正在跑时允许保存新图，
+    // 会让正在执行的旧 turn 与新 version 同时存在，旧结果还有可能写回新图。
+    // 因此这里像 Mission 修改一样，在入口直接阻止并发变更。
+    const activeTurn = getActiveInvestigationTurn(name);
+    if (activeTurn) {
+      res.status(409).json(ApiErrorSchema.parse({
+        code: 'WORKFLOW_CHANGE_BLOCKED',
+        error: '本次调查正在执行，工作方式暂时不能修改。请先停止当前执行，再保存新的工作地图。',
+        details: { execution: activeTurn },
+      }));
+      return;
+    }
+
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
       res.status(409).json(ApiErrorSchema.parse({
@@ -949,6 +962,16 @@ app.post('/api/sessions', async (req, res) => {
   /** 删除当前 Investigation 的自定义地图，恢复所选工作方式的内置路线。 */
   app.post('/api/sessions/:name/workflow/reset', async (req, res) => {
     const name = sessionKey(req.params.name);
+    const activeTurn = getActiveInvestigationTurn(name);
+    if (activeTurn) {
+      res.status(409).json(ApiErrorSchema.parse({
+        code: 'WORKFLOW_CHANGE_BLOCKED',
+        error: '本次调查正在执行，工作地图不能重置。请先停止当前执行，再重置工作地图。',
+        details: { execution: activeTurn },
+      }));
+      return;
+    }
+
     const context = await loadWorkspaceContext(name);
     if (!context.workflow) {
       res.status(409).json(ApiErrorSchema.parse({
