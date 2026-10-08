@@ -14,6 +14,8 @@
  * OpenCode 只负责本轮 Agent 执行；Investigation 的 Mission、Evidence、Conversation、
  * Stage Gate 等业务状态仍然由本项目自己管理。
  */
+import { spawn } from 'node:child_process';
+import { config } from '../config.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { appendAuditEvent } from '../investigation/control.js';
