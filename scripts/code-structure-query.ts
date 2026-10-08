@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { TypeScriptCodeStructureProvider } from '../src/structure/typescript-provider.js';
+import { CodeStructureIndexProvider } from '../src/structure/code-structure-index-provider.js';
 import type { CodeStructureIndex } from '../src/structure/types.js';
 
 const [rootArg = '.', operation = 'find', ...args] = process.argv.slice(2);
@@ -11,16 +11,16 @@ let index: CodeStructureIndex;
 try {
   index = JSON.parse(await fs.readFile(indexFile, 'utf8')) as CodeStructureIndex;
 } catch {
-  index = await new TypeScriptCodeStructureProvider(root).build();
+  index = await new CodeStructureIndexProvider(root).build();
 }
 
-const provider = new TypeScriptCodeStructureProvider(root);
+const provider = new CodeStructureIndexProvider(root);
 provider.loadIndex(index);
 
 const output = (() => {
   switch (operation) {
     case 'find':
-      return provider.find({ text: args[0], kind: args[1] as never });
+      return provider.find({ text: args[0], kind: args[1] as import('../src/structure/types.js').CodeNodeKind });
     case 'callers':
       return provider.callers(args[0] ?? '');
     case 'callees':
