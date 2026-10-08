@@ -167,7 +167,7 @@ test('Stage Gate rejects a checkpoint when current scope has not been validated'
   assert.ok(result.checks.some((item) => item.name === '正式范围已经确认' && !item.passed));
 });
 
-test('Stage Gate rejects real but Mission-unrelated work when Smart Alignment says it is unrelated', () => {
+test('Stage Gate does not block real work when Smart Alignment says it is unrelated', () => {
   const result = evaluateInvestigationStageGate(input({
     missionAlignment: {
       aligned: false,
@@ -178,8 +178,8 @@ test('Stage Gate rejects real but Mission-unrelated work when Smart Alignment sa
     },
   }));
 
-  assert.equal(result.passed, false);
-  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && !item.passed));
+  assert.equal(result.passed, true);
+  assert.ok(result.checks.some((item) => item.name === '阶段成果与 Mission 对齐' && item.passed));
 });
 
 test('Stage Gate uses deterministic open deliverables before Smart continuation advice', () => {

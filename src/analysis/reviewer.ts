@@ -170,7 +170,9 @@ async function runReviewerOnce(
   }
 
   const hasHigh = parsed.issues.some((issue) => issue.severity === 'high');
-  const normalizedStatus = !hasHigh && parsed.status === 'pass' && parsed.score >= 75 ? 'pass' : 'fail';
+  // Score is a quality signal only; the prompt defines pass/fail by status and severity.
+  // Do not turn an arbitrary model score into another hard gate.
+  const normalizedStatus = !hasHigh && parsed.status === 'pass' ? 'pass' : 'fail';
   return {
     ...parsed,
     ...(input.artifactHash ? { artifactHash: input.artifactHash } : {}),

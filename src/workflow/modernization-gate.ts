@@ -87,10 +87,16 @@ export function evaluateModernizationGate(
 
   if (stage === 'mapping') {
     const coverage = plan.mappingCoverage;
+    const unmappedAssets = new Set(coverage?.unmappedAssets ?? []);
+    const mappedSourceCount = coverage
+      ? coverage.sourceAssets.filter((asset) => !unmappedAssets.has(asset)).length
+      : 0;
     add(
-      '新旧对应有实际记录',
-      plan.mappings.length > 0,
-      'mappings=' + String(plan.mappings.length),
+      '需要迁移的来源已经有对应记录',
+      mappedSourceCount === 0 || plan.mappings.length > 0,
+      mappedSourceCount === 0
+        ? '所有范围内来源都已经明确为不迁移，无需建立 Mapping。'
+        : '需要建立对应关系的来源=' + String(mappedSourceCount) + '，Mapping=' + String(plan.mappings.length),
     );
     add(
       'Mapping 覆盖范围已经明确且未对应来源都有处置',

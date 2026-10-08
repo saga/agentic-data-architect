@@ -74,7 +74,7 @@ const MISSION_PLACEHOLDERS = [
  */
 export function isMissionTextMeaningful(text: string): boolean {
   const value = text.trim().replace(/[：:，,。.!！?？\s]+$/g, '');
-  if (value.length < 10) return false;
+  if (value.length < 4) return false;
   const normalized = value.toLowerCase();
   return !MISSION_PLACEHOLDERS.some(
     (placeholder) =>
@@ -260,11 +260,6 @@ export function evaluateMissionGate(mission: MissionContract | undefined): Missi
 
   const meaningfulPurpose = isMissionTextMeaningful(mission?.purpose ?? '');
   const meaningfulExpectedResult = isMissionTextMeaningful(mission?.expectedResult ?? '');
-  const inferredDeliverables = mission
-    ? inferMissionDeliverables(mission.purpose, mission.expectedResult).map((item) => item.id)
-    : [];
-  const persistedDeliverables = mission?.deliverables.map((item) => item.id) ?? [];
-
   add(
     '任务目的明确',
     meaningfulPurpose,
@@ -279,25 +274,14 @@ export function evaluateMissionGate(mission: MissionContract | undefined): Missi
       ? '已经记录一个可以判断交付结果的期望结果。'
       : '期望结果为空、过于简短或仍然是占位话术。',
   );
+  const persistedDeliverables = mission?.deliverables ?? [];
+
   add(
-    '交付物已拆分',
-    Boolean(mission?.deliverables.length),
-    mission?.deliverables.length
-      ? '已经拆成 ' + String(mission.deliverables.length) + ' 项交付物。'
+    '交付物已记录',
+    persistedDeliverables.length > 0,
+    persistedDeliverables.length
+      ? '已经记录 ' + String(persistedDeliverables.length) + ' 项用户确认的交付物。'
       : '还没有可观察的交付物。',
-  );
-  add(
-    '交付物与任务契约一致',
-    Boolean(mission)
-      && persistedDeliverables.length > 0
-      && persistedDeliverables.length === inferredDeliverables.length
-      && persistedDeliverables.every((id, index) => id === inferredDeliverables[index]),
-    Boolean(mission)
-      && persistedDeliverables.length > 0
-      && persistedDeliverables.length === inferredDeliverables.length
-      && persistedDeliverables.every((id, index) => id === inferredDeliverables[index])
-      ? '交付物与当前任务目的和期望结果一致。'
-      : '交付物和当前任务契约不一致，需要重新确认。',
   );
   add(
     '已由用户确认',
@@ -327,7 +311,7 @@ export function assertMissionGate(mission: MissionContract | undefined): Mission
 export function formatMissionGateFailure(result: MissionGateResult): string {
   const purposeMissing = result.checks.some((item) => item.name === '任务目的明确' && !item.passed);
   const expectedMissing = result.checks.some((item) => item.name === '期望结果明确' && !item.passed);
-  const deliverablesMismatch = result.checks.some((item) => item.name === '交付物与任务契约一致' && !item.passed);
+  const deliverablesMissing = result.checks.some((item) => item.name === '交付物已记录' && !item.passed);
 
   if (purposeMissing && expectedMissing) {
     return '开始调查前，需要先确认两件事：为什么要做这次调查，以及最后希望拿到什么结果。';
@@ -338,8 +322,8 @@ export function formatMissionGateFailure(result: MissionGateResult): string {
   if (expectedMissing) {
     return '开始调查前，还需要确认最后希望拿到什么结果。';
   }
-  if (deliverablesMismatch) {
-    return '这次任务的交付内容和目的/期望结果没有对齐，请重新确认任务契约。';
+  if (deliverablesMissing) {
+    return '开始调查前，还需要明确这次最终要交付什么。';
   }
   return '开始调查前，请先确认这次任务的目的和期望结果。';
 }

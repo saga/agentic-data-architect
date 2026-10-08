@@ -217,15 +217,11 @@ export function evaluateInvestigationStageGate(input: StageGateInput): StageGate
     input.parsed.answer.trim() ? '已有本阶段回答。' : '本阶段没有可保存的回答。',
   );
 
-  const missionAlignmentPassed =
-    input.missionAlignment === null
-      || input.missionAlignment === undefined
-      || input.missionAlignment.aligned === true;
   add(
     '阶段成果与 Mission 对齐',
-    missionAlignmentPassed,
+    true,
     input.missionAlignment
-      ? input.missionAlignment.reason
+      ? input.missionAlignment.reason + '（仅作为参考，不阻止阶段成果保存。）'
       : 'Mission Alignment 暂时不可用；改由确定性的 Evidence / Claim 检查判断。',
   );
 

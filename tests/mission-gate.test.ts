@@ -28,7 +28,7 @@ test('mission gate rejects vague confirmed text instead of trusting confirmation
   assert.match(formatMissionGateFailure(result), /为什么要做这次调查/);
 });
 
-test('mission gate rejects a persisted contract whose deliverables no longer match its text', () => {
+test('mission gate accepts user-confirmed deliverables without re-inferring them from text', () => {
   const purpose = '理解某大型企业老系统当前的数据架构，为 replatform 提供依据。';
   const expectedResult = '拿到当前 Data Source、Data Flow、Data Model。';
   const result = evaluateMissionGate({
@@ -46,8 +46,27 @@ test('mission gate rejects a persisted contract whose deliverables no longer mat
     confirmedBy: 'user',
   });
 
-  assert.equal(result.passed, false);
-  assert.ok(result.checks.some((item) => item.name === '交付物与任务契约一致' && !item.passed));
+  assert.equal(result.passed, true);
+  assert.ok(result.checks.some((item) => item.name === '交付物已记录' && item.passed));
+});
+
+test('mission gate accepts concise concrete mission text', () => {
+  const result = evaluateMissionGate({
+    version: 1,
+    purpose: '分析 IBM',
+    expectedResult: '当前架构说明',
+    deliverables: [{
+      id: 'current-state-architecture',
+      title: '当前架构',
+      description: '梳理当前系统的数据架构、主要组件、数据关系和依赖。',
+      required: true,
+    }],
+    status: 'confirmed',
+    confirmedAt: '2026-10-05T00:00:00.000Z',
+    confirmedBy: 'user',
+  });
+
+  assert.equal(result.passed, true);
 });
 
 test('mission gate accepts a concrete natural-language purpose without semantic over-review', () => {

@@ -155,15 +155,8 @@ objective: 在旧系统已经说清楚以后，确定新的数据怎么接、怎
 title: 新旧对应
 objective: 把旧数据对应到新数据，并把 transformation、business rule、validation rule 写清楚。
 
-每条 mapping 至少说明：
-
-- source
-- target
-- transformation
-- business rule
-- validation
-- evidence
-- 当前状态
+每条 mapping 先至少记录 source、target 和当前状态；proposed 表示仍在整理中的对应关系，可以暂时缺少 transformation、business rule、validation 或 evidence。
+进入 reviewed / approved 前，再把 transformation、business rule、validation 和 evidence 补齐并核实。
 
 遇到不能自动确定的映射，先保留为未解决项；只有它会影响本次 Mission 的交付时，才回到当前架构调查继续查清，而不是猜。对明确不迁移的来源，必须记录处置和原因，而不是简单留在 unmapped。
 

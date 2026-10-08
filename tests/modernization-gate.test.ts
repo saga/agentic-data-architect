@@ -68,6 +68,43 @@ test('mapping gate requires explicit disposition for intentionally unmapped asse
   assert.equal(passed.passed, true);
 });
 
+test('mapping gate allows a mapping stage with no mappings when every source is explicitly excluded', () => {
+  const value = plan({
+    mappings: [],
+    mappingCoverage: {
+      sourceAssets: ['legacy_position', 'legacy_account'],
+      unmappedAssets: ['legacy_position', 'legacy_account'],
+      unmappedAssetDispositions: [
+        { asset: 'legacy_position', disposition: 'obsolete', reason: '旧表已确认废弃。' },
+        { asset: 'legacy_account', disposition: 'out-of-scope', reason: '本次改造明确不包含该来源。' },
+      ],
+    },
+  });
+  const result = evaluateModernizationGate(value, new Set(['ev-1']), 'mapping', '/tmp/modernization-plan.json');
+  assert.equal(result.passed, true);
+});
+
+test('mapping gate allows proposed draft mappings to remain incomplete', () => {
+  const proposed = plan({
+    mappings: [{
+      ...plan().mappings[0],
+      status: 'proposed',
+      evidenceIds: [],
+      transformation: undefined,
+      businessRule: undefined,
+      validationRule: undefined,
+    }],
+  });
+  const result = evaluateModernizationGate(
+    proposed,
+    new Set(['ev-1']),
+    'mapping',
+    '/tmp/modernization-plan.json',
+  );
+
+  assert.equal(result.passed, true);
+});
+
 test('validation gate rejects ready-only checks and passes only persisted results', () => {
   const notExecuted = plan({
     validationPlan: {
