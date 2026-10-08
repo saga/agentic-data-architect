@@ -351,7 +351,9 @@ async function buildModernizationPlanFromSource(
   const dir = reportsDir(name);
   await fs.mkdir(dir, { recursive: true });
   const fp = path.join(dir, 'modernization-plan.json');
-  await fs.writeFile(fp, JSON.stringify(plan, null, 2), 'utf-8');
+  // Modernization Plan 是正式工作成果；使用原子写入，避免进程中断后留下半份 JSON，
+  // 下一次读取时把一次瞬时 I/O 故障误判成数据结构损坏。
+  await writeJsonAtomic(fp, plan);
   return { plan, path: fp };
 }
 
