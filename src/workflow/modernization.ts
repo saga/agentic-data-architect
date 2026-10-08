@@ -35,6 +35,11 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/** 比较结构化工作成果是否真的发生变化；排除 version / timestamp 这类每次保存都会变化的运行元数据。 */
+function sameWorkValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 /** 把真正迁移前要检查的事情列出来，避免到了最后才发现没法验证。 */
 function buildValidationPlan(
   current: DiscoverySnapshot['currentState'] | null,
@@ -395,7 +400,7 @@ export async function persistModernizationAgentResult(
         ...(input.evidenceIds ?? []).filter((id) => knownEvidence.has(id)),
       ])];
 
-      targetArchitecture = ModernizationPlanSchema.shape.targetArchitecture.parse({
+      const nextTargetArchitecture = ModernizationPlanSchema.shape.targetArchitecture.parse({
         ...targetArchitecture,
         title: input.title ?? targetArchitecture.title,
         status: input.status === 'approved'
@@ -408,7 +413,10 @@ export async function persistModernizationAgentResult(
         components: input.components ?? targetArchitecture.components,
         openQuestions: input.openQuestions ?? targetArchitecture.openQuestions,
       });
-      changedSections.push('targetArchitecture');
+      const comparableCurrent = { ...targetArchitecture, version: 0, updatedAt: '' };
+      const comparableNext = { ...nextTargetArchitecture, version: 0, updatedAt: '' };
+      targetArchitecture = nextTargetArchitecture;
+      if (!sameWorkValue(comparableCurrent, comparableNext)) changedSections.push('targetArchitecture');
     }
 
     let mappings = plan.mappings;
@@ -460,8 +468,18 @@ export async function persistModernizationAgentResult(
         byId.set(mapping.id, mapping);
       }
 
+      const previousMappings = plan.mappings.map((mapping) => ({
+        ...mapping,
+        version: 0,
+        updatedAt: '',
+      }));
+      const nextMappings = [...byId.values()].map((mapping) => ({
+        ...mapping,
+        version: 0,
+        updatedAt: '',
+      }));
       mappings = [...byId.values()];
-      changedSections.push('mappings');
+      if (!sameWorkValue(previousMappings, nextMappings)) changedSections.push('mappings');
     }
 
     const mappingCoverage = result.mappingCoverage
@@ -470,6 +488,9 @@ export async function persistModernizationAgentResult(
           unmappedAssets: [...new Set(result.mappingCoverage.unmappedAssets)],
         }
       : plan.mappingCoverage;
+    if (!sameWorkValue(plan.mappingCoverage ?? null, mappingCoverage ?? null)) {
+      changedSections.push('mappingCoverage');
+    }
 
     let validationPlan = plan.validationPlan;
     if (result.validation) {
@@ -502,7 +523,7 @@ export async function persistModernizationAgentResult(
         checksById.set(check.id, check);
       }
 
-      validationPlan = ValidationPlanSchema.parse({
+      const nextValidationPlan = ValidationPlanSchema.parse({
         ...validationPlan,
         status: 'in_review',
         version: validationPlan.version + 1,
@@ -515,7 +536,10 @@ export async function persistModernizationAgentResult(
           ? { rollbackCriteria: result.validation.rollbackCriteria }
           : {}),
       });
-      changedSections.push('validationPlan');
+      const comparableCurrent = { ...validationPlan, version: 0, updatedAt: '' };
+      const comparableNext = { ...nextValidationPlan, version: 0, updatedAt: '' };
+      validationPlan = nextValidationPlan;
+      if (!sameWorkValue(comparableCurrent, comparableNext)) changedSections.push('validationPlan');
     }
 
     const nextVersion = plan.version + 1;
