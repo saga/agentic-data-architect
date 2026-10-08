@@ -748,6 +748,12 @@ export function useInvestigationController() {
     let missionBlocked = false;
     let executionFailed = false;
     let key = active;
+    const updateTurnStatus = (value: string) => {
+      if (activeRef.current === key) updateTurnStatus(value);
+    };
+    const updateTurnError = (value: string | undefined) => {
+      if (activeRef.current === key) updateTurnError(value);
+    };
 
     try {
       if (!key) {
@@ -812,7 +818,7 @@ export function useInvestigationController() {
             // Mission Gate 只阻止 Agent 执行，不能吞掉用户刚刚发送的消息。
             // 服务端已经以 turnId:user 持久化它；这里刷新一次让聊天区立即显示。
             await loadSession(key);
-            setTurnStatus('开始调查前，请先确认任务目的和期望结果。');
+            updateTurnStatus('开始调查前，请先确认任务目的和期望结果。');
             return;
           }
         }
@@ -824,11 +830,11 @@ export function useInvestigationController() {
       let streamedReasoning = '';
       await consumeSse(response, ({ event, data }) => {
         if (event === 'started') {
-          setTurnStatus('助手正在处理你的问题，请稍候…');
+          updateTurnStatus('助手正在处理你的问题，请稍候…');
           return;
         }
         if (event === 'status') {
-          if (data.status.trim()) setTurnStatus(data.status.trim());
+          if (data.status.trim()) updateTurnStatus(data.status.trim());
           return;
         }
         if (event === 'companion_note') {
@@ -840,12 +846,12 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'checkpoint') {
-          setTurnStatus('已形成阶段小结：' + data.title);
+          updateTurnStatus('已形成阶段小结：' + data.title);
           return;
         }
         if (event === 'reasoning') {
           streamedReasoning += data.delta;
-          setTurnStatus('助手正在分析你的问题，请稍候…');
+          updateTurnStatus('助手正在分析你的问题，请稍候…');
           setStreamingReasoning(streamedReasoning);
           return;
         }
@@ -865,7 +871,7 @@ export function useInvestigationController() {
 
       if (!result) throw new Error('Agent stream ended without a completed result.');
 
-      setTurnStatus('正在保存这次分析结果，请稍候…');
+      updateTurnStatus('正在保存这次分析结果，请稍候…');
       let refreshed: SessionData | undefined;
       if (activeRef.current === key) {
         refreshed = await loadSession(key);
@@ -889,7 +895,7 @@ export function useInvestigationController() {
       // 非阻断的结构化结果告警已经由服务端自动修正，并记录到 Agent 轨迹。
       // 不把这类内部校验信息显示成用户错误，否则会让用户误以为需要处理。
       if (result.warnings.length) {
-        setTurnStatus('结果已保存，部分内部引用已自动修正。');
+        updateTurnStatus('结果已保存，部分内部引用已自动修正。');
       }
     } catch (e) {
       const stoppedByUser = e instanceof DOMException
@@ -898,8 +904,8 @@ export function useInvestigationController() {
       executionFailed = !stoppedByUser;
 
       if (stoppedByUser) {
-        setError(undefined);
-        setTurnStatus('正在停止本轮调查…');
+        updateTurnError(undefined);
+        updateTurnStatus('正在停止本轮调查…');
         await waitForExecutionIdle(key as string);
         try {
           await loadSession(key as string);
@@ -913,17 +919,17 @@ export function useInvestigationController() {
           || /Failed to fetch|NetworkError|network error|Load failed/i.test(errorText);
 
         if (isTransportError) {
-          setError(undefined);
-          setTurnStatus('连接已中断，正在等待服务恢复并检查这次调查是否已经保存…');
+          updateTurnError(undefined);
+          updateTurnStatus('连接已中断，正在等待服务恢复并检查这次调查是否已经保存…');
           const recovered = key
             ? await recoverAfterStreamDisconnect(key as string, turnId)
             : false;
           if (recovered) {
-            setError(undefined);
-            setTurnStatus('连接已恢复，这次调查状态已经重新加载。');
+            updateTurnError(undefined);
+            updateTurnStatus('连接已恢复，这次调查状态已经重新加载。');
             executionFailed = false;
           } else {
-            setError('服务暂时不可连接。请重新启动服务；这次调查记录会从服务器恢复，不需要重新提交。');
+            updateTurnError('服务暂时不可连接。请重新启动服务；这次调查记录会从服务器恢复，不需要重新提交。');
           }
         } else {
           if (key && activeRef.current === key) {
@@ -933,7 +939,7 @@ export function useInvestigationController() {
               // Keep the optimistic message if the recovery reload itself fails.
             }
           }
-          setError(errorText);
+          updateTurnError(errorText);
         }
       }
     } finally {
@@ -942,7 +948,7 @@ export function useInvestigationController() {
       setStreamingReasoning('');
       assistantCompanionNoteRef.current = '';
       setAssistantCompanionNote('');
-      setTurnStatus(missionBlocked
+      updateTurnStatus(missionBlocked
         ? '开始调查前，请先确认任务目的和期望结果。'
         : stopRequestedTurnRef.current === turnId
           ? '本轮执行已停止，可以继续提问'
