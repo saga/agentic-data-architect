@@ -341,6 +341,8 @@ export async function answerQuestion(
             model: control.agent.model,
             modelCallName: '生成陪伴提示',
             workingDirectory: workspaceRoot(investigationName),
+            investigationName,
+            turnId,
             onTrajectory: recordTrajectory,
             onReasoningDelta: (delta) => emitReasoning(delta, '生成陪伴提示'),
             purpose: 'review',
