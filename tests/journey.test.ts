@@ -76,7 +76,7 @@ test('human workflow nodes cannot use deterministic completeWhen', () => {
     '- approved -> done',
     '',
     '## @end done',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.ok(result.definition);
   assert.ok(
@@ -123,7 +123,7 @@ test('deterministic completion cannot jump to @end before Mission completion', (
     '- success -> done',
     '',
     '## @end done',
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.ok(result.definition);
   const incomplete = buildJourneyState(
