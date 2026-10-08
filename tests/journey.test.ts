@@ -13,6 +13,8 @@ import {
 
 const baseFacts: JourneyFacts = {
   goal: 'modernize proxy voting',
+  scopeReady: true,
+  missionComplete: true,
   currentState: null,
   unknowns: ['where is the source table?'],
   highGapKinds: ['discovery'],
