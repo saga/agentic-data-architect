@@ -73,6 +73,16 @@ Workspace 使用 runtime-neutral Agent session slot：
 
 Session 必须与 Runtime 和 Control version 一致才能恢复；同一 Runtime/model 的阶段继续执行使用 SDK `resume`，发生 Runtime/Configuration/model 变化时必须从新 session 开始。
 
+
+### 6. Copilot 模型分层
+
+Copilot Runtime 使用两档明确的模型策略：
+
+- `claude-sonnet-5.5`：普通 Investigation、Discovery、Synthesis、Report、Review 等实质性工作；
+- `claude-haiku-5.5`：Jev Smart Function 以及明确标记为简单、高频、结构化判断的调用。
+
+`COPILOT_MODEL` 和 `COPILOT_SIMPLE_MODEL` 是部署配置，默认分别为上述两个模型。Smart Function 不继承普通 Agent 的模型配置，避免高频判断意外消耗 Sonnet；普通 Agent 也不使用 `auto`，保证 Trajectory、成本和质量分析具有确定的模型维度。
+
 ## Consequences
 
 - 新调查可以直接选择最适合的 Agent runtime。
