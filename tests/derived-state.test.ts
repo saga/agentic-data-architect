@@ -135,4 +135,3 @@ test('high discovery or lineage gaps do not block a usable current-state result'
   assert.equal(derived.currentStateReady, true);
   assert.equal(derived.currentDataArchitectureReady, true);
 });
-});
