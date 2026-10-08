@@ -19,7 +19,11 @@
    - Agent Runtime 不再检查、注册、强制使用 Graphify。
    - OpenCode / Copilot 不再存在 Graphify-specific preflight、trajectory 或 capability。
 2. 保留并正式采用 Code Structure Index 作为唯一 structural-analysis 实现。
-3. Code Structure Index 使用现有 TypeScript compiler API 分析 TS/JS，生成 .code-structure/index.json。
+3. Code Structure Index 采用分语言 Provider：
+   - TS/JS 使用 TypeScript compiler API；
+   - Java / Python / C# 使用 `@vscode/tree-sitter-wasm` 的预构建 WASM grammar；
+   - SQL 使用 `node-sql-parser` 做 statement/table/column 级结构提取。
+   最终统一生成 `.code-structure/index.json`；DuckDB 只是查询投影，不是 canonical source。
 4. Code Structure Index 仍然只是结构导航层，不直接产生 Evidence；正式结论必须回到源码、SQL、metadata 或 deterministic analysis。
 5. 不为了替代 Graphify 而重新建设通用 graph database、MCP server、community/god-node、embedding 或跨语言解析平台。
 6. 节点 ID 使用 `file + kind + name + same-name ordinal`，不得使用行号或字符 offset；详见 ADR-035。
