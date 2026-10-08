@@ -36,7 +36,7 @@ export class CodeStructureDuckDBQuery {
   }
 
   async trace(fromNodeId: string, toNodeId: string, maxDepth = 8): Promise<StructurePath | undefined> {
-    const instance = await DuckDBInstance.create(this.databaseFile);
+    const instance = await DuckDBInstance.fromCache(this.databaseFile);
     const connection = await instance.connect();
     try {
       const reader = await connection.runAndReadAll(
@@ -74,7 +74,7 @@ export class CodeStructureDuckDBQuery {
   }
 
   async summary(): Promise<StructureSummary> {
-    const instance = await DuckDBInstance.create(this.databaseFile);
+    const instance = await DuckDBInstance.fromCache(this.databaseFile);
     const connection = await instance.connect();
     try {
       const counts = await connection.runAndReadAll("SELECT (SELECT count(*) FROM structure_files) AS files, (SELECT count(*) FROM structure_nodes) AS nodes, (SELECT count(*) FROM structure_edges) AS edges");
@@ -92,7 +92,7 @@ export class CodeStructureDuckDBQuery {
   }
 
   private async related(nodeId: string, side: 'from' | 'to'): Promise<CodeNode[]> {
-    const instance = await DuckDBInstance.create(this.databaseFile);
+    const instance = await DuckDBInstance.fromCache(this.databaseFile);
     const connection = await instance.connect();
     try {
       const sourceColumn = side === 'to' ? 'from_id' : 'to_id';
