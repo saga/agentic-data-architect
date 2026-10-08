@@ -14,16 +14,6 @@
  * OpenCode 只负责本轮 Agent 执行；Investigation 的 Mission、Evidence、Conversation、
  * Stage Gate 等业务状态仍然由本项目自己管理。
  */
-import { spawn } from 'node:child_process';
-import { config } from '../config.js';
-import {
-  GRAPHIFY_MCP_NAME,
-  GRAPHIFY_SELECTION_INSTRUCTION,
-  buildGraphifyMcpServer,
-  tryEnsureGraphifyGraph,
-  isGraphifyTool,
-  requiresGraphifyFirst,
-} from '../adapters/graphify.js';
 import { applyAgentWorkflowTransition, buildJourneyAgentInstruction } from '../workflow/journey-editor.js';
 import type { WorkflowId } from '../investigation/schemas.js';
 import { appendAuditEvent } from '../investigation/control.js';
@@ -62,36 +52,6 @@ interface OpenCodePart {
   state?: {
     status?: string;
     input?: unknown;
-  };
-}
-
-const GRAPHIFY_MCP_TOOL_KEYS = [
-  'query_graph',
-  'get_node',
-  'get_neighbors',
-  'get_community',
-  'god_nodes',
-  'graph_stats',
-  'shortest_path',
-].map((tool) => GRAPHIFY_MCP_NAME + '_' + tool);
-
-
-export function graphifyPreflightTools(): Record<string, boolean> {
-  return {
-    read: false,
-    grep: false,
-    glob: false,
-    bash: false,
-    edit: false,
-    write: false,
-    apply_patch: false,
-    task: false,
-    webfetch: false,
-    websearch: false,
-    skill: false,
-    todowrite: false,
-    todoread: false,
-    ...Object.fromEntries(GRAPHIFY_MCP_TOOL_KEYS.map((tool) => [tool, true])),
   };
 }
 
@@ -189,61 +149,6 @@ async function openCodeFetch(
   });
 }
 
-/** 把平台内置 Graphify 动态注册到当前 OpenCode workspace，不写入被调查仓库的配置文件。 */
-export async function registerOpenCodeGraphifyMcp(
-  workingDirectory: string,
-  commandOverride?: string,
-): Promise<void> {
-  const graphify = buildGraphifyMcpServer(workingDirectory, commandOverride);
-  if (!graphify) return;
-
-  // OpenCode Server 按 workspace 维护 MCP 状态；同一 Investigation 的后续 turn 不应重复注册同名 server。
-  const existingResponse = await openCodeFetch('/mcp', { method: 'GET' }, workingDirectory);
-  if (existingResponse.ok) {
-    try {
-      const existing = await existingResponse.json() as Record<string, { status?: unknown }>;
-      const current = existing[graphify.name];
-      const currentStatus = typeof current?.status === 'string'
-        ? current.status
-        : current?.status && typeof current.status === 'object' && 'status' in current.status
-          ? String((current.status as { status?: unknown }).status ?? '')
-          : '';
-      if (['connected', 'connecting', 'pending'].includes(currentStatus.toLowerCase())) {
-        return;
-      }
-    } catch (error) {
-      console.warn('[opencode] Unable to read Graphify MCP status; registration will be attempted.', error);
-    }
-  }
-
-  const response = await openCodeFetch(
-    '/mcp',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        name: graphify.name,
-        config: {
-          type: 'local',
-          command: [graphify.server.command, ...graphify.server.args],
-          cwd: workingDirectory,
-          enabled: true,
-          timeout: 5_000,
-        },
-      }),
-    },
-    workingDirectory,
-  );
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(
-      '代码结构分析无法接入 OpenCode（HTTP '
-      + response.status
-      + (detail ? ' · ' + detail.slice(0, 500) : ''),
-    );
-  }
-}
-
 /** 查询 OpenCode 当前已经配置并连通的 provider/model。allowlist 可显式传入，方便测试；默认读全局配置。 */
 export async function listOpenCodeModels(allowlist: readonly string[] = config.openCodeModelAllowlist): Promise<OpenCodeModelOption[]> {
   if (!config.openCodeEnabled) return [];
@@ -313,7 +218,7 @@ async function consumeOpenCodeEvents(
   input: OpenCodeAskInput,
   sessionId: string,
   /** 后台 reader 只记录、不抛错：抛错会变成 unhandled rejection 直接崩掉整个服务进程。 */
-  readerState: { sessionError?: string; graphifyUsed?: boolean },
+  readerState: { sessionError?: string },
 ): Promise<void> {
   if (!response.body) return;
 
@@ -377,50 +282,6 @@ async function consumeOpenCodeEvents(
           if (part.type === 'tool') {
             const toolName = part.tool?.trim() || '工具';
             const status = part.state?.status;
-            const graphifyToolCall = isGraphifyTool({ toolName });
-            if (graphifyToolCall) readerState.graphifyUsed = true;
-            if (status === 'running') {
-              input.onStatus?.(
-                graphifyToolCall
-                  ? '助手正在用 Graphify 查看代码结构，请稍候…'
-                  : 'OpenCode 正在使用工具 ' + toolName + '，请稍候…',
-              );
-              input.onTrajectory?.({
-                type: 'tool_call',
-                name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'OpenCode 工具：' + toolName,
-                status: 'started',
-                model: input.model,
-                details: {
-                  sessionId,
-                  tool: toolName,
-                  ...(graphifyToolCall ? {
-                    mcpServerName: GRAPHIFY_MCP_NAME,
-                    mcpToolName: toolName,
-                  } : {}),
-                },
-              });
-            } else if (status === 'completed' || status === 'error') {
-              input.onStatus?.(
-                graphifyToolCall
-                  ? 'Graphify 已完成结构查询，正在整理结果…'
-                  : 'OpenCode 已完成工具调用，正在整理结果…',
-              );
-              input.onTrajectory?.({
-                type: 'tool_result',
-                name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'OpenCode 工具：' + toolName,
-                status: status === 'completed' ? 'completed' : 'failed',
-                model: input.model,
-                details: {
-                  sessionId,
-                  tool: toolName,
-                  status,
-                  ...(graphifyToolCall ? {
-                    mcpServerName: GRAPHIFY_MCP_NAME,
-                    mcpToolName: toolName,
-                  } : {}),
-                },
-              });
-            }
           }
           continue;
         }
@@ -553,21 +414,9 @@ export function buildOpenCodeCliPrompt(
   input: Pick<OpenCodeAskInput, 'missionPrompt' | 'systemPrompt'>,
   prompt: string,
   workflowInstruction: string,
-  preflight: boolean,
-  graphifyEnabled: boolean,
   responseSchema?: z.ZodTypeAny,
 ): string {
   const sections = [
-    ...(preflight
-      ? [
-          '这是结构调查的前置步骤。',
-          '先使用 Graphify MCP 完成结构导航；至少执行一次 Graphify 查询。',
-          '这一轮不要先回答用户的问题；先完成结构导航并返回关键节点/关系，供下一轮继续核实。',
-        ]
-      : []),
-    input.missionPrompt,
-    input.systemPrompt,
-    graphifyEnabled ? GRAPHIFY_SELECTION_INSTRUCTION : '',
     workflowInstruction,
     ...(responseSchema
       ? [
@@ -582,10 +431,7 @@ export function buildOpenCodeCliPrompt(
   return sections.filter((value): value is string => Boolean(value && value.trim())).join('\n\n');
 }
 
-function buildOpenCodeCliConfig(
-  preflight: boolean,
-  graphifyServer?: Awaited<ReturnType<typeof buildGraphifyMcpServer>>,
-): string {
+function buildOpenCodeCliConfig(): string {
   let existing: Record<string, unknown> = {};
   const raw = process.env.OPENCODE_CONFIG_CONTENT?.trim();
   if (raw) {
@@ -612,22 +458,13 @@ function buildOpenCodeCliConfig(
     [OPENCODE_CLI_AGENT]: {
       ...existingAgent,
       mode: 'primary',
-      ...(preflight ? { tools: graphifyPreflightTools() } : {}),
     },
   };
 
   const existingMcp = existing.mcp && typeof existing.mcp === 'object' && !Array.isArray(existing.mcp)
     ? existing.mcp as Record<string, unknown>
     : {};
-  const mcp = graphifyServer
-    ? {
-        ...existingMcp,
-        [graphifyServer.name]: {
-          ...graphifyServer.server,
-          enabled: true,
-        },
-      }
-    : existing.mcp;
+  const mcp = existing.mcp;
 
   return JSON.stringify({
     ...existing,
@@ -666,7 +503,6 @@ function extractOpenCodeCliError(value: unknown): string | undefined {
 interface OpenCodeCliExecutionResult {
   answer: string;
   sessionId: string;
-  graphifyUsed: boolean;
   usage?: Record<string, unknown>;
   stderr: string;
 }
@@ -684,7 +520,6 @@ async function runOpenCodeCli(
 
   let sessionId = '';
   const answerParts: string[] = [];
-  let graphifyUsed = false;
   let usage: Record<string, unknown> | undefined;
   let sessionError: string | undefined;
   let aborted = false;
@@ -731,27 +566,15 @@ async function runOpenCodeCli(
 
       const toolName = typeof part.tool === 'string' && part.tool.trim() ? part.tool.trim() : '工具';
       const status = part.state?.status;
-      const graphifyToolCall = isGraphifyTool({ toolName });
-      if (graphifyToolCall) graphifyUsed = true;
-
       input.onStatus?.(
-        graphifyToolCall
-          ? (status === 'error' ? '代码结构分析没有成功，正在整理错误信息…' : 'Graphify 已完成结构查询，正在整理结果…')
-          : (status === 'error' ? '工具调用没有成功，正在整理错误信息…' : 'OpenCode 已完成工具调用，正在整理结果…'),
+        status === 'error' ? '工具调用没有成功，正在整理错误信息…' : 'OpenCode 已完成工具调用，正在整理结果…',
       );
       input.onTrajectory?.({
         type: 'tool_result',
-        name: graphifyToolCall ? 'Graphify 结构分析：' + toolName : 'OpenCode 工具：' + toolName,
+        name: 'OpenCode 工具：' + toolName,
         status: status === 'error' ? 'failed' : 'completed',
         model: input.model,
-        details: {
-          sessionId,
-          tool: toolName,
-          ...(graphifyToolCall ? {
-            mcpServerName: GRAPHIFY_MCP_NAME,
-            mcpToolName: toolName,
-          } : {}),
-        },
+        details: { sessionId, tool: toolName },
       });
       return;
     }
@@ -904,37 +727,12 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
   }
 
   const { providerId, modelId } = parseOpenCodeModel(input.model);
-  let graphifyEnabled = input.purpose !== 'journey-map'
-    && input.purpose !== 'review'
-    && config.graphifyEnabled;
-  let graphifyServer: Awaited<ReturnType<typeof buildGraphifyMcpServer>> | undefined;
-  if (graphifyEnabled) {
-    const graphifyPreparation = await tryEnsureGraphifyGraph(input.workingDirectory, false);
-    if (graphifyPreparation.available) {
-      graphifyServer = buildGraphifyMcpServer(input.workingDirectory);
-    } else {
-      graphifyEnabled = false;
-      input.onStatus?.('代码结构分析这次没有生成可用结果，助手改用源码工具继续调查。');
-      input.onTrajectory?.({
-        type: 'status',
-        name: '代码结构分析没成功，已改用源码继续查',
-        status: 'info',
-        details: {
-          capability: GRAPHIFY_MCP_NAME,
-          ...(graphifyPreparation.error ? { error: graphifyPreparation.error } : {}),
-        },
-      });
-    }
-  }
-
   let sessionId = '';
   const requestedAutomaticContinuations = Math.min(
     6,
     Math.max(0, Math.round(input.autoContinuationTurns ?? 0)),
   );
-  const maxAutomaticContinuations = graphifyEnabled && requiresGraphifyFirst(input.prompt)
-    ? Math.min(6, requestedAutomaticContinuations + 1)
-    : requestedAutomaticContinuations;
+  const maxAutomaticContinuations = requestedAutomaticContinuations;
   let currentPrompt = input.prompt;
   let currentWorkflowInstruction = input.purpose === 'review'
     ? ''
@@ -953,18 +751,15 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
       input.onStatus?.('OpenCode 已完成前一阶段，正在继续调查（第 ' + (execution + 1) + ' 阶段）…');
     }
 
-    const preflight = execution === 0 && graphifyEnabled && requiresGraphifyFirst(input.prompt);
     const cliPrompt = buildOpenCodeCliPrompt(
       input,
       currentPrompt,
       currentWorkflowInstruction,
-      preflight,
-      graphifyEnabled,
       input.responseSchema,
     );
 
-    input.onStatus?.(preflight ? '正在先用 Graphify 梳理代码结构…' : 'OpenCode 正在执行，请稍候…');
-    const cliConfig = buildOpenCodeCliConfig(preflight, graphifyServer);
+    input.onStatus?.('OpenCode 正在执行，请稍候…');
+    const cliConfig = buildOpenCodeCliConfig();
     const env = {
       ...process.env,
       OPENCODE_CONFIG_CONTENT: cliConfig,
@@ -1007,21 +802,6 @@ export async function askOpenCode(input: OpenCodeAskInput): Promise<string> {
           ...(cost !== undefined ? { cost } : {}),
         },
       });
-    }
-
-    if (preflight) {
-      if (!result.graphifyUsed) {
-        throw new Error('结构调查前置检查失败：OpenCode 没有先使用 Graphify。');
-      }
-      input.onTrajectory?.({
-        type: 'status',
-        name: 'Graphify 结构分析前置检查完成',
-        status: 'completed',
-        model: input.model,
-        details: { execution, sessionId },
-      });
-      currentPrompt = input.prompt;
-      continue;
     }
 
     finalAnswer = result.answer;
