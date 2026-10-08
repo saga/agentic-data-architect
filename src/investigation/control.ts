@@ -37,8 +37,9 @@ function globalConfigFile(): string {
 const controlUpdateLocks = new Map<string, Promise<void>>();
 let globalConfigLock: Promise<void> = Promise.resolve();
 const controlLockOwners = new AsyncLocalStorage<Set<string>>();
+const globalConfigLockOwner = new AsyncLocalStorage<boolean>();
 const taskConfigInitLocks = new Map<string, Promise<void>>();
-let globalConfigInitLock: Promise<void> = Promise.resolve();
+const auditWriteLocks = new Map<string, Promise<void>>();
 
 /** 将同一 Investigation 的配置更新串行化，避免多个请求互相覆盖版本。 */
 async function withControlUpdateLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
@@ -148,6 +149,28 @@ function buildGlobalConfiguration(agent: InvestigationControl['agent'], version 
   };
 }
 
+async function withGlobalConfigLock<T>(operation: () => Promise<T>): Promise<T> {
+  // 初始化和修改必须共用同一把锁。否则“首次读取触发初始化”与“用户正在保存新配置”
+  // 可以同时运行，默认 v1 可能在用户的 v2/v3 后面写回磁盘，造成版本倒退和配置丢失。
+  if (globalConfigLockOwner.getStore()) return operation();
+
+  const previous = globalConfigLock;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  globalConfigLock = queued;
+  await previous.catch(() => undefined);
+
+  return globalConfigLockOwner.run(true, async () => {
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (globalConfigLock === queued) globalConfigLock = Promise.resolve();
+    }
+  });
+}
+
 export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
   try {
     return GlobalConfigurationSchema.parse(JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')));
@@ -155,24 +178,20 @@ export async function loadGlobalConfiguration(): Promise<GlobalConfiguration> {
     if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 
-  const previous = globalConfigInitLock;
-  let release!: () => void;
-  globalConfigInitLock = new Promise<void>((resolve) => { release = resolve; });
-  await previous.catch(() => undefined);
-  try {
+  return withGlobalConfigLock(async () => {
+    // 锁内再读一次；排队等待期间可能已经有人创建好了配置。
     try {
       return GlobalConfigurationSchema.parse(JSON.parse(await fs.readFile(globalConfigFile(), 'utf8')));
     } catch (error) {
       if (!(error instanceof Error) || !('code' in error) || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+
     const base = defaultControl();
     const global = buildGlobalConfiguration(base.agent);
     await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
     await writeJsonAtomic(globalConfigFile(), global);
     return global;
-  } finally {
-    release();
-  }
+  });
 }
 
 /** 读取 Task 的原始 sparse override；不能从 Effective Config 反推，因为 Global 变化后无法区分继承值和显式覆盖值。 */
@@ -476,11 +495,7 @@ export async function updateInvestigationControl(
 export async function updateGlobalConfiguration(
   overrides: Partial<InvestigationControl['agent']>,
 ): Promise<GlobalConfiguration> {
-  const previous = globalConfigLock;
-  let release!: () => void;
-  globalConfigLock = new Promise<void>((resolve) => { release = resolve; });
-  await previous.catch(() => undefined);
-  try {
+  return withGlobalConfigLock(async () => {
     const current = await loadGlobalConfiguration();
     const now = new Date().toISOString();
     const mergedAgent = {
@@ -492,9 +507,7 @@ export async function updateGlobalConfiguration(
     await fs.mkdir(path.dirname(globalConfigFile()), { recursive: true });
     await writeJsonAtomic(globalConfigFile(), nextConfig);
     return nextConfig;
-  } finally {
-    release();
-  }
+  });
 }
 
 /** 向 audit.jsonl 追加一条经过 Schema 校验的审计事件。 */
@@ -507,8 +520,24 @@ export async function appendAuditEvent(
     timestamp: new Date().toISOString(),
     ...event,
   });
-  await fs.appendFile(auditFile(name), JSON.stringify(full) + '\n', 'utf8');
-  return full;
+
+  // Runtime、Workflow、Companion 等多个异步路径可能同时写 audit.jsonl。
+  // 不加串行保护时，一旦两个 write 同时发生，JSONL 可能出现交错/损坏，后续 reader
+  // 会把整份审计历史判为不可读。Audit 是 durable diagnostics，因此这里必须串行化。
+  const previous = auditWriteLocks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  auditWriteLocks.set(name, queued);
+  await previous.catch(() => undefined);
+  try {
+    await fs.mkdir(path.dirname(auditFile(name)), { recursive: true });
+    await fs.appendFile(auditFile(name), JSON.stringify(full) + '\n', 'utf8');
+    return full;
+  } finally {
+    release();
+    if (auditWriteLocks.get(name) === queued) auditWriteLocks.delete(name);
+  }
 }
 
 export class AuditDataError extends Error {
