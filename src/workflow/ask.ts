@@ -639,6 +639,8 @@ export async function answerQuestion(
           },
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          investigationName,
+          turnId,
           onTrajectory: recordTrajectory,
         });
 
@@ -692,6 +694,8 @@ export async function answerQuestion(
               },
               model: control.agent.model,
               workingDirectory: workspaceRoot(inv.name),
+              investigationName,
+              turnId,
               onTrajectory: recordTrajectory,
             })
           : [];
@@ -726,6 +730,8 @@ export async function answerQuestion(
               },
               model: control.agent.model,
               workingDirectory: workspaceRoot(inv.name),
+              investigationName,
+              turnId,
               onTrajectory: recordTrajectory,
             })
           : null;
@@ -915,6 +921,8 @@ export async function answerQuestion(
           unknownReviews: unknownReviewsForTurn,
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          investigationName,
+          turnId,
           onTrajectory: recordTrajectory,
         });
         recordTrajectory({
@@ -1001,6 +1009,8 @@ export async function answerQuestion(
           ].join('\\n'),
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          investigationName,
+          turnId,
           onTrajectory: recordTrajectory,
           onReasoningDelta: (delta) => emitReasoning(delta, '整理最终回答'),
           purpose: 'review',
@@ -1049,6 +1059,8 @@ export async function answerQuestion(
           unknownReviews: unknownReviewsForTurn,
           model: control.agent.model,
           workingDirectory: workspaceRoot(inv.name),
+          investigationName,
+          turnId,
           onTrajectory: recordTrajectory,
         });
         if (completion.completed) {
