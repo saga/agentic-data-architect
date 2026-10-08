@@ -54,6 +54,7 @@ import {
 
 
 const JOURNEY_DIR = 'workflow';
+const JOURNEY_EVENT_WRITE_LOCKS = new Map<string, Promise<void>>();
 const ACTIVE_FILE = 'journey.md';
 const META_FILE = 'journey-meta.json';
 const LAYOUT_FILE = 'journey-layout.json';
@@ -123,11 +124,27 @@ async function readTextOrNull(file: string): Promise<string | null> {
 }
 /**
  * 运行事件用 JSONL 追加保存：简单、可检查，不让 execution.json 无限增长。
+ *
+ * 一个 Investigation 内可能同时存在 Agent transition、deterministic auto-advance、
+ * 人工操作和 UI 读取请求；所有写入都必须串行，否则 JSONL 一旦交错，整个事件历史
+ * 就无法被严格 Schema 重新读取。
  */
 export async function appendJourneyRunEvent(name: string, event: JourneyRunEvent): Promise<void> {
-  await fs.mkdir(journeyDir(name), { recursive: true });
   const validated = JourneyRunEventSchema.parse(event);
-  await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(validated) + '\n', 'utf8');
+  const previous = JOURNEY_EVENT_WRITE_LOCKS.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  JOURNEY_EVENT_WRITE_LOCKS.set(name, queued);
+  await previous.catch(() => undefined);
+
+  try {
+    await fs.mkdir(journeyDir(name), { recursive: true });
+    await fs.appendFile(journeyFile(name, EVENTS_FILE), JSON.stringify(validated) + '\n', 'utf8');
+  } finally {
+    release();
+    if (JOURNEY_EVENT_WRITE_LOCKS.get(name) === queued) JOURNEY_EVENT_WRITE_LOCKS.delete(name);
+  }
 }
 
 /** 只读取最近事件供 UI/诊断使用；完整历史文件仍留在 workspace，不塞进当前快照。 */
