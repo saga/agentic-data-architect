@@ -284,6 +284,20 @@ async function consumeOpenCodeEvents(
           if (part.type === 'tool') {
             const toolName = part.tool?.trim() || '工具';
             const status = part.state?.status;
+            input.onStatus?.(
+              status === 'error'
+                ? '工具调用没有成功，正在整理错误信息…'
+                : status === 'running'
+                  ? 'OpenCode 正在使用工具 ' + toolName + '，请稍候…'
+                  : 'OpenCode 已完成工具调用，正在整理结果…',
+            );
+            input.onTrajectory?.({
+              type: status === 'running' ? 'tool_call' : 'tool_result',
+              name: 'OpenCode 工具：' + toolName,
+              status: status === 'running' ? 'started' : status === 'error' ? 'failed' : 'completed',
+              model: input.model,
+              details: { sessionId, tool: toolName },
+            });
           }
           continue;
         }
@@ -419,6 +433,8 @@ export function buildOpenCodeCliPrompt(
   responseSchema?: z.ZodTypeAny,
 ): string {
   const sections = [
+    input.missionPrompt,
+    input.systemPrompt,
     workflowInstruction,
     ...(responseSchema
       ? [
