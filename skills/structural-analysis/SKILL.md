@@ -21,11 +21,11 @@ npm run structure:query -- <repository> callees <nodeId>
 npm run structure:query -- <repository> trace <fromNodeId> <toNodeId>
 ~~~
 
-如果已有 `.code-structure/index.json`，query 会直接读取 snapshot；源码变化明显时再重新 index。
+如果已有 `.code-structure/index.json` 和 `.code-structure/structure.duckdb`，query 直接读取 DuckDB projection；源码变化明显时重新 index。DuckDB 文件只是派生数据，可以删除后重新生成。
 
 ## 当前实现
 
-TS/JS 使用 TypeScript compiler API；Java/Python/C# 使用 Tree-sitter；SQL 使用 SQL-specific extractor。所有 provider 最终合并为一个 canonical `.code-structure/index.json`，而不是多套图。
+TS/JS 使用 TypeScript compiler API；Java/Python/C# 使用 Tree-sitter；SQL 使用 SQL-specific extractor。所有 provider 最终合并为一个 canonical `.code-structure/index.json`，而不是多套图。成功 build 后会生成可重建的 `.code-structure/structure.duckdb` 作为 analytical projection；JSON 仍是 canonical source。
 
 节点 ID 必须稳定：`file + kind + name + same-name ordinal`。不得把行号或字符 offset 放进 ID，因为插入注释/空行不应改变已有实体身份。
 
