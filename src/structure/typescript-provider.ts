@@ -15,8 +15,9 @@ import type {
 const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.code-structure']);
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
-function nodeId(file: string, kind: CodeNodeKind, name: string, position: number): string {
-  return [file, kind, name, position].join('#');
+function nodeId(file: string, kind: CodeNodeKind, name: string, ordinal: number): string {
+  // ID 不能包含行号/字符位置：源码前面插入一行时，实体本身没有变化，ID 也必须保持不变。
+  return [file, kind, name, ordinal].join('#');
 }
 
 function lineOf(sourceFile: ts.SourceFile, position: number): number {
@@ -96,6 +97,8 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
     const sourceByAbsolute = new Map<string, ts.SourceFile>();
     const fileNodeByPath = new Map<string, CodeNode>();
     const symbolByName = new Map<string, CodeNode[]>();
+    const declarationByStart = new Map<string, CodeNode>();
+    const declarationOrdinal = new Map<string, number>();
     const nodes: CodeNode[] = [];
     const edges: CodeEdge[] = [];
 
@@ -133,14 +136,18 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
                 : ts.isTypeAliasDeclaration(node)
                   ? 'type'
                   : 'function';
+            const ordinalKey = `${kind}\u0000${name}`;
+            const ordinal = declarationOrdinal.get(ordinalKey) ?? 0;
+            declarationOrdinal.set(ordinalKey, ordinal + 1);
             const symbol: CodeNode = {
-              id: nodeId(rel, kind, name, node.getStart(source)),
+              id: nodeId(rel, kind, name, ordinal),
               kind,
               name,
               file: rel,
               line: lineOf(source, node.getStart(source)),
             };
             addNode(nodes, this.nodesById, symbol);
+            declarationByStart.set(`${rel}:${node.getStart(source)}`, symbol);
             const list = symbolByName.get(name) ?? [];
             list.push(symbol);
             symbolByName.set(name, list);
@@ -206,10 +213,7 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
 
       const visit = (node: ts.Node, owner?: CodeNode): void => {
         let currentOwner = owner;
-        const matching = nodes.find(item =>
-          item.file === rel && item.line === lineOf(source, node) &&
-          (item.kind === 'class' || item.kind === 'interface' || item.kind === 'type' || item.kind === 'function')
-        );
+        const matching = declarationByStart.get(`${rel}:${node.getStart(source)}`);
         if (matching) currentOwner = matching;
 
         if (ts.isCallExpression(node)) {
