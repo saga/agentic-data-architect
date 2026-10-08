@@ -295,6 +295,7 @@ export function recoverRunningConversationTurns(): number {
     // 使用同步追加是故意的：startup recovery 完成前不能把日志写入留到数据库关闭之后。
     const transcript = '## Agent — ' + new Date().toISOString() + '\n\n' + content.trim() + '\n\n';
     try {
+      fs.mkdirSync(path.dirname(transcriptFile(sessionName)), { recursive: true });
       fs.appendFileSync(transcriptFile(sessionName), transcript, 'utf8');
     } catch (error) {
       console.error('[conversation-recovery] Failed to persist recovery message to transcript.', {
