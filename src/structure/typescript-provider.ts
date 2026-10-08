@@ -87,6 +87,8 @@ export class TypeScriptCodeStructureProvider implements CodeStructureProvider {
   ) {}
 
   public async build(): Promise<CodeStructureIndex> {
+    // build 可以在同一个 provider 实例上重复执行；先清掉旧节点，避免旧快照污染新查询。
+    this.nodesById.clear();
     const root = path.resolve(this.rootDirectory);
     const files = await sourceFiles(root);
     const relative = (file: string) => path.relative(root, file).split(path.sep).join('/');
