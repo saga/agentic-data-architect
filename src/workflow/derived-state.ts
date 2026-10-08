@@ -68,7 +68,17 @@ const hasAny = (values: readonly string[], targets: readonly string[]): boolean 
 
 export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSignals {
   const coverage = input.currentState?.coverage;
-  const currentStateAvailable = Boolean(coverage && coverage.datasets > 0);
+  const currentStateAvailable = Boolean(
+    coverage
+      && (
+        coverage.datasets > 0
+        || coverage.sqlParsedStatements > 0
+        || coverage.connectedDatasets > 0
+        || coverage.semanticAssets > 0
+        || input.estateColumnCount > 0
+        || input.lineageEdgeCount > 0
+      ),
+  );
 
   // Identified source candidates are valid Data Source coverage; unique source-of-truth proof is stricter.
   const dataSourceReady = currentStateAvailable;
@@ -91,9 +101,9 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   // prevent a usable Current State result. Stricter results apply their own conditions.
   const currentStateReady = currentStateAvailable;
 
-  // Current Data Architecture 的目标是尽可能还原当前状态，而不是要求每个分析维度
-  // 都已经完整。Flow / Model / Transformation 是独立的覆盖信号；缺失时应进入报告
-  // 的 Unknown / Limitation，而不是阻止整个 Current State 结果。
+  // Current Data Architecture 的目标是尽可能还原当前状态。只要已有任一类实质性
+  // Current-State 证据，就可以继续形成结果；Flow / Model / Transformation 是独立的覆盖
+  // 信号，缺失时进入报告的 Unknown / Limitation，而不是阻止整个 Current State 结果。
   const currentDataArchitectureReady = currentStateReady;
 
   const dataTruthReady = currentStateReady
