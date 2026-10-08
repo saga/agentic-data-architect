@@ -224,8 +224,14 @@ export async function readArchitectureAssessmentArtifact(
   return { status: ArtifactLifecycleStatusSchema.parse('current'), plan };
 }
 
-/** 兼容已有内部调用方：只有 current Artifact 才返回 plan。 */
+/**
+ * 给 Workflow / Gate 提供当前可用的 Assessment Plan。
+ * missing / stale 说明目前没有可用于继续的计划；error 则表示 durable artifact 已损坏，
+ * 必须显式失败，不能转换成“没有评估结果”让状态机继续往后走。
+ */
 export async function loadArchitectureAssessmentPlan(name: string): Promise<ArchitectureAssessmentPlan | null> {
   const result = await readArchitectureAssessmentArtifact(name);
-  return result.status === 'current' ? result.plan : null;
+  if (result.status === 'current') return result.plan;
+  if (result.status === 'missing' || result.status === 'stale') return null;
+  throw new Error('Data Architecture Assessment 工作成果无法读取，当前状态是 error。请检查 assessment 文件后重新处理。');
 }
