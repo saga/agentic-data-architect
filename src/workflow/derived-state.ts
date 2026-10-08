@@ -70,8 +70,8 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
   const coverage = input.currentState?.coverage;
   const currentStateAvailable = Boolean(coverage && coverage.datasets > 0);
 
-  // Source-of-Truth candidate 是待确认事实，不能直接当成 data-source 已完成。
-  // Identified source candidates are valid Data Source coverage; unique source-of-truth proof is stricter.\n  const dataSourceReady = currentStateAvailable;
+  // Identified source candidates are valid Data Source coverage; unique source-of-truth proof is stricter.
+  const dataSourceReady = currentStateAvailable;
 
   // Flow 是否成立只看有没有 lineage 边：connectedDatasets 本身就是从 lineage
   // 关系里数出来的，再拿它当备选条件等于自己证明自己，还会让“0 条边也算有 Flow”
@@ -87,8 +87,9 @@ export function evaluateDerivedState(input: DerivedStateInput): DerivedStateSign
       || coverage!.sqlParsedStatements > 0
     );
 
-  const currentStateReady = currentStateAvailable
-    && !hasAny(input.highGapKinds, ['discovery', 'lineage']);
+  // High discovery/lineage gaps remain explicit unknowns; they do not by themselves
+  // prevent a usable Current State result. Stricter results apply their own conditions.
+  const currentStateReady = currentStateAvailable;
 
   // “Current Data Architecture”允许保留业务上尚未确认的候选项；
   // 真正要求数据真相时，由 dataTruthReady 单独收紧。
