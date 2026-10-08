@@ -877,7 +877,7 @@ export function useInvestigationController() {
         refreshed = await loadSession(key);
         await reloadSessions(false);
       }
-      if (streamedReasoning.trim() && refreshed) {
+      if (activeRef.current === key && streamedReasoning.trim() && refreshed) {
         const lastAssistant = [...refreshed.messages].reverse().find((item) => item.role === 'assistant');
         if (lastAssistant) {
           setReasoningByMessage((items) => ({ ...items, [lastAssistant.id]: streamedReasoning }));
@@ -890,7 +890,7 @@ export function useInvestigationController() {
           .filter(Boolean)
           .slice(0, 3)
         : [];
-      setNextGuidance(questions);
+      if (activeRef.current === key) setNextGuidance(questions);
 
       // 非阻断的结构化结果告警已经由服务端自动修正，并记录到 Agent 轨迹。
       // 不把这类内部校验信息显示成用户错误，否则会让用户误以为需要处理。
