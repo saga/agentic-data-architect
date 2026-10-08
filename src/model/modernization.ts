@@ -165,6 +165,11 @@ export const AgentModernizationResultSchema = z.object({
   mappingCoverage: z.object({
     sourceAssets: z.array(z.string().trim().min(1)),
     unmappedAssets: z.array(z.string().trim().min(1)),
+    unmappedAssetDispositions: z.array(z.object({
+      asset: z.string().trim().min(1),
+      disposition: z.enum(['excluded', 'deprecated', 'obsolete', 'out-of-scope', 'requires-review']),
+      reason: z.string().trim().min(1),
+    }).strict()).optional(),
   }).strict().optional(),
   validation: z.object({
     checks: z.array(z.object({
@@ -242,6 +247,11 @@ export const ModernizationPlanSchema = z.object({
   mappingCoverage: z.object({
     sourceAssets: z.array(z.string()),
     unmappedAssets: z.array(z.string()),
+    unmappedAssetDispositions: z.array(z.object({
+      asset: z.string().min(1),
+      disposition: z.enum(['excluded', 'deprecated', 'obsolete', 'out-of-scope', 'requires-review']),
+      reason: z.string().trim().min(1),
+    }).strict()).optional(),
   }).strict().optional(),
   evidenceIds: z.array(z.string()),
 }).strict();
