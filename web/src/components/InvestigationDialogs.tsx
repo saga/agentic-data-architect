@@ -11,6 +11,7 @@ export function InvestigationDialogs(props: {
   current?: SessionData;
   active?: string;
   loading: boolean;
+  newSessionCreating: boolean;
   newSessionOpen: boolean;
   newSessionName: string;
   newSessionRuntime: AgentRuntime;
@@ -38,7 +39,8 @@ export function InvestigationDialogs(props: {
         onCancel={() => props.setNewSessionOpen(false)}
         onOk={props.onCreateSession}
         okButtonProps={{
-          disabled:
+          loading: props.newSessionCreating,
+          disabled: props.newSessionCreating ||
             !props.newSessionName.trim() ||
             !props.newSessionGoal.trim() ||
             !props.newSessionExpectedResult.trim() ||
@@ -131,7 +133,7 @@ export function InvestigationDialogs(props: {
                 type="primary"
                 size="small"
                 icon={<SendOutlined />}
-                disabled={!props.active || props.loading}
+                disabled={!props.active || props.loading || props.newSessionCreating}
                 onClick={() => props.onContinueUnknown(unknown)}
               >
                 让 Agent 继续查
