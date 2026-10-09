@@ -16,11 +16,12 @@ const SQL_EXTENSIONS = new Set(['.sql', '.ddl', '.dml', '.hql']);
 const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.code-structure']);
 
 type SqlGlotStatement = { type: string; tables: Array<{ operation: string; name: string }>; columns: string[] };
+let sqlGlotPythonCommand: string | undefined;
 
 function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotStatement[] | undefined {
   const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const script = path.join(appRoot, 'scripts', 'parse-sqlglot.py');
-  const candidates = [
+  const candidates = sqlGlotPythonCommand ? [sqlGlotPythonCommand] : [
     path.join(appRoot, '.venv', 'bin', 'python'),
     path.join(appRoot, '.venv', 'Scripts', 'python.exe'),
     'python3',
@@ -37,6 +38,7 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
     if (result.error || result.status !== 0 || !result.stdout) continue;
     try {
       const parsed = JSON.parse(result.stdout) as { available?: boolean; statements?: SqlGlotStatement[] };
+      sqlGlotPythonCommand = command;
       if (parsed.available && Array.isArray(parsed.statements)) return parsed.statements;
     } catch {
       // An unavailable or broken Python bridge must not block the existing Node parser.
