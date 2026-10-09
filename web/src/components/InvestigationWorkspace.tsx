@@ -239,7 +239,6 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
         newSessionExpectedResult={newSessionExpectedResult}
         newSessionRuntime={newSessionRuntime}
         setNewSessionRuntime={setNewSessionRuntime}
-        newSessionCreating={newSessionCreating}
         providerStatuses={providerStatuses}
         providerCatalogLoaded={providerCatalogLoaded}
         providerCatalogError={providerCatalogError}
