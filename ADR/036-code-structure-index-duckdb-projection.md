@@ -68,6 +68,13 @@ projection 至少包含：
 
 Code Structure projection 不承担 workflow、conversation 或 Mission state。
 
+## Projection refresh and failure semantics
+
+- Refresh the DuckDB projection through the same cached DuckDB instance used by query clients. Do not open a competing instance for the same database file while readers may still hold cached handles.
+- Write the canonical JSON snapshot atomically (temporary file followed by rename) so a process interruption cannot leave a truncated authoritative snapshot.
+- JSON persistence and DuckDB projection are separate outcomes. If JSON persistence succeeds but projection refresh fails, the build must report the saved canonical snapshot path and the projection failure explicitly. Consumers must not interpret that error as proof that no new canonical snapshot exists, and must not assume the projection is current.
+- A failed projection is recoverable by rerunning the structure-index build; DuckDB remains disposable and must not be treated as an independent source of truth.
+
 ## Consequences
 
 - 结构 extractor 不需要关心查询实现。
