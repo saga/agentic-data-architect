@@ -6,6 +6,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 
 ## 当前 ADR
 
+
 | ADR | 决定 | 状态 |
 |---|---|---|
 | [ADR-001](./001-data-estate-as-canonical-graph.md) | DataEstate 是唯一 canonical graph；重复图查询统一到轻量 query helpers，不建立第二套 Catalog 模型 | Accepted |
@@ -33,7 +34,19 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-023](./023-investigation-report-and-analysis-artifacts.md) | 每次完整 Investigation 都要有用户可读报告，并保留可继续使用的中间分析产物 | Accepted |
 | [ADR-024](./024-skill-input-output-gate-contract.md) | 每个 Skill 都必须声明输入、输出、验证、Gate 和期望结果，并接受基础结构检查 | Accepted |
 | [ADR-025](./025-global-task-config-and-media-cache-boundaries.md) | Global / Task 配置与缓存分层；远程媒体由 yt-dlp 解析，Remote first、Global Cache fallback | Accepted |
-
+| [ADR-026](./026-canonical-derived-state-and-result-boundaries.md) | Canonical Derived State 统一 Mission、Workflow、Gate 的完成语义，并分离 Assessment / Modernization Artifact 与 Workflow runtime | Accepted |
+| [ADR-027](./027-investigation-state-persistence-boundary.md) | 明确 context.json、SQLite、DuckDB 和文件产物各自的 canonical persistence boundary | Accepted |
+| [ADR-028](./028-agent-runtime-selection-and-fallback.md) | 三种 Agent Runtime 选择与 quota fallback：Copilot SDK → CodeBuddy SDK → OpenCode Run | Accepted |
+| [ADR-029](./029-conversation-turn-failure-durability.md) | Agent 失败也是已发生的 Conversation Turn；秘书消息和已流出的 assistant 内容必须在失败时持久化，SSE 只是实时显示通道 | Accepted |
+| [ADR-030](./030-sse-restart-and-turn-recovery.md) | SSE 只负责实时显示；turn draft、Server shutdown、restart recovery 和浏览器 reconnect 必须保护 Conversation Turn 可恢复性 | Accepted |
+| [ADR-031](./031-codebuddy-investigation-sandbox.md) | CodeBuddy Investigation 只使用只读 built-in tools；禁止宿主仓库写入和 shell 路径逃逸 | Accepted |
+| [ADR-032](./032-agent-runtime-adapter-isolation-and-workflow-completion.md) | Runtime adapter 互不直接依赖；共享输入/Graphify 能力下沉；无 completeWhen 的 Agent 节点必须先通过 Stage Gate | Accepted |
+| [ADR-033](./033-lightweight-code-structure-index.md) | 轻量级 Code Structure Index 作为 Graphify 的可替换实现 | Accepted |
+| [ADR-034](./034-remove-graphify-use-code-structure-index.md) | 完全移除 Graphify，Code Structure Index 成为唯一结构分析能力 | Accepted |
+| [ADR-035](./035-polyglot-structure-analysis-provider-boundary.md) | 多语言采用 Provider + Artifact Extractor；不把所有工件强行 Tree-sitter 化 | Accepted |
+| [ADR-036](./036-code-structure-index-duckdb-projection.md) | Code Structure Index 保持 canonical JSON；DuckDB 作为可重建分析 projection 和统一结构查询层 | Accepted |
+| [ADR-037](./037-sql-analysis-capability-boundaries.md) | 区分 SQL 结构索引、SQL lineage 和 live database discovery 的能力边界 | Accepted |
+| [ADR-038](./038-sql-dialect-lineage-confidence-and-coverage.md) | SQL 方言识别、lineage 置信度与解析覆盖率必须可观察；不把解析成功当成完整血缘 | Accepted |
 
 ## 如何使用 ADR
 
@@ -56,18 +69,3 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 这些附录只是历史参考，**不是规范文本**。真正具有架构约束力的是 ADR 正文中的 Context、Decision、Consequences 和 Rejected alternatives。
 
 因此，阅读 ADR 时先看正文；需要理解“为什么会做出这个决定”或追溯设计演进时，再阅读附录。
-
-| [ADR-026](./026-canonical-derived-state-and-result-boundaries.md) | Canonical Derived State 统一 Mission、Workflow、Gate 的完成语义，并分离 Assessment / Modernization Artifact 与 Workflow runtime | Accepted |
-| [ADR-027](./027-investigation-state-persistence-boundary.md) | 明确 context.json、SQLite、DuckDB 和文件产物各自的 canonical persistence boundary | Accepted |
-| [ADR-028](./028-agent-runtime-selection-and-fallback.md) | 三种 Agent Runtime 选择与 quota fallback：Copilot SDK → CodeBuddy SDK → OpenCode Run | Accepted |
-| [ADR-029](./029-conversation-turn-failure-durability.md) | Agent 失败也是已发生的 Conversation Turn；秘书消息和已流出的 assistant 内容必须在失败时持久化，SSE 只是实时显示通道 | Accepted |
-| [ADR-030](./030-sse-restart-and-turn-recovery.md) | SSE 只负责实时显示；turn draft、Server shutdown、restart recovery 和浏览器 reconnect 必须保护 Conversation Turn 可恢复性 | Accepted |
-| [ADR-031](./031-codebuddy-investigation-sandbox.md) | CodeBuddy Investigation 只使用只读 built-in tools；禁止宿主仓库写入和 shell 路径逃逸 | Accepted |
-| [ADR-032](./032-agent-runtime-adapter-isolation-and-workflow-completion.md) | Runtime adapter 互不直接依赖；共享输入/Graphify 能力下沉；无 completeWhen 的 Agent 节点必须先通过 Stage Gate | Accepted |
-- [ADR-033：轻量级 Code Structure Index 作为 Graphify 的可替换实现](033-lightweight-code-structure-index.md) — 不安装 Graphify 时，用少量确定性代码结构索引提供 find/callers/callees/trace，并通过 Evidence 边界接入 Investigation。
-
-| [ADR-034](./034-remove-graphify-use-code-structure-index.md) | 完全移除 Graphify，Code Structure Index 成为唯一结构分析能力 | Accepted |
-| [ADR-035](./035-polyglot-structure-analysis-provider-boundary.md) | 多语言采用 Provider + Artifact Extractor；不把所有工件强行 Tree-sitter 化 | Accepted |
-| [ADR-036](./036-code-structure-index-duckdb-projection.md) | Code Structure Index 保持 canonical JSON；DuckDB 作为可重建分析 projection 和统一结构查询层 | Accepted |
-| [ADR-037](./037-sql-analysis-capability-boundaries.md) | 区分 SQL 结构索引、SQL lineage 和 live database discovery 的能力边界 | Accepted |
-| [ADR-038](./038-sql-dialect-lineage-confidence-and-coverage.md) | SQL 方言识别、lineage 置信度与解析覆盖率必须可观察；不把解析成功当成完整血缘 | Accepted |
