@@ -113,8 +113,12 @@ export function splitStatements(text: string): SplitStatement[] {
   let lineComment = false;
   let blockComment = false;
   const push = (end: number, endLine: number) => {
-    const sql = text.slice(start, end).trim();
-    if (sql) out.push({ sql, lineStart: startLine, lineEnd: endLine });
+    const raw = text.slice(start, end);
+    const sql = raw.trim();
+    if (!sql) return;
+    const leadingWhitespace = raw.search(/\S/);
+    const lineStart = text.slice(0, start + Math.max(leadingWhitespace, 0)).split('\n').length;
+    out.push({ sql, lineStart, lineEnd: endLine });
   };
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
