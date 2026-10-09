@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { TreeSitterCodeStructureProvider } from '../src/structure/tree-sitter-provider.js';
 
-test('Tree-sitter provider loads Java/Python from VS Code WASM and C# from its published grammar', async () => {
+test('Tree-sitter provider parses Java/Python with WASM and extracts C# declarations with fallback', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agentic-structure-'));
   try {
     await fs.writeFile(
@@ -34,7 +34,7 @@ test('Tree-sitter provider loads Java/Python from VS Code WASM and C# from its p
     );
     assert.equal(index.files.find((file) => file.path.endsWith('.java'))?.parser, 'tree-sitter-java');
     assert.equal(index.files.find((file) => file.path.endsWith('.py'))?.parser, 'tree-sitter-python');
-    assert.equal(index.files.find((file) => file.path.endsWith('.cs'))?.parser, 'tree-sitter-csharp');
+    assert.equal(index.files.find((file) => file.path.endsWith('.cs'))?.parser, 'csharp-declaration-fallback');
 
     assert.ok(index.nodes.some((node) => node.file === 'Sample.java' && node.kind === 'class' && node.name === 'Sample'));
     assert.ok(index.nodes.some((node) => node.file === 'Sample.java' && node.kind === 'method' && node.name === 'run'));
