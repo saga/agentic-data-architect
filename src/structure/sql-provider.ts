@@ -50,9 +50,9 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
 
 export function detectSqlDialect(sql: string, configured: string): string {
   const text = sql.toLowerCase();
-  const oracleSignals = /\\b(varchar2|nvarchar2|number\\s*\\(|sysdate|systimestamp|dual|connect\\s+by|pragma\\s+autonomous_transaction)\\b|\\b(dbms_[a-z0-9_$]+|utl_[a-z0-9_$]+)\\b/.test(text);
-  const postgresSignals = /::[a-z_][\\w.]*(?:\\[\\])?|\\b(serial|bigserial|smallserial|ilike|returning|distinct\\s+on|jsonb|plpgsql)\\b|\\$[a-z_]*\\$/.test(text);
-  const snowflakeSignals = /\\b(qualify|flatten|variant|object_construct|parse_json|copy\\s+into|lateral\\s+flatten|snowflake\\.account_usage)\\b/.test(text);
+  const oracleSignals = /\b(varchar2|nvarchar2|number\s*\(|sysdate|systimestamp|dual|connect\s+by|pragma\s+autonomous_transaction)\b|\b(dbms_[a-z0-9_$]+|utl_[a-z0-9_$]+)\b/.test(text);
+  const postgresSignals = /::[a-z_][\w.]*(?:\[\])?|\b(serial|bigserial|smallserial|ilike|returning|distinct\s+on|jsonb|plpgsql)\b|\$[a-z_]*\$/.test(text);
+  const snowflakeSignals = /\b(qualify|flatten|variant|object_construct|parse_json|copy\s+into|lateral\s+flatten|snowflake\.account_usage)\b/.test(text);
   if (oracleSignals) return 'oracle';
   if (postgresSignals) return 'postgres';
   if (snowflakeSignals) return 'snowflake';
