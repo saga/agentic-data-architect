@@ -3,7 +3,14 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { SqlCodeStructureProvider } from '../src/structure/sql-provider.js';
+import { detectSqlDialect, SqlCodeStructureProvider } from '../src/structure/sql-provider.js';
+
+test('detects PostgreSQL, Oracle and Snowflake dialect signals', () => {
+  assert.equal(detectSqlDialect('SELECT value::jsonb FROM t', 'mysql'), 'postgres');
+  assert.equal(detectSqlDialect('SELECT SYSDATE FROM DUAL', 'mysql'), 'oracle');
+  assert.equal(detectSqlDialect('SELECT value FROM t QUALIFY ROW_NUMBER() OVER (ORDER BY id) = 1', 'mysql'), 'snowflake');
+  assert.equal(detectSqlDialect('SELECT id FROM t', 'postgres'), 'postgres');
+});
 
 test('extracts SQL statements, tables, columns, reads and writes', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ada-sql-'));
