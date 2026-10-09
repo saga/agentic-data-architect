@@ -202,7 +202,7 @@ export class SqlglotParser implements SqlParser {
     const statements: ParsedStatement[] = [];
     const failures: ParseFailure[] = [];
     parsed.results.forEach((r, i) => {
-      if (r.error && (!r.statements || r.statements.length === 0)) {
+      if (r.error && (!r.statements || r.statements.length === 0) && !(r.failures?.length)) {
         failures.push({ statementIndex: i, error: r.error });
       }
       for (const failure of r.failures ?? []) {
