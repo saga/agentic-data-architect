@@ -256,20 +256,34 @@ def analyze_statement(statement: exp.Expression) -> dict:
     }
 
 
+def detect_dialect(sql: str, configured: str | None) -> str | None:
+    """Prefer clear dialect-specific syntax; otherwise honor caller configuration."""
+    text = sql.lower()
+    if any(token in text for token in ("varchar2", "nvarchar2", "sysdate", "systimestamp", "connect by", "dbms_", "utl_")) or " from dual" in text:
+        return "oracle"
+    if any(token in text for token in ("::jsonb", "::text", " ilike ", " distinct on ", " bigserial", " serial ", " returning ", "$")):
+        return "postgres"
+    if any(token in text for token in (" qualify ", " flatten(", " variant", "object_construct(", "parse_json(", "copy into ", "snowflake.account_usage")):
+        return "snowflake"
+    return configured.lower() if configured else None
+
+
 def parse_one(sql: str, dialect) -> dict:
+    selected_dialect = detect_dialect(sql, dialect)
     try:
-        parsed = sqlglot.parse(sql, read=dialect) if dialect else sqlglot.parse(sql)
+        parsed = sqlglot.parse(sql, read=selected_dialect) if selected_dialect else sqlglot.parse(sql)
     except Exception as e:
-        return {"statements": [], "error": f"parse failed: {e}"}
-    out = []
-    for stmt in parsed:
+        return {"statements": [], "failures": [{"statementIndex": 0, "error": f"parse failed ({selected_dialect or 'generic'}): {e}"}], "dialect": selected_dialect, "error": f"parse failed: {e}"}
+    out, failures = [], []
+    for index, stmt in enumerate(parsed):
         if stmt is None:
+            failures.append({"statementIndex": index, "error": "SQL parser returned an empty statement"})
             continue
         try:
             out.append(analyze_statement(stmt))
-        except Exception:
-            continue
-    return {"statements": out, "error": None}
+        except Exception as e:
+            failures.append({"statementIndex": index, "error": f"AST extraction failed: {e}"})
+    return {"statements": out, "failures": failures, "dialect": selected_dialect, "error": None}
 
 
 def main() -> None:
