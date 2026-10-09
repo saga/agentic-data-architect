@@ -14,7 +14,9 @@ export class CodeStructureDuckDBProjector {
   async project(index: CodeStructureIndex): Promise<string> {
     const database = path.resolve(this.databaseFile);
     await fs.mkdir(path.dirname(database), { recursive: true });
-    const instance = await DuckDBInstance.create(database);
+    // Share the same cached instance as readers; opening a second instance for the same
+    // file can conflict with an active query connection or keep readers on stale handles.
+    const instance = await DuckDBInstance.fromCache(database);
     const connection = await instance.connect();
     try {
       await connection.run('BEGIN');
