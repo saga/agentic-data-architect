@@ -67,7 +67,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
     const fileNodeByPath = new Map<string, CodeNode>();
     const objectNodes = new Map<string, CodeNode>();
     const parser = new Parser();
-    const parseOptions = { database: this.database as any };
+    const parseOptions = { database: this.database as any, parseOptions: { includeLocations: true } };
     const hashes: CodeStructureIndex['files'] = [];
 
     for (const absolute of files) {
@@ -93,21 +93,31 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         let tableAccesses: Array<{ operation: string; name: string }> = [];
         let columns: string[] = [];
         try {
-          // astify() returns AST nodes; tableList()/columnList() are separate parser APIs.
-          // Re-serialize each AST so INSERT...SELECT access types remain associated with
-          // the correct statement instead of marking every referenced table as a write.
-          const statementSql = parser.sqlify(statement, parseOptions);
-          tableAccesses = parser.tableList(statementSql, parseOptions)
+          // Use the original source range when available. This preserves dialect-specific
+          // syntax and keeps INSERT...SELECT read/write operations tied to this statement.
+          const start = statement?.loc?.start?.offset;
+          const end = statement?.loc?.end?.offset;
+          const statementSql = Number.isInteger(start) && Number.isInteger(end) && end > start
+            ? text.slice(start, end)
+            : parser.sqlify(statement, parseOptions);
+          const metadata = parser.parse(statementSql, parseOptions) as {
+            tableList?: string[];
+            columnList?: string[];
+          };
+          tableAccesses = (metadata.tableList ?? [])
             .map((entry: string) => ({
               operation: entry.split('::')[0]?.toLowerCase() ?? '',
               name: qualifiedTable(entry),
             }))
             .filter((entry: { operation: string; name: string }) => Boolean(entry.name));
-          columns = parser.columnList(statementSql, parseOptions)
+          columns = (metadata.columnList ?? [])
             .map((entry: string) => entry.split('::').slice(1).filter((part: string) => part && part !== 'null').join('.'))
             .filter(Boolean);
-        } catch {
-          // Keep the successfully parsed statement but do not invent relationships.
+        } catch (error) {
+          throw new Error(
+            'Failed to extract SQL metadata from ' + rel + ' statement ' + (index + 1),
+            { cause: error },
+          );
         }
 
         const statementName = String(statement?.type ?? 'statement') + ':' + index;
