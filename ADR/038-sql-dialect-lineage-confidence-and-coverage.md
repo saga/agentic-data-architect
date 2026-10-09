@@ -17,6 +17,8 @@ The repository has two SQL consumers with different purposes: the Code Structure
 5. Keep Oracle support scoped accurately: static SQL dialect parsing is not Oracle live database discovery or complete PL/SQL package/procedure analysis. The structure index currently scans `.sql`, `.ddl`, `.dml`, and `.hql`; additional extensions require explicit support and fixtures.
 6. Keep read-only SQL validation as defense in depth. Database-enforced read-only credentials and least privilege remain necessary.
 7. Add dialect-specific fixture tests for PostgreSQL, Oracle, Snowflake, CTEs, nested queries, INSERT/SELECT, MERGE, parse failures, and lineage mapping when parser behavior changes.
+8. For MERGE, emit target-to-source dataset dependencies but do not infer column-level mappings from WHEN clauses until their semantics can be resolved reliably.
+9. Preserve source line locations on structural statement nodes and edges; where a parser provides no locations, use statement splitting as a best-effort fallback and document procedural SQL limitations.
 
 ## Consequences
 
