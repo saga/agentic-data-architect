@@ -28,6 +28,7 @@ import {
   type AgentProviderStatus,
   type CopilotModelOption,
   type ExecutionStatus,
+  type AgentRuntime,
   type InvestigationCheckpoint,
   type GlobalConfiguration,
   type InvestigationControl,
@@ -826,7 +827,7 @@ export function useInvestigationController() {
       await waitForExecutionIdle(key as string);
 
       activeTurnRef.current = { key: key as string, turnId, controller };
-      pendingOutgoingMessagesRef.current[key] = optimisticMessage;
+      (pendingOutgoingMessagesRef.current[key] ??= {})[turnId] = optimisticMessage;
       setCurrent((existing) => {
         if (!existing || existing.context.name !== key) return existing;
         if (existing.messages.some((item) => item.id === optimisticMessage.id)) return existing;
@@ -909,7 +910,7 @@ export function useInvestigationController() {
           return;
         }
         if (event === 'delta') {
-          setStreamingAnswer((currentAnswer) => currentAnswer?.key === key
+          setStreamingAnswer((currentAnswer) => currentAnswer && currentAnswer.key === key
             ? { ...currentAnswer, content: currentAnswer.content + data.delta }
             : currentAnswer);
           return;
