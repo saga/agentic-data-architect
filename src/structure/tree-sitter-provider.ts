@@ -197,7 +197,6 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
               name: typeMatch[2]!,
               line: i + 1,
             });
-            continue;
           }
           const methodMatch = lineText.match(/^\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\s+)*(?:[\w<>,?.\[\]]+\s+)+(\w+)\s*\([^;]*\)\s*(?:\{|=>)/);
           if (methodMatch && !['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodMatch[1]!)) {
