@@ -106,6 +106,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
           current={undefined}
           active={active}
           loading={loading}
+          newSessionCreating={newSessionCreating}
           newSessionOpen={newSessionOpen}
           newSessionName={newSessionName}
           newSessionRuntime={newSessionRuntime}
@@ -236,6 +237,8 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
         newSessionGoal={newSessionGoal}
         newSessionExpectedResult={newSessionExpectedResult}
         newSessionRuntime={newSessionRuntime}
+        setNewSessionRuntime={setNewSessionRuntime}
+        newSessionCreating={newSessionCreating}
         providerStatuses={providerStatuses}
         providerCatalogLoaded={providerCatalogLoaded}
         providerCatalogError={providerCatalogError}
