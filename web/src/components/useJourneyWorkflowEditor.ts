@@ -886,8 +886,9 @@ export function useJourneyWorkflowEditor(): JourneyWorkflowEditorResult {
         try {
           const payload = ApiErrorSchema.parse(JSON.parse(error instanceof Error ? error.message : String(error)));
           const details = payload.details;
-          const issues = details && typeof details === 'object' && Array.isArray((details as Record<string, unknown>).issues)
-            ? (details as Record<string, unknown>).issues.filter((item): item is string => typeof item === 'string')
+          const issueDetails = details as { issues?: unknown[] } | undefined;
+          const issues = Array.isArray(issueDetails?.issues)
+            ? issueDetails.issues.filter((item) => typeof item === 'string') as string[]
             : [];
           setValidationIssues(issues);
           throw new Error(
