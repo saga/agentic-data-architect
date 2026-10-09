@@ -121,20 +121,15 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
           const statementSql = Number.isInteger(start) && Number.isInteger(end) && end > start
             ? text.slice(start, end)
             : parser.sqlify(statement, parseOptions);
-          const metadata = parser.parse(statementSql, parseOptions) as {
-            tableList?: string[];
-            columnList?: string[];
-          };
-          if (!Array.isArray(metadata?.tableList) || !Array.isArray(metadata?.columnList)) {
-            throw new Error('Parser did not return tableList and columnList arrays');
-          }
-          tableAccesses = metadata.tableList
+          const tableEntries = parser.tableList(statementSql, parseOptions) ?? [];
+          const columnEntries = parser.columnList(statementSql, parseOptions) ?? [];
+          tableAccesses = tableEntries
             .map((entry: string) => ({
               operation: entry.split('::')[0]?.toLowerCase() ?? '',
               name: qualifiedTable(entry),
             }))
             .filter((entry: { operation: string; name: string }) => Boolean(entry.name));
-          columns = metadata.columnList
+          columns = columnEntries
             .map((entry: string) => entry.split('::').slice(1).filter((part: string) => part && part !== 'null').join('.'))
             .filter(Boolean);
         } catch (error) {
