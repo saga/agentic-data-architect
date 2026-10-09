@@ -62,7 +62,10 @@ def main() -> int:
             result.append({"type": kind, "tables": tables, "columns": columns})
         print(json.dumps({"available": True, "statements": result}))
     except Exception as exc:
-        print(json.dumps({"available": False, "error": str(exc)}))
+        # SQLGlot is installed and ran, but this dialect did not parse the input.
+        # Keep this distinct from the import failure above so callers can cache
+        # the working interpreter without treating a syntax error as missing SQLGlot.
+        print(json.dumps({"available": True, "statements": [], "error": str(exc)}))
     return 0
 
 if __name__ == "__main__":
