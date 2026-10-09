@@ -184,7 +184,7 @@ export interface JevSmartFuncInput {
 const probabilitySchema = z.array(
   z.object({
     key: z.string().min(1),
-    probability: z.number().min(0).max(1),
+    probability: z.number(),
   }).strict(),
 );
 
@@ -199,7 +199,7 @@ const choiceAnswerSchema = z.object({
   type: z.literal('choice'),
   choice: z.string().min(1),
   probabilities: probabilitySchema,
-  confidence: z.number().min(0).max(1),
+  confidence: z.number(),
 }).strict();
 
 const scoreAnswerSchema = z.object({
@@ -211,7 +211,7 @@ const scoreAnswerSchema = z.object({
 
 const noulAnswerSchema = z.object({
   type: z.literal('noul'),
-  noul: z.number().min(0).max(1),
+  noul: z.number(),
 }).strict();
 
 /**
@@ -288,12 +288,17 @@ function validateAndNormalize(
   questions: Record<string, JevQuestion>,
   raw: Record<string, unknown>,
 ): Record<string, JevSmartAnswer> {
+  const assertProbability = (value: number, label: string) => {
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('Smart Function 概率超出 0 到 1 的范围：' + label);
+  };
   const result: Record<string, JevSmartAnswer> = {};
 
   for (const [key, question] of Object.entries(questions)) {
     const answer = raw[key];
     if (question.type === 'choice') {
       const parsed = choiceAnswerSchema.parse(answer);
+      assertProbability(parsed.confidence, key + '.confidence');
+      parsed.probabilities.forEach((item) => assertProbability(item.probability, key + '.probabilities.' + item.key));
       const allowed = new Set(Object.keys(question.options));
       if (!allowed.has(parsed.choice)) {
         throw new Error('Smart Function choice 超出候选项：' + key + ' -> ' + parsed.choice);
@@ -314,6 +319,8 @@ function validateAndNormalize(
 
     if (question.type === 'score') {
       const parsed = scoreAnswerSchema.parse(answer);
+      assertProbability(parsed.confidence, key + '.confidence');
+      parsed.probabilities.forEach((item) => assertProbability(item.probability, key + '.probabilities.' + item.level));
       const maxScore = question.levels.length - 1;
       if (parsed.score < 0 || parsed.score > maxScore) {
         throw new Error('Smart Function score 超出评分范围：' + key);
