@@ -7,6 +7,7 @@ import type {
   CurrentStateSummary as SharedCurrentStateSummary,
   ExecutionStatus as SharedExecutionStatus,
   InvestigationControl as SharedInvestigationControl,
+  GlobalConfiguration as SharedGlobalConfiguration,
   Message as SharedMessage,
   MissionContract as SharedMissionContract,
   MissionDeliverable as SharedMissionDeliverable,
@@ -39,12 +40,13 @@ export type Message = SharedMessage;
 export type SessionData = SharedSessionData;
 export type CurrentStateSummary = SharedCurrentStateSummary;
 export type InvestigationControl = SharedInvestigationControl;
+export type GlobalConfiguration = SharedGlobalConfiguration;
 export type MissionDeliverable = SharedMissionDeliverable;
 export type MissionContract = SharedMissionContract;
 export type MissionDeliverableProgress = SharedMissionDeliverableProgress;
 export type MissionProgress = SharedMissionProgress;
 export type MissionDraft = SharedMissionDraft;
 export type InvestigationCheckpoint = TrajectoryCheckpoint;
-export type JourneyState = SharedWorkflowSnapshot['state'];
+export type JourneyState = SharedWorkflowSnapshot['state'] & { execution: SharedWorkflowSnapshot['execution'] };
 export type WorkflowSnapshot = SharedWorkflowSnapshot;
 export type ConversationTurnSummary = SharedConversationTurnSummary;
