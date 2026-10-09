@@ -30,8 +30,8 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 - Capability Skill 由当前 Agent Runtime 自动发现；当前 Investigation 只通过 `workflow` 选择一条 Workflow Skill，其它 Workflow Skill 会被禁用，不能通过 `control.json` 再组装一套 Skill enable list
 - 金融领域检查放在 `skills/financial-data-review/`，其中 deterministic 检查放在 `scripts/review.mjs`
 - `.workspace/shared/index.json` 和共享研究资料
-- 本地 SQL / PostgreSQL / Snowflake discovery
-- SQLGlot dataset / column lineage
+- 本地 SQL 文件分析，以及 PostgreSQL / Snowflake 实时数据库 discovery（Oracle 实时数据库 adapter 尚未实现）
+- SQLGlot 驱动的 dataset / column lineage（尽力而为；解析失败会记录，但不能把所有语法或列映射都视为已覆盖）
 - Evidence provenance
 - read-only profiling / targeted query
 - deterministic findings
@@ -43,6 +43,16 @@ Express 只负责 Web/API 边界，不重新实现 Investigation、Evidence 或 
 ```bash
 npm run start
 ```
+
+## SQL / Database 分析能力边界
+
+SQL 相关能力分成三层，不能互相替代：
+
+- **SQL Code Structure Index**：从仓库中的 `.sql`、`.ddl`、`.dml`、`.hql` 文件提取 statement、表访问和列引用，用于结构导航。列引用不是列级血缘；结构索引目前不覆盖 Oracle 专用的 `.pks`、`.pkb`、`.pls` 等 PL/SQL 工件。
+- **SQLGlot lineage**：尝试提取 dataset 依赖和列级映射，适用于已能正确解析且映射规则覆盖的 SQL。CTE、派生表和表达式已有处理逻辑，但 `SELECT *`、复杂作用域、存储过程、动态 SQL、方言扩展和复杂写入语义仍可能不完整。结果应结合 parse failures 与 Evidence 审查，不能将“解析成功”理解为“血缘完整”。
+- **实时数据库 discovery**：当前适配器为 PostgreSQL 和 Snowflake，主要读取元数据，按需执行受限 profiling。Oracle SQL 方言识别不代表支持 Oracle 数据库连接、元数据 discovery 或 PL/SQL 血缘。
+
+方言自动识别基于 SQL 特征启发式规则，不是可靠的完整方言推断。遇到混合方言、弱特征或解析器不支持的语法时，必须保留不确定性，不能静默声称已完整分析。数据库查询的应用层只读检查也不能替代数据库侧只读账号和最小权限。
 
 ## SSE 断线、Stop 与 Server Restart
 
