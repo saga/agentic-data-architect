@@ -189,8 +189,35 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         let tableAccesses: Array<{ operation: string; name: string }> = [];
         let columns: string[] = [];
         if (statement?.sqlGlot) {
-          tableAccesses = statement.sqlGlot.tables;
-          columns = statement.sqlGlot.columns;
+          tableAccesses = [...statement.sqlGlot.tables];
+          columns = [...statement.sqlGlot.columns];
+          // SQLGlot supplies dialect-aware AST facts. Supplement it with the existing
+          // parser's per-statement table/column extraction so unsupported AST shapes do
+          // not silently erase ordinary table references (for example aliased JOIN tables).
+          try {
+            const sourceSql = sourceStatementLocations[index]?.sql ?? text;
+            const tableEntries = parser.tableList(sourceSql, parseOptions) ?? [];
+            const columnEntries = parser.columnList(sourceSql, parseOptions) ?? [];
+            const fallbackTables = tableEntries
+              .map((entry: string) => ({
+                operation: entry.split('::')[0]?.toLowerCase() ?? '',
+                name: qualifiedTable(entry),
+              }))
+              .filter((entry: { operation: string; name: string }) => Boolean(entry.name));
+            const seenTables = new Set(tableAccesses.map(entry => `${entry.operation}:${entry.name.toLowerCase()}`));
+            for (const entry of fallbackTables) {
+              const key = `${entry.operation}:${entry.name.toLowerCase()}`;
+              if (!seenTables.has(key)) {
+                tableAccesses.push(entry);
+                seenTables.add(key);
+              }
+            }
+            columns = [...new Set([...columns, ...columnEntries
+              .map((entry: string) => entry.split('::').slice(1).filter((part: string) => part && part !== 'null').join('.'))
+              .filter(Boolean)])];
+          } catch {
+            // Keep SQLGlot's result when the fallback parser cannot interpret this dialect.
+          }
         } else try {
           // The location range keeps INSERT...SELECT source tables attached to the same
           // statement as its target; sqlify is used when the parser omitted source locations.
