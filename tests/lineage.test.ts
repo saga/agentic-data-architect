@@ -88,7 +88,7 @@ describe('dialect detection', () => {
     assert.equal(postgres.statements[0]?.dialect, 'postgres');
     const snowflake = await parser.parseFileDetailed!(
       'snowflake.sql',
-      'SELECT payload FROM events QUALIFY ROW_NUMBER() OVER (ORDER BY event_id) = 1',
+      'SELECT NUMBER(38,0) AS amount FROM events QUALIFY ROW_NUMBER() OVER (ORDER BY event_id) = 1',
     );
     assert.equal(snowflake.statements[0]?.dialect, 'snowflake');
   });
