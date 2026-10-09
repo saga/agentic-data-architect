@@ -194,7 +194,7 @@ export function splitStatements(text: string): SplitStatement[] {
         continue;
       }
     }
-    if (ch === "'" || ch === '"' || ch === '\`') {
+    if (ch === "'" || ch === '"' || ch === String.fromCharCode(96)) {
       quote = ch;
       continue;
     }
