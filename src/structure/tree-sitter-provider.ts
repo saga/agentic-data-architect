@@ -198,9 +198,14 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
               line: i + 1,
             });
           }
-          const methodMatch = lineText.match(/^\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\s+)*(?:[\w<>,?.\[\]]+\s+)+(\w+)\s*\([^;]*\)\s*(?:\{|=>)/);
-          if (methodMatch && !['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodMatch[1]!)) {
-            declarations.push({ kind: 'method', name: methodMatch[1]!, line: i + 1 });
+          // Search the entire line: compact C# files often put a class and several
+          // methods on one line, so an anchored single-match expression silently loses them.
+          const methodPattern = /(?:^|\\s)(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\\s+)*(?:[\\w<>,?.\\[\\]]+\\s+)+(\\w+)\\s*\\([^;]*?\\)\\s*(?:\\{|=>)/g;
+          for (const methodMatch of lineText.matchAll(methodPattern)) {
+            const methodName = methodMatch[1]!;
+            if (!['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodName)) {
+              declarations.push({ kind: 'method', name: methodName, line: i + 1 });
+            }
           }
         }
         for (const declaration of declarations) {
