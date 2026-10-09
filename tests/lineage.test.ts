@@ -69,11 +69,16 @@ describe('sqlglot parser', () => {
 });
 
 describe('dialect detection', () => {
-  it('records the detected dialect for Oracle and PostgreSQL SQL', async () => {
+  it('records the detected dialect for Oracle, PostgreSQL and Snowflake SQL', async () => {
     const oracle = await parser.parseFileDetailed!('oracle.sql', 'SELECT SYSDATE FROM DUAL');
     assert.equal(oracle.statements[0]?.dialect, 'oracle');
     const postgres = await parser.parseFileDetailed!('postgres.sql', 'SELECT value::jsonb FROM public.events');
     assert.equal(postgres.statements[0]?.dialect, 'postgres');
+    const snowflake = await parser.parseFileDetailed!(
+      'snowflake.sql',
+      'SELECT payload FROM events QUALIFY ROW_NUMBER() OVER (ORDER BY event_id) = 1',
+    );
+    assert.equal(snowflake.statements[0]?.dialect, 'snowflake');
   });
 
   it('preserves parse failures for individual statements', async () => {
