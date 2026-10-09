@@ -240,7 +240,7 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
       fileRecords.push({
         path: rel,
         hash: createHash('sha256').update(sourceBytes).digest('hex'),
-        parser: grammar.packageName ?? '@vscode/tree-sitter-wasm/' + grammar.language,
+        parser: 'tree-sitter-' + grammar.language,
       });
     }
 
