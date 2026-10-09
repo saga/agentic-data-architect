@@ -11,6 +11,7 @@ import type { Parser as SqlParser } from 'node-sql-parser';
 const require = createRequire(import.meta.url);
 const { Parser } = require('node-sql-parser') as { Parser: new () => SqlParser };
 import type { CodeEdge, CodeNode, CodeStructureIndex, CodeStructureProvider, StructurePath, StructureQuery } from './types.js';
+import { splitStatements } from '../analysis/sql-parser.js';
 
 const SQL_EXTENSIONS = new Set(['.sql', '.ddl', '.dml', '.hql']);
 const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.code-structure']);
@@ -145,6 +146,10 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
       fileNodeByPath.set(rel, file);
       const ordinals = new Map<string, number>();
       ordinals.set('file\0' + rel, 1);
+      // Align parsed statements with source locations for navigation and evidence.
+      // This is approximate for procedural SQL whose internal semicolons are not
+      // ordinary statement separators; parser-provided locations take precedence.
+      const sourceStatementLocations = splitStatements(text);
 
       let statements: any[];
       if (sqlGlotStatements) {
@@ -176,6 +181,9 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
 
       for (let index = 0; index < statements.length; index++) {
         const statement = statements[index];
+        const statementLine = statement?.loc?.start?.line
+          ?? sourceStatementLocations[index]?.lineStart
+          ?? 1;
         let tableAccesses: Array<{ operation: string; name: string }> = [];
         let columns: string[] = [];
         if (statement?.sqlGlot) {
@@ -226,8 +234,8 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         }
 
         const statementName = String(statement?.type ?? 'statement') + ':' + index;
-        const stmtNode = add(nodes, new Map(), rel, 'statement', statementName, ordinals, 1);
-        edges.push({ from: file.id, to: stmtNode.id, kind: 'contains', confidence: 'exact', file: rel, line: 1 });
+        const stmtNode = add(nodes, new Map(), rel, 'statement', statementName, ordinals, statementLine);
+        edges.push({ from: file.id, to: stmtNode.id, kind: 'contains', confidence: 'exact', file: rel, line: statementLine });
 
         const tableNames = [...new Set(tableAccesses.map((entry) => entry.name))];
         const tableNodesByName = new Map<string, CodeNode>();
@@ -236,7 +244,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
           let tableNode = objectNodes.get(key);
           if (!tableNode) {
             const kind: CodeNode['kind'] = /^(view|views)[:.]/i.test(tableName) ? 'view' : 'table';
-            tableNode = add(nodes, new Map(), rel, kind, tableName, ordinals, 1);
+            tableNode = add(nodes, new Map(), rel, kind, tableName, ordinals, statementLine);
             objectNodes.set(key, tableNode);
           }
           tableNodesByName.set(tableName, tableNode);
@@ -246,7 +254,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
           const table = tableNodesByName.get(access.name);
           if (!table) continue;
           const write = ['insert', 'update', 'delete', 'merge'].includes(access.operation);
-          edges.push({ from: stmtNode.id, to: table.id, kind: write ? 'writes' : 'reads', confidence: 'exact', file: rel, line: 1 });
+          edges.push({ from: stmtNode.id, to: table.id, kind: write ? 'writes' : 'reads', confidence: 'exact', file: rel, line: statementLine });
         }
         const joinedTables = [...new Set(tableAccesses
           .filter((entry) => entry.operation === 'select')
@@ -255,13 +263,13 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
           .filter((node): node is CodeNode => Boolean(node));
         if (String(statement?.type).toLowerCase() === 'select' && joinedTables.length > 1) {
           for (let i = 1; i < joinedTables.length; i++) {
-            edges.push({ from: joinedTables[0]!.id, to: joinedTables[i]!.id, kind: 'joins', confidence: 'inferred', file: rel, line: 1 });
+            edges.push({ from: joinedTables[0]!.id, to: joinedTables[i]!.id, kind: 'joins', confidence: 'inferred', file: rel, line: statementLine });
           }
         }
 
         for (const columnName of [...new Set(columns)]) {
-          const columnNode = add(nodes, new Map(), rel, 'column', columnName, ordinals, 1);
-          edges.push({ from: stmtNode.id, to: columnNode.id, kind: 'references', confidence: 'exact', file: rel, line: 1 });
+          const columnNode = add(nodes, new Map(), rel, 'column', columnName, ordinals, statementLine);
+          edges.push({ from: stmtNode.id, to: columnNode.id, kind: 'references', confidence: 'exact', file: rel, line: statementLine });
         }
       }
     }
