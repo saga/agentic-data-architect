@@ -200,7 +200,7 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
           }
           // Search the entire line: compact C# files often put a class and several
           // methods on one line, so an anchored single-match expression silently loses them.
-          const methodPattern = /(?:^|\\s)(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\\s+)*(?:[\\w<>,?.\\[\\]]+\\s+)+(\\w+)\\s*\\([^;]*?\\)\\s*(?:\\{|=>)/g;
+          const methodPattern = /(?:^|\s)(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\s+)*(?:[\w<>,?.\[\]]+\s+)+(\w+)\s*\([^;]*?\)\s*(?:\{|=>)/g;
           for (const methodMatch of lineText.matchAll(methodPattern)) {
             const methodName = methodMatch[1]!;
             if (!['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodName)) {
