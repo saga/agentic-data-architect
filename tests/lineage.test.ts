@@ -42,6 +42,17 @@ describe('sqlglot parser', () => {
     assert.deepEqual(st?.sources, ['src.raw']);
   });
 
+  it('MERGE preserves the write target and source dataset dependency', async () => {
+    const [st] = await parse(
+      'MERGE INTO target_table t USING source_table s ON t.id = s.id ' +
+      'WHEN MATCHED THEN UPDATE SET value = s.value ' +
+      'WHEN NOT MATCHED THEN INSERT (id, value) VALUES (s.id, s.value)',
+    );
+    assert.equal(st?.target, 'target_table');
+    assert.equal(st?.dialect, undefined);
+    assert.deepEqual(st?.sources, ['source_table']);
+  });
+
   it('quoted identifiers and multi-statement files', async () => {
     const stmts = await parse(`CREATE VIEW "V" AS SELECT x FROM "Sch".t; SELECT 1`);
     assert.equal(stmts.length, 2);
