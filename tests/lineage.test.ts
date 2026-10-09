@@ -19,6 +19,16 @@ describe('splitStatements (no bridge needed)', () => {
     assert.equal(chunks[0]?.lineStart, 1);
     assert.equal(chunks[1]?.lineStart, 2);
   });
+
+  it('does not split PostgreSQL dollar-quoted procedure bodies or doubled quotes', () => {
+    const chunks = splitStatements(
+      "CREATE FUNCTION f() RETURNS void AS $body$ BEGIN PERFORM ';'; END; $body$ LANGUAGE plpgsql; SELECT 'it''s;ok' AS value; SELECT 3",
+    );
+    assert.equal(chunks.length, 3);
+    assert.match(chunks[0]?.sql ?? '', /PERFORM ';'/);
+    assert.match(chunks[1]?.sql ?? '', /it''s;ok/);
+    assert.equal(chunks[2]?.sql.trim(), 'SELECT 3');
+  });
 });
 
 describe('sqlglot parser', () => {
