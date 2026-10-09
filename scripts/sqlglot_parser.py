@@ -258,13 +258,35 @@ def analyze_statement(statement: exp.Expression) -> dict:
 
 
 def detect_dialect(sql: str, configured: str | None) -> str | None:
-    """Prefer clear dialect-specific syntax; otherwise honor caller configuration."""
+    """Heuristically detect strong dialect syntax; fall back to caller configuration.
+
+    This is deliberately a syntax-signal heuristic, not a SQL lexer. Comments and
+    string literals can still contain matching tokens, so callers should prefer an
+    explicit dialect when the source format is known.
+    """
     text = sql.lower()
-    if any(token in text for token in ("varchar2", "nvarchar2", "sysdate", "systimestamp", "connect by", "dbms_", "utl_")) or " from dual" in text:
+    oracle = (
+        r"\b(?:varchar2|nvarchar2|sysdate|systimestamp|dual|connect\s+by)\b",
+        r"\bnumber\s*\(",
+        r"\b(?:dbms|utl)_[a-z0-9_$]+\b",
+        r"\bpragma\s+autonomous_transaction\b",
+    )
+    postgres = (
+        r"::\s*[a-z_][\w.]*(?:\[\])?",
+        r"\b(?:serial|bigserial|smallserial|ilike|returning|jsonb|plpgsql)\b",
+        r"\bdistinct\s+on\s*\(",
+        r"\$[a-z_]*\$",
+    )
+    snowflake = (
+        r"\b(?:qualify|flatten|variant|object_construct|parse_json)\b",
+        r"\bcopy\s+into\b",
+        r"\bsnowflake\.account_usage\b",
+    )
+    if any(re.search(pattern, text) for pattern in oracle):
         return "oracle"
-    if any(token in text for token in ("::jsonb", "::text", " ilike ", " distinct on ", " bigserial", " serial ", " returning ")) or re.search(r"\$[a-z_]*\$", text):
+    if any(re.search(pattern, text) for pattern in postgres):
         return "postgres"
-    if any(token in text for token in (" qualify ", "flatten(", "object_construct(", "parse_json(", "copy into ", "snowflake.account_usage")) or re.search(r"\bvariant\b", text):
+    if any(re.search(pattern, text) for pattern in snowflake):
         return "snowflake"
     return configured.lower() if configured else None
 
