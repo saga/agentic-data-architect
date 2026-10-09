@@ -46,6 +46,17 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
   return undefined;
 }
 
+function detectSqlDialect(sql: string, configured: string): string {
+  const text = sql.toLowerCase();
+  const oracleSignals = /\\b(varchar2|nvarchar2|number\\s*\\(|sysdate|systimestamp|dual|connect\\s+by|pragma\\s+autonomous_transaction)\\b|\\b(dbms_[a-z0-9_$]+|utl_[a-z0-9_$]+)\\b/.test(text);
+  const postgresSignals = /::[a-z_][\\w.]*(?:\\[\\])?|\\b(serial|bigserial|smallserial|ilike|returning|distinct\\s+on|jsonb|plpgsql)\\b|\\$[a-z_]*\\$/.test(text);
+  const snowflakeSignals = /\\b(qualify|flatten|variant|object_construct|parse_json|copy\\s+into|lateral\\s+flatten|snowflake\\.account_usage)\\b/.test(text);
+  if (oracleSignals) return 'oracle';
+  if (postgresSignals) return 'postgres';
+  if (snowflakeSignals) return 'snowflake';
+  return configured.toLowerCase();
+}
+
 function nodeId(file: string, kind: CodeNode['kind'], name: string, ordinal: number): string {
   return [file, kind, name, ordinal].join('#');
 }
@@ -112,12 +123,13 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
     for (const absolute of files) {
       const rel = path.relative(root, absolute).split(path.sep).join('/');
       const text = await fs.readFile(absolute, 'utf8');
-      // Snowflake projects commonly use QUALIFY, FLATTEN, VARIANT, scripting blocks,
-      // and Snowflake DDL. Prefer SQLGlot's Snowflake dialect, then the configured dialect.
-      const sqlGlotStatements = parseWithSqlGlot(root, text, 'snowflake')
-        ?? (this.database.toLowerCase() === 'snowflake'
-          ? undefined
-          : parseWithSqlGlot(root, text, this.database));
+      // Prefer the configured dialect unless the SQL contains strong dialect-specific
+      // signals. Repositories may contain mixed PostgreSQL, Oracle, and Snowflake scripts.
+      const dialect = detectSqlDialect(text, this.database);
+      const sqlGlotStatements = parseWithSqlGlot(root, text, dialect)
+        ?? [...new Set(['postgres', 'oracle', 'snowflake', 'mysql'].filter(item => item !== dialect))]
+          .map(item => parseWithSqlGlot(root, text, item))
+          .find((result): result is SqlGlotStatement[] => result !== undefined);
       hashes.push({
         path: rel,
         hash: createHash('sha256').update(text).digest('hex'),
