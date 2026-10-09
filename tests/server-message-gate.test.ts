@@ -58,13 +58,11 @@ test('Mission Gate preserves the user message it blocks', async () => {
 });
 
 test.after(async () => {
-  // Stop accepting requests first, then destroy tracked sockets, including idle keep-alive
-  // sockets retained by fetch/Undici. This avoids waiting indefinitely for server.close().
-  const closed = new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
-  });
+  // Teardown must not await server.close(): its callback can remain pending when a client
+  // keep-alive socket is left in an unusual state. Closing the listener and actively
+  // destroying every known connection is sufficient; only workspace cleanup is awaited.
+  server.close();
   server.closeAllConnections();
   for (const socket of sockets) socket.destroy();
-  await closed;
   await fs.rm(workspaceDir, { recursive: true, force: true });
 });
