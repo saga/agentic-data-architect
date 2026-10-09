@@ -88,13 +88,28 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         continue;
       }
 
+      // Prefer metadata for each statement, but keep a file-level result as a fallback.
+      // A successfully parsed SQL statement should not disappear from the structural snapshot
+      // just because this parser version returns an unexpected per-statement metadata shape.
+      let fileTableEntries: string[] = [];
+      let fileColumnEntries: string[] = [];
+      try {
+        fileTableEntries = parser.tableList(text, parseOptions) ?? [];
+        fileColumnEntries = parser.columnList(text, parseOptions) ?? [];
+      } catch (error) {
+        console.warn('[sql-structure] Could not extract file-level metadata.', {
+          file: rel,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       for (let index = 0; index < statements.length; index++) {
         const statement = statements[index];
         let tableAccesses: Array<{ operation: string; name: string }> = [];
         let columns: string[] = [];
         try {
-          // Use the original source range when available. This preserves dialect-specific
-          // syntax and keeps INSERT...SELECT read/write operations tied to this statement.
+          // The location range keeps INSERT...SELECT source tables attached to the same
+          // statement as its target; sqlify is used when the parser omitted source locations.
           const start = statement?.loc?.start?.offset;
           const end = statement?.loc?.end?.offset;
           const statementSql = Number.isInteger(start) && Number.isInteger(end) && end > start
@@ -104,20 +119,41 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
             tableList?: string[];
             columnList?: string[];
           };
-          tableAccesses = (metadata.tableList ?? [])
+          if (!Array.isArray(metadata?.tableList) || !Array.isArray(metadata?.columnList)) {
+            throw new Error('Parser did not return tableList and columnList arrays');
+          }
+          tableAccesses = metadata.tableList
             .map((entry: string) => ({
               operation: entry.split('::')[0]?.toLowerCase() ?? '',
               name: qualifiedTable(entry),
             }))
             .filter((entry: { operation: string; name: string }) => Boolean(entry.name));
-          columns = (metadata.columnList ?? [])
+          columns = metadata.columnList
             .map((entry: string) => entry.split('::').slice(1).filter((part: string) => part && part !== 'null').join('.'))
             .filter(Boolean);
         } catch (error) {
-          throw new Error(
-            'Failed to extract SQL metadata from ' + rel + ' statement ' + (index + 1),
-            { cause: error },
-          );
+          // This is a fallback, not a hard gate: the file AST was already parsed, so retain
+          // best-effort table/column facts and leave a diagnostic instead of failing the build.
+          const operation = String(statement?.type ?? '').toLowerCase();
+          const fallbackEntries = fileTableEntries.filter((entry) => {
+            const kind = entry.split('::')[0]?.toLowerCase() ?? '';
+            return kind === operation || (operation === 'insert' && kind === 'select');
+          });
+          tableAccesses = fallbackEntries
+            .map((entry) => ({
+              operation: entry.split('::')[0]?.toLowerCase() ?? '',
+              name: qualifiedTable(entry),
+            }))
+            .filter((entry) => Boolean(entry.name));
+          columns = fileColumnEntries
+            .map((entry) => entry.split('::').slice(1).filter((part) => part && part !== 'null').join('.'))
+            .filter(Boolean);
+          console.warn('[sql-structure] Used file-level SQL metadata fallback.', {
+            file: rel,
+            statement: index + 1,
+            type: operation,
+            reason: error instanceof Error ? error.message : String(error),
+          });
         }
 
         const statementName = String(statement?.type ?? 'statement') + ':' + index;
