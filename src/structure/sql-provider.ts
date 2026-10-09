@@ -67,6 +67,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
     const fileNodeByPath = new Map<string, CodeNode>();
     const objectNodes = new Map<string, CodeNode>();
     const parser = new Parser();
+    const parseOptions = { database: this.database as any };
     const hashes: CodeStructureIndex['files'] = [];
 
     for (const absolute of files) {
@@ -80,7 +81,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
 
       let statements: any[];
       try {
-        const parsed = parser.astify(text, { database: this.database as any }) as any;
+        const parsed = parser.astify(text, parseOptions) as any;
         statements = Array.isArray(parsed) ? parsed : [parsed];
       } catch {
         // 不把无法解析的 SQL 猜成结构事实；文件仍然保留在 snapshot 中。
@@ -89,20 +90,33 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
 
       for (let index = 0; index < statements.length; index++) {
         const statement = statements[index];
-        const statementName = `${statement?.type ?? 'statement'}:${index}`;
+        let tableAccesses: Array<{ operation: string; name: string }> = [];
+        let columns: string[] = [];
+        try {
+          // astify() returns AST nodes; tableList()/columnList() are separate parser APIs.
+          // Re-serialize each AST so INSERT...SELECT access types remain associated with
+          // the correct statement instead of marking every referenced table as a write.
+          const statementSql = parser.sqlify(statement, parseOptions);
+          tableAccesses = parser.tableList(statementSql, parseOptions)
+            .map((entry: string) => ({
+              operation: entry.split('::')[0]?.toLowerCase() ?? '',
+              name: qualifiedTable(entry),
+            }))
+            .filter((entry: { operation: string; name: string }) => Boolean(entry.name));
+          columns = parser.columnList(statementSql, parseOptions)
+            .map((entry: string) => entry.split('::').slice(1).filter((part: string) => part && part !== 'null').join('.'))
+            .filter(Boolean);
+        } catch {
+          // Keep the successfully parsed statement but do not invent relationships.
+        }
+
+        const statementName = String(statement?.type ?? 'statement') + ':' + index;
         const stmtNode = add(nodes, new Map(), rel, 'statement', statementName, ordinals, 1);
         edges.push({ from: file.id, to: stmtNode.id, kind: 'contains', confidence: 'exact', file: rel, line: 1 });
 
-        const tables: string[] = Array.isArray(statement?.tableList)
-          ? statement.tableList.map((x: string) => qualifiedTable(x)).filter(Boolean)
-          : [];
-        const columns: string[] = Array.isArray(statement?.columnList)
-          ? statement.columnList.map((x: string) => x.split('::').slice(1).filter((p: string) => p && p !== 'null').join('.')).filter(Boolean)
-          : [];
-
-        const uniqueTables = [...new Set(tables)];
-        const tableNodes: CodeNode[] = [];
-        for (const tableName of uniqueTables) {
+        const tableNames = [...new Set(tableAccesses.map((entry) => entry.name))];
+        const tableNodesByName = new Map<string, CodeNode>();
+        for (const tableName of tableNames) {
           const key = tableName.toLowerCase();
           let tableNode = objectNodes.get(key);
           if (!tableNode) {
@@ -110,15 +124,24 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
             tableNode = add(nodes, new Map(), rel, kind, tableName, ordinals, 1);
             objectNodes.set(key, tableNode);
           }
-          tableNodes.push(tableNode);
+          tableNodesByName.set(tableName, tableNode);
         }
 
-        for (const table of tableNodes) {
-          const write = ['insert', 'update', 'delete'].includes(String(statement?.type).toLowerCase());
+        for (const access of tableAccesses) {
+          const table = tableNodesByName.get(access.name);
+          if (!table) continue;
+          const write = ['insert', 'update', 'delete'].includes(access.operation);
           edges.push({ from: stmtNode.id, to: table.id, kind: write ? 'writes' : 'reads', confidence: 'exact', file: rel, line: 1 });
         }
-        if (tableNodes.length > 1) {
-          for (let i = 1; i < tableNodes.length; i++) edges.push({ from: tableNodes[0].id, to: tableNodes[i].id, kind: 'joins', confidence: 'inferred', file: rel, line: 1 });
+        const joinedTables = [...new Set(tableAccesses
+          .filter((entry) => entry.operation === 'select')
+          .map((entry) => entry.name))]
+          .map((name) => tableNodesByName.get(name))
+          .filter((node): node is CodeNode => Boolean(node));
+        if (String(statement?.type).toLowerCase() === 'select' && joinedTables.length > 1) {
+          for (let i = 1; i < joinedTables.length; i++) {
+            edges.push({ from: joinedTables[0]!.id, to: joinedTables[i]!.id, kind: 'joins', confidence: 'inferred', file: rel, line: 1 });
+          }
         }
 
         for (const columnName of [...new Set(columns)]) {
