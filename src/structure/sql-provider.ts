@@ -112,7 +112,12 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
     for (const absolute of files) {
       const rel = path.relative(root, absolute).split(path.sep).join('/');
       const text = await fs.readFile(absolute, 'utf8');
-      const sqlGlotStatements = parseWithSqlGlot(root, text, this.database);
+      // Snowflake projects commonly use QUALIFY, FLATTEN, VARIANT, scripting blocks,
+      // and Snowflake DDL. Prefer SQLGlot's Snowflake dialect, then the configured dialect.
+      const sqlGlotStatements = parseWithSqlGlot(root, text, 'snowflake')
+        ?? (this.database.toLowerCase() === 'snowflake'
+          ? undefined
+          : parseWithSqlGlot(root, text, this.database));
       hashes.push({
         path: rel,
         hash: createHash('sha256').update(text).digest('hex'),
