@@ -274,7 +274,6 @@ def detect_dialect(sql: str, configured: str | None) -> str | None:
     text = sql.lower()
     oracle = (
         r"\b(?:varchar2|nvarchar2|sysdate|systimestamp|dual|connect\s+by)\b",
-        r"\bnumber\s*\(",
         r"\b(?:dbms|utl)_[a-z0-9_$]+\b",
         r"\bpragma\s+autonomous_transaction\b",
     )
