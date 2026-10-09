@@ -112,6 +112,7 @@ export function splitStatements(text: string): SplitStatement[] {
   let dollarQuote: string | null = null;
   let lineComment = false;
   let blockComment = false;
+
   const push = (end: number, endLine: number) => {
     const raw = text.slice(start, end);
     const sql = raw.trim();
@@ -139,10 +140,12 @@ export function splitStatements(text: string): SplitStatement[] {
     const lineStart = text.slice(0, start + first).split('\n').length;
     out.push({ sql, lineStart, lineEnd: endLine });
   };
+
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     const next = text[i + 1];
     if (ch === '\n') line++;
+
     if (lineComment) {
       if (ch === '\n') lineComment = false;
       continue;
@@ -163,8 +166,8 @@ export function splitStatements(text: string): SplitStatement[] {
     }
     if (quote) {
       if (ch === quote) {
-        // SQL escapes a quote by doubling it ('it''s', "a""b"); a backslash
-        // escape is also accepted for dialects that support it.
+        // SQL escapes quote characters by doubling them; backslash escapes are
+        // accepted too for dialects that support them.
         if (next === quote) {
           i++;
           continue;
@@ -183,7 +186,19 @@ export function splitStatements(text: string): SplitStatement[] {
       i++;
       continue;
     }
-    if (ch === '
+    if (ch === '$') {
+      const delimiter = text.slice(i).match(/^\$(?:[a-zA-Z_][a-zA-Z0-9_]*)?\$/)?.[0];
+      if (delimiter) {
+        dollarQuote = delimiter;
+        i += delimiter.length - 1;
+        continue;
+      }
+    }
+    if (ch === "'" || ch === '"' || ch === '\`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === ';') {
       push(i, line);
       start = i + 1;
     }
