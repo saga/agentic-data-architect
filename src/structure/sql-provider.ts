@@ -48,7 +48,7 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
   return undefined;
 }
 
-function detectSqlDialect(sql: string, configured: string): string {
+export function detectSqlDialect(sql: string, configured: string): string {
   const text = sql.toLowerCase();
   const oracleSignals = /\\b(varchar2|nvarchar2|number\\s*\\(|sysdate|systimestamp|dual|connect\\s+by|pragma\\s+autonomous_transaction)\\b|\\b(dbms_[a-z0-9_$]+|utl_[a-z0-9_$]+)\\b/.test(text);
   const postgresSignals = /::[a-z_][\\w.]*(?:\\[\\])?|\\b(serial|bigserial|smallserial|ilike|returning|distinct\\s+on|jsonb|plpgsql)\\b|\\$[a-z_]*\\$/.test(text);
