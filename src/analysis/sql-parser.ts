@@ -107,7 +107,6 @@ export interface SplitStatement {
 export function splitStatements(text: string): SplitStatement[] {
   const out: SplitStatement[] = [];
   let start = 0;
-  let startLine = 1;
   let line = 1;
   let quote: string | null = null;
   let lineComment = false;
@@ -156,7 +155,6 @@ export function splitStatements(text: string): SplitStatement[] {
     if (ch === ';') {
       push(i, line);
       start = i + 1;
-      startLine = line;
     }
   }
   push(text.length, line);
