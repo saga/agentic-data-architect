@@ -241,7 +241,7 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
         `SQL 解析组件启动失败（Python=${resolvePython()}）。请确认这个 Python 环境已经安装 sqlglot；可以运行 uv sync。具体原因：${e instanceof Error ? e.message : e}`,
       );
     }
-    const parsed = JSON.parse(stdout) as { results?: { statements: BridgeStatement[]; error: string | null }[] };
+    const parsed = JSON.parse(stdout) as { results?: { statements?: BridgeStatement[]; dialect?: string | null; error: string | null }[] };
     if (!parsed.results) throw new Error(`SQL 解析组件返回了无法识别的结果。请查看执行轨迹；原始信息：${stdout.slice(0, 200)}`);
     const out: ParsedStatement[] = [];
     parsed.results.forEach((r, i) => {
