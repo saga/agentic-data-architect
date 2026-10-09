@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { Parser as SqlParser } from 'node-sql-parser';
 
 // node-sql-parser is CommonJS. Node 22 does not synthesize a named ESM export
@@ -12,6 +13,36 @@ import type { CodeEdge, CodeNode, CodeStructureIndex, CodeStructureProvider, Str
 
 const SQL_EXTENSIONS = new Set(['.sql', '.ddl', '.dml', '.hql']);
 const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.code-structure']);
+
+type SqlGlotStatement = { type: string; tables: Array<{ operation: string; name: string }>; columns: string[] };
+
+function parseWithSqlGlot(root: string, sql: string, dialect: string): SqlGlotStatement[] | undefined {
+  const script = path.join(root, 'scripts', 'parse-sqlglot.py');
+  const candidates = [
+    path.join(root, '.venv', 'bin', 'python'),
+    path.join(root, '.venv', 'Scripts', 'python.exe'),
+    'python3',
+    'python',
+  ];
+  for (const command of candidates) {
+    const result = spawnSync(command, [script], {
+      input: JSON.stringify({ sql, dialect }),
+      encoding: 'utf8',
+      timeout: 15_000,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    });
+    if (result.error || result.status !== 0 || !result.stdout) continue;
+    try {
+      const parsed = JSON.parse(result.stdout) as { available?: boolean; statements?: SqlGlotStatement[] };
+      if (parsed.available && Array.isArray(parsed.statements)) return parsed.statements;
+    } catch {
+      // An unavailable or broken Python bridge must not block the existing Node parser.
+    }
+    // Python ran but SQLGlot is unavailable or failed on this input; try another interpreter.
+  }
+  return undefined;
+}
 
 function nodeId(file: string, kind: CodeNode['kind'], name: string, ordinal: number): string {
   return [file, kind, name, ordinal].join('#');
@@ -79,19 +110,28 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
     for (const absolute of files) {
       const rel = path.relative(root, absolute).split(path.sep).join('/');
       const text = await fs.readFile(absolute, 'utf8');
-      hashes.push({ path: rel, hash: createHash('sha256').update(text).digest('hex'), parser: 'node-sql-parser' });
+      const sqlGlotStatements = parseWithSqlGlot(root, text, this.database);
+      hashes.push({
+        path: rel,
+        hash: createHash('sha256').update(text).digest('hex'),
+        parser: sqlGlotStatements ? 'sqlglot' : 'node-sql-parser',
+      });
       const file = add(nodes, new Map(), rel, 'file', rel, new Map([['file\0' + rel, 1]]), 1);
       fileNodeByPath.set(rel, file);
       const ordinals = new Map<string, number>();
       ordinals.set('file\0' + rel, 1);
 
       let statements: any[];
-      try {
-        const parsed = parser.astify(text, parseOptions) as any;
-        statements = Array.isArray(parsed) ? parsed : [parsed];
-      } catch {
-        // 不把无法解析的 SQL 猜成结构事实；文件仍然保留在 snapshot 中。
-        continue;
+      if (sqlGlotStatements) {
+        statements = sqlGlotStatements.map((item) => ({ type: item.type, sqlGlot: item }));
+      } else {
+        try {
+          const parsed = parser.astify(text, parseOptions) as any;
+          statements = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          // 不把无法解析的 SQL 猜成结构事实；文件仍然保留在 snapshot 中。
+          continue;
+        }
       }
 
       // Prefer metadata for each statement, but keep a file-level result as a fallback.
@@ -113,7 +153,10 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         const statement = statements[index];
         let tableAccesses: Array<{ operation: string; name: string }> = [];
         let columns: string[] = [];
-        try {
+        if (statement?.sqlGlot) {
+          tableAccesses = statement.sqlGlot.tables;
+          columns = statement.sqlGlot.columns;
+        } else try {
           // The location range keeps INSERT...SELECT source tables attached to the same
           // statement as its target; sqlify is used when the parser omitted source locations.
           const start = statement?.loc?.start?.offset;
