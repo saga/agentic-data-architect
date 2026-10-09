@@ -11,6 +11,11 @@ process.env.WORKSPACE_DIR = workspaceDir;
 const { createApp } = await import('../src/server.js');
 
 const server = http.createServer(createApp());
+const sockets = new Set<import('node:net').Socket>();
+server.on('connection', (socket) => {
+  sockets.add(socket);
+  socket.once('close', () => sockets.delete(socket));
+});
 await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
 const address = server.address();
 if (!address || typeof address === 'string') throw new Error('Test server did not bind to a TCP port.');
@@ -53,10 +58,13 @@ test('Mission Gate preserves the user message it blocks', async () => {
 });
 
 test.after(async () => {
-  // fetch() may leave keep-alive sockets open; close them before awaiting server.close().
-  server.closeAllConnections();
-  await new Promise<void>((resolve, reject) => {
+  // Stop accepting requests first, then destroy tracked sockets, including idle keep-alive
+  // sockets retained by fetch/Undici. This avoids waiting indefinitely for server.close().
+  const closed = new Promise<void>((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
+  server.closeAllConnections();
+  for (const socket of sockets) socket.destroy();
+  await closed;
   await fs.rm(workspaceDir, { recursive: true, force: true });
 });
