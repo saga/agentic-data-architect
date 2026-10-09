@@ -18,6 +18,7 @@ Statement = {
 列解析是启发式的：SELECT * 无 schema 时记为 sourceColumn="*"。
 """
 import json
+import re
 import sys
 
 try:
@@ -261,7 +262,7 @@ def detect_dialect(sql: str, configured: str | None) -> str | None:
     text = sql.lower()
     if any(token in text for token in ("varchar2", "nvarchar2", "sysdate", "systimestamp", "connect by", "dbms_", "utl_")) or " from dual" in text:
         return "oracle"
-    if any(token in text for token in ("::jsonb", "::text", " ilike ", " distinct on ", " bigserial", " serial ", " returning ")) or __import__("re").search(r"\$[a-z_]*\$", text):
+    if any(token in text for token in ("::jsonb", "::text", " ilike ", " distinct on ", " bigserial", " serial ", " returning ")) or re.search(r"\$[a-z_]*\$", text):
         return "postgres"
     if any(token in text for token in (" qualify ", "flatten(", "object_construct(", "parse_json(", "copy into ", "snowflake.account_usage")) or __import__("re").search(r"\bvariant\b", text):
         return "snowflake"
