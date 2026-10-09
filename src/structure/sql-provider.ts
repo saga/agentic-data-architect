@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Parser } from 'node-sql-parser';
+import type { Parser as SqlParser } from 'node-sql-parser';
+
+// node-sql-parser is CommonJS. Node 22 does not synthesize a named ESM export
+// for Parser, so load the CJS package through createRequire for consistent behavior.
+const require = createRequire(import.meta.url);
+const { Parser } = require('node-sql-parser') as { Parser: new () => SqlParser };
 import type { CodeEdge, CodeNode, CodeStructureIndex, CodeStructureProvider, StructurePath, StructureQuery } from './types.js';
 
 const SQL_EXTENSIONS = new Set(['.sql', '.ddl', '.dml', '.hql']);
