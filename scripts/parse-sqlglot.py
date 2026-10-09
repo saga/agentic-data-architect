@@ -33,6 +33,9 @@ def main() -> int:
             elif isinstance(statement, exp.Delete):
                 target = statement.this
                 kind = "delete"
+            elif hasattr(exp, "Merge") and isinstance(statement, exp.Merge):
+                target = statement.this
+                kind = "merge"
             elif isinstance(statement, exp.Select) or isinstance(statement, exp.Query):
                 kind = "select"
             else:
@@ -44,7 +47,7 @@ def main() -> int:
             target_name = target_table.sql(dialect=dialect) if target_table is not None else None
             for table in statement.find_all(exp.Table):
                 name = table.sql(dialect=dialect)
-                is_target = bool(target_name and name.lower() == target_name.lower() and kind in {"insert", "update", "delete"})
+                is_target = bool(target_name and name.lower() == target_name.lower() and kind in {"insert", "update", "delete", "merge"})
                 operation = kind if is_target else "select"
                 key = (name.lower(), operation)
                 if key in seen:
