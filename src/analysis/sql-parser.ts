@@ -109,6 +109,7 @@ export function splitStatements(text: string): SplitStatement[] {
   let start = 0;
   let line = 1;
   let quote: string | null = null;
+  let dollarQuote: string | null = null;
   let lineComment = false;
   let blockComment = false;
   const push = (end: number, endLine: number) => {
@@ -146,6 +147,13 @@ export function splitStatements(text: string): SplitStatement[] {
       if (ch === '\n') lineComment = false;
       continue;
     }
+    if (dollarQuote) {
+      if (text.startsWith(dollarQuote, i)) {
+        i += dollarQuote.length - 1;
+        dollarQuote = null;
+      }
+      continue;
+    }
     if (blockComment) {
       if (ch === '*' && next === '/') {
         blockComment = false;
@@ -154,7 +162,15 @@ export function splitStatements(text: string): SplitStatement[] {
       continue;
     }
     if (quote) {
-      if (ch === quote && text[i - 1] !== '\\') quote = null;
+      if (ch === quote) {
+        // SQL escapes a quote by doubling it ('it''s', "a""b"); a backslash
+        // escape is also accepted for dialects that support it.
+        if (next === quote) {
+          i++;
+          continue;
+        }
+        if (text[i - 1] !== '\\') quote = null;
+      }
       continue;
     }
     if (ch === '-' && next === '-') {
@@ -166,6 +182,133 @@ export function splitStatements(text: string): SplitStatement[] {
       blockComment = true;
       i++;
       continue;
+    }
+    if (ch === '
+      push(i, line);
+      start = i + 1;
+    }
+  }
+  push(text.length, line);
+  return out;
+}
+
+interface BridgeColumn {
+  targetColumn: string;
+  sourceDataset: string;
+  sourceColumn: string;
+  expression: string;
+}
+
+interface BridgeStatement {
+  target: string | null;
+  kind: string;
+  sources: string[];
+  columns: BridgeColumn[];
+  sql: string;
+}
+
+/** 基于 Python sqlglot bridge 的 SqlParser 实现，把 AST 结果转换为本项目统一结构。 */
+export class SqlglotParser implements SqlParser {
+
+  /** 解析整个 SQL 文件，并保留每个无法解析 statement 的错误。 */
+  async parseFileDetailed(
+    file: string,
+    sql: string,
+    dialect?: string,
+  ): Promise<{ statements: ParsedStatement[]; failures: ParseFailure[] }> {
+    const chunks = splitStatements(sql);
+    if (chunks.length === 0) return { statements: [], failures: [] };
+    const payload = JSON.stringify({
+      batch: chunks.map((c) => ({ sql: c.sql, ...(dialect ? { dialect } : {}) })),
+    });
+    let stdout: string;
+    try {
+      stdout = await execBridge(resolvePython(), bridgeScript(), payload);
+    } catch (e) {
+      throw new Error(
+        `SQL 解析组件启动失败（Python=${resolvePython()}）。请确认这个 Python 环境已经安装 sqlglot；可以运行 uv sync。具体原因：${e instanceof Error ? e.message : e}`,
+      );
+    }
+    const parsed = JSON.parse(stdout) as { results?: { statements?: BridgeStatement[]; failures?: { statementIndex: number; error: string }[]; dialect?: string | null; error: string | null }[] };
+    if (!parsed.results) throw new Error(`SQL 解析组件返回了无法识别的结果。请查看执行轨迹；原始信息：${stdout.slice(0, 200)}`);
+
+    const statements: ParsedStatement[] = [];
+    const failures: ParseFailure[] = [];
+    parsed.results.forEach((r, i) => {
+      if (r.error && (!r.statements || r.statements.length === 0) && !(r.failures?.length)) {
+        failures.push({ statementIndex: i, error: r.error });
+      }
+      for (const failure of r.failures ?? []) {
+        failures.push({ statementIndex: i, error: failure.error });
+      }
+      if (!r.statements) return;
+      const parsedStatements = r.statements;
+      const statementDialect = r.dialect || dialect;
+      parsedStatements.forEach((s, j) => {
+        const parsedStatement: ParsedStatement = {
+          id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
+          file,
+          statementIndex: i,
+          lineStart: chunks[i]?.lineStart ?? 1,
+          lineEnd: chunks[i]?.lineEnd ?? 1,
+          ...(s.target ? { target: s.target } : {}),
+          sources: s.sources,
+          columns: s.columns,
+        };
+        if (statementDialect) parsedStatement.dialect = statementDialect;
+        statements.push(parsedStatement);
+      });
+    });
+    return { statements, failures };
+  }
+
+  /** 解析一个 SQL 文件，单条解析失败时跳过该 statement，避免污染整份文件。 */
+async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStatement[]> {
+    const chunks = splitStatements(sql);
+    if (chunks.length === 0) return [];
+    const payload = JSON.stringify({
+      batch: chunks.map((c) => ({ sql: c.sql, ...(dialect ? { dialect } : {}) })),
+    });
+    let stdout: string;
+    try {
+      stdout = await execBridge(resolvePython(), bridgeScript(), payload);
+    } catch (e) {
+      throw new Error(
+        `SQL 解析组件启动失败（Python=${resolvePython()}）。请确认这个 Python 环境已经安装 sqlglot；可以运行 uv sync。具体原因：${e instanceof Error ? e.message : e}`,
+      );
+    }
+    const parsed = JSON.parse(stdout) as { results?: { statements?: BridgeStatement[]; dialect?: string | null; error: string | null }[] };
+    if (!parsed.results) throw new Error(`SQL 解析组件返回了无法识别的结果。请查看执行轨迹；原始信息：${stdout.slice(0, 200)}`);
+    const out: ParsedStatement[] = [];
+    parsed.results.forEach((r, i) => {
+      if (r.error || !r.statements) return; // 单条失败跳过，不污染整文件
+      const parsedStatements = r.statements;
+      const statementDialect = r.dialect || dialect;
+      parsedStatements.forEach((s, j) => {
+        const parsedStatement: ParsedStatement = {
+          id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
+          file,
+          statementIndex: i,
+          lineStart: chunks[i]?.lineStart ?? 1,
+          lineEnd: chunks[i]?.lineEnd ?? 1,
+          ...(s.target ? { target: s.target } : {}),
+          sources: s.sources,
+          columns: s.columns,
+        };
+        if (statementDialect) parsedStatement.dialect = statementDialect;
+        out.push(parsedStatement);
+      });
+    });
+    return out;
+  }
+}
+) {
+      const delimiter = text.slice(i).match(/^\$[a-zA-Z_][a-zA-Z0-9_]*\$|^\$\$/)?.[0];
+      if (delimiter) {
+        dollarQuote = delimiter;
+        i += delimiter.length - 1;
+        continue;
+      }
     }
     if (ch === "'" || ch === '"' || ch === '`') {
       quote = ch;
