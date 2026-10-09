@@ -75,6 +75,16 @@ describe('dialect detection', () => {
     const postgres = await parser.parseFileDetailed!('postgres.sql', 'SELECT value::jsonb FROM public.events');
     assert.equal(postgres.statements[0]?.dialect, 'postgres');
   });
+
+  it('preserves parse failures for individual statements', async () => {
+    const result = await parser.parseFileDetailed!(
+      'mixed.sql',
+      'SELECT a FROM t1; THIS IS NOT SQL ((((; SELECT b FROM t2',
+    );
+    assert.equal(result.statements.length, 2);
+    assert.equal(result.failures.length, 1);
+    assert.match(result.failures[0]?.error ?? '', /parse failed/i);
+  });
 });
 
 describe('buildLineage emits evidence with provenance', () => {
