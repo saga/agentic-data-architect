@@ -34,4 +34,16 @@ test('projects canonical structure index to DuckDB and queries it', async () => 
   assert.equal(summary.nodes, 3);
   assert.equal(summary.edges, 2);
   assert.equal((await query.trace('src/a.ts#function#foo#0', 'src/a.ts#function#bar#0'))?.nodes.length, 2);
+
+  // Re-project through the cached instance while query clients have already opened it.
+  // Readers must see the refreshed snapshot, not a stale cached database handle.
+  const refreshed: CodeStructureIndex = {
+    ...index,
+    generatedAt: new Date(Date.now() + 1000).toISOString(),
+    nodes: index.nodes.filter(node => node.name !== 'bar'),
+    edges: index.edges.filter(edge => edge.to !== 'src/a.ts#function#bar#0'),
+  };
+  await new CodeStructureDuckDBProjector(root, db).project(refreshed);
+  assert.equal((await query.find({ text: 'bar' })).length, 0);
+  assert.equal((await query.summary()).nodes, 2);
 });
