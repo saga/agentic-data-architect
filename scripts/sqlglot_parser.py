@@ -2,7 +2,7 @@
 """SQLGlot 解析桥：stdin JSON -> stdout JSON。
 
 输入:  {"sql": "...", "dialect": "postgres" | null}
-输出:  {"statements": [Statement], "error": null | str}
+输出:  {"statements": [Statement], "failures": [Failure], "dialect": str | null, "error": null | str}
 
 Statement = {
   "target": "schema.table" | null,   # CREATE VIEW/TABLE AS / INSERT INTO
@@ -14,7 +14,7 @@ Statement = {
   ],
   "sql": "<statement text>",
 }
-顶层整体解析失败时 statements=[] 且 error 有值；单个 statement 失败则跳过该条。
+顶层解析失败时 statements=[] 且 error 有值；AST 提取失败会写入 failures，避免静默跳过。实际选择的 dialect 会随结果返回。
 列解析是启发式的：SELECT * 无 schema 时记为 sourceColumn="*"。
 """
 import json
