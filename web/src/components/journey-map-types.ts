@@ -5,6 +5,7 @@ import type {
   JourneyExecution,
   JourneyNode,
   JourneyNodeType,
+  JourneyLayout as SharedJourneyLayout,
   JourneyRoute,
   JourneyStage,
   JourneyWorkflowChange,
@@ -24,6 +25,7 @@ export type WorkflowExecution = JourneyExecution;
 export type WorkflowState = JourneyDerivedState;
 export type WorkflowRunEvent = JourneyRunEvent;
 export type WorkflowSnapshot = SharedWorkflowSnapshot;
+export type WorkflowLayout = SharedJourneyLayout;
 
 export interface JourneyMapRoute {
   id: string;
