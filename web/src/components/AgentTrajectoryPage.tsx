@@ -625,6 +625,11 @@ export function AgentTrajectoryPage(props: { sessionName: string; onBack: () => 
           totalTokens: 0,
           models: {},
           eventCount: 0,
+          idleObserved: false,
+          assistantTurnEnded: turn.status === 'completed' || turn.status === 'failed' || turn.status === 'aborted',
+          pendingToolCount: 0,
+          pendingPermissionCount: 0,
+          pendingUserInputCount: 0,
           state: turn.status === 'completed'
             ? 'completed'
             : turn.status === 'failed'
