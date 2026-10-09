@@ -264,7 +264,7 @@ def detect_dialect(sql: str, configured: str | None) -> str | None:
         return "oracle"
     if any(token in text for token in ("::jsonb", "::text", " ilike ", " distinct on ", " bigserial", " serial ", " returning ")) or re.search(r"\$[a-z_]*\$", text):
         return "postgres"
-    if any(token in text for token in (" qualify ", "flatten(", "object_construct(", "parse_json(", "copy into ", "snowflake.account_usage")) or __import__("re").search(r"\bvariant\b", text):
+    if any(token in text for token in (" qualify ", "flatten(", "object_construct(", "parse_json(", "copy into ", "snowflake.account_usage")) or re.search(r"\bvariant\b", text):
         return "snowflake"
     return configured.lower() if configured else None
 
