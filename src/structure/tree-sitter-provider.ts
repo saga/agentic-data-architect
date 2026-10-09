@@ -7,13 +7,13 @@ import type * as TreeSitterTypes from '@vscode/tree-sitter-wasm';
 import type { CodeEdge, CodeNode, CodeNodeKind, CodeStructureIndex, CodeStructureProvider, StructurePath, StructureQuery } from './types.js';
 
 type Language = 'java' | 'python' | 'csharp';
-type Grammar = { extensions: string[]; language: Language; wasmFile: string };
+type Grammar = { extensions: string[]; language: Language; wasmFile: string; packageName?: string };
 
 const GRAMMARS: Grammar[] = [
   { language: 'java', extensions: ['.java'], wasmFile: 'tree-sitter-java.wasm' },
   { language: 'python', extensions: ['.py'], wasmFile: 'tree-sitter-python.wasm' },
-  // @vscode/tree-sitter-wasm uses the non-standard asset name tree-sitter-c_sharp.wasm.
-  { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c_sharp.wasm' },
+  // @vscode/tree-sitter-wasm@0.3.1 does not publish its C# grammar asset; use the official grammar package.
+  { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c_sharp.wasm', packageName: 'tree-sitter-c-sharp' },
 ];
 
 const require = createRequire(import.meta.url);
@@ -78,8 +78,12 @@ async function loadLanguage(grammar: Grammar): Promise<TreeSitterTypes.Language>
 
   const promise = (async () => {
     const TreeSitter = await getTreeSitter();
-    const moduleRoot = path.dirname(require.resolve('@vscode/tree-sitter-wasm'));
-    const bytes = await fs.readFile(path.join(moduleRoot, grammar.wasmFile));
+    // Runtime initialization always comes from VS Code's package, but grammar assets must
+    // be resolved from the package that actually publishes each language binary.
+    const grammarRoot = grammar.packageName
+      ? path.dirname(require.resolve(grammar.packageName + '/package.json'))
+      : path.dirname(require.resolve('@vscode/tree-sitter-wasm'));
+    const bytes = await fs.readFile(path.join(grammarRoot, grammar.wasmFile));
     return TreeSitter.Language.load(
       new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     );
@@ -236,7 +240,7 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
       fileRecords.push({
         path: rel,
         hash: createHash('sha256').update(sourceBytes).digest('hex'),
-        parser: grammar.language === 'csharp' ? 'tree-sitter-csharp' : 'tree-sitter-' + grammar.language,
+        parser: grammar.packageName ?? '@vscode/tree-sitter-wasm/' + grammar.language,
       });
     }
 
