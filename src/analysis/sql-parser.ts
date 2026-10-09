@@ -233,7 +233,7 @@ export class SqlglotParser implements SqlParser {
       const parsedStatements = r.statements;
       const statementDialect = r.dialect || dialect;
       parsedStatements.forEach((s, j) => {
-        statements.push({
+        const parsedStatement: ParsedStatement = {
           id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
           file,
           statementIndex: i,
@@ -242,8 +242,9 @@ export class SqlglotParser implements SqlParser {
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...(statementDialect ? { dialect: statementDialect } : {}),
-        });
+        };
+        if (statementDialect) parsedStatement.dialect = statementDialect;
+        statements.push(parsedStatement);
       });
     });
     return { statements, failures };
@@ -272,7 +273,7 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
       const parsedStatements = r.statements;
       const statementDialect = r.dialect || dialect;
       parsedStatements.forEach((s, j) => {
-        out.push({
+        const parsedStatement: ParsedStatement = {
           id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
           file,
           statementIndex: i,
@@ -281,8 +282,9 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...(statementDialect ? { dialect: statementDialect } : {}),
-        });
+        };
+        if (statementDialect) parsedStatement.dialect = statementDialect;
+        out.push(parsedStatement);
       });
     });
     return out;
