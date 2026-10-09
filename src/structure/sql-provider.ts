@@ -44,11 +44,14 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
       if (parsed.available) {
         sqlGlotPythonCommand = command;
         if (Array.isArray(parsed.statements) && (parsed.statements.length > 0 || !sql.trim())) return parsed.statements;
+        // SQLGlot is installed and this input did not parse under the selected dialect.
+        // Do not repeat the same SQL against other interpreters; let node-sql-parser fallback run.
+        return undefined;
       }
     } catch {
       // An unavailable or broken Python bridge must not block the existing Node parser.
     }
-    // Python ran but SQLGlot is unavailable or failed on this input; try another interpreter.
+    // SQLGlot is not installed in this interpreter; try the next configured interpreter.
   }
   return undefined;
 }
