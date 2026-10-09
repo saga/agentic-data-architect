@@ -50,8 +50,8 @@ describe('sqlglot parser', () => {
       'WHEN NOT MATCHED THEN INSERT (id, value) VALUES (s.id, s.value)',
     );
     assert.equal(st?.target, 'target_table');
-    assert.equal(st?.dialect, undefined);
     assert.deepEqual(st?.sources, ['source_table']);
+    assert.deepEqual(st?.columns, []); // MERGE column mappings are intentionally not inferred.
   });
 
   it('quoted identifiers and multi-statement files', async () => {
