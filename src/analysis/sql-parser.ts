@@ -115,8 +115,27 @@ export function splitStatements(text: string): SplitStatement[] {
     const raw = text.slice(start, end);
     const sql = raw.trim();
     if (!sql) return;
-    const leadingWhitespace = raw.search(/\S/);
-    const lineStart = text.slice(0, start + Math.max(leadingWhitespace, 0)).split('\n').length;
+    // A comment between two statements belongs to the separator, not the next
+    // statement's source location. Skip leading whitespace and SQL comments.
+    let first = 0;
+    while (first < raw.length) {
+      if (/\s/.test(raw[first] ?? '')) {
+        first++;
+        continue;
+      }
+      if (raw.startsWith('--', first)) {
+        const newline = raw.indexOf('\n', first + 2);
+        first = newline < 0 ? raw.length : newline + 1;
+        continue;
+      }
+      if (raw.startsWith('/*', first)) {
+        const close = raw.indexOf('*/', first + 2);
+        first = close < 0 ? raw.length : close + 2;
+        continue;
+      }
+      break;
+    }
+    const lineStart = text.slice(0, start + first).split('\n').length;
     out.push({ sql, lineStart, lineEnd: endLine });
   };
   for (let i = 0; i < text.length; i++) {
