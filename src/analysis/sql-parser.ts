@@ -202,13 +202,13 @@ export class SqlglotParser implements SqlParser {
     const statements: ParsedStatement[] = [];
     const failures: ParseFailure[] = [];
     parsed.results.forEach((r, i) => {
-      if (r.error || !r.statements) {
-        failures.push({
-          statementIndex: i,
-          error: r.error || 'SQL parser 没有返回这个语句的解析结果',
-        });
-        return;
+      if (r.error && (!r.statements || r.statements.length === 0)) {
+        failures.push({ statementIndex: i, error: r.error });
       }
+      for (const failure of r.failures ?? []) {
+        failures.push({ statementIndex: i, error: failure.error });
+      }
+      if (!r.statements) return;
       r.statements.forEach((s, j) => {
         statements.push({
           id: `${file}#${i}${r.statements.length > 1 ? `.${j}` : ''}`,
@@ -219,7 +219,7 @@ export class SqlglotParser implements SqlParser {
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...(dialect ? { dialect } : {}),
+          ...((r.dialect ?? dialect) ? { dialect: r.dialect ?? dialect } : {}),
         });
       });
     });
