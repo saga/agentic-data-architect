@@ -223,6 +223,13 @@ def target_of(statement: exp.Expression):
         elif isinstance(this, exp.Table):
             name = table_name(this)
         return name or None, "insert", statement.args.get("expression")
+    # MERGE has a write target and one or more read sources, but its WHEN clauses
+    # are not a normal SELECT projection. Preserve dataset lineage without claiming
+    # column-level mappings that this extractor cannot reliably resolve.
+    if hasattr(exp, "Merge") and isinstance(statement, exp.Merge):
+        this = statement.this
+        name = table_name(this) if isinstance(this, exp.Table) else ""
+        return name or None, "merge", None
     if isinstance(statement, (exp.Select, exp.Union)):
         return None, "select", statement
     return None, "other", None
