@@ -12,7 +12,7 @@ type Grammar = { extensions: string[]; language: Language; wasmFile: string };
 const GRAMMARS: Grammar[] = [
   { language: 'java', extensions: ['.java'], wasmFile: 'tree-sitter-java.wasm' },
   { language: 'python', extensions: ['.py'], wasmFile: 'tree-sitter-python.wasm' },
-  // @vscode/tree-sitter-wasm 的构建脚本把 C# grammar 输出成 c-sharp 文件名。
+  // @vscode/tree-sitter-wasm uses the non-standard asset name tree-sitter-c_sharp.wasm.
   { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c_sharp.wasm' },
 ];
 
