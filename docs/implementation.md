@@ -386,3 +386,16 @@ skills/financial-data-review/
 ### Schema 验证
 
 项目使用 Zod 4 作为运行时 Schema 层。持久化 JSON、HTTP 请求体、环境变量和 Agent 结构化输出都在进入业务逻辑前经过 Schema 校验；TypeScript 类型由 Zod Schema 推导，避免手写 interface 与验证逻辑长期漂移。
+
+## SQL / Database Analysis: capability boundaries
+
+The SQL Code Structure Index and SQL lineage pipeline are separate consumers of SQL parsing:
+
+- The structure index supports source navigation and table/column references. Its `references` edges do not claim source-to-target column lineage.
+- The SQLGlot lineage pipeline emits best-effort dataset and column lineage for supported query shapes. A missing edge is not proof that no dependency exists.
+- PostgreSQL and Snowflake have live database adapters. Oracle currently has static SQL dialect detection only; there is no Oracle live metadata/profiling adapter.
+- The structure index currently scans `.sql`, `.ddl`, `.dml`, and `.hql`; Oracle package/procedure extensions such as `.pks`, `.pkb`, and `.pls` are not included.
+- Dialect detection is heuristic. A successful parse does not establish complete dependency or lineage coverage. Unsupported syntax, parser errors, truncated scans, and unavailable metadata must remain visible as limitations/unknowns.
+- Read-only SQL text validation is a guardrail, not a substitute for a database-enforced read-only role and least-privilege credentials.
+
+When reporting SQL analysis, distinguish discovered facts, inferred relationships, and unknown coverage. Do not describe Oracle database discovery or complete Oracle PL/SQL analysis as implemented.
