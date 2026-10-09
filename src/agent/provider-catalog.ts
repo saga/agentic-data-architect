@@ -262,13 +262,13 @@ async function discoverProviders(): Promise<AgentCatalog> {
     configuredDefaultRuntime,
     ...RUNTIMES,
   ])];
-  const recommendedRuntime = selectRecommendedRuntime(
-    configuredDefaultRuntime,
-    fallbackOrder,
-    providers,
-  );
+  // Copilot is the primary runtime for this workbench. Prefer it when live discovery
+  // confirms it is usable; retain explicit configured preference only when Copilot is unavailable.
+  const recommendedRuntime = providers.some((provider) => provider.runtime === 'copilot-sdk' && provider.usable)
+    ? 'copilot-sdk'
+    : selectRecommendedRuntime(configuredDefaultRuntime, fallbackOrder, providers);
   const models = providers
-    .filter((provider) => provider.usable)
+    .filter((provider) => provider.usable && provider.runtime !== 'opencode-run')
     .flatMap((provider) => results.get(provider.runtime)!.models);
 
   return {
