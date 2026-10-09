@@ -256,7 +256,7 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...(dialect ? { dialect } : {}),
+          ...((r.dialect ?? dialect) ? { dialect: r.dialect ?? dialect } : {}),
         });
       });
     });
