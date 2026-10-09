@@ -17,6 +17,7 @@ describe('splitStatements (no bridge needed)', () => {
     const chunks = splitStatements(`SELECT ';' AS a; -- comment ;\nSELECT 2; /* ; */ SELECT 3`);
     assert.equal(chunks.length, 3);
     assert.equal(chunks[0]?.lineStart, 1);
+    assert.equal(chunks[1]?.lineStart, 2);
   });
 });
 
