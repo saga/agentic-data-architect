@@ -68,6 +68,15 @@ describe('sqlglot parser', () => {
   });
 });
 
+describe('dialect detection', () => {
+  it('records the detected dialect for Oracle and PostgreSQL SQL', async () => {
+    const oracle = await parser.parseFileDetailed!('oracle.sql', 'SELECT SYSDATE FROM DUAL');
+    assert.equal(oracle.statements[0]?.dialect, 'oracle');
+    const postgres = await parser.parseFileDetailed!('postgres.sql', 'SELECT value::jsonb FROM public.events');
+    assert.equal(postgres.statements[0]?.dialect, 'postgres');
+  });
+});
+
 describe('buildLineage emits evidence with provenance', () => {
   it('statement + edge evidence carry file, lines, hash, run', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'lin-'));
