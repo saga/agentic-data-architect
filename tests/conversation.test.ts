@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
-import {
+
+// Recovery intentionally processes every running turn. Keep the database isolated so
+// stale turns in a developer workspace cannot change the expected recovery count.
+const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ada-conversation-test-'));
+process.env.WORKSPACE_DIR = workspaceDir;
+
+const {
   abortStaleConversationTurn,
   beginConversationTurn,
+  closeConversationStore,
   getConversationTurn,
   getConversationSummary,
   recoverRunningConversationTurns,
@@ -12,7 +22,12 @@ import {
   listConversationMessages,
   saveConversationMessage,
   searchConversation,
-} from '../src/investigation/conversation.js';
+} = await import('../src/investigation/conversation.js');
+
+test.after(() => {
+  closeConversationStore();
+  fs.rmSync(workspaceDir, { recursive: true, force: true });
+});
 
 test('stores conversation turns in sqlite and searches them with fts5', () => {
   const sessionName = 'conversation-test-' + randomUUID();
