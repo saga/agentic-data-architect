@@ -17,5 +17,7 @@ test('extracts SQL statements, tables, columns, reads and writes', async () => {
   assert.ok(index.nodes.some(n => n.kind === 'column' && n.name.endsWith('id')));
   assert.ok(index.edges.some(e => e.kind === 'reads' && index.nodes.find(n => n.id === e.to)?.name === 'orders'));
   assert.ok(index.edges.some(e => e.kind === 'writes' && index.nodes.find(n => n.id === e.to)?.name === 'orders'));
+  assert.ok(index.edges.some(e => e.kind === 'reads' && index.nodes.find(n => n.id === e.to)?.name === 'staging_orders'));
+  assert.ok(!index.edges.some(e => e.kind === 'writes' && index.nodes.find(n => n.id === e.to)?.name === 'staging_orders'));
   assert.ok(index.edges.some(e => e.kind === 'joins'));
 });
