@@ -230,9 +230,11 @@ export class SqlglotParser implements SqlParser {
         failures.push({ statementIndex: i, error: failure.error });
       }
       if (!r.statements) return;
-      r.statements.forEach((s, j) => {
+      const parsedStatements = r.statements;
+      const statementDialect = r.dialect || dialect;
+      parsedStatements.forEach((s, j) => {
         statements.push({
-          id: `${file}#${i}${r.statements.length > 1 ? `.${j}` : ''}`,
+          id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
           file,
           statementIndex: i,
           lineStart: chunks[i]?.lineStart ?? 1,
@@ -240,7 +242,7 @@ export class SqlglotParser implements SqlParser {
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...((r.dialect ?? dialect) ? { dialect: r.dialect ?? dialect } : {}),
+          ...(statementDialect ? { dialect: statementDialect } : {}),
         });
       });
     });
@@ -267,9 +269,11 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
     const out: ParsedStatement[] = [];
     parsed.results.forEach((r, i) => {
       if (r.error || !r.statements) return; // 单条失败跳过，不污染整文件
-      r.statements.forEach((s, j) => {
+      const parsedStatements = r.statements;
+      const statementDialect = r.dialect || dialect;
+      parsedStatements.forEach((s, j) => {
         out.push({
-          id: `${file}#${i}${r.statements.length > 1 ? `.${j}` : ''}`,
+          id: `${file}#${i}${parsedStatements.length > 1 ? `.${j}` : ''}`,
           file,
           statementIndex: i,
           lineStart: chunks[i]?.lineStart ?? 1,
@@ -277,7 +281,7 @@ async parseFile(file: string, sql: string, dialect?: string): Promise<ParsedStat
           ...(s.target ? { target: s.target } : {}),
           sources: s.sources,
           columns: s.columns,
-          ...((r.dialect ?? dialect) ? { dialect: r.dialect ?? dialect } : {}),
+          ...(statementDialect ? { dialect: statementDialect } : {}),
         });
       });
     });
