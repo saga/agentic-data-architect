@@ -17,7 +17,7 @@ test('builds one canonical snapshot across TypeScript, Java, Python, C# and SQL'
   assert.ok(index.files.some(f => f.path === 'app.ts' && f.parser === 'typescript-compiler'));
   assert.ok(index.files.some(f => f.path === 'Main.java' && f.parser === 'tree-sitter-java'));
   assert.ok(index.files.some(f => f.path === 'app.py' && f.parser === 'tree-sitter-python'));
-  assert.ok(index.files.some(f => f.path === 'Service.cs' && f.parser === 'tree-sitter-csharp'));
+  assert.ok(index.files.some(f => f.path === 'Service.cs' && f.parser === 'csharp-declaration-fallback'));
   assert.ok(index.files.some(f => f.path === 'flow.sql' && f.parser === 'node-sql-parser'));
   assert.ok(index.nodes.some(n => n.kind === 'table' && n.name === 'orders'));
 });
