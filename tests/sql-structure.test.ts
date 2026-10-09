@@ -7,6 +7,7 @@ import { detectSqlDialect, SqlCodeStructureProvider } from '../src/structure/sql
 
 test('detects PostgreSQL, Oracle and Snowflake dialect signals', () => {
   assert.equal(detectSqlDialect('SELECT value::jsonb FROM t', 'mysql'), 'postgres');
+  assert.equal(detectSqlDialect('SELECT DISTINCT ON (id) id FROM t', 'mysql'), 'postgres');
   assert.equal(detectSqlDialect('SELECT SYSDATE FROM DUAL', 'mysql'), 'oracle');
   assert.equal(detectSqlDialect('SELECT NUMBER(38,0) AS amount FROM t QUALIFY ROW_NUMBER() OVER (ORDER BY id) = 1', 'mysql'), 'snowflake');
   assert.equal(detectSqlDialect('SELECT id FROM t', 'postgres'), 'postgres');
