@@ -187,10 +187,10 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
         nodes.push(fileNode);
         const ordinals = new Map<string, number>();
         const declarations: Array<{ kind: CodeNodeKind; name: string; line: number }> = [];
-        const lines = source.split(/\\r?\\n/);
+        const lines = source.split(/\r?\n/);
         for (let i = 0; i < lines.length; i++) {
           const lineText = lines[i]!;
-          const typeMatch = lineText.match(/\\b(class|struct|record|interface|enum)\\s+(\\w+)/);
+          const typeMatch = lineText.match(/\b(class|struct|record|interface|enum)\s+(\w+)/);
           if (typeMatch) {
             declarations.push({
               kind: typeMatch[1] === 'interface' ? 'interface' : 'class',
@@ -199,13 +199,13 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
             });
             continue;
           }
-          const methodMatch = lineText.match(/^\\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\\s+)*(?:[\\w<>,?.\\[\\]]+\\s+)+(\\w+)\\s*\\([^;]*\\)\\s*(?:\\{|=>)/);
+          const methodMatch = lineText.match(/^\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\s+)*(?:[\w<>,?.\[\]]+\s+)+(\w+)\s*\([^;]*\)\s*(?:\{|=>)/);
           if (methodMatch && !['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodMatch[1]!)) {
             declarations.push({ kind: 'method', name: methodMatch[1]!, line: i + 1 });
           }
         }
         for (const declaration of declarations) {
-          const key = declaration.kind + '\\0' + declaration.name;
+          const key = declaration.kind + '\0' + declaration.name;
           const ordinal = ordinals.get(key) ?? 0;
           ordinals.set(key, ordinal + 1);
           const symbol: CodeNode = {
