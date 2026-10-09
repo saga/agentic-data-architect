@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { TreeSitterCodeStructureProvider } from '../src/structure/tree-sitter-provider.js';
 
-test('Tree-sitter provider parses Java, Python and C# with VS Code WASM grammars', async () => {
+test('Tree-sitter provider loads Java/Python from VS Code WASM and C# from its published grammar', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agentic-structure-'));
   try {
     await fs.writeFile(
@@ -32,7 +32,9 @@ test('Tree-sitter provider parses Java, Python and C# with VS Code WASM grammars
       index.files.map((file) => file.path),
       ['Sample.cs', 'Sample.java', 'sample.py'],
     );
-    assert.ok(index.files.every((file) => file.parser.startsWith('@vscode/tree-sitter-wasm/')));
+    assert.ok(index.files.filter((file) => file.path.endsWith('.java') || file.path.endsWith('.py'))
+      .every((file) => file.parser.startsWith('@vscode/tree-sitter-wasm/')));
+    assert.equal(index.files.find((file) => file.path.endsWith('.cs'))?.parser, 'tree-sitter-c-sharp');
 
     assert.ok(index.nodes.some((node) => node.file === 'Sample.java' && node.kind === 'class' && node.name === 'Sample'));
     assert.ok(index.nodes.some((node) => node.file === 'Sample.java' && node.kind === 'method' && node.name === 'run'));
