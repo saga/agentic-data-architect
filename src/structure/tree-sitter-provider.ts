@@ -178,6 +178,57 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
       const sourceBytes = await fs.readFile(absolute);
       const source = sourceBytes.toString('utf8');
       const rel = path.relative(root, absolute).split(path.sep).join('/');
+
+      // The published tree-sitter-c-sharp npm package is a native binding, not a WASM
+      // grammar. Keep C# files useful with a conservative declaration-only fallback rather
+      // than trying to load a native grammar binary as WASM.
+      if (grammar.language === 'csharp') {
+        const fileNode: CodeNode = { id: id(rel, 'file', rel, 0), kind: 'file', name: rel, file: rel, line: 1 };
+        nodes.push(fileNode);
+        const ordinals = new Map<string, number>();
+        const declarations: Array<{ kind: CodeNodeKind; name: string; line: number }> = [];
+        const lines = source.split(/\\r?\\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const lineText = lines[i]!;
+          const typeMatch = lineText.match(/\\b(class|struct|record|interface|enum)\\s+(\\w+)/);
+          if (typeMatch) {
+            declarations.push({
+              kind: typeMatch[1] === 'interface' ? 'interface' : 'class',
+              name: typeMatch[2]!,
+              line: i + 1,
+            });
+            continue;
+          }
+          const methodMatch = lineText.match(/^\\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|new|partial|extern|unsafe|readonly)\\s+)*(?:[\\w<>,?.\\[\\]]+\\s+)+(\\w+)\\s*\\([^;]*\\)\\s*(?:\\{|=>)/);
+          if (methodMatch && !['if', 'for', 'foreach', 'while', 'switch', 'catch', 'using', 'lock'].includes(methodMatch[1]!)) {
+            declarations.push({ kind: 'method', name: methodMatch[1]!, line: i + 1 });
+          }
+        }
+        for (const declaration of declarations) {
+          const key = declaration.kind + '\\0' + declaration.name;
+          const ordinal = ordinals.get(key) ?? 0;
+          ordinals.set(key, ordinal + 1);
+          const symbol: CodeNode = {
+            id: id(rel, declaration.kind, declaration.name, ordinal),
+            kind: declaration.kind,
+            name: declaration.name,
+            file: rel,
+            line: declaration.line,
+          };
+          nodes.push(symbol);
+          const list = symbols.get(symbol.name) ?? [];
+          list.push(symbol);
+          symbols.set(symbol.name, list);
+          edges.push({ from: fileNode.id, to: symbol.id, kind: 'defines', confidence: 'inferred', file: rel, line: declaration.line });
+        }
+        fileRecords.push({
+          path: rel,
+          hash: createHash('sha256').update(sourceBytes).digest('hex'),
+          parser: 'csharp-declaration-fallback',
+        });
+        continue;
+      }
+
       const language = await loadLanguage(grammar);
 
       // Parser / Tree 都是当前文件的短生命周期 WASM 资源；无论解析还是遍历失败，都必须释放。
