@@ -27,4 +27,8 @@ test('extracts SQL statements, tables, columns, reads and writes', async () => {
   assert.ok(index.edges.some(e => e.kind === 'reads' && index.nodes.find(n => n.id === e.to)?.name === 'staging_orders'));
   assert.ok(!index.edges.some(e => e.kind === 'writes' && index.nodes.find(n => n.id === e.to)?.name === 'staging_orders'));
   assert.ok(index.edges.some(e => e.kind === 'joins'));
+  const statementNodes = index.nodes.filter(n => n.kind === 'statement').sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+  assert.equal(statementNodes[0]?.line, 1);
+  assert.equal(statementNodes[1]?.line, 2);
+  assert.ok(index.edges.some(e => e.kind === 'writes' && e.line === 2));
 });
