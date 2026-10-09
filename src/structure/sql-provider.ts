@@ -239,7 +239,7 @@ export class SqlCodeStructureProvider implements CodeStructureProvider {
         for (const access of tableAccesses) {
           const table = tableNodesByName.get(access.name);
           if (!table) continue;
-          const write = ['insert', 'update', 'delete'].includes(access.operation);
+          const write = ['insert', 'update', 'delete', 'merge'].includes(access.operation);
           edges.push({ from: stmtNode.id, to: table.id, kind: write ? 'writes' : 'reads', confidence: 'exact', file: rel, line: 1 });
         }
         const joinedTables = [...new Set(tableAccesses
