@@ -40,14 +40,17 @@ def main() -> int:
 
             tables = []
             seen = set()
-            target_name = target.sql(dialect=dialect) if isinstance(target, exp.Table) else None
+            target_table = target if isinstance(target, exp.Table) else (target.find(exp.Table) if target is not None else None)
+            target_name = target_table.sql(dialect=dialect) if target_table is not None else None
             for table in statement.find_all(exp.Table):
                 name = table.sql(dialect=dialect)
-                key = (name.lower(), "write" if target_name and name.lower() == target_name.lower() else "read")
+                is_target = bool(target_name and name.lower() == target_name.lower() and kind in {"insert", "update", "delete"})
+                operation = kind if is_target else "select"
+                key = (name.lower(), operation)
                 if key in seen:
                     continue
                 seen.add(key)
-                tables.append({"name": name, "operation": "write" if key[1] == "write" else "select"})
+                tables.append({"name": name, "operation": operation})
             columns = []
             for column in statement.find_all(exp.Column):
                 name = ".".join(part for part in [column.table, column.name] if part)
