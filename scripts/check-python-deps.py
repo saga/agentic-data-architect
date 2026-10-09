@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Validate the Python runtime used by the project's uv environment."""
+"""Validate the Python runtime dependencies required by the current project."""
 
 from __future__ import annotations
 
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
-import shutil
-import subprocess
 import sys
 
-REQUIRED_PACKAGES = ("sqlglot", "graphify", "mcp")
-REQUIRED_COMMANDS = ("graphify-mcp",)
+
+# Keep this list aligned with pyproject.toml. Graphify was removed from the
+# architecture and is no longer a runtime dependency; the SQLGlot bridge is
+# the only Python runtime component required by the current implementation.
+REQUIRED_PACKAGES = ("sqlglot",)
 
 
 def main() -> int:
@@ -21,10 +22,6 @@ def main() -> int:
             import_module(module)
         except Exception as exc:  # pragma: no cover - error reporting path
             missing.append(f"{module}: {exc}")
-
-    for command in REQUIRED_COMMANDS:
-        if shutil.which(command) is None:
-            missing.append(f"{command}: executable not found")
 
     if missing:
         print("Python environment is missing required dependencies:", file=sys.stderr)
@@ -41,17 +38,6 @@ def main() -> int:
             versions.append(f"{package}==unknown")
 
     print(f"Python runtime OK: {', '.join(versions)}")
-
-    result = subprocess.run(
-        ["graphify-mcp", "--help"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    if result.returncode != 0:
-        print("graphify-mcp --help failed.", file=sys.stderr)
-        return result.returncode or 1
-
     return 0
 
 
