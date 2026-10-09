@@ -40,10 +40,27 @@ export class CodeStructureIndexProvider implements CodeStructureProvider {
       edges,
     };
     await fs.mkdir(path.dirname(this.outputFile), { recursive: true });
-    await fs.writeFile(this.outputFile, JSON.stringify(this.index, null, 2) + '\n', 'utf8');
+    const temporaryOutput = `${this.outputFile}.tmp-${process.pid}`;
+    try {
+      await fs.writeFile(temporaryOutput, JSON.stringify(this.index, null, 2) + '\n', 'utf8');
+      await fs.rename(temporaryOutput, this.outputFile);
+    } catch (error) {
+      await fs.rm(temporaryOutput, { force: true }).catch(() => undefined);
+      throw error;
+    }
 
     // DuckDB is a disposable analytical projection. index.json remains authoritative.
-    await new CodeStructureDuckDBProjector(root, this.databaseFile).project(this.index);
+    // If projection refresh fails, make the partial-success boundary explicit: callers
+    // must not assume the DuckDB copy is current just because the canonical JSON was saved.
+    try {
+      await new CodeStructureDuckDBProjector(root, this.databaseFile).project(this.index);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Canonical structure index was saved to "${this.outputFile}", but DuckDB projection "${this.databaseFile}" failed: ${detail}. Rebuild the structure index to retry projection.`,
+        { cause: error },
+      );
+    }
     return this.index;
   }
 
