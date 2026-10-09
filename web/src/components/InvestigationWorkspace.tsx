@@ -232,6 +232,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
         current={current}
         active={active}
         loading={loading}
+        newSessionCreating={newSessionCreating}
         newSessionOpen={newSessionOpen}
         newSessionName={newSessionName}
         newSessionGoal={newSessionGoal}
