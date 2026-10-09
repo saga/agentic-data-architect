@@ -397,7 +397,7 @@ The SQL Code Structure Index and SQL lineage pipeline are separate consumers of 
 - The structure index currently scans `.sql`, `.ddl`, `.dml`, and `.hql`; Oracle package/procedure extensions such as `.pks`, `.pkb`, and `.pls` are not included.
 - Dialect detection is heuristic. A successful parse does not establish complete dependency or lineage coverage. Unsupported syntax, parser errors, truncated scans, and unavailable metadata must remain visible as limitations/unknowns.
 - Read-only SQL text validation is a guardrail, not a substitute for a database-enforced read-only role and least-privilege credentials.
-- SQL statement splitting is used only to associate parser output with source line ranges. It handles ordinary quoted strings, comments, and PostgreSQL dollar-quoted bodies, but is not a full dialect lexer; unsupported procedural syntax must remain visible as a coverage limitation.
+- SQL statement splitting is used only to associate parser output with source line ranges. It handles ordinary quoted strings and comments, but is not a full dialect lexer; PostgreSQL dollar-quoted procedure bodies and other procedural syntax can be split incorrectly and remain a known coverage limitation.
 - The canonical structure JSON is written atomically before the DuckDB projection is refreshed. If projection refresh fails, the build reports that the canonical snapshot was saved and that the projection may be stale; rerunning the index build retries the projection.
 
 When reporting SQL analysis, distinguish discovered facts, inferred relationships, and unknown coverage. Do not describe Oracle database discovery or complete Oracle PL/SQL analysis as implemented.
