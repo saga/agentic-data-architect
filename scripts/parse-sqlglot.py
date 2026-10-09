@@ -44,9 +44,12 @@ def main() -> int:
             tables = []
             seen = set()
             target_table = target if isinstance(target, exp.Table) else (target.find(exp.Table) if target is not None else None)
-            target_name = target_table.sql(dialect=dialect) if target_table is not None else None
+            # Use canonical identifier components rather than rendered SQL. Rendering a
+            # Table can include dialect-specific quoting and aliases, which must not become
+            # part of the index's stable object name.
+            target_name = ".".join(part for part in (target_table.catalog, target_table.db, target_table.name) if part) if target_table is not None else None
             for table in statement.find_all(exp.Table):
-                name = table.sql(dialect=dialect)
+                name = ".".join(part for part in (table.catalog, table.db, table.name) if part)
                 is_target = bool(target_name and name.lower() == target_name.lower() and kind in {"insert", "update", "delete", "merge"})
                 operation = kind if is_target else "select"
                 key = (name.lower(), operation)
