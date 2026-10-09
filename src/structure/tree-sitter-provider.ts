@@ -13,7 +13,7 @@ const GRAMMARS: Grammar[] = [
   { language: 'java', extensions: ['.java'], wasmFile: 'tree-sitter-java.wasm' },
   { language: 'python', extensions: ['.py'], wasmFile: 'tree-sitter-python.wasm' },
   // @vscode/tree-sitter-wasm 的构建脚本把 C# grammar 输出成 c-sharp 文件名。
-  { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c-sharp.wasm' },
+  { language: 'csharp', extensions: ['.cs'], wasmFile: 'tree-sitter-c_sharp.wasm' },
 ];
 
 const require = createRequire(import.meta.url);
@@ -236,7 +236,7 @@ export class TreeSitterCodeStructureProvider implements CodeStructureProvider {
       fileRecords.push({
         path: rel,
         hash: createHash('sha256').update(sourceBytes).digest('hex'),
-        parser: '@vscode/tree-sitter-wasm/' + grammar.language,
+        parser: grammar.language === 'csharp' ? 'tree-sitter-csharp' : 'tree-sitter-' + grammar.language,
       });
     }
 
