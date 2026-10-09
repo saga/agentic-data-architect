@@ -69,3 +69,5 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-034](./034-remove-graphify-use-code-structure-index.md) | 完全移除 Graphify，Code Structure Index 成为唯一结构分析能力 | Accepted |
 | [ADR-035](./035-polyglot-structure-analysis-provider-boundary.md) | 多语言采用 Provider + Artifact Extractor；不把所有工件强行 Tree-sitter 化 | Accepted |
 | [ADR-036](./036-code-structure-index-duckdb-projection.md) | Code Structure Index 保持 canonical JSON；DuckDB 作为可重建分析 projection 和统一结构查询层 | Accepted |
+| [ADR-037](./037-sql-analysis-capability-boundaries.md) | 区分 SQL 结构索引、SQL lineage 和 live database discovery 的能力边界 | Accepted |
+| [ADR-038](./038-sql-dialect-lineage-confidence-and-coverage.md) | SQL 方言识别、lineage 置信度与解析覆盖率必须可观察；不把解析成功当成完整血缘 | Accepted |
