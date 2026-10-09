@@ -118,9 +118,9 @@ export function calibrateStatus(evidence: number | EvidenceRef[], claimed: Claim
   return claimed;
 }
 
-import { randomBytes } from 'node:crypto';
-
 /** 全局唯一 id（进程重启也不碰撞；同一 investigation 多 run 追加不覆盖）。 */
 export function nextId(prefix: string): string {
-  return `${prefix}-${randomBytes(4).toString('hex')}`;
+  const bytes = new Uint8Array(4);
+  globalThis.crypto.getRandomValues(bytes);
+  return `${prefix}-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
