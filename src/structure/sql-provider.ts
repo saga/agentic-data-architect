@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import type { Parser as SqlParser } from 'node-sql-parser';
 
@@ -16,11 +17,12 @@ const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.
 
 type SqlGlotStatement = { type: string; tables: Array<{ operation: string; name: string }>; columns: string[] };
 
-function parseWithSqlGlot(root: string, sql: string, dialect: string): SqlGlotStatement[] | undefined {
-  const script = path.join(root, 'scripts', 'parse-sqlglot.py');
+function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotStatement[] | undefined {
+  const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const script = path.join(appRoot, 'scripts', 'parse-sqlglot.py');
   const candidates = [
-    path.join(root, '.venv', 'bin', 'python'),
-    path.join(root, '.venv', 'Scripts', 'python.exe'),
+    path.join(appRoot, '.venv', 'bin', 'python'),
+    path.join(appRoot, '.venv', 'Scripts', 'python.exe'),
     'python3',
     'python',
   ];
