@@ -568,13 +568,9 @@ export async function readAuditEvents(name: string, limit = 50): Promise<AuditEv
     try {
       events.push(AuditEventSchema.parse(JSON.parse(row)));
     } catch (error) {
-      // Audit is append-only diagnostic history. A truncated/corrupt historical line must
-      // not make the entire Investigation configuration/session unreadable.
-      console.warn('[control] Ignoring malformed audit record.', {
-        sessionName: name,
-        record: offset + index + 1,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      throw new AuditDataError(
+        `Malformed audit record ${offset + index + 1} for Investigation "${name}": ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   return events;
