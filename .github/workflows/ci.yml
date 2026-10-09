@@ -50,11 +50,16 @@ jobs:
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Typecheck
-        run: npm run typecheck
-
+      # Run tests even when typecheck reports unrelated existing type errors; otherwise
+      # a failing typecheck masks the test diagnostics needed to locate regressions.
       - name: Test
+        if: always()
         run: npm test
 
+      - name: Typecheck
+        if: always()
+        run: npm run typecheck
+
       - name: Build
+        if: always()
         run: npm run build
