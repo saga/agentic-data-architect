@@ -43,6 +43,7 @@ export function InvestigationWorkspace({ controller }: { controller: Investigati
     modelSaving,
     value,
     newSessionOpen,
+    newSessionCreating,
     newSessionName,
     newSessionRuntime,
     newSessionGoal,
