@@ -39,7 +39,7 @@ function parseWithSqlGlot(_root: string, sql: string, dialect: string): SqlGlotS
     try {
       const parsed = JSON.parse(result.stdout) as { available?: boolean; statements?: SqlGlotStatement[] };
       sqlGlotPythonCommand = command;
-      if (parsed.available && Array.isArray(parsed.statements)) return parsed.statements;
+      if (parsed.available && Array.isArray(parsed.statements) && (parsed.statements.length > 0 || !sql.trim())) return parsed.statements;
     } catch {
       // An unavailable or broken Python bridge must not block the existing Node parser.
     }
