@@ -20,7 +20,17 @@ let client: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 let clientLifecycleGeneration = 0;
 
-const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
+const SESSION_NOT_FOUND = /session not found|no such session|unknown session/i;
+
+function isMissingCopilotSession(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message;
+  if (SESSION_NOT_FOUND.test(message)) return true;
+  const code = (error as Error & { code?: unknown }).code;
+  if (code === -32601 && /session/i.test(message)) return true;
+  return /session.{0,100}\b(?:does not exist|has been deleted)\b/i.test(message)
+    || /\b(?:does not exist|has been deleted)\b.{0,100}session/i.test(message);
+}
 const TURN_TIMEOUT = /^(?:Timeout after \d+ms waiting for session\.idle|等待运行结果超过 \d+ms。)$/;
 const AGENT_EXECUTION_TIMEOUT = /^(?:Timeout after \d+ms waiting for agent execution|助手执行超过 \d+ms，已停止本轮调查。)$/;
 const USER_INPUT_WAIT_TIMEOUT = /^(?:Timeout after \d+ms waiting for user input|等待你的回答超过 \d+ms，这次操作已停止。)$/;
@@ -331,9 +341,9 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
-    // Allow All 由 SDK helper 处理；人工审批模式显式返回 no-result，
-    // 让本 Session 的 permission.requested 事件 + pending RPC/UI 完成审批，
-    // 而不是依赖全局修改 CopilotClient.prototype 的副作用。
+    // Allow All 使用显式 approve-once，避免 SDK 的 approveAll helper 在 managed settings
+    // 开启时抛错；managedApprovalRequired 请求交回本 Session 的 permission.requested + pending RPC/UI。
+    // 人工审批模式始终返回 no-result；不通过全局修改 CopilotClient.prototype 注入行为。
     ...((input.permissionMode ?? 'allow_all') === 'allow_all'
       ? {
           onPermissionRequest: async (request: PermissionRequest) =>
@@ -1452,7 +1462,7 @@ async function resumeOrCreate(
   try {
     return await c.resumeSession(sessionId, sessionConfig);
   } catch (e) {
-    if (e instanceof Error && SESSION_NOT_FOUND.test(e.message)) {
+    if (isMissingCopilotSession(e)) {
       return c.createSession(sessionConfig);
     }
     try {
