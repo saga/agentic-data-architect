@@ -314,9 +314,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
   const sessionConfig: CreateSessionConfig = {
     model: selectedModel,
     ...(selectedModel === 'auto' && input.autoTier ? { capi: { autoTier: input.autoTier } } : {}),
-    // 默认直接 Allow All，避免本地单用户工作台对每个 read/grep/bash 都重复确认。
-    // 只有上层显式传 permission 时，才启用逐次人工审批。
-    ...((input.permissionMode ?? 'allow_all') === 'allow_all' ? { onPermissionRequest: approveAll } : {}),
+    // Allow All 由 SDK helper 处理；人工审批模式显式返回 no-result，
+    // 让本 Session 的 permission.requested 事件 + pending RPC/UI 完成审批，
+    // 而不是依赖全局修改 CopilotClient.prototype 的副作用。
+    ...((input.permissionMode ?? 'allow_all') === 'allow_all'
+      ? { onPermissionRequest: approveAll }
+      : { onPermissionRequest: async () => ({ kind: 'no-result' as const }) }),
     /**
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
      * 不能像默认行为一样悄悄把请求丢在那里等待；明确取消，让 Agent 得到可处理的失败结果。
