@@ -4,7 +4,7 @@
  * 这里负责 Copilot SDK 生命周期、Session 创建/恢复、自动技能发现、MCP/工具配置、流式事件和取消。
  * Investigation 的业务状态仍由 workflow / investigation 层负责持久化。
  */
-import { CopilotClient, ToolSet, approveAll } from '@github/copilot-sdk';
+import { CopilotClient, ToolSet, type PermissionRequest } from '@github/copilot-sdk';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -335,7 +335,12 @@ export async function askCopilot(input: AskInput): Promise<string> {
     // 让本 Session 的 permission.requested 事件 + pending RPC/UI 完成审批，
     // 而不是依赖全局修改 CopilotClient.prototype 的副作用。
     ...((input.permissionMode ?? 'allow_all') === 'allow_all'
-      ? { onPermissionRequest: approveAll }
+      ? {
+          onPermissionRequest: async (request: PermissionRequest) =>
+            request.managedApprovalRequired === true
+              ? { kind: 'no-result' as const }
+              : { kind: 'approve-once' as const },
+        }
       : { onPermissionRequest: async () => ({ kind: 'no-result' as const }) }),
     /**
      * 用户配置的 MCP 如果要求 OAuth，本工作台暂时没有内置 OAuth 登录流程。
