@@ -47,6 +47,7 @@ ADR 是当前设计的正式依据。代码、Skill、Workflow、UI 和文档发
 | [ADR-036](./036-code-structure-index-duckdb-projection.md) | Code Structure Index 保持 canonical JSON；DuckDB 作为可重建分析 projection 和统一结构查询层 | Accepted |
 | [ADR-037](./037-sql-analysis-capability-boundaries.md) | 区分 SQL 结构索引、SQL lineage 和 live database discovery 的能力边界 | Accepted |
 | [ADR-038](./038-sql-dialect-lineage-confidence-and-coverage.md) | SQL 方言识别、lineage 置信度与解析覆盖率必须可观察；不把解析成功当成完整血缘 | Accepted |
+| [ADR-039](./039-copilot-sdk-session-callbacks-and-lifecycle.md) | Copilot SDK 权限与 MCP OAuth 回调按 Session 显式注入；启动/关闭竞争和 Session 恢复必须保留生命周期及历史语义 | Accepted |
 
 ## 如何使用 ADR
 
