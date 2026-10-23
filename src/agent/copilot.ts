@@ -18,6 +18,7 @@ import type { AskInput } from './ask-input.js';
 // 进程级 CopilotClient。它负责 SDK 生命周期，不保存 Investigation 业务状态。
 let client: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
+let clientLifecycleGeneration = 0;
 
 const SESSION_NOT_FOUND = /session not found|no such session|unknown session|does not exist|has been deleted/i;
 const TURN_TIMEOUT = /^(?:Timeout after \d+ms waiting for session\.idle|等待运行结果超过 \d+ms。)$/;
@@ -48,7 +49,9 @@ function shouldCheckMissionAction(toolName: string): boolean {
 export async function getClient(): Promise<CopilotClient> {
   if (client) return client;
   if (starting) return starting;
-  starting = (async () => {
+
+  const generation = clientLifecycleGeneration;
+  const startPromise = (async () => {
     // Copilot SDK 的运行数据与 Investigation workspace 分开，避免 SDK 自己的日志/状态被当成调查目录。
     const copilotBaseDirectory = path.join(config.dataDir, 'copilot');
 
@@ -63,26 +66,40 @@ export async function getClient(): Promise<CopilotClient> {
       ...(config.githubToken ? { gitHubToken: config.githubToken, useLoggedInUser: false } : { useLoggedInUser: true }),
     });
     await c.start();
+
+    if (generation !== clientLifecycleGeneration) {
+      try {
+        await c.stop();
+      } catch {
+        // Shutdown already invalidated this startup; never publish its client.
+      }
+      throw new Error('Copilot client was stopped while it was starting.');
+    }
+
     client = c;
-    starting = null;
     return c;
-  })().catch((e) => {
-    starting = null;
-    throw e;
-  });
-  return starting;
+  })();
+
+  starting = startPromise;
+  try {
+    return await startPromise;
+  } finally {
+    if (starting === startPromise) starting = null;
+  }
 }
 
 /** 停止 CopilotClient 并清理共享运行时状态，供服务退出和测试 teardown 使用。 */
 export async function stopClient(): Promise<void> {
+  clientLifecycleGeneration += 1;
   starting = null;
-  if (client) {
+  const activeClient = client;
+  client = null;
+  if (activeClient) {
     try {
-      await client.stop();
+      await activeClient.stop();
     } catch (error) {
       console.warn('[copilot] Agent client stop failed during shutdown.', error);
     }
-    client = null;
   }
 
   // 服务退出时不能留下等待中的请求；活动 turn 也必须失效。
