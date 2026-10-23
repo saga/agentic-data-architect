@@ -41,7 +41,6 @@ async function main(): Promise<void> {
     console.error('[process] Uncaught exception.', { origin, error, stack: error.stack });
   });
 
-  await import('./agent/copilot-permission-bridge.js');
   const { createApp } = await import('./server.js');
   const { closeConversationStore, recoverRunningConversationTurns } = await import('./investigation/conversation.js');
   const { getActiveInvestigationTurn, listActiveInvestigationTurns, requestAbort, waitForInvestigationTurnsToFinish } = await import('./workflow/ask.js');
